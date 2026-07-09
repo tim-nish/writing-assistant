@@ -5,10 +5,71 @@ into publishable articles: a **harvest** step gathers source-pointed facts, a
 **draft** pipeline fills a chosen framework, and a **review** workflow checks the
 result. Installable per-repository so it runs *inside* the repo it writes about.
 
-> **Status: skeleton.** This repository is being built story-by-story from its
-> spec. The layout below is in place; skill content, config examples, scripts,
-> and packaging land in later stories. See the full installation and usage guide
-> (Story 6.3) for how to install and run the plugin once packaged.
+## Install
+
+The repo is **its own marketplace** — no Community Marketplace submission, and no
+files are copied into the repo you're writing about. From inside a host repo (a
+fresh clone of the project you want to write about), run:
+
+```
+/plugin marketplace add tim-nish/writing-assistant
+/plugin install writing-assistant@writing-assistant
+```
+
+That makes the `harvest`, `draft-article`, and `review-article` skills available
+in the host repo as `/writing-assistant:<skill>`. To develop against the plugin
+without installing it, see [Development mode](#development-mode-run-skills-before-packaging).
+
+## Configure
+
+Two config files drive the plugin; **your identity lives in config, never in the
+skills**, so the engine is generic (a different user's config produces a different
+author with zero skill edits).
+
+**1. Owner identity — machine-global (per person, not per repo).** Copy the
+example to the resolved path and fill in your details:
+
+```sh
+mkdir -p ~/.config/writing-assistant
+cp config/user-config.example.yaml ~/.config/writing-assistant/user-config.yaml
+# then edit: name, site_url, pointer-block content, canonical/syndication
+# policy, and your target site's `article` frontmatter schema.
+```
+
+Resolution order: `~/.config/writing-assistant/user-config.yaml` first, then an
+optional repo-local `config/user-config.yaml` as a per-key override.
+
+**2. Sources & draft location — per host repo.** In the repo you're writing
+about, create `writing-sources.yaml` (see
+[`config/writing-sources.example.yaml`](config/writing-sources.example.yaml)):
+
+```yaml
+sources:
+  - path: .                      # the host repo itself
+  - path: ../research-notes      # sibling checkout (optional)
+    include: ["notes/**", "specs/**"]
+output:
+  drafts: articles/drafts/       # where drafts + platform variants are written
+```
+
+`harvest` reads **only** the declared `sources` (undeclared repos are never
+read). **`output.drafts` has no default** — the pipeline writes drafts and
+platform variants there; if the key is missing it asks once and offers to write
+your choice back into `writing-sources.yaml`.
+
+## Usage
+
+```
+harvest                                  # standalone source-pointed fact sheet
+draft article <F1-F4> from <sources>     # harvest → interview → fill → variants
+review article <draft>                   # lint → structure → prose → cold read
+```
+
+- Frameworks: `F1` project intro, `F2` engineering lessons, `F3` evaluation
+  methodology, `F4` research survey.
+- The draft pipeline marks every inferred claim with `[VERIFY]` and resolves them
+  in a bounded owner pass; the review workflow emits capped, severity-tagged
+  findings and never auto-edits — you arbitrate.
 
 ## Layout
 
