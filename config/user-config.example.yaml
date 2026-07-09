@@ -1,0 +1,115 @@
+# user-config.example.yaml — Owner identity & site policy (CAP-6).
+#
+# This is the ONLY place the owner's identity lives; skill prompts stay generic.
+# Copy it to your live config and replace every placeholder. The engine reads
+# identity exclusively from here, so a different owner's config yields a
+# different author with zero skill-file edits.
+#
+# Resolution order (see specs/spec-writing-assistant/plugin-layout.md; the
+# resolver itself lands in Story 1.4):
+#   1. ~/.config/writing-assistant/user-config.yaml   # machine-global — identity is per-person, not per-repo
+#   2. <host-repo>/config/user-config.yaml            # optional repo-local override
+# This *.example.yaml ships as a template and is never read at runtime.
+#
+# All values below are deliberately non-real placeholders. Keep real identity
+# (site domain, name) only in your private copy so the shipped repo stays clean
+# for OSS release and the CAP-6 grep guarantee (Story 1.4) holds.
+
+owner:
+  name: "Your Name"
+  # Canonical home for your articles. Consumed by the pointer block and by the
+  # dev.to/Zenn variants (canonical_url). No trailing slash.
+  site_url: "https://example.com"
+  # Display name for the site link in the pointer block: [{site_name}]({site_url}).
+  site_name: "example.com"
+  # Fills "I write about {focus_areas}" in the pointer block (free text).
+  focus_areas: "your-topic, another-topic"
+
+# ---------------------------------------------------------------------------
+# Pointer block (spec §3 invariant): every framework ends with this block.
+# Ported verbatim from specs/spec-article-frameworks/article-frameworks.md §3.
+# The engine renders `template`; {placeholders} resolve from `owner.*` and the
+# fragments in `lines`, or are filled per-draft (related / counterpart). No
+# identity text lives in the skills.
+# ---------------------------------------------------------------------------
+pointer_block:
+  # The rendered template. Leading `---` separates the block from the body.
+  template: |
+    ---
+    *I write about {focus_areas} — more at [{site_name}]({site_url}).*
+    *{related_line}*
+    *{newsletter_line}*
+    {counterpart_line}
+
+  # Newsletter/RSS state drives the third line (spec §3):
+  #   coming-soon -> RSS + follow links ; live -> capture link.
+  newsletter:
+    status: coming-soon            # enum: coming-soon | live
+    rss_url: "https://example.com/rss.xml"
+    follow_url: "https://example.com/follow"
+    capture_url: "https://example.com/subscribe"   # used only when status: live
+
+  # Line fragments the renderer selects between, kept here so wording is
+  # owner-editable without touching skills. {title}/{url} are filled per-draft.
+  lines:
+    related: "Related: [{title}]({url})"
+    newsletter_coming_soon: "New posts via [RSS]({rss_url}) or [follow]({follow_url})."
+    newsletter_live: "Get new posts by email — [subscribe]({capture_url})."
+    ja_counterpart: "日本語版は Zenn にあります: {url}"     # rendered when an EN piece has a JA Zenn counterpart
+    en_counterpart: "English version: [{title}]({url})"    # rendered when a JA piece has an EN counterpart
+
+# ---------------------------------------------------------------------------
+# Target-site `article` frontmatter schema (CAP-6).
+# Field set + order and the mode/language enums are reproduced verbatim from
+# the adopted frameworks (article-frameworks.md). Story 2.1 emits these fields;
+# the lint (Story 5.1) validates a draft against this shape.
+#
+# NOTE: the finer sub-shape of `syndication:` is defined by the site's
+# content-guide.md (external to this repo). Only the fields observable in the
+# adopted specs are reproduced here; extend `syndication` sub-keys when porting
+# that guide, without changing skills.
+# ---------------------------------------------------------------------------
+frontmatter:
+  # Fields emitted on every article, in order.
+  schema:
+    - slug            # kebab-case
+    - title           # claim-shaped, quoted
+    - date            # YYYY-MM-DD
+    - mode            # canonical | external  (set by syndication.policy per language)
+    - language        # en | ja
+    - summary         # <= 240 chars
+    - topics          # [kebab-case, ...]
+    - related         # { projects: [], publications: [], products: [] }
+  enums:
+    mode: [canonical, external]
+    language: [en, ja]
+  # `related` is always an object of these list keys (default each to []).
+  related_keys: [projects, publications, products]
+  # Present on canonical (EN/dev.to) pieces; authority = site content-guide.md.
+  # The policy below is what a skill uses to decide whether to emit it.
+  optional_fields: [syndication]
+
+# ---------------------------------------------------------------------------
+# Canonical vs. syndication policy (AP-6). Structured (not prose) so a skill
+# picks `mode` and platform variants deterministically from config alone.
+# Ported verbatim from article-frameworks.md "Syndication notes".
+# ---------------------------------------------------------------------------
+syndication:
+  # Per-language canonical mode + where the article body actually publishes.
+  policy:
+    en:
+      mode: canonical            # site is canonical
+      variants: [devto]          # full text syndicated to dev.to
+    ja:
+      mode: external             # site holds a mode:external record only
+      variants: [zenn]           # Zenn is canonical via repo-sync
+  variants:
+    devto:
+      # dev.to copy: full text; frontmatter canonical_url -> the site page.
+      # (Add/repoint once the site can host canonical articles.)
+      canonical_url_base: "https://example.com/articles"
+    zenn:
+      # JA canonical via repo-sync; the site gets a <=20-line mode:external
+      # record with the body forbidden (AC-4).
+      external_record_max_lines: 20
+      body_forbidden: true
