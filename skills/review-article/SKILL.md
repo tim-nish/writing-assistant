@@ -103,7 +103,31 @@ tokens**. Fix every lint defect before spending a model pass; a draft with
 ## Pass 2 — Structure
 
 Structural review (cuts, reordering, missing/redundant sections) on a
-Sonnet-class model with repo access, run once per draft version. *(Rubric below.)*
+**Sonnet-class model with repo access**, run **once per draft version**. Open with
+the shared reviewer preamble, then apply this rubric **in order** — the structural
+defects it catches (a deleted section, a reordered argument) would invalidate any
+prose feedback, which is why this pass runs before prose.
+
+Check, in order:
+
+1. **Hook** — do the first 3 sentences state the problem or the result, with
+   zero credentials or throat-clearing? If they warm up instead, flag it.
+2. **One idea** — is there exactly one idea? Two ideas → recommend the split
+   point (and that the second becomes its own article).
+3. **Section relevance** — does every section advance that one idea? Name the
+   sections to cut or merge; a section that does not earn its place is a finding.
+4. **Missing load-bearing content** — is anything the stated audience needs
+   absent (evidence, limits, quickstart — per the framework used)?
+5. **Reader-order** — is the order the reader's (problem → solution → evidence),
+   not the author's chronology? A **misplaced section** (e.g. evidence before the
+   claim it supports) gets a corresponding finding naming where it should move.
+6. **GATE-slot conformance** — do the framework's mandatory GATE slots (the
+   **evidence** slot and the **pointer block**) hold real content, not `{slot}`
+   placeholders or *(prompt)* text?
+
+Emit findings in the standard contract format (severity, location, issue, fix),
+capped at 10, highest-leverage change first. **No rewrites** — name the structural
+change; the owner applies it.
 
 ## Pass 3 — Prose
 
