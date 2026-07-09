@@ -1,0 +1,15 @@
+# BMAD / hand-written separation (SPEC-writing-assistant).
+# BMAD's footprint is confined to exactly these paths; release stripping is a
+# mechanical removal of them with no judgment calls. They are also covered by
+# the owner's machine-global git excludes — committed here so the separation
+# holds on any clone or CI checkout, not just the owner's machine.
+_bmad/
+_bmad-output/
+.claude/skills/bmad-*/
+
+# BMAD spec-authoring working logs must never land under specs/ (which is
+# reserved for canonical hand-written specs only).
+**/.memlog.md
+
+# Local crash / scratch artifacts (e.g. Cygwin/WSL stack dumps).
+*.stackdump
