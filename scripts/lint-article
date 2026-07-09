@@ -1,0 +1,290 @@
+#!/usr/bin/env python3
+"""Zero-token mechanical lint for a draft article (Story 5.1 / SPEC-article-review CAP-1).
+
+This is pass 1 of the fixed review order (lint → structure → prose → cold read).
+It runs BEFORE any model and spends NO LLM tokens — every check is a deterministic
+string/parse/filesystem operation. It reports each defect with `path:line` so the
+owner fixes the cheap-to-detect problems before a single reviewer runs.
+
+Checks (all against the config `article` schema, never a hardcoded site schema):
+
+  1. frontmatter — parses and conforms: every field in `frontmatter.schema` is
+     present, `mode`/`language` are within their config enums, `summary` <= 240.
+  2. title       — <= 70 chars AND carries a claim verb (a bare noun phrase warns).
+  3. pointer     — the owner's `owner.site_url` (from config) appears in the draft;
+     the framework's mandatory pointer block is what carries it.
+  4. headings    — no gap wider than ~250 words between headings.
+  5. links       — relative link targets resolve on disk; `--check-http` also
+     verifies http(s) links (off by default so the lint stays hermetic/offline).
+  6. markers     — no `[VERIFY]` marker remains (draft-pipeline stage-4 exit gate,
+     re-checked here so an unverified claim can never reach review).
+
+Config source: `--config-json FILE` (or `-` for stdin), else `resolve-user-config.py`
+resolves it exactly as every other skill does (machine-global + repo-local override).
+
+Exit status: 0 when a draft is clean, 1 when any draft has a defect (or 2 on a
+usage/config error) — so it drops straight into a shell gate.
+
+Stdlib-only by design (host repos guarantee no venv / no PyYAML): the YAML-subset
+parser is reused from the sibling `resolve-user-config.py`.
+"""
+
+import argparse
+import importlib.util
+import json
+import os
+import re
+import subprocess
+import sys
+
+HERE = os.path.dirname(os.path.realpath(__file__))
+TITLE_MAX = 70
+SUMMARY_MAX = 240           # `article` schema limit (config/user-config.example.yaml)
+HEADING_WORD_GAP = 250      # review-prompts.md: no gap > ~250 words between headings
+
+# Claim-verb heuristic (review-prompts.md: "warn if title is a bare noun phrase").
+# A title carries a claim verb if any token ends in a verb inflection or is one of
+# these common present-tense claim verbs. Deliberately excludes bare `-s` (too many
+# plurals) to avoid flagging noun-heavy-but-verbed titles.
+_PRESENT_VERBS = {
+    "is", "are", "was", "were", "be", "beat", "beats", "kill", "kills", "cut",
+    "cuts", "break", "breaks", "broke", "ship", "ships", "find", "finds",
+    "fix", "fixes", "make", "makes", "made", "turn", "turns", "save", "saves",
+    "cost", "costs", "double", "doubles", "triple", "triples", "halve", "halves",
+    "win", "wins", "won", "fail", "fails", "catch", "catches", "reduce",
+    "reduces", "add", "adds", "drop", "drops", "speed", "speeds", "run", "runs",
+    "ran", "build", "builds", "built", "scale", "scales", "boost", "boosts",
+    "slash", "slashes", "power", "powers", "drive", "drives", "solve", "solves",
+    "handle", "handles", "replace", "replaces", "beats", "why", "how",
+}
+
+
+# --------------------------------------------------------------------------
+# YAML-subset parser reuse (sibling resolve-user-config.py, hyphenated filename)
+# --------------------------------------------------------------------------
+def _load_yaml_parser():
+    spec = importlib.util.spec_from_file_location(
+        "_ruc", os.path.join(HERE, "resolve-user-config.py")
+    )
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod.load_yaml
+
+
+load_yaml = _load_yaml_parser()
+
+
+# --------------------------------------------------------------------------
+# Config
+# --------------------------------------------------------------------------
+def load_config(args):
+    if args.config_json:
+        raw = sys.stdin.read() if args.config_json == "-" else open(
+            args.config_json, encoding="utf-8"
+        ).read()
+        return json.loads(raw)
+    cmd = [sys.executable, os.path.join(HERE, "resolve-user-config.py")]
+    for flag, val in (("--root", args.root), ("--global-config", args.global_config),
+                      ("--repo-config", args.repo_config)):
+        if val:
+            cmd += [flag, val]
+    cmd.append("resolved")
+    r = subprocess.run(cmd, capture_output=True, text=True)
+    if r.returncode != 0:
+        raise SystemExit("error: could not resolve user-config:\n" + r.stderr.strip())
+    return json.loads(r.stdout)
+
+
+# --------------------------------------------------------------------------
+# Draft parsing
+# --------------------------------------------------------------------------
+def split_frontmatter(text):
+    """Return (frontmatter_text, fm_dict_or_None, body_start_line, error).
+
+    body_start_line is 1-indexed (the first body line after the closing `---`).
+    """
+    lines = text.split("\n")
+    if not lines or lines[0].strip() != "---":
+        return None, None, 1, "no frontmatter block (file must open with `---`)"
+    for i in range(1, len(lines)):
+        if lines[i].strip() == "---":
+            fm_text = "\n".join(lines[1:i])
+            try:
+                fm = load_yaml(fm_text)
+            except Exception as exc:  # YamlSubsetError and friends
+                return fm_text, None, i + 2, f"frontmatter does not parse: {exc}"
+            return fm_text, fm or {}, i + 2, None
+    return None, None, 1, "frontmatter block is not closed (missing terminating `---`)"
+
+
+def has_claim_verb(title):
+    for raw in re.findall(r"[A-Za-z][A-Za-z'-]*", title.lower()):
+        if raw.endswith("ed") or raw.endswith("ing") or raw in _PRESENT_VERBS:
+            return True
+    return False
+
+
+# --------------------------------------------------------------------------
+# Checks — each appends (line, code, message) findings
+# --------------------------------------------------------------------------
+def check_frontmatter(fm, cfg, findings):
+    fmcfg = cfg.get("frontmatter", {})
+    schema = fmcfg.get("schema") or []
+    enums = fmcfg.get("enums", {})
+    for field in schema:
+        if field not in fm or fm[field] in (None, ""):
+            findings.append((1, "schema", f"missing required frontmatter field: {field}"))
+    for key in ("mode", "language"):
+        allowed = enums.get(key)
+        if allowed and key in fm and fm[key] not in allowed:
+            findings.append((1, "schema",
+                             f"{key}={fm[key]!r} not in allowed {allowed}"))
+    summary = fm.get("summary")
+    if isinstance(summary, str) and len(summary.strip()) > SUMMARY_MAX:
+        findings.append((1, "schema",
+                         f"summary is {len(summary.strip())} chars (> {SUMMARY_MAX})"))
+
+
+def check_title(fm, findings):
+    title = fm.get("title")
+    if not isinstance(title, str) or not title.strip():
+        return  # missing title already reported by schema check
+    title = title.strip()
+    if len(title) > TITLE_MAX:
+        findings.append((1, "title", f"title is {len(title)} chars (> {TITLE_MAX})"))
+    if not has_claim_verb(title):
+        findings.append((1, "title",
+                         "title is a bare noun phrase — no claim verb (state the claim)"))
+
+
+def check_pointer_block(text, cfg, total_lines, findings):
+    site_url = (cfg.get("owner", {}) or {}).get("site_url")
+    if not site_url:
+        return  # nothing to anchor on; config check is elsewhere
+    if site_url not in text:
+        findings.append((total_lines, "pointer",
+                         f"pointer block missing: owner.site_url ({site_url}) not found"))
+
+
+def check_heading_density(lines, body_start, findings):
+    # Collect (line_no, is_heading) from body; measure words between headings.
+    heading_re = re.compile(r"^\s{0,3}#{1,6}\s")
+    span_start = body_start
+    span_words = 0
+    span_start_after_heading = False
+    for idx in range(body_start - 1, len(lines)):
+        line = lines[idx]
+        lineno = idx + 1
+        if heading_re.match(line):
+            if span_words > HEADING_WORD_GAP:
+                findings.append((span_start, "headings",
+                                 f"{span_words} words with no heading (> {HEADING_WORD_GAP})"))
+            span_start = lineno
+            span_words = 0
+            span_start_after_heading = True
+        else:
+            span_words += len(re.findall(r"\S+", line))
+    if span_words > HEADING_WORD_GAP:
+        findings.append((span_start, "headings",
+                         f"{span_words} words with no heading (> {HEADING_WORD_GAP})"))
+    _ = span_start_after_heading
+
+
+_LINK_RE = re.compile(r"(?<!\!)\[[^\]]*\]\(([^)]+)\)")
+
+
+def check_links(lines, draft_path, check_http, findings):
+    draft_dir = os.path.dirname(os.path.realpath(draft_path))
+    for idx, line in enumerate(lines):
+        for m in _LINK_RE.finditer(line):
+            target = m.group(1).strip()
+            # Strip an optional link title:  (url "title")
+            target = re.split(r"\s+", target, 1)[0]
+            if not target or target.startswith("#") or target.startswith("mailto:"):
+                continue
+            if target.startswith("http://") or target.startswith("https://"):
+                if check_http:
+                    _check_http_link(target, idx + 1, findings)
+                continue
+            # relative / local link — resolve on disk (drop any #fragment)
+            rel = target.split("#", 1)[0]
+            if not rel:
+                continue
+            resolved = os.path.normpath(os.path.join(draft_dir, rel))
+            if not os.path.exists(resolved):
+                findings.append((idx + 1, "links", f"dead link: {target} (target not found)"))
+
+
+def _check_http_link(url, lineno, findings):
+    import urllib.request
+    req = urllib.request.Request(url, method="HEAD",
+                                 headers={"User-Agent": "lint-article/1.0"})
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            if resp.status not in (200, 301, 302):
+                findings.append((lineno, "links", f"dead link: {url} (HTTP {resp.status})"))
+    except Exception as exc:
+        findings.append((lineno, "links", f"dead link: {url} ({exc})"))
+
+
+def check_verify_markers(lines, findings):
+    for idx, line in enumerate(lines):
+        if "[VERIFY" in line:
+            findings.append((idx + 1, "markers", "unresolved [VERIFY] marker"))
+
+
+# --------------------------------------------------------------------------
+# Driver
+# --------------------------------------------------------------------------
+def lint_file(path, cfg, check_http):
+    findings = []
+    with open(path, encoding="utf-8") as fh:
+        text = fh.read()
+    lines = text.split("\n")
+    fm_text, fm, body_start, err = split_frontmatter(text)
+    if err:
+        findings.append((1, "schema", err))
+    if fm is not None:
+        check_frontmatter(fm, cfg, findings)
+        check_title(fm, findings)
+    check_pointer_block(text, cfg, len(lines), findings)
+    check_heading_density(lines, body_start, findings)
+    check_links(lines, path, check_http, findings)
+    check_verify_markers(lines, findings)
+    findings.sort(key=lambda f: (f[0], f[1]))
+    return findings
+
+
+def main(argv=None):
+    p = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    p.add_argument("drafts", nargs="+", help="draft markdown file(s) to lint")
+    p.add_argument("--config-json", help="resolved config as JSON (FILE or - for stdin)")
+    p.add_argument("--root")
+    p.add_argument("--global-config")
+    p.add_argument("--repo-config")
+    p.add_argument("--check-http", action="store_true",
+                   help="also verify http(s) links resolve (network; off by default)")
+    args = p.parse_args(argv)
+
+    cfg = load_config(args)
+    total = 0
+    for path in args.drafts:
+        if not os.path.isfile(path):
+            print(f"{path}:0: [io] no such file", file=sys.stderr)
+            total += 1
+            continue
+        findings = lint_file(path, cfg, args.check_http)
+        for lineno, code, msg in findings:
+            print(f"{path}:{lineno}: [{code}] {msg}")
+        total += len(findings)
+    if total:
+        print(f"\n{total} defect(s) found.", file=sys.stderr)
+        return 1
+    print("lint: clean.", file=sys.stderr)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
