@@ -90,10 +90,13 @@ for token in 'claude --plugin-dir' 'dev-link.sh' 'CLAUDE_SKILL_DIR'; do
   grep -q -- "$token" README.md && ok "README documents: $token" || err "README missing: $token"
 done
 
-# 7. Convention guard on real tracked SKILL.md (vacuous until Epics 3-5 land):
-#    bundled-asset references must use \${CLAUDE_SKILL_DIR} and never couple to
-#    cwd or a hardcoded plugin path.
-skills=$(git ls-files -- 'skills/**/SKILL.md' 2>/dev/null || true)
+# 7. Convention guard on real tracked SKILL.md: a bundled-asset reference must
+#    use a portable Claude Code path variable and never couple to cwd or a
+#    hardcoded path. Skill-local assets (frameworks/, review-prompts.md) use
+#    ${CLAUDE_SKILL_DIR}; shared plugin-root scripts/ use ${CLAUDE_PLUGIN_ROOT}
+#    (or ${CLAUDE_PROJECT_DIR}) — the variable Claude Code substitutes in both
+#    plugin and local-skill modes.
+skills=$(git ls-files -- skills | grep '/SKILL\.md$' || true)
 if [ -z "$skills" ]; then
   ok "convention guard — no SKILL.md files yet (vacuously clean)"
 else
@@ -102,11 +105,12 @@ else
     if grep -Eq '\$\(pwd\)|/workspaces/|\.\./(frameworks|scripts)' "$f"; then
       err "SKILL.md couples to cwd/hardcoded path: $f"; bad=1
     fi
-    if grep -Eq '(frameworks/|review-prompts\.md|scripts/)' "$f" && ! grep -q 'CLAUDE_SKILL_DIR' "$f"; then
-      err "SKILL.md references bundled assets without \${CLAUDE_SKILL_DIR}: $f"; bad=1
+    if grep -Eq '(frameworks/|review-prompts\.md|scripts/)' "$f" \
+       && ! grep -Eq 'CLAUDE_(SKILL_DIR|PLUGIN_ROOT|PROJECT_DIR)' "$f"; then
+      err "SKILL.md references bundled assets without a Claude path variable: $f"; bad=1
     fi
   done
-  [ "$bad" -eq 0 ] && ok "convention guard — SKILL.md files use \${CLAUDE_SKILL_DIR}, no cwd coupling"
+  [ "$bad" -eq 0 ] && ok "convention guard — SKILL.md files use a Claude path variable, no cwd coupling"
 fi
 
 if [ "$fail" -eq 0 ]; then
