@@ -26,9 +26,16 @@ Subcommands (each takes --root; default: the git top-level, else cwd):
                             non-zero otherwise. This is the harvest read
                             boundary — an undeclared sibling repo is rejected
                             even when adjacent on disk.
+
+  files                     Print the concrete allowlist of files harvest may
+                            read: declared sources only, narrowed by `include`
+                            globs, with `.git/` pruned and symlink/.. escapes
+                            excluded. Fail-closed — no/malformed writing-sources
+                            or a non-existent declared path yields nothing.
 """
 
 import argparse
+import glob
 import os
 import re
 import subprocess
@@ -172,6 +179,48 @@ def _contains(parent, child):
     return child.startswith(parent + os.sep)
 
 
+def enumerate_files(sources):
+    """The concrete allowlist of files harvest may read: declared sources only,
+    narrowed by any `include` globs, with `.git/` pruned and every path checked
+    to stay inside its declared root (no symlink/.. escape). Fail-closed —
+    undeclared or non-existent paths contribute nothing.
+    """
+    seen, out = set(), []
+    for s in sources:
+        root = s["path"]
+        if os.path.isfile(root):        # a declared single-file source
+            candidates = [root]
+        elif os.path.isdir(root):
+            if s["include"]:
+                candidates = []
+                for pat in s["include"]:
+                    if ".." in pat.split("/"):
+                        continue        # reject path-escaping include patterns
+                    candidates += glob.glob(os.path.join(root, pat), recursive=True)
+            else:
+                candidates = []
+                for dp, dn, fn in os.walk(root, followlinks=False):
+                    dn[:] = [d for d in dn if d != ".git"]   # never descend VCS metadata
+                    candidates += [os.path.join(dp, name) for name in fn]
+        else:
+            continue                    # non-existent declared path: read nothing
+
+        for full in candidates:
+            if not os.path.isfile(full):
+                continue
+            rel = os.path.relpath(full, root)
+            if rel.split(os.sep)[0] == ".git":
+                continue
+            if not _contains(root, full):
+                continue                # symlink / .. escaping the declared root
+            real = os.path.realpath(full)
+            if real in seen:
+                continue
+            seen.add(real)
+            out.append(full)
+    return sorted(out)
+
+
 def cmd_draft_location(args):
     root = host_root(args.root)
     val = get_output_drafts(read_lines(root))
@@ -213,6 +262,13 @@ def cmd_is_declared(args):
     return 1
 
 
+def cmd_files(args):
+    root = host_root(args.root)
+    for f in enumerate_files(get_sources(read_lines(root), root)):
+        print(f)
+    return 0
+
+
 def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--root", help="host-repo root (default: git top-level, else cwd)")
@@ -223,12 +279,14 @@ def main(argv=None):
     sub.add_parser("sources")
     sp = sub.add_parser("is-declared")
     sp.add_argument("path")
+    sub.add_parser("files")
     args = p.parse_args(argv)
     return {
         "draft-location": cmd_draft_location,
         "set-draft-location": cmd_set_draft_location,
         "sources": cmd_sources,
         "is-declared": cmd_is_declared,
+        "files": cmd_files,
     }[args.cmd](args)
 
 
