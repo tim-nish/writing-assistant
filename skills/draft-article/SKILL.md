@@ -36,14 +36,34 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py start <framework> <sourc
   framework file, and the **raw sources verbatim** plus their classification
   (path / glob / commit-range). Carry this record into the next stage unchanged.
 
-## Stage 1 — harvest (proceed)
+## Stage 1 — harvest and consume its output
 
-Hand the run to the `harvest` skill to produce the source-pointed fact sheet and
-NEEDS-OWNER list. The stage-0 sources are a **selection**, not a scope widener:
-harvest enumerates the writing-sources-declared files
-(`resolve-writing-sources.py files`) and **intersects** this selection with them,
-so a path passed on the command line can only narrow what is read — never add an
-undeclared repo. Reconciliation against `writing-sources.yaml` happens there.
+Hand the run to the `harvest` skill to produce its output document (the
+source-pointed fact sheet **and** the NEEDS-OWNER list). The stage-0 sources are
+a **selection**, not a scope widener: harvest enumerates the
+writing-sources-declared files (`resolve-writing-sources.py files`) and
+**intersects** this selection with them, so a path passed on the command line can
+only narrow what is read — never add an undeclared repo. Reconciliation against
+`writing-sources.yaml` happens there.
+
+Then consume that output into pipeline state:
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py consume <harvest-doc>
+```
+
+This carries harvest's output forward **without re-reading any source** — it only
+reads the harvest document, so there is no second read path that could bypass the
+Story 3.1 scope boundary. It:
+
+- holds **both** the fact sheet and the NEEDS-OWNER list, parsed against harvest's
+  exact contract (a schema change surfaces here rather than being absorbed);
+- preserves every entry's **source pointer verbatim** (`path:line@sha` / sha /
+  URL) for later traceability — no re-normalization;
+- **threads the NEEDS-OWNER list into the gap interview** (`next_stage:
+  interview`, Story 4.3), so unsourced gaps are not dropped;
+- advances on a valid-but-empty result (empty fact sheet and/or NEEDS-OWNER) —
+  the stage contract is total.
 
 ## Later stages
 
