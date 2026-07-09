@@ -128,9 +128,50 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py verify-markers <draft>
 Malformed markers fail; Stage 4 then resolves each `[VERIFY]` until
 `verify-markers --count` reports zero.
 
-## Later stages
+## Stage 4 — owner verification pass
 
-Stage 4 (owner verification) and stage 5 (platform variants) are Stories
-4.5–4.6. Each consumes the prior stage's output; the framework's slots and the
-shared pointer block come from `frameworks/` and user config (never hardcoded
-here).
+A bounded pass where the owner resolves the draft's `[VERIFY]` markers within a
+**≤4 minute** owner-attention budget. Exit criterion: **zero `[VERIFY]` markers remain**.
+Build the owner's worklist:
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py verify <draft>
+```
+
+This lists every well-formed marker with its **line and reason** (a malformed
+marker blocks the pass — Stage 3 must have produced canonical `[VERIFY: <reason>]`
+forms). Resolve **each** marker to exactly one of:
+
+1. a **source pointer** (the claim was verifiable after all — replace the marker
+   with the pointer);
+2. an **owner confirmation** (the owner vouches for the claim — drop the marker);
+3. **deletion** of the claim (it cannot be supported — remove it).
+
+The pass is done when the Stage-3 gate reports zero:
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py verify-markers --count <draft>   # -> 0
+```
+
+**More than one rewrite routes back to a question, never open-ended editing.**
+A section gets **one** rewrite in this pass. If the owner asks for a further
+change, do not keep editing — reroute it into a new, bounded interview question:
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py reroute --section <id> --rewrites <n>
+```
+
+With `n` = rewrites already applied to that section, this returns `decision:
+edit` while a rewrite remains, or `decision: reroute` (with `next_stage:
+interview` and a bounded question) once the budget is spent. Ask the rerouted
+question, capture the bullet answer verbatim as in Stage 2, and apply it — the
+draft never drifts into unbounded editing.
+
+Stage 4 exit: zero unmarked invented claims, zero `[VERIFY]` markers — the draft
+is ready for platform variants.
+
+## Stage 5 — platform-ready variants
+
+Stage 5 (dev.to / Zenn variants per language and canonical policy) is Story 4.6.
+It consumes the verified draft; platform mapping and canonical policy come from
+user config (`syndication.policy`), never hardcoded here.
