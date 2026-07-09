@@ -11,5 +11,10 @@ _bmad-output/
 # reserved for canonical hand-written specs only).
 **/.memlog.md
 
+# Live owner identity — never commit; only the *.example.yaml template ships.
+# Real identity lives in ~/.config/writing-assistant/user-config.yaml or this
+# optional repo-local override (CAP-6).
+config/user-config.yaml
+
 # Local crash / scratch artifacts (e.g. Cygwin/WSL stack dumps).
 *.stackdump
