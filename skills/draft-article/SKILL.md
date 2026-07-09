@@ -65,9 +65,34 @@ Story 3.1 scope boundary. It:
 - advances on a valid-but-empty result (empty fact sheet and/or NEEDS-OWNER) —
   the stage contract is total.
 
+## Stage 2 — bounded gap interview
+
+Select the interview questions from the stage-1 state:
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py interview --framework <F> <state>
+```
+
+This returns **at most 5** questions, and:
+
+- draws them from the fixed question bank, **prioritized by the framework's GATE
+  slots** (not bank order), so the same fact sheet yields a stable interview;
+- puts **confirmed NEEDS-OWNER gaps first**, using the GATE-slot order as the
+  deterministic tie-break when more than five could apply — the ≤5 cap holds even
+  when the NEEDS-OWNER list is longer;
+- **de-duplicates against the fact sheet**: a question whose information harvest
+  already found (matched semantically via a synonym set, not literal text) is
+  suppressed — unless a NEEDS-OWNER gap re-raises it;
+- asks **zero** questions when harvest already covers everything — it never pads
+  to five.
+
+Ask the owner the selected questions; accept **bullet answers** and capture them
+**verbatim**, keyed by question `id`, into the run state. Stage 3 depends on that
+answer text being preserved unaltered for traceability.
+
 ## Later stages
 
-Stage 2 (gap interview), stage 3 (framework fill with `[VERIFY]` markers), stage
-4 (owner verification), and stage 5 (platform variants) are Stories 4.2–4.6. Each
-consumes the prior stage's output; the framework's slots and the shared pointer
-block come from `frameworks/` and user config (never hardcoded here).
+Stage 3 (framework fill with `[VERIFY]` markers), stage 4 (owner verification),
+and stage 5 (platform variants) are Stories 4.4–4.6. Each consumes the prior
+stage's output; the framework's slots and the shared pointer block come from
+`frameworks/` and user config (never hardcoded here).
