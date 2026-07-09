@@ -35,8 +35,49 @@ project specs live only under `specs/`. Release stripping is therefore a
 mechanical removal of those three paths. `scripts/check-skeleton.sh` verifies
 these invariants.
 
-## Development
+## Development mode (run skills before packaging)
 
-During development the plugin content runs as plain local skills
-(`claude --plugin-dir` against this repo, or symlinked into a host repo's
-`.claude/`). Packaging (`plugin.json` + `marketplace.json`) is additive.
+The plugin's skills run as plain local skills **before any `plugin.json` /
+`marketplace.json` exists** — packaging is purely additive, so these commands
+keep working after Stories 6.1/6.2 add the manifests. Neither mode copies files
+into the host repo.
+
+**Mode A — `--plugin-dir` (no linking).** From inside the repo you're writing
+about, point Claude at this checkout:
+
+```sh
+# prints the exact command, with this checkout's absolute path:
+scripts/dev-link.sh plugin-dir-cmd
+# e.g.
+claude --plugin-dir /path/to/writing-assistant
+```
+
+The `harvest`, `draft-article`, and `review-article` skills are then invocable
+in that host repo (as `/writing-assistant:<skill>` once a manifest names the
+plugin, or `/<skill>` in local mode).
+
+**Mode B — symlink into the host's `.claude/skills/`.** Auto-loads with no flag:
+
+```sh
+scripts/dev-link.sh link   ../my-host-repo    # symlink each skills/<name> in
+scripts/dev-link.sh status ../my-host-repo    # show link state
+scripts/dev-link.sh unlink ../my-host-repo    # remove only this plugin's links
+```
+
+`link` creates `../my-host-repo/.claude/skills/<name>` as a **symlink** back to
+this checkout — edits here take effect immediately, and nothing is copied. It
+refuses to clobber a pre-existing non-symlink skill of the same name.
+
+**Asset paths.** Skills reference their own bundled files (`frameworks/`,
+`review-prompts.md`, `scripts/`) via **`${CLAUDE_SKILL_DIR}`**, which resolves to
+the skill's own directory in both modes and regardless of cwd — so a symlinked
+skill still finds its assets. Use **`${CLAUDE_PROJECT_DIR}`** for the host repo
+root.
+
+**In dev mode the normal rules still apply:** identity resolves from
+`~/.config/writing-assistant/user-config.yaml` (not this repo's working tree),
+and harvest reads only the sources declared in the host repo's
+`writing-sources.yaml`. See [`config/README.md`](config/README.md).
+
+Packaging (`plugin.json` + `marketplace.json`) is finalized in Epic 6 once
+dogfooding proves the skills out.
