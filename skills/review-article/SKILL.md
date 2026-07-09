@@ -157,8 +157,30 @@ issue and a one-line fix; the owner edits.
 
 ## Pass 4 — Cold read
 
-A context-free read by a model given only the draft, answering a reader rubric to
-surface missing-context defects. *(Rubric below.)*
+A read by **any cheap model given ONLY the draft** — **no repo access, no project
+context, no interview answers** — so it simulates the actual reader and surfaces
+missing-context defects the repo-grounded passes cannot see. Do **not** paste the
+sources or the prior findings into this pass; that would defeat it. Ask the model
+the reader rubric:
+
+1. In one sentence, what is this article's **claim**?
+2. **Who is it for**?
+3. At which paragraph did you **first get confused**, and why?
+4. What did the author **assume you already knew**?
+5. Would you **read past the first screen**? Why / why not?
+6. What would you **do after** reading it?
+
+**Then compare the cold-read answers to the author's intent** — the article's
+interview answers **#2 (the point/claim)** and **#5 (the intended audience)**:
+
+- A **mismatch on Q1 (claim) or Q2 (audience)** is a **blocker** — the draft does
+  not communicate its own claim or reader, which unexplained repo-internal context
+  typically causes.
+- **Q3 (confusion) and Q4 (assumed knowledge)** hits are **should-fixes**.
+- Q5/Q6 answers inform severity but are not themselves findings.
+
+Emit findings in the standard contract format, capped at 10, highest-leverage
+first, no rewrites. This is the final pass; its findings feed arbitration.
 
 ## Arbitration
 
