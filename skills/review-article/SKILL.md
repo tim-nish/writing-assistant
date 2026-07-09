@@ -131,8 +131,29 @@ change; the owner applies it.
 
 ## Pass 3 — Prose
 
-Prose review (clarity, tone, hedging, jargon) on a Sonnet/Haiku-class model with
-repo access, run once per draft version after structure is settled. *(Rubric below.)*
+Prose review (clarity, tone, hedging, jargon) on a **Sonnet/Haiku-class model with
+repo access**, run **once per draft version** — and **only after the structural
+pass is settled**, because a structural change would invalidate prose feedback.
+Open with the shared reviewer preamble, then apply this rubric:
+
+1. **Unwarranted hedging** — claims softened into mush ("might", "could
+   potentially") where the evidence actually supports the stronger statement;
+   tighten them.
+2. **Unexplained jargon** — terms the stated audience will not know, used without
+   a gloss.
+3. **Overlong sentences** — sentences over ~30 words doing two jobs; name the
+   split point.
+4. **Agent-less decision statements** — passive constructions that hide who acted
+   ("it was decided", "the approach was changed"); restore the actor.
+5. **Buried load-bearing sentences** — paragraphs whose key sentence is buried in
+   the middle; name it so the owner can lead with or emphasize it.
+6. **Non-native phrasing** — for EN drafts by a non-native author, flag
+   unidiomatic phrasing, **but do not sand off voice** — opinions stay
+   opinionated; flatten the phrasing, not the stance.
+
+Emit findings in the standard contract format (severity, location, issue, fix),
+capped at 10, highest-leverage change first. **No rewrites** — name the prose
+issue and a one-line fix; the owner edits.
 
 ## Pass 4 — Cold read
 
