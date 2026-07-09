@@ -184,7 +184,29 @@ first, no rewrites. This is the final pass; its findings feed arbitration.
 
 ## Arbitration
 
-The **owner is the sole arbiter**: findings are accepted or rejected in a single
-top-down round, and **no finding is auto-applied**. A rejected finding is not
-re-litigated in a later pass. A second full cycle is triggered only if a
-blocker-severity finding survives arbitration. *(Details below.)*
+After lint, structure, prose, and cold read have run, collect their findings into
+one list and hand it to the owner. The **owner is the sole arbiter**.
+
+**The single arbitration round.** Walk the findings **top-down, once**:
+
+- **Accept or reject each finding** — no finding is skipped and none is
+  **auto-applied**. Apply an accepted fix yourself, or via **one targeted edit
+  instruction per finding**; never open-ended rewriting.
+- **A rejected finding is rejected.** Do **not** re-litigate it in a later pass or
+  a second cycle — the decision stands.
+- The round is **top-down and single-pass**: the highest-leverage findings (which
+  each pass placed first) are arbitrated before the nits.
+
+**Second-cycle gate.** After the round:
+
+- If a **blocker-severity finding survived** the fixes (the canonical case: a
+  cold-read **claim/audience mismatch** still present after edits), trigger
+  **exactly one additional full cycle** — lint → structure → prose → cold read
+  again on the new draft version. **One** — the workflow never loops unbounded.
+- **Otherwise the draft is publishable.** No surviving blocker ⇒ done.
+
+**Per-pass model routing (recap).** Each pass runs on the tier and grounding in
+the *Model routing* table above: **lint** is the zero-token script; **structure**
+and **prose** run on a **Sonnet-class model with repo access** so claims are
+checked against the sources; **cold read** runs on **any cheap model, context-free
+by design**. The second cycle, if triggered, uses the same routing.
