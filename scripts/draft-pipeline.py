@@ -105,6 +105,13 @@ QUESTION_BUDGET = 5
 VERIFY_CANDIDATE = re.compile(r"\[VERIFY\b[^\]]*\]", re.IGNORECASE)
 VERIFY_CANONICAL = re.compile(r"^\[VERIFY: [^\]]+\]$")
 
+# Stage-4 rewrite budget (Story 4.5). The verification pass allows ONE rewrite
+# per section; a section needing more than that routes back into a new interview
+# question instead of open-ended editing (SPEC-article-draft-pipeline constraint:
+# "A section needing more than one rewrite routes back to a new interview
+# question, never into open-ended editing.").
+REWRITE_BUDGET = 1
+
 
 def cmd_verify_markers(args):
     """Stage 3/4: validate the `[VERIFY: reason]` markers in a draft. Every
@@ -126,6 +133,77 @@ def cmd_verify_markers(args):
         print(f"MALFORMED {c}   (must be exactly `[VERIFY: <reason>]`)")
     print(f"\n{len(well)} well-formed, {len(malformed)} malformed.")
     return 1 if malformed else 0
+
+
+def cmd_verify(args):
+    """Stage 4: build the owner's verification worklist — one entry per
+    well-formed `[VERIFY: reason]` marker, carrying its line and the reason so
+    the owner resolves each to a source, a confirmation, or deletion. The pass
+    is complete (next_stage = variants) only when zero markers remain; any
+    malformed marker blocks the pass (Stage 3 must have produced canonical ones).
+    """
+    text = sys.stdin.read() if args.draft == "-" else open(args.draft, encoding="utf-8").read()
+    worklist = []
+    for lineno, line in enumerate(text.splitlines(), 1):
+        for m in VERIFY_CANDIDATE.finditer(line):
+            frag = m.group(0)
+            if not VERIFY_CANONICAL.match(frag):
+                sys.stderr.write(
+                    f"error: malformed marker at line {lineno}: {frag}   "
+                    "(must be exactly `[VERIFY: <reason>]`; resolve Stage 3 first)\n"
+                )
+                return 1
+            worklist.append({"line": lineno, "marker": frag,
+                             "reason": frag[len("[VERIFY: "):-1]})
+    remaining = len(worklist)
+    out = {
+        "stage": "verify",
+        # The pass exits to Stage 5 only when every marker is resolved.
+        "next_stage": "variants" if remaining == 0 else "verify",
+        "remaining": remaining,
+        "worklist": worklist,
+    }
+    print(json.dumps(out, indent=2))
+    return 0
+
+
+def cmd_reroute(args):
+    """Stage 4 constraint: a section needing more than one rewrite routes back to
+    a NEW interview question rather than open-ended editing. Given the rewrites
+    already applied to a section, decide `edit` (the one allowed pass-time
+    rewrite) or `reroute` — the latter emits a bounded interview question that
+    re-enters Stage 2's answer capture instead of continuing to edit.
+    """
+    if args.rewrites < 0:
+        sys.stderr.write("error: --rewrites must be >= 0\n")
+        return 2
+    if args.rewrites < REWRITE_BUDGET:
+        out = {
+            "stage": "verify",
+            "section": args.section,
+            "rewrites": args.rewrites,
+            "decision": "edit",
+            "remaining_edits": REWRITE_BUDGET - args.rewrites,
+        }
+    else:
+        out = {
+            "stage": "verify",
+            "section": args.section,
+            "rewrites": args.rewrites,
+            "decision": "reroute",
+            "next_stage": "interview",
+            "reason": ("past the one allowed rewrite; route to a new interview "
+                       "question, not open-ended editing"),
+            "question": {
+                "id": f"reroute:{args.section}",
+                "text": (f"Section {args.section!r} still needs change after one "
+                         "rewrite. In a bullet: what exactly should it say, and "
+                         "what source or fact supports that?"),
+                "from_reroute": True,
+            },
+        }
+    print(json.dumps(out, indent=2))
+    return 0
 
 
 def cmd_interview(args):
@@ -262,10 +340,16 @@ def main(argv=None):
     sp = sub.add_parser("verify-markers")
     sp.add_argument("draft", nargs="?", default="-", help="draft file, or - for stdin")
     sp.add_argument("--count", action="store_true", help="print the count of well-formed markers")
+    sp = sub.add_parser("verify")
+    sp.add_argument("draft", nargs="?", default="-", help="filled draft, or - for stdin")
+    sp = sub.add_parser("reroute")
+    sp.add_argument("--rewrites", type=int, required=True,
+                    help="rewrites already applied to this section")
+    sp.add_argument("--section", default="?", help="section identifier (for the routed question)")
     args = p.parse_args(argv)
     return {
         "start": cmd_start, "consume": cmd_consume, "interview": cmd_interview,
-        "verify-markers": cmd_verify_markers,
+        "verify-markers": cmd_verify_markers, "verify": cmd_verify, "reroute": cmd_reroute,
     }[args.cmd](args)
 
 
