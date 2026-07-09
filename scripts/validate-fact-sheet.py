@@ -124,7 +124,14 @@ def main(argv=None):
     sources = rws.get_sources(rws.read_lines(host), host)
     text = sys.stdin.read() if args.factsheet == "-" else open(args.factsheet, encoding="utf-8").read()
 
-    entries = [ln[2:] for ln in text.split("\n") if ln.startswith("- ")]
+    # Only the fact-sheet section: stop at the NEEDS-OWNER list (Story 3.3),
+    # whose entries use a different `CANDIDATE / REASON / TOPIC` schema.
+    fs_lines = []
+    for ln in text.split("\n"):
+        if re.match(r"^#+\s*NEEDS-OWNER\b", ln):
+            break
+        fs_lines.append(ln)
+    entries = [ln[2:] for ln in fs_lines if ln.startswith("- ")]
     rejected = 0
     for raw, reason in (validate_entry(e, host, sources) for e in entries):
         if reason is None:
