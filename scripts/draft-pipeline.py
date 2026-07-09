@@ -63,6 +63,86 @@ def _load(name):
     return mod
 
 
+# Stage-2 gap-interview question bank (from pipeline-stages.md). Each question
+# has a topic aligned with the NEEDS-OWNER topics and a synonym-rich `covers`
+# set: if a fact-sheet claim already contains that content, the question is
+# redundant (semantic de-dup, not literal-string match) and is suppressed unless
+# a NEEDS-OWNER gap re-raises it.
+QUESTION_BANK = {
+    "q1": {"text": "What surprised you most while building this?", "topic": "surprise",
+           "covers": ["surprise", "surprising", "unexpected", "caught us off guard", "to our shock"]},
+    "q2": {"text": "Which single result or number matters most, and why that one?", "topic": "significance",
+           "covers": ["most important result", "headline number", "key result", "matters most",
+                      "flagship metric", "primary metric", "the result that counts"]},
+    "q3": {"text": "What would you warn a reader about before they adopt this?", "topic": "warning",
+           "covers": ["warning", "caveat", "caution", "pitfall", "limitation", "gotcha", "watch out", "do not use"]},
+    "q4": {"text": "What did this decision cost you — what did you give up?", "topic": "tradeoff",
+           "covers": ["tradeoff", "trade-off", "cost us", "gave up", "sacrificed", "at the expense of"]},
+    "q5": {"text": "Who exactly is this article for, and what should they do after reading?", "topic": "audience",
+           "covers": ["intended audience", "written for", "target reader", "this is for", "aimed at", "readers are"]},
+    "q6": {"text": "What opinion in this piece are you willing to defend in comments?", "topic": "opinion",
+           "covers": ["our opinion", "we argue", "we believe", "hot take", "controversial", "we contend"]},
+    "q7": {"text": "What would you do differently if starting over?", "topic": "retrospective",
+           "covers": ["in hindsight", "would do differently", "if starting over", "lessons for next time"]},
+}
+
+# Per-framework question priority, ORDERED by that framework's GATE slots (not
+# question-bank order) — so the same fact sheet yields a stable, framework-
+# tailored interview and the ordering is the deterministic tie-break under the
+# ≤5 cap.
+FRAMEWORK_PRIORITY = {
+    "F1": ["q2", "q4", "q3", "q5", "q1"],   # evidence GATE, decision cost, limits, audience, surprise
+    "F2": ["q1", "q4", "q3", "q2", "q7"],   # what-happened, mechanism/cost, applicability, significance, retro
+    "F3": ["q2", "q3", "q4", "q5", "q6"],   # what-it-caught, cannot-tell, tradeoff, audience, opinion
+    "F4": ["q6", "q2", "q3", "q5", "q1"],   # my-take opinion, significance, warning, audience, surprise
+}
+QUESTION_BUDGET = 5
+
+
+def cmd_interview(args):
+    """Stage 2: select at most 5 gap-interview questions, prioritized by the
+    framework's GATE slots and by confirmed NEEDS-OWNER gaps, de-duped against
+    fact-sheet content. Deterministic; asks zero when nothing is left to ask.
+    """
+    framework = args.framework.upper()
+    if framework not in FRAMEWORK_PRIORITY:
+        sys.stderr.write(f"error: invalid framework {args.framework!r}. Valid: F1, F2, F3, F4.\n")
+        return 2
+    text = sys.stdin.read() if args.state == "-" else open(args.state, encoding="utf-8").read()
+    state = json.loads(text)
+    fs_blob = "\n".join(e.get("claim", "").lower() for e in state.get("fact_sheet", []))
+    gap_topics = {n.get("topic") for n in state.get("needs_owner", [])}
+
+    def covered(qid):
+        return any(kw in fs_blob for kw in QUESTION_BANK[qid]["covers"])
+
+    # Walk the framework's GATE-slot order; keep a question if it is a confirmed
+    # NEEDS-OWNER gap, or a GATE-slot question the fact sheet has not answered.
+    picked = []
+    for qid in FRAMEWORK_PRIORITY[framework]:
+        is_gap = QUESTION_BANK[qid]["topic"] in gap_topics
+        if is_gap or not covered(qid):
+            picked.append((qid, is_gap))
+    # Confirmed gaps first (stable → framework order preserved within each
+    # group), then hard-cap at the ≤5 budget.
+    picked.sort(key=lambda t: 0 if t[1] else 1)
+    picked = picked[:QUESTION_BUDGET]
+
+    questions = [{"id": qid, "text": QUESTION_BANK[qid]["text"],
+                  "topic": QUESTION_BANK[qid]["topic"], "from_gap": is_gap}
+                 for qid, is_gap in picked]
+    out = {
+        "stage": "interview",
+        "next_stage": "fill",
+        "framework": framework,
+        "budget": QUESTION_BUDGET,
+        "asked": len(questions),
+        "questions": questions,
+    }
+    print(json.dumps(out, indent=2))
+    return 0
+
+
 def cmd_consume(args):
     """Stage 1: consume harvest's output document (fact sheet + NEEDS-OWNER) into
     pipeline state — WITHOUT re-reading any source. Source pointers are carried
@@ -147,8 +227,11 @@ def main(argv=None):
     sp.add_argument("sources", nargs="*")
     sp = sub.add_parser("consume")
     sp.add_argument("doc", nargs="?", default="-", help="harvest output document, or - for stdin")
+    sp = sub.add_parser("interview")
+    sp.add_argument("--framework", required=True)
+    sp.add_argument("state", nargs="?", default="-", help="stage-1 pipeline state JSON, or - for stdin")
     args = p.parse_args(argv)
-    return {"start": cmd_start, "consume": cmd_consume}[args.cmd](args)
+    return {"start": cmd_start, "consume": cmd_consume, "interview": cmd_interview}[args.cmd](args)
 
 
 if __name__ == "__main__":
