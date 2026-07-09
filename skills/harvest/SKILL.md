@@ -60,18 +60,39 @@ Read the in-scope files and extract facts. Every entry is one line —
   pointer into an undeclared repo is unsourceable.
 
 A claim you cannot pin to a resolvable SOURCE does **not** go on the fact sheet —
-it routes to the needs-owner list (Story 3.3). Validate the emitted sheet with:
+it routes to the **NEEDS-OWNER** list below. Validate the emitted sheet with:
 
 ```
-python3 ${CLAUDE_PLUGIN_ROOT}/scripts/validate-fact-sheet.py <fact-sheet>
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/validate-fact-sheet.py <harvest-doc>
 ```
 
-Every entry must pass; the rejects are exactly what the needs-owner list captures.
+Every entry must pass; the rejects are exactly what the NEEDS-OWNER list captures.
 
-## Fact-sheet output contract
+## 4. Collect unsourceable candidates into NEEDS-OWNER
+
+A useful candidate you cannot attach a resolvable source to goes to the
+**NEEDS-OWNER** list — never onto the fact sheet unmarked. Each entry is one line
+— `CANDIDATE / REASON / TOPIC`:
+
+- **REASON** — why it could not be sourced (e.g. "no artifact in declared
+  sources", "owner's opinion", "unverified number") — enough context to seed the
+  gap interview.
+- **TOPIC** ∈ {surprise, significance, opinion, warning, other} — the gap-
+  interview categories (Epic 4), so items are groupable into ≤5 questions.
+
+Partition rule: a candidate lands in **exactly one** of the fact sheet or
+NEEDS-OWNER — never both. **Always emit the `# NEEDS-OWNER` heading**, even when
+the list is empty, so the pipeline can rely on its presence. Validate with:
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/validate-needs-owner.py <harvest-doc>
+```
+
+## Harvest output contract
 
 Identical whether invoked standalone or as pipeline stage 1, so the pipeline
-consumes it unchanged:
+consumes it unchanged — the fact sheet followed by the always-present
+NEEDS-OWNER list:
 
 ```markdown
 # Fact sheet: {subject}
@@ -81,7 +102,13 @@ consumes it unchanged:
 - p99 latency 180ms / metrics/latency.csv:7@a1b2c3d / number
 - "we deliberately leak no test scenarios" / README.md:88@a1b2c3d / quote
 - v0.3.0 tagged and released / a1b2c3d / event
+
+# NEEDS-OWNER
+
+- The token-bill win surprised us mid-project / no artifact in declared sources / surprise
+- This matters because reviewers keep asking about leakage / owner's framing / significance
 ```
 
-Every entry is `CLAIM / SOURCE / KIND` with a resolvable, commit-pinned SOURCE;
-no entry appears without one.
+Fact-sheet entries are `CLAIM / SOURCE / KIND` (resolvable, commit-pinned, no
+entry without a source). NEEDS-OWNER entries are `CANDIDATE / REASON / TOPIC`.
+A candidate never appears in both.
