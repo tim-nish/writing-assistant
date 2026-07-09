@@ -44,26 +44,44 @@ or declares only non-existent paths — **stop and read nothing**. Report that n
 sources are declared and point the owner at
 `config/writing-sources.example.yaml`. Never widen scope to compensate.
 
-## 3. Extract facts, each with a source pointer
+## 3. Extract facts, each as `CLAIM / SOURCE / KIND`
 
-Read the in-scope files and extract facts. **Every fact carries a resolvable
-pointer** back to where it came from — `path:line` for a file, a commit SHA, or
-a URL for a declared external source. (The detailed extraction rules and the
-needs-owner handling for unsourceable claims are Stories 3.2 and 3.3.)
+Read the in-scope files and extract facts. Every entry is one line —
+`CLAIM / SOURCE / KIND`:
+
+- **SOURCE** is a resolvable pointer: `path:line@sha` (a file line PINNED to the
+  commit it came from, so it survives later edits that shift line numbers), a
+  commit `sha`, or a URL for a declared external source. A bare `path:line`
+  without `@sha` is not accepted.
+- **KIND** ∈ {result, decision, number, quote, event}.
+- A `quote` entry's CLAIM is the source text **verbatim** — never paraphrased or
+  normalized.
+- Every file pointer resolves inside a **declared** repo (Story 3.1 scope); a
+  pointer into an undeclared repo is unsourceable.
+
+A claim you cannot pin to a resolvable SOURCE does **not** go on the fact sheet —
+it routes to the needs-owner list (Story 3.3). Validate the emitted sheet with:
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/validate-fact-sheet.py <fact-sheet>
+```
+
+Every entry must pass; the rejects are exactly what the needs-owner list captures.
 
 ## Fact-sheet output contract
 
-The output is a Markdown fact sheet — identical whether invoked standalone or as
-pipeline stage 1, so the pipeline can consume it unchanged:
+Identical whether invoked standalone or as pipeline stage 1, so the pipeline
+consumes it unchanged:
 
 ```markdown
 # Fact sheet: {subject}
 
-- {fact} — `path/to/file:line`
-- {fact} — `commit abc1234`
-- {fact} — <https://declared.source/url>
+- Throughput rose 2x on the 10k-scenario suite / bench/results.md:42@a1b2c3d / result
+- Chose JAX over PyTorch for vmap composability / a1b2c3d / decision
+- p99 latency 180ms / metrics/latency.csv:7@a1b2c3d / number
+- "we deliberately leak no test scenarios" / README.md:88@a1b2c3d / quote
+- v0.3.0 tagged and released / a1b2c3d / event
 ```
 
-Every entry is one fact plus exactly one pointer. Entries with no resolvable
-pointer do not belong on the fact sheet (they route to the needs-owner list —
-Story 3.3).
+Every entry is `CLAIM / SOURCE / KIND` with a resolvable, commit-pinned SOURCE;
+no entry appears without one.
