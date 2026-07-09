@@ -1,0 +1,14 @@
+{
+  "name": "writing-assistant",
+  "owner": {
+    "name": "tim-nish"
+  },
+  "description": "Repo-as-marketplace for the writing-assistant plugin: draft and review technical articles from a repository's own material.",
+  "plugins": [
+    {
+      "name": "writing-assistant",
+      "source": "./",
+      "description": "Draft (harvest -> interview -> framework fill -> variants) and review (lint -> structure -> prose -> cold read) technical articles from a repo's own material. Identity lives in config, so the engine is generic."
+    }
+  ]
+}
