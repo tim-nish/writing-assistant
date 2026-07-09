@@ -98,6 +98,35 @@ FRAMEWORK_PRIORITY = {
 }
 QUESTION_BUDGET = 5
 
+# Stage-3 `[VERIFY]` marker contract. The canonical marker is exactly
+# `[VERIFY: <reason>]` — an inferred claim carries one naming WHY it is
+# unverified. Stage 4 (resolve markers) and the lint (5.1) match this exact
+# form, so the format is machine-detectable and non-negotiable.
+VERIFY_CANDIDATE = re.compile(r"\[VERIFY\b[^\]]*\]", re.IGNORECASE)
+VERIFY_CANONICAL = re.compile(r"^\[VERIFY: [^\]]+\]$")
+
+
+def cmd_verify_markers(args):
+    """Stage 3/4: validate the `[VERIFY: reason]` markers in a draft. Every
+    VERIFY-shaped bracket must match the canonical form exactly; anything else
+    (bare `[VERIFY]`, empty reason, wrong case, missing colon) is malformed.
+    --count prints the number of well-formed markers (Stage 4 drives it to zero).
+    """
+    text = sys.stdin.read() if args.draft == "-" else open(args.draft, encoding="utf-8").read()
+    candidates = VERIFY_CANDIDATE.findall(text)
+    well = [c for c in candidates if VERIFY_CANONICAL.match(c)]
+    malformed = [c for c in candidates if not VERIFY_CANONICAL.match(c)]
+
+    if args.count:
+        print(len(well))
+        return 0
+    for c in well:
+        print(f"VALID     {c}")
+    for c in malformed:
+        print(f"MALFORMED {c}   (must be exactly `[VERIFY: <reason>]`)")
+    print(f"\n{len(well)} well-formed, {len(malformed)} malformed.")
+    return 1 if malformed else 0
+
 
 def cmd_interview(args):
     """Stage 2: select at most 5 gap-interview questions, prioritized by the
@@ -230,8 +259,14 @@ def main(argv=None):
     sp = sub.add_parser("interview")
     sp.add_argument("--framework", required=True)
     sp.add_argument("state", nargs="?", default="-", help="stage-1 pipeline state JSON, or - for stdin")
+    sp = sub.add_parser("verify-markers")
+    sp.add_argument("draft", nargs="?", default="-", help="draft file, or - for stdin")
+    sp.add_argument("--count", action="store_true", help="print the count of well-formed markers")
     args = p.parse_args(argv)
-    return {"start": cmd_start, "consume": cmd_consume, "interview": cmd_interview}[args.cmd](args)
+    return {
+        "start": cmd_start, "consume": cmd_consume, "interview": cmd_interview,
+        "verify-markers": cmd_verify_markers,
+    }[args.cmd](args)
 
 
 if __name__ == "__main__":

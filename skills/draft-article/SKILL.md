@@ -90,9 +90,47 @@ Ask the owner the selected questions; accept **bullet answers** and capture them
 **verbatim**, keyed by question `id`, into the run state. Stage 3 depends on that
 answer text being preserved unaltered for traceability.
 
+## Stage 3 — fill the framework (with `[VERIFY]` markers)
+
+Fill the chosen framework's slots from the fact sheet and the interview answers.
+
+**Frontmatter** is generated from the config `article` schema — never hardcoded —
+so a schema change propagates without editing the fill:
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/render-frontmatter.py --language <en|ja>
+```
+
+**Provenance — every claim traces to exactly one of three things:**
+
+1. a **source pointer** carried from the fact sheet (kept verbatim and traceable
+   — `path:line@sha` / sha / URL, not paraphrased away);
+2. an **interview answer**, referenced by its question `id`;
+3. an inline **`[VERIFY: <reason>]`** marker naming why it is unverified.
+
+**Never an unmarked assertion.** A claim that is neither source-pointed nor
+interview-sourced carries a `[VERIFY]` marker. So does a claim only *partially*
+supported by a source but **extended by inference** — the source pointer does not
+wave the inferred part through. When in doubt, mark it.
+
+**Copy facts, don't summarize them into new claims.** Summarizing source content
+can silently introduce an assertion the sources don't make — if a rewrite adds
+anything beyond the source, that addition is inferred and takes a `[VERIFY]`.
+
+The marker format is **exactly `[VERIFY: <reason>]`** (uppercase, colon-space,
+non-empty reason) so Stage 4 and the lint (Story 5.1) can find every one. Check
+the filled draft with:
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py verify-markers <draft>
+```
+
+Malformed markers fail; Stage 4 then resolves each `[VERIFY]` until
+`verify-markers --count` reports zero.
+
 ## Later stages
 
-Stage 3 (framework fill with `[VERIFY]` markers), stage 4 (owner verification),
-and stage 5 (platform variants) are Stories 4.4–4.6. Each consumes the prior
-stage's output; the framework's slots and the shared pointer block come from
-`frameworks/` and user config (never hardcoded here).
+Stage 4 (owner verification) and stage 5 (platform variants) are Stories
+4.5–4.6. Each consumes the prior stage's output; the framework's slots and the
+shared pointer block come from `frameworks/` and user config (never hardcoded
+here).
