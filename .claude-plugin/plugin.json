@@ -1,0 +1,21 @@
+{
+  "name": "writing-assistant",
+  "description": "Draft and review technical articles from a repository's own material: harvest source-pointed facts, fill a category framework with [VERIFY] markers, emit platform variants, and run the fixed lint -> structure -> prose -> cold-read review. Owner identity lives in config, so the engine is generic. Exposes the draft-article, review-article, and harvest skills.",
+  "version": "0.1.0",
+  "author": {
+    "name": "tim-nish"
+  },
+  "homepage": "https://github.com/tim-nish/writing-assistant",
+  "repository": "https://github.com/tim-nish/writing-assistant",
+  "license": "MIT",
+  "keywords": [
+    "writing",
+    "technical-writing",
+    "articles",
+    "draft-article",
+    "review-article",
+    "harvest",
+    "devto",
+    "zenn"
+  ]
+}
