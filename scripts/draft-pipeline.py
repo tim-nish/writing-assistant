@@ -28,6 +28,7 @@ import argparse
 import json
 import os
 import re
+import subprocess
 import sys
 
 FRAMEWORKS = {
@@ -206,6 +207,175 @@ def cmd_reroute(args):
     return 0
 
 
+def _read_frontmatter(text):
+    """Parse the leading `---` article frontmatter into a dict. Stdlib-only
+    line surgery (host repos have no PyYAML): top-level `key: value` pairs, with
+    `[a, b]` lists split and a folded `key: >` block collapsing its indented
+    continuation lines. Returns (fields, body) — body is everything after the
+    closing fence, verbatim (the full article text).
+    """
+    lines = text.splitlines()
+    if not lines or lines[0].strip() != "---":
+        raise SystemExit("error: draft has no `---` frontmatter block")
+    end = None
+    for i in range(1, len(lines)):
+        if lines[i].strip() == "---":
+            end = i
+            break
+    if end is None:
+        raise SystemExit("error: draft frontmatter is not closed with `---`")
+
+    fields = {}
+    i = 1
+    while i < end:
+        line = lines[i]
+        m = re.match(r"^([A-Za-z_][\w-]*):\s*(.*)$", line)
+        if not m:
+            i += 1
+            continue
+        key, val = m.group(1), m.group(2).strip()
+        if val in (">", "|"):                       # folded/literal block
+            block = []
+            i += 1
+            while i < end and (lines[i].startswith((" ", "\t")) or lines[i].strip() == ""):
+                if lines[i].strip():
+                    block.append(lines[i].strip())
+                i += 1
+            fields[key] = " ".join(block)
+            continue
+        if val.startswith("[") and val.endswith("]"):
+            inner = val[1:-1].strip()
+            fields[key] = [t.strip().strip('"\'') for t in inner.split(",") if t.strip()]
+        else:
+            fields[key] = val.strip().strip('"\'')
+        i += 1
+
+    body = "\n".join(lines[end + 1:]).lstrip("\n")
+    return fields, body
+
+
+def _devto_variant(fields, body, variant_cfg):
+    """dev.to (Forem) copy: full text, `canonical_url` placeholder pointing back
+    at the site page. Tags are sanitized to Forem's alphanumeric rule (≤4)."""
+    slug = fields.get("slug", "{slug}")
+    base = variant_cfg.get("canonical_url_base", "{site_url}/articles")
+    tags = []
+    for t in fields.get("topics", []) or []:
+        clean = re.sub(r"[^a-z0-9]", "", t.lower())
+        if clean and clean not in tags:
+            tags.append(clean)
+    fm = [
+        "---",
+        f"title: {fields.get('title', '{title}')}",
+        "published: false",
+        f"description: {fields.get('summary', '')}",
+        f"tags: {', '.join(tags[:4])}",
+        f"canonical_url: {base}/{slug}",   # placeholder — owner confirms/repoints
+        "---",
+    ]
+    return "\n".join(fm) + "\n\n" + body.rstrip() + "\n"
+
+
+def _zenn_variant(fields, body, variant_cfg):
+    """Zenn repo-sync copy: Zenn frontmatter, full body (Zenn is canonical via
+    repo-sync). `emoji` is a placeholder the owner may change."""
+    topics = [re.sub(r"[^a-z0-9]", "", t.lower()) for t in (fields.get("topics", []) or [])]
+    topics = [t for t in topics if t][:5]
+    fm = [
+        "---",
+        f'title: "{fields.get("title", "{title}")}"',
+        'emoji: "📝"',                     # placeholder — owner may change
+        'type: "tech"',
+        "topics: [" + ", ".join(f'"{t}"' for t in topics) + "]",
+        "published: false",
+        "---",
+    ]
+    return "\n".join(fm) + "\n\n" + body.rstrip() + "\n"
+
+
+VARIANT_BUILDERS = {"devto": _devto_variant, "zenn": _zenn_variant}
+
+
+def _resolve_drafts_dir(root):
+    """Resolve output.drafts via resolve-writing-sources.py (Story 1.3). Exit 3
+    there means the location is undeclared — surface that, no silent default."""
+    here = os.path.dirname(os.path.realpath(__file__))
+    cmd = [sys.executable, os.path.join(here, "resolve-writing-sources.py")]
+    if root:
+        cmd += ["--root", root]
+    cmd.append("draft-location")
+    r = subprocess.run(cmd, capture_output=True, text=True)
+    if r.returncode == 3:
+        raise SystemExit("error: output.drafts is undeclared in writing-sources.yaml; "
+                         "declare it (resolve-writing-sources.py set-draft-location) "
+                         "or pass --out")
+    if r.returncode != 0:
+        raise SystemExit(r.stderr.strip() or "error: could not resolve output.drafts")
+    return r.stdout.strip()
+
+
+def cmd_variants(args):
+    """Stage 5: emit platform-ready variants of a VERIFIED draft, per the
+    article's language and the config canonical policy (never a hardcoded
+    mapping). EN/canonical → a dev.to copy (full text, canonical_url
+    placeholder); JA/external → a Zenn repo-sync copy (Zenn frontmatter). Each is
+    written to the resolved output.drafts location (or --out).
+    """
+    text = sys.stdin.read() if args.draft == "-" else open(args.draft, encoding="utf-8").read()
+
+    # Precondition: a verified draft carries zero well-formed [VERIFY] markers.
+    unresolved = [c for c in VERIFY_CANDIDATE.findall(text) if VERIFY_CANONICAL.match(c)]
+    if unresolved:
+        sys.stderr.write(f"error: draft still has {len(unresolved)} unresolved [VERIFY] "
+                         "marker(s); complete Stage 4 before emitting variants\n")
+        return 1
+
+    fields, body = _read_frontmatter(text)
+    lang = fields.get("language")
+    if not lang:
+        sys.stderr.write("error: draft frontmatter has no `language`; cannot pick a variant policy\n")
+        return 1
+
+    # Config drives the mapping: which platforms, and their canonical policy.
+    rf = _load("render-frontmatter.py")
+    cfg_args = argparse.Namespace(config_json=args.config_json, root=args.root,
+                                  global_config=args.global_config, repo_config=args.repo_config)
+    cfg = rf.load_config(cfg_args)
+    policy = cfg.get("syndication", {}).get("policy", {}).get(lang)
+    if not policy:
+        sys.stderr.write(f"error: no syndication.policy for language {lang!r} in config\n")
+        return 1
+    variant_params = cfg.get("syndication", {}).get("variants", {})
+
+    slug = fields.get("slug") or "draft"
+    out_dir = args.out if args.out else _resolve_drafts_dir(args.root)
+
+    emitted = []
+    for name in policy.get("variants", []):
+        builder = VARIANT_BUILDERS.get(name)
+        if not builder:
+            sys.stderr.write(f"error: no builder for configured variant {name!r}\n")
+            return 1
+        content = builder(fields, body, variant_params.get(name, {}))
+        path = os.path.join(out_dir, f"{slug}.{name}.md")
+        if not args.dry_run:
+            os.makedirs(out_dir, exist_ok=True)
+            with open(path, "w", encoding="utf-8") as fh:
+                fh.write(content)
+        emitted.append({"platform": name, "path": path})
+
+    out = {
+        "stage": "variants",
+        "next_stage": "review",           # draft exits into SPEC-article-review
+        "language": lang,
+        "mode": policy.get("mode"),
+        "emitted": emitted,
+        "written": not args.dry_run,
+    }
+    print(json.dumps(out, indent=2))
+    return 0
+
+
 def cmd_interview(args):
     """Stage 2: select at most 5 gap-interview questions, prioritized by the
     framework's GATE slots and by confirmed NEEDS-OWNER gaps, de-duped against
@@ -346,10 +516,19 @@ def main(argv=None):
     sp.add_argument("--rewrites", type=int, required=True,
                     help="rewrites already applied to this section")
     sp.add_argument("--section", default="?", help="section identifier (for the routed question)")
+    sp = sub.add_parser("variants")
+    sp.add_argument("draft", nargs="?", default="-", help="verified draft, or - for stdin")
+    sp.add_argument("--config-json", help="resolved config as JSON (FILE or - for stdin)")
+    sp.add_argument("--root")
+    sp.add_argument("--global-config")
+    sp.add_argument("--repo-config")
+    sp.add_argument("--out", help="output dir (default: resolved output.drafts)")
+    sp.add_argument("--dry-run", action="store_true", help="do not write files; just report")
     args = p.parse_args(argv)
     return {
         "start": cmd_start, "consume": cmd_consume, "interview": cmd_interview,
         "verify-markers": cmd_verify_markers, "verify": cmd_verify, "reroute": cmd_reroute,
+        "variants": cmd_variants,
     }[args.cmd](args)
 
 
