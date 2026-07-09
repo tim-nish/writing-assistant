@@ -172,6 +172,26 @@ is ready for platform variants.
 
 ## Stage 5 — platform-ready variants
 
-Stage 5 (dev.to / Zenn variants per language and canonical policy) is Story 4.6.
-It consumes the verified draft; platform mapping and canonical policy come from
-user config (`syndication.policy`), never hardcoded here.
+Emit platform-ready copies of the **verified** draft. Which platforms, and each
+one's canonical policy, come from user config (`syndication.policy` /
+`syndication.variants`) keyed by the draft's `language` — **never a hardcoded
+mapping**:
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py variants <draft>
+```
+
+- **Precondition:** the draft carries **zero `[VERIFY]` markers** — Stage 4 must
+  be complete. Any unresolved marker aborts the stage.
+- **EN / `mode: canonical`** → a **dev.to** copy: the full article text with a
+  dev.to frontmatter whose `canonical_url` is a placeholder
+  (`{canonical_url_base}/{slug}`) pointing back at the site page.
+- **JA / `mode: external`** → a **Zenn** repo-sync copy: Zenn frontmatter
+  (`emoji`/`type`/`topics`, `published: false`) with the full body — Zenn is
+  canonical via repo-sync.
+- Each variant is written to the **resolved `output.drafts`** location (Story
+  1.3; `--out <dir>` overrides). Files are named `{slug}.{platform}.md`.
+
+Each variant is publishable on its platform with **no manual reformatting beyond
+filling the canonical URL**. The draft then exits this pipeline into
+SPEC-article-review (`next_stage: review`).
