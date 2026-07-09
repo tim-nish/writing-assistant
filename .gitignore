@@ -16,5 +16,14 @@ _bmad-output/
 # optional repo-local override (CAP-6).
 config/user-config.yaml
 
+# Live per-host-repo source declaration — created in host repos on first use;
+# only the *.example.yaml template ships. Ignored defensively in case this repo
+# is ever dogfooded on itself (CAP-2).
+writing-sources.yaml
+
+# Python bytecode cache (helper scripts are stdlib-only Python).
+__pycache__/
+*.pyc
+
 # Local crash / scratch artifacts (e.g. Cygwin/WSL stack dumps).
 *.stackdump

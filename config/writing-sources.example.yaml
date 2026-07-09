@@ -1,0 +1,20 @@
+# writing-sources.example.yaml — per-host-repo source & output declaration (CAP-2).
+#
+# Copy to <host-repo>/writing-sources.yaml (this file lives in the repo you are
+# writing ABOUT, not in the plugin repo). Two things are declared here:
+#
+#   sources: the ONLY paths the harvest step may read. A repo not listed is
+#            never traversed, even if it sits next to this one on disk. Paths
+#            resolve against the host-repo root, not the process working dir.
+#   output:  where the pipeline writes drafts. There is no fixed `drafts/`
+#            default — an absent output key makes the pipeline ask once and
+#            offer to write your answer back into this file.
+
+sources:
+  - path: .                              # the host repo itself (whole tree in scope)
+  - path: ../research-notes              # a sibling checkout on local disk
+    include: ["notes/**", "specs/**"]    # optional: narrow to these globs. Omit = whole path in scope.
+
+output:
+  # Draft + platform-variant output directory, relative to the host-repo root.
+  drafts: articles/drafts/
