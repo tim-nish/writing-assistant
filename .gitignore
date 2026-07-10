@@ -27,3 +27,5 @@ __pycache__/
 
 # Local crash / scratch artifacts (e.g. Cygwin/WSL stack dumps).
 *.stackdump
+.nightwatch/out/
+.nightwatch/*
