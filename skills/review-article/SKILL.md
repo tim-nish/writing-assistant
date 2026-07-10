@@ -125,6 +125,19 @@ claim verb, pointer-block presence, heading density, dead links, and residual
 tokens**. Fix every lint defect before spending a model pass; a draft with
 `[VERIFY]` markers is not review-ready.
 
+**Configuration backstop (CAP-5, Story 7.4).** The lint pass also re-runs the
+stage-0 configuration validation as a zero-token backstop:
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/validate-config.py
+```
+
+Any configuration defect it reports — an unresolved placeholder, a malformed URL,
+or config-caused frontmatter invalidity — is a **publish blocker**: it routes to
+the completion summary's publish-blocker bucket (Story 7.5), **never** into the
+capped prose or structure findings lists. Configuration is not an article-quality
+finding.
+
 ## Pass 2 — Structure
 
 Structural review (cuts, reordering, missing/redundant sections) on a
@@ -237,7 +250,10 @@ the capped (≤10), severity-tagged findings **format** from *Findings contract*
   cold-read **claim/audience mismatch** still present after edits), trigger
   **exactly one additional full cycle** — lint → structure → prose → cold read
   again on the new draft version. **One** — the workflow never loops unbounded.
-- **Otherwise the draft is publishable.** No surviving blocker ⇒ done.
+- **Otherwise the draft is publishable.** No surviving blocker ⇒ done — **unless a
+  configuration blocker is still open**, in which case review does **not** report
+  the draft "publishable" until it is fixed (the zero-token lint pass re-checks
+  configuration as the backstop to Story 7.4).
 
 **Per-pass model routing (recap).** Each pass runs on the tier and grounding in
 the *Model routing* table above: **lint** is the zero-token script; **structure**
@@ -253,8 +269,10 @@ End every review run with the shared
 — **informational notes**, **publish blockers**, **optional cleanup** — then an
 explicit **next step** (e.g. "apply the accepted findings, then re-run review" or
 "the draft is publishable"). A surviving blocker-severity finding, an unresolved
-`[VERIFY]` marker, or an unrendered figure goes under **publish blockers** and
-nowhere else. Because review works on an **article body**, the informational
+`[VERIFY]` marker, an unrendered figure, or a **configuration defect**
+(placeholder, malformed URL, config-caused frontmatter invalidity) goes under
+**publish blockers** and nowhere else — a config defect is never routed into the
+capped prose/structure findings lists. Because review works on an **article body**, the informational
 bucket includes a **reading-time estimate**:
 
 ```
