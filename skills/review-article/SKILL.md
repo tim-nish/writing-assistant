@@ -221,3 +221,19 @@ the *Model routing* table above: **lint** is the zero-token script; **structure*
 and **prose** run on a **Sonnet-class model with repo access** so claims are
 checked against the sources; **cold read** runs on **any cheap model, context-free
 by design**. The second cycle, if triggered, uses the same routing.
+
+## Completion summary
+
+End every review run with the shared
+[**completion summary**](../completion-summary.md)
+(`${CLAUDE_PLUGIN_ROOT}/skills/completion-summary.md`): the three labelled buckets
+— **informational notes**, **publish blockers**, **optional cleanup** — then an
+explicit **next step** (e.g. "apply the accepted findings, then re-run review" or
+"the draft is publishable"). A surviving blocker-severity finding, an unresolved
+`[VERIFY]` marker, or an unrendered figure goes under **publish blockers** and
+nowhere else. Because review works on an **article body**, the informational
+bucket includes a **reading-time estimate**:
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/reading-time.py --language <en|ja> <draft>
+```

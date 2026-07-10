@@ -207,3 +207,20 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py variants <draft>
 Each variant is publishable on its platform with **no manual reformatting beyond
 filling the canonical URL**. The draft then exits this pipeline into
 SPEC-article-review (`next_stage: review`).
+
+## Completion summary
+
+End every run with the shared
+[**completion summary**](../completion-summary.md)
+(`${CLAUDE_PLUGIN_ROOT}/skills/completion-summary.md`): the three labelled buckets
+— **informational notes**, **publish blockers**, **optional cleanup** — followed
+by an explicit **next step** (here: "run review-article on the draft"). Because
+this run produces an **article body**, the informational bucket includes a
+**reading-time estimate**:
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/reading-time.py --language <en|ja> <draft>
+```
+
+Any unresolved `[VERIFY]` marker or unrendered figure is a **publish blocker**,
+listed under that bucket and nowhere else.

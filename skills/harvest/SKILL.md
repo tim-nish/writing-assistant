@@ -112,3 +112,14 @@ NEEDS-OWNER list:
 Fact-sheet entries are `CLAIM / SOURCE / KIND` (resolvable, commit-pinned, no
 entry without a source). NEEDS-OWNER entries are `CANDIDATE / REASON / TOPIC`.
 A candidate never appears in both.
+
+## Completion summary
+
+End every harvest run with the shared
+[**completion summary**](../completion-summary.md)
+(`${CLAUDE_PLUGIN_ROOT}/skills/completion-summary.md`): the three labelled buckets
+— **informational notes** (e.g. fact-sheet and NEEDS-OWNER counts), **publish
+blockers**, **optional cleanup** — then an explicit **next step** ("review the
+fact sheet, or run draft-article to turn it into a draft"). A **standalone harvest
+omits the reading-time estimate**: it produces a fact sheet, not an article body,
+so there is nothing to measure.
