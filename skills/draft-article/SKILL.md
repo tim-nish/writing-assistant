@@ -187,6 +187,24 @@ unasked. Each proposal follows the shared
 A declined proposal leaves the slot **omitted entirely** (Story 8.1), with no
 placeholder residue.
 
+### Sourced visuals (SPEC-article-visuals CAP-3)
+
+A diagram is a claim, so a visual is sourced **exactly like prose** — the same
+provenance rule as the framework fill above, applied **per element**. For every
+element of a proposed visual (each node, edge, row, or label):
+
+1. it is **source-pointed** like a fact-sheet entry (`path:line@sha` / sha / URL),
+   **or**
+2. the proposal carries a **`[VERIFY: <reason>]`** marker naming why that element
+   is unverified.
+
+**Never an unmarked structural claim.** A structural claim the pipeline **cannot
+source** — a relationship, ordering, or grouping with no artifact behind it —
+routes to **NEEDS-OWNER**, the **same partition rule as prose** (Story 3.1 / stage
+1): it never becomes an unmarked diagram element. Auditing any approved diagram
+element must lead to a source pointer, an interview answer, or a `[VERIFY]` marker
+— no exceptions.
+
 ## Stage 4 — owner verification pass
 
 A bounded pass where the owner resolves the draft's `[VERIFY]` markers within a
