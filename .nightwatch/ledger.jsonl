@@ -1,0 +1,13 @@
+{"type":"run","date":"2026-07-10","job":"arch-review","candidates":2,"brief":2,"degraded":1}
+{"type":"finding","date":"2026-07-10","job":"arch-review","id":"AR-244928","kind":"decision","severity":4}
+{"type":"finding","date":"2026-07-10","job":"arch-review","id":"AR-7c1754","kind":"arch","severity":5}
+{"type":"run","date":"2026-07-10","job":"repo-reconcile","findings":1,"degraded":2,"tokens":99754}
+{"type":"finding","id":"RC-615fba","kind":"drift","severity":2,"date":"2026-07-10","job":"repo-reconcile"}
+{"type":"run","date":"2026-07-10","job":"arch-review","findings":2,"degraded":1,"tokens":35446}
+{"type":"finding","id":"AR-244928","kind":"decision","severity":4,"date":"2026-07-10","job":"arch-review"}
+{"type":"finding","id":"AR-7c1754","kind":"arch","severity":5,"date":"2026-07-10","job":"arch-review"}
+{"type":"run","date":"2026-07-10","job":"release-progress","findings":3,"degraded":0,"tokens":48092}
+{"type":"finding","id":"RP-ff0627","kind":"info","severity":5,"date":"2026-07-10","job":"release-progress"}
+{"type":"finding","id":"RP-70609d","kind":"info","severity":3,"date":"2026-07-10","job":"release-progress"}
+{"type":"finding","id":"RP-09c718","kind":"info","severity":3,"date":"2026-07-10","job":"release-progress"}
+{"type":"run","date":"2026-07-10","job":"collect-brief","shown":4,"total":4,"cap":25}

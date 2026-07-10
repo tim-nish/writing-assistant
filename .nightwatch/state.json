@@ -1,0 +1,25 @@
+{
+  "schema": 1,
+  "updated": "2026-07-10",
+  "last_brief_date": "2026-07-10",
+  "jobs": {
+    "repo-reconcile": {
+      "cadence": "nightly",
+      "last_run": "2026-07-10",
+      "runs": 1,
+      "next_due": "2026-07-11"
+    },
+    "arch-review": {
+      "cadence": "weekly",
+      "last_run": "2026-07-10",
+      "runs": 1,
+      "next_due": "2026-07-17"
+    },
+    "release-progress": {
+      "cadence": "nightly",
+      "last_run": "2026-07-10",
+      "runs": 1,
+      "next_due": "2026-07-11"
+    }
+  }
+}
