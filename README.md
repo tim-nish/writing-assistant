@@ -24,7 +24,14 @@ without installing it, see [Development mode](#development-mode-run-skills-befor
 
 Two config files drive the plugin; **your identity lives in config, never in the
 skills**, so the engine is generic (a different user's config produces a different
-author with zero skill edits).
+author with zero skill edits). The split, at a glance:
+
+| | `user-config.yaml` | `writing-sources.yaml` |
+|---|---|---|
+| Answers | **who is writing**, and where it publishes | **what this repo's articles draw from**, and where drafts land |
+| Scope | machine-global (per person, not per repo) | per host repo |
+| Lives at | `~/.config/writing-assistant/` | host repo root |
+| Set up | once per machine | once per repo you write about |
 
 **1. Owner identity — machine-global (per person, not per repo).** Copy the
 example to the resolved path and fill in your details:
@@ -35,6 +42,21 @@ cp config/user-config.example.yaml ~/.config/writing-assistant/user-config.yaml
 # then edit: name, site_url, pointer-block content, canonical/syndication
 # policy, and your target site's `article` frontmatter schema.
 ```
+
+Two of its sections are easy to skip past on first setup, so here is what they
+are *for*:
+
+- **`frontmatter` (the `article` schema)** — the YAML schema your target site
+  expects on every article. The pipeline emits draft frontmatter conforming to
+  it, which is what lets a finished draft drop into your site unchanged and pass
+  its build validation.
+- **`canonical` / syndication policy** — which platform hosts the *canonical*
+  copy per language (e.g. EN: your site canonical, dev.to copy carries a
+  `canonical_url` back to it; JA: Zenn canonical). This drives which platform
+  variants the pipeline emits and how each variant's `canonical_url` is filled.
+
+Values left as example placeholders are reported as configuration errors before
+any drafting starts — fill them once and they never resurface.
 
 Resolution order: `~/.config/writing-assistant/user-config.yaml` first, then an
 optional repo-local `config/user-config.yaml` as a per-key override.

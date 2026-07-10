@@ -3,10 +3,26 @@
 Two config files drive the plugin; both have a shipped `*.example.yaml` template.
 Skills never hard-code identity — they read it from here (CAP-6).
 
-| File | Scope | Home | Resolver |
-|------|-------|------|----------|
-| `user-config.yaml` | owner identity (name, site, pointer block, frontmatter schema, syndication policy) | machine-global, per-person | `scripts/resolve-user-config.py` |
-| `writing-sources.yaml` | per-repo sources + draft output location | per host repo | `scripts/resolve-writing-sources.py` |
+| File | Answers | Scope | Home | Resolver |
+|------|---------|-------|------|----------|
+| `user-config.yaml` | **who is writing**: owner identity (name, site, pointer block, frontmatter schema, syndication policy) | machine-global, per-person | `~/.config/writing-assistant/` | `scripts/resolve-user-config.py` |
+| `writing-sources.yaml` | **what this repo's articles draw from**: declared sources + draft output location | per host repo | host repo root | `scripts/resolve-writing-sources.py` |
+
+## What the syndication / frontmatter sections are for
+
+The two `user-config.yaml` sections that are least obvious on first setup:
+
+- **`frontmatter` (the `article` schema)** — the YAML schema your target site
+  expects on every article. Drafts emit frontmatter conforming to it, so a
+  finished draft drops into your site unchanged and passes build validation.
+- **`canonical` / syndication policy** — which platform hosts the *canonical*
+  copy per language (e.g. EN: site-canonical with a dev.to copy carrying
+  `canonical_url`; JA: Zenn-canonical). This determines which platform variants
+  the pipeline emits and how each variant's `canonical_url` is composed.
+
+Both are validated up front (SPEC-article-draft-pipeline CAP-5): example
+placeholders, malformed URLs, and missing required keys are reported as
+configuration errors before any generation, never as late article findings.
 
 ## User-config resolution order (the single documented order)
 
