@@ -298,6 +298,23 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py variants <draft>
 - Each variant is written to the **resolved `output.drafts`** location (Story
   1.3; `--out <dir>` overrides). Files are named `{slug}.{platform}.md`.
 
+### Visual rendering per platform (SPEC-article-visuals CAP-5)
+
+The two platforms render diagrams differently, so each variant handles a
+Mermaid/figure-spec visual its own way:
+
+- **Zenn variant** — **embeds the Mermaid source directly** (a ` ```mermaid ` code
+  block). Zenn renders it natively, so the diagram appears with **zero manual
+  work**.
+- **dev.to variant** — dev.to does **not** render Mermaid, so the variant carries
+  the **Mermaid/figure-spec inside an HTML comment** (`<!-- … -->`, invisible until
+  rendered) and lists **each unrendered figure as a publish blocker** ("render to
+  image before publishing") in the **completion summary's publish-blocker bucket**
+  (Story 7.5 / CAP-6). The owner renders it to an image before publishing.
+
+A **figure-spec** visual (no Mermaid) is handled the same way per platform: shown
+where the platform can render it, otherwise carried in a comment and blocker-listed.
+
 Each variant is publishable on its platform with **no manual reformatting beyond
 filling the canonical URL**. The draft then exits this pipeline into
 SPEC-article-review (`next_stage: review`).
