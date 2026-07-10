@@ -198,6 +198,15 @@ first, no rewrites. This is the final pass; its findings feed arbitration.
 After lint, structure, prose, and cold read have run, collect their findings into
 one list and hand it to the owner. The **owner is the sole arbiter**.
 
+**Present each finding under the
+[owner-facing proposal contract](../owner-facing-proposal-contract.md):** show
+**where** it sits in the article (the finding's `{location}`), **why** it is
+raised (its one-sentence issue), and accept/reject choices whose labels state
+their **concrete effect on the article** — *accept* → "apply the fix to the
+article", *reject* → "leave the article unchanged" — never a bare accept/reject
+the owner must decode. This is a presentation wrapper only: it **does not change**
+the capped (≤10), severity-tagged findings **format** from *Findings contract*.
+
 **The single arbitration round.** Walk the findings **top-down, once**:
 
 - **Accept or reject each finding** — no finding is skipped and none is
