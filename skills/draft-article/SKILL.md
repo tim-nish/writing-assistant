@@ -205,6 +205,28 @@ routes to **NEEDS-OWNER**, the **same partition rule as prose** (Story 3.1 / sta
 element must lead to a source pointer, an interview answer, or a `[VERIFY]` marker
 — no exceptions.
 
+### Visual fallback ladder (SPEC-article-visuals CAP-4)
+
+When no existing repo visual fits a slot, produce **visual source** — never a bare
+`[Figure: …]` placeholder — following this **strict order**, stopping at the first
+rung that fits:
+
+1. **reuse a repo visual** — an existing diagram/image already in the sources;
+2. **Mermaid** source (Mermaid only; no PlantUML);
+3. **figure spec** — elements, relations, emphasis, and a caption;
+4. a **copy-paste-ready image-generation prompt** derived from the figure spec,
+   including **"no embedded text"** guidance and an **aspect ratio**;
+5. **ASCII** — **simple structures only**.
+
+Prefer a **markdown table over a diagram** whenever the content is comparative
+rather than topological. Every non-reused visual in a draft is therefore one of:
+Mermaid source, a figure spec, an image-generation prompt block, or ASCII —
+**never a bare `[Figure: …]` placeholder**.
+
+**No rendering (NFR9).** This step produces **source only**: it never invokes
+`mermaid-cli`, any image tooling, or an image-generation API — rendering is the
+owner's tooling. The plugin bundles no such tools.
+
 ## Stage 4 — owner verification pass
 
 A bounded pass where the owner resolves the draft's `[VERIFY]` markers within a
