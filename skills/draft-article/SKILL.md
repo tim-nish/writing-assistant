@@ -164,6 +164,29 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py verify-markers <draft>
 Malformed markers fail; Stage 4 then resolves each `[VERIFY]` until
 `verify-markers --count` reports zero.
 
+### Visual proposals (SPEC-article-visuals CAP-2)
+
+As the framework fills, reach its **declared visual slot** (Story 8.1;
+`frameworks/CONVENTIONS.md`) — and identify **up to 2 opportunistic extra
+visuals** where one would materially help. **Propose** each; never insert one
+unasked. Each proposal follows the shared
+[**owner-facing proposal contract**](../owner-facing-proposal-contract.md)
+(`${CLAUDE_PLUGIN_ROOT}/skills/owner-facing-proposal-contract.md`):
+
+- **where** it lands in the outline (the framework slot, or the section an
+  opportunistic visual would sit in);
+- **why** it is proposed (the rationale);
+- a **preview** — the actual **Mermaid source**, **table**, or **figure spec** the
+  owner is approving;
+- **choices whose labels state their concrete effect** — *approve* → "insert this
+  visual", *modify* → "revise the source, then insert", *decline* → "omit the
+  visual; the slot leaves no `[Figure: …]` residue".
+
+**Insert nothing without explicit owner approval.** Opportunistic suggestions are
+**capped at 2 per draft** — the declared slot plus at most two extras, never more.
+A declined proposal leaves the slot **omitted entirely** (Story 8.1), with no
+placeholder residue.
+
 ## Stage 4 — owner verification pass
 
 A bounded pass where the owner resolves the draft's `[VERIFY]` markers within a
