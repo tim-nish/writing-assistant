@@ -35,7 +35,21 @@ skill references that one convention rather than restating its own wording.
 
 ## Stage 0 — start the run
 
-Validate the framework and record the run with:
+**Configuration validation (CAP-5) runs first — before any generation.** Validate
+the resolved configuration:
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/validate-config.py
+```
+
+It **halts** on any unresolved example placeholder, malformed URL (e.g. a
+double-slash `canonical_url`), or missing required key, printing a
+**per-key report** naming the file (`user-config.yaml` / `writing-sources.yaml`)
+and the fix — before any generation work. A clean, fully resolved config passes **silently**,
+so no configuration finding appears anywhere later in the run. Relay any report
+and stop.
+
+Then validate the framework and record the run with:
 
 ```
 python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py start <framework> <sources...>
