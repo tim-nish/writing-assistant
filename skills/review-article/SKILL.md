@@ -20,6 +20,17 @@ review article <draft>
 - **draft** — a path to a framework-complete draft (the unit of review is a
   filled draft, never an outline or idea).
 
+## Owner-facing proposals
+
+Arbitration hands each finding to the owner to accept or reject; that
+presentation follows the shared
+[**owner-facing proposal contract**](../owner-facing-proposal-contract.md)
+(`${CLAUDE_PLUGIN_ROOT}/skills/owner-facing-proposal-contract.md`): **where** the
+finding sits in the article, **why** it is raised, and accept/reject **choices
+whose labels state their concrete effect** on the article — never a shorthand
+label the owner must decode. This skill references that one convention rather than
+defining its own wording.
+
 The design goal is **maximum defect yield per pass** at a fixed, small cost: the
 mechanical checks cost zero tokens, each LLM pass runs **once per draft version**
 on a cheap-tier model, and the owner arbitrates all findings in a single round.
