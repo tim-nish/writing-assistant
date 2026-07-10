@@ -35,6 +35,20 @@ The design goal is **maximum defect yield per pass** at a fixed, small cost: the
 mechanical checks cost zero tokens, each LLM pass runs **once per draft version**
 on a cheap-tier model, and the owner arbitrates all findings in a single round.
 
+## Stage 0 — configuration validation
+
+Before any review pass, validate the resolved configuration (CAP-5):
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/validate-config.py
+```
+
+It **halts** on any unresolved placeholder, malformed URL (e.g. a double-slash
+`canonical_url`), or missing required key with a **per-key report naming the file**
+(`user-config.yaml` / `writing-sources.yaml`) and the fix — so a configuration
+defect is caught up front, before any review work, never surfaced as a late
+article-quality finding. A clean config passes **silently**.
+
 ## Fixed pass order
 
 Run the passes in this exact order — **lint → structure → prose → cold read** —
