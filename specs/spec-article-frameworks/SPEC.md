@@ -35,6 +35,8 @@ A pain to solve: the owner writes self-branding technical articles for dev.to (E
 - Templates are plain markdown files in the repo, usable by hand or by an agent; this spec introduces no runtime tooling (automation belongs to SPEC-article-draft-pipeline).
 - Language-neutral: the same skeleton serves EN articles (site-canonical, syndicated to dev.to) and JA articles (Zenn-canonical, indexed as `mode: external`) per AP-6/AP-11.
 - Category set is fixed to the four above; a category outside spec §9's sanctioned genres (e.g. generic tutorials) must not get a framework.
+- **Length is an outcome, not a target** (added 2026-07-10, `q_a/a1.md` Q2): frameworks bound structure — every slot filled, no slot padded — and never define or optimize toward a word count. Platform hard limits, where they exist, are validation (publish blockers), not optimization targets.
+- **Visual slots** (added 2026-07-10): each framework's expected visuals — F1 one overview diagram, F2 optional before/after or timeline, F3 one comparison table (required), F4 one landscape table or concept map — are defined by SPEC-article-visuals CAP-1; a declined slot is omitted entirely, never left as a placeholder.
 
 ## Non-goals
 

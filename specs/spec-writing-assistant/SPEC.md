@@ -5,8 +5,12 @@ companions:
   - ../spec-article-frameworks/SPEC.md
   - ../spec-article-draft-pipeline/SPEC.md
   - ../spec-article-review/SPEC.md
+  - ../spec-article-visuals/SPEC.md      # accepted 2026-07-10 (q_a/a1.md)
 sources:
   - ../../../website/q_a/3/question.md  # external: website repo (sibling checkout), traceability only
+  - ../../q_a/q1.md                     # dogfooding Q&A round 1, traceability only
+  - ../../q_a/a1.md                     # dogfooding Q&A round 1, traceability only
+  - ../../docs/dogfood-findings.md      # dogfood evidence behind the 2026-07-10 amendments
 ---
 
 > **Canonical contract.** This SPEC and the files in `companions:` are the complete, preservation-validated contract for what to build, test, and validate. Source documents listed in frontmatter are for traceability only — consult them only if you need narrative rationale or prose color this contract intentionally omits.
@@ -48,6 +52,7 @@ An opportunity to capture plus a vision to realize: the article specs already pr
 - The repository is BMAD-managed from day one (specs + epics + stories), since the owner implements via BMAD.
 - BMAD artifacts and hand-written content stay strictly separated: BMAD's footprint is exactly `_bmad/`, `_bmad-output/`, and `.claude/skills/bmad-*`; project specs live only under `specs/`. Release stripping is then a mechanical removal of those three paths with no judgment calls — nothing hand-written may ever land in a BMAD directory, and no BMAD output may land in `specs/`.
 - Dogfooding gate: OSS release decisions wait until the plugin has produced real published articles for research-notes/QuantScenarioBench; releasing is a separate later decision, not part of this build. If working-note history must not ship, release happens via a fresh public repo (or squashed export), keeping this BMAD-managed repo private.
+- **Owner-facing proposal contract** (engine-wide; added 2026-07-10 from dogfood findings): every prompt that asks the owner to approve, modify, or decline something — gap-interview questions, owner-verification items, review-arbitration findings, visual proposals, and any future proposal surface — must show (a) **where** the item lands in the artifact (outline/section context, with a short preview of the current content when one exists), (b) **why** it is being asked, and (c) choices whose labels state their **concrete effect on the artifact** — never shorthand labels that require inferring the generation logic. A first-time user must be able to answer from repository knowledge alone, without already understanding the generated draft. Stage specs reference this contract; they do not restate it.
 
 ## Non-goals
 
@@ -65,6 +70,13 @@ An opportunity to capture plus a vision to realize: the article specs already pr
 
 - Claude Code's plugin mechanism (`.claude-plugin` layout, repo-as-marketplace) is the distribution vehicle; during development the same content runs as plain local skills/commands (`claude --plugin-dir`, or symlinked into a host repo's `.claude/`), so packaging is additive and no submodule/`npx` bootstrap fallback is anticipated.
 - Cross-repo harvest reads sibling checkouts on local disk (paths in `writing-sources.yaml`); no GitHub API scraping is needed in v1.
+
+## Deferred specs (trigger-gated, not part of the current build)
+
+Written 2026-07-10 (`q_a/a1.md`) so the build decisions are pre-made; each fires mechanically when its frontmatter `build-trigger` is met, with `docs/dogfood-findings.md` as the tripwire. They are deliberately **not** companions: companions are the current build contract.
+
+- [`../spec-article-restructure/SPEC.md`](../spec-article-restructure/SPEC.md) — intent-changing re-outline + fact-preserving re-fill. Trigger: ≥3 logged runs with whole-section post-review manual edits.
+- [`../spec-article-index/SPEC.md`](../spec-article-index/SPEC.md) — machine-global metadata index (pointers + one-line claims, never bodies). Trigger: 5 published pipeline articles, or first observed self-repetition.
 
 ## Open Questions
 

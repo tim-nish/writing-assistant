@@ -21,7 +21,7 @@ writing-assistant/
   config/
     user-config.example.yaml # CAP-6: identity — name, site URL, pointer block, canonical policy, frontmatter schema
     writing-sources.example.yaml
-  specs/                     # canonical home for implementation specs: this spec + the vendored article specs
+  specs/                     # canonical home for implementation specs: this spec, the vendored article specs, spec-article-visuals (accepted 2026-07-10), and the deferred specs (spec-article-restructure, spec-article-index — trigger-gated, see their frontmatter)
   _bmad/                     # BMAD install (installer-managed; stripped at release via bmad-clean)
   _bmad-output/              # BMAD planning/implementation artifacts — epics, stories (stripped at release)
   README.md

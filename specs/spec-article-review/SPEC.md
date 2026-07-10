@@ -5,9 +5,12 @@ companions:
 sources:
   - ../../../website/q_a/2/question.md  # external: website repo (sibling checkout), traceability only
   - ../../../website/q_a/2/answer.md    # external: website repo (sibling checkout), traceability only
+  - ../../q_a/a1.md                     # dogfooding Q&A round 1, traceability only
+  - ../../docs/dogfood-findings.md      # dogfood evidence behind the 2026-07-10 amendments
 ---
 
 > **Vendored copy.** Adopted verbatim from the website repo (`website/_bmad-output/specs/spec-article-review/`, 2026-07-09) per SPEC-writing-assistant; this copy is now the canonical version for this project. Repo-internal references (`q_a/…`) refer to the website repo.
+> **Amended 2026-07-10** per accepted dogfood findings (`docs/dogfood-findings.md`, `q_a/a1.md`): arbitration prompts follow SPEC-writing-assistant's owner-facing proposal contract; configuration defects are separated from article-quality findings and gate the "publishable" verdict.
 
 > **Canonical contract.** This SPEC and the files in `companions:` are the complete, preservation-validated contract for what to build, test, and validate. Source documents listed in frontmatter are for traceability only — consult them only if you need narrative rationale or prose color this contract intentionally omits.
 
@@ -38,7 +41,8 @@ A pain to solve: the owner wants article review that maximizes ROI while keeping
 - Each LLM pass runs exactly once per draft version; a second full cycle only if a blocker-severity finding survives the owner's arbitration round.
 - Findings format: location + severity (blocker/should/nit) + issue + suggested fix, capped at 10 per pass; praise and summary forbidden; each pass names its single highest-leverage change first.
 - Review passes use cheap-tier models (Sonnet class; Haiku class for the mechanical end) and run grounded in the repo (Claude Code) so factual claims can be checked against sources. Drafting-model choice is SPEC-article-draft-pipeline's concern.
-- The owner is the arbiter: findings are accepted/rejected in one round; no auto-applied edits.
+- The owner is the arbiter: findings are accepted/rejected in one round; no auto-applied edits. Arbitration presentation obeys SPEC-writing-assistant's **owner-facing proposal contract**: each finding shows where it sits in the article, why it is raised, and accept/reject choices stating their concrete effect on the article.
+- **Configuration defects are not article findings** (added 2026-07-10): unresolved config placeholders, malformed URLs, and schema-invalid frontmatter caused by configuration route to the completion summary's publish-blocker bucket (SPEC-article-draft-pipeline CAP-6), not into the capped prose/structure findings lists — and review never reports a draft "publishable" while a configuration blocker is open. Up-front detection is SPEC-article-draft-pipeline CAP-5's contract; review's lint pass (CAP-1) is the backstop that re-checks it.
 
 ## Non-goals
 
