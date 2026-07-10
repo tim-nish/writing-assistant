@@ -21,6 +21,18 @@ draft article <framework> from <sources>
 - **sources** — any mix of paths, globs (`src/**/*.py`), and commit ranges
   (`HEAD~20..HEAD`).
 
+## Owner-facing proposals
+
+Every point in this pipeline where the owner approves, modifies, or declines
+something — the **Stage 2** gap interview and the **Stage 4** verification pass —
+follows the shared
+[**owner-facing proposal contract**](../owner-facing-proposal-contract.md)
+(`${CLAUDE_PLUGIN_ROOT}/skills/owner-facing-proposal-contract.md`): show **where**
+the item lands (outline/section context, with a preview of current content when
+one exists), **why** it is asked, and **choices whose labels state their concrete
+effect** on the article — never a shorthand label the owner must decode. This
+skill references that one convention rather than restating its own wording.
+
 ## Stage 0 — start the run
 
 Validate the framework and record the run with:
