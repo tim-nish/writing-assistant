@@ -11,6 +11,15 @@ Slot syntax, the config-bound frontmatter, and the shared pointer block are
 defined once in [`CONVENTIONS.md`](CONVENTIONS.md) — F3 reuses them and does not
 re-implement them. Section order below is load-bearing.
 
+## Visual slot (SPEC-article-visuals CAP-1)
+
+**F3 declares one comparison table — required** — the results table in the
+*What it caught* GATE is where the methodology's evidence lands (tables are
+preferred over diagrams for comparative content). It is **proposed, not
+auto-inserted** (Story 8.2). If the owner **declines** the visual proposal, the
+slot is **omitted entirely** — no `[Figure: …]` or placeholder residue is left in
+the draft.
+
 ## Frontmatter
 
 Config-bound `article` frontmatter (rendered per language from user config; see

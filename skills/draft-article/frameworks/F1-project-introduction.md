@@ -11,6 +11,13 @@ defined once in [`CONVENTIONS.md`](CONVENTIONS.md) — F1 reuses them and does n
 re-implement them. Section order below is load-bearing: fill every slot and the
 result is structurally complete with nothing to reorganize.
 
+## Visual slot (SPEC-article-visuals CAP-1)
+
+**F1 declares one overview diagram** — a structural picture of what the project is
+and does, placed near *What I built*. It is **proposed, not auto-inserted** (Story
+8.2). If the owner **declines** it, the slot is **omitted entirely** — no
+`[Figure: …]` or placeholder residue is left in the draft.
+
 ## Frontmatter
 
 Config-bound `article` frontmatter (rendered per language from user config —
