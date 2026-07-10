@@ -75,3 +75,21 @@ The block is **state-dependent and conditional**, not a single static line:
 If a required identity value is missing from config, the renderer emits a
 `NOT PUBLISHABLE` GATE marker instead of a silently blank block — so the pointer
 GATE, too, is unambiguous by inspection.
+
+## Visual slots (SPEC-article-visuals CAP-1)
+
+Each framework declares its **expected visual(s)** as a slot, so a structurally
+important visual has a defined place:
+
+| Framework | Visual slot |
+|---|---|
+| F1 | one **overview diagram** |
+| F2 | **optional** before/after or timeline |
+| F3 | one **comparison table** (**required**) |
+| F4 | one **landscape table or concept map** |
+
+A visual slot is **proposed, not auto-filled** (Story 8.2): the pipeline offers it
+under the owner-facing proposal contract, and the owner approves, modifies, or
+declines. A **declined slot is omitted entirely** — the draft contains **no
+`[Figure: …]` or placeholder residue** where a declined visual would have gone. A
+slot is not a mandatory GATE: declining it leaves a structurally complete draft.

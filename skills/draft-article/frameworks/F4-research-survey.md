@@ -13,6 +13,14 @@ re-implement them. Scope, the map, My take, the reading list, and the pointer
 block each appear **exactly once**; the branch unit between the map and My take
 repeats per taxonomy branch. Section order is load-bearing.
 
+## Visual slot (SPEC-article-visuals CAP-1)
+
+**F4 declares one landscape table or concept map** — the field map in *The map*
+section (a table when the landscape is comparative, a concept map when it is
+topological). It is **proposed, not auto-inserted** (Story 8.2). If the owner
+**declines** it, the slot is **omitted entirely** — no `[Figure: …]` or
+placeholder residue is left in the draft.
+
 ## Frontmatter
 
 Config-bound `article` frontmatter (rendered per language from user config; see

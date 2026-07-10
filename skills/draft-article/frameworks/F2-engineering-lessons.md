@@ -11,6 +11,13 @@ defined once in [`CONVENTIONS.md`](CONVENTIONS.md) — F2 reuses them and does n
 re-implement them. `Context` and the pointer block appear **exactly once**; the
 lesson unit between them repeats. Section order is load-bearing.
 
+## Visual slot (SPEC-article-visuals CAP-1)
+
+**F2 declares one optional before/after or timeline visual** — showing the change
+over time that the lesson turns on. It is **optional** and **proposed, not
+auto-inserted** (Story 8.2). If the owner **declines** it, the slot is
+**omitted entirely** — no `[Figure: …]` or placeholder residue is left in the draft.
+
 ## Frontmatter
 
 Config-bound `article` frontmatter (rendered per language from user config; see
