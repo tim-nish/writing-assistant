@@ -114,6 +114,86 @@ VERIFY_CANONICAL = re.compile(r"^\[VERIFY: [^\]]+\]$")
 REWRITE_BUDGET = 1
 
 
+# Stage-3 sidecar provenance map (Story 11.1; `docs/harness-architecture.md` D1).
+# Every draft sentence belongs to exactly one provenance class:
+#   sourced   — asserts something traceable to ONE fact-sheet entry or interview
+#               answer; carries that pointer;
+#   derived   — a synthesis over >=2 named sourced claims (compress / combine /
+#               restate); inherits ALL their pointers;
+#   narration — asserts nothing checkable (falsifiability test, D2); no pointer;
+#   verify    — an inferred claim beyond sources/derivation; carries an inline
+#               [VERIFY] marker in the draft body (no pointer in the map).
+# The map lives in the run workspace, never inline, so the draft body stays clean
+# for variants and review. This command parses and STRUCTURALLY validates the map
+# (pointer-count rules per class); the independent `verify-provenance` check
+# (Story 11.2) adds the semantic layer (falsifiability + the six forbidden
+# derivation categories).
+PROV_CLASSES = ("sourced", "derived", "narration", "verify")
+PROV_LINE = re.compile(
+    r"^(?P<pos>\S+):\s*(?P<cls>sourced|derived|narration|verify)"
+    r"(?:\s*<-\s*(?P<ptrs>.+?))?\s*$"
+)
+
+
+def parse_provenance_map(text):
+    """Parse the sidecar map text into [(pos, cls, [pointers])], raising
+    ValueError on a malformed line or a class name outside the closed set."""
+    entries = []
+    for lineno, raw in enumerate(text.splitlines(), 1):
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        m = PROV_LINE.match(line)
+        if not m:
+            raise ValueError(f"line {lineno}: malformed provenance entry: {raw!r}")
+        ptrs = [p.strip() for p in (m.group("ptrs") or "").split(",") if p.strip()]
+        entries.append((m.group("pos"), m.group("cls"), ptrs))
+    return entries
+
+
+def cmd_provenance(args):
+    """Stage 3: parse and structurally validate the sidecar provenance map
+    (Story 11.1). Enforces the per-class pointer contract:
+
+      - sourced   → exactly-traceable: >=1 pointer;
+      - derived   → synthesis over >=2 named sourced claims: >=2 pointers;
+      - narration → asserts nothing: 0 pointers;
+      - verify    → inferred, marked inline in the draft: 0 pointers here.
+
+    --count prints the per-class tallies (dimension-4 quote-density reads these).
+    A structural violation exits non-zero; the semantic checks live in
+    `verify-provenance` (Story 11.2).
+    """
+    text = sys.stdin.read() if args.map == "-" else open(args.map, encoding="utf-8").read()
+    try:
+        entries = parse_provenance_map(text)
+    except ValueError as e:
+        sys.stderr.write(f"error: {e}\n")
+        return 1
+
+    tally = {c: 0 for c in PROV_CLASSES}
+    problems = []
+    for pos, cls, ptrs in entries:
+        tally[cls] += 1
+        if cls == "sourced" and len(ptrs) < 1:
+            problems.append(f"{pos}: sourced claim carries no pointer")
+        elif cls == "derived" and len(ptrs) < 2:
+            problems.append(f"{pos}: derived claim must inherit >=2 pointers (got {len(ptrs)})")
+        elif cls in ("narration", "verify") and ptrs:
+            problems.append(f"{pos}: {cls} must carry no pointer (got {len(ptrs)})")
+
+    if args.count:
+        print(json.dumps(tally))
+        return 0
+    if problems:
+        sys.stderr.write("provenance map INVALID:\n")
+        for p in problems:
+            sys.stderr.write(f"  {p}\n")
+        return 1
+    print(f"provenance map OK: {json.dumps(tally)}")
+    return 0
+
+
 def cmd_verify_markers(args):
     """Stage 3/4: validate the `[VERIFY: reason]` markers in a draft. Every
     VERIFY-shaped bracket must match the canonical form exactly; anything else
@@ -685,6 +765,9 @@ def main(argv=None):
     sp = sub.add_parser("journal")
     sp.add_argument("--interview", required=True, help="the `interview` output JSON (carries triage), or - for stdin")
     sp.add_argument("--answers", help="recorded answer records (JSON list), or - for stdin")
+    sp = sub.add_parser("provenance")
+    sp.add_argument("--map", default="-", help="the sidecar provenance map, or - for stdin")
+    sp.add_argument("--count", action="store_true", help="print per-class tallies as JSON")
     sp = sub.add_parser("verify-markers")
     sp.add_argument("draft", nargs="?", default="-", help="draft file, or - for stdin")
     sp.add_argument("--count", action="store_true", help="print the count of well-formed markers")
@@ -705,7 +788,7 @@ def main(argv=None):
     args = p.parse_args(argv)
     return {
         "start": cmd_start, "consume": cmd_consume, "interview": cmd_interview,
-        "answer": cmd_answer, "journal": cmd_journal,
+        "answer": cmd_answer, "journal": cmd_journal, "provenance": cmd_provenance,
         "verify-markers": cmd_verify_markers, "verify": cmd_verify, "reroute": cmd_reroute,
         "variants": cmd_variants,
     }[args.cmd](args)
