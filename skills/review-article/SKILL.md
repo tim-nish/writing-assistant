@@ -86,11 +86,17 @@ cycle happens only when a blocker survives arbitration (see *Arbitration*).
 Every LLM pass emits **findings only**, in this exact format, one per line:
 
 ```
-- [blocker|should|nit] {location}: {issue in one sentence}. Fix: {concrete suggestion in one sentence}.
+- [blocker|should|nit] {location}: {issue in one sentence}. Why {severity}: {criterion}. Fix: {concrete suggestion in one sentence}.
 ```
 
 - **Severity** is one of `blocker` (publication-stopping), `should`
   (fix before publishing), or `nit` (optional polish).
+- **The `Why {severity}:` rationale field is mandatory** (Story 12.1): it names
+  the **criterion** that sets the severity, from the severity criteria table in
+  [`review-prompts.md`](review-prompts.md). A finding that asserts a severity
+  **without naming its criterion is a contract violation**, not reviewer
+  judgment — severity is auditable for consistency, never assigned by unstated
+  taste.
 - **Capped at 10** findings per pass. If more exist, keep the 10 highest-leverage.
 - **Ordered by severity**, and the **single highest-leverage change comes FIRST** —
   each pass leads with the one change that most improves the draft.
