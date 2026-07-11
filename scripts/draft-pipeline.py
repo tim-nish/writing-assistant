@@ -464,6 +464,77 @@ def cmd_interview(args):
     return 0
 
 
+# Stage-2 answer dispositions (Story 10.3; `docs/interview-architecture.md` D2).
+# Each disposition maps deterministically to the provenance class the answer
+# carries into stage 3, so the drafting stage never has to re-derive it:
+#   - approved : the recommended answer is adopted VERBATIM and KEEPS its source
+#                pointers → SOURCED provenance (grounds claims like a fact-sheet
+#                entry);
+#   - modified : the owner edited the recommendation → INTERVIEW provenance
+#                (owner judgment on top of the grounding);
+#   - replaced : the owner supplied their own bullet → INTERVIEW provenance;
+#   - answered : an OPEN question answered with a free-text bullet → INTERVIEW;
+#   - skipped  : unanswered — the engine records ONLY the disposition; the slot
+#                effect is the framework's declared contract (Story 10.5),
+#                resolved at stage 3, never by the interview engine.
+DISPOSITION_PROVENANCE = {
+    "approved": "sourced",
+    "modified": "interview",
+    "replaced": "interview",
+    "answered": "interview",
+    "skipped": None,
+}
+
+
+def cmd_answer(args):
+    """Stage 2: record one interview answer with its disposition and the
+    provenance class that disposition implies (Story 10.3). Enforces the D2
+    rules so a malformed answer record cannot reach stage 3:
+
+      - approved  → must carry ≥1 inherited source pointer and the adopted text;
+      - modified / replaced / answered → must carry owner text, no pointers
+        (owner judgment is interview-sourced, not source-pointed);
+      - skipped   → carries neither text nor pointers; only the disposition,
+        its slot effect deferred to the framework (Story 10.5).
+    """
+    disposition = args.disposition
+    if disposition not in DISPOSITION_PROVENANCE:
+        sys.stderr.write(
+            f"error: invalid disposition {disposition!r}. "
+            f"Valid: {', '.join(DISPOSITION_PROVENANCE)}.\n")
+        return 2
+    provenance = DISPOSITION_PROVENANCE[disposition]
+    text = (args.text or "").strip()
+    pointers = list(args.pointer or [])
+
+    if disposition == "skipped":
+        if text or pointers:
+            sys.stderr.write("error: a skipped answer records only the disposition "
+                             "(no text, no pointers); its slot effect is the framework's (Story 10.5)\n")
+            return 1
+    elif disposition == "approved":
+        if not pointers:
+            sys.stderr.write("error: an approved answer must inherit ≥1 source pointer "
+                             "(it grounds sourced claims like a fact-sheet entry)\n")
+            return 1
+        if not text:
+            sys.stderr.write("error: an approved answer must carry the adopted recommendation text\n")
+            return 1
+    else:  # modified / replaced / answered
+        if not text:
+            sys.stderr.write(f"error: a {disposition} answer must carry the owner's text\n")
+            return 1
+        if pointers:
+            sys.stderr.write(f"error: a {disposition} answer is owner judgment (interview-sourced); "
+                             "it carries no source pointers\n")
+            return 1
+
+    record = {"id": args.id, "disposition": disposition, "provenance": provenance,
+              "answer": text or None, "pointers": pointers}
+    print(json.dumps(record, indent=2))
+    return 0
+
+
 def cmd_consume(args):
     """Stage 1: consume harvest's output document (fact sheet + NEEDS-OWNER) into
     pipeline state — WITHOUT re-reading any source. Source pointers are carried
@@ -551,6 +622,13 @@ def main(argv=None):
     sp = sub.add_parser("interview")
     sp.add_argument("--framework", required=True)
     sp.add_argument("state", nargs="?", default="-", help="stage-1 pipeline state JSON, or - for stdin")
+    sp = sub.add_parser("answer")
+    sp.add_argument("--id", required=True, help="the question id this answer keys to")
+    sp.add_argument("--disposition", required=True,
+                    help="approved | modified | replaced | answered | skipped")
+    sp.add_argument("--text", help="the answer text (adopted recommendation, or owner's bullet)")
+    sp.add_argument("--pointer", action="append",
+                    help="inherited source pointer (approved answers only; repeatable)")
     sp = sub.add_parser("verify-markers")
     sp.add_argument("draft", nargs="?", default="-", help="draft file, or - for stdin")
     sp.add_argument("--count", action="store_true", help="print the count of well-formed markers")
@@ -571,6 +649,7 @@ def main(argv=None):
     args = p.parse_args(argv)
     return {
         "start": cmd_start, "consume": cmd_consume, "interview": cmd_interview,
+        "answer": cmd_answer,
         "verify-markers": cmd_verify_markers, "verify": cmd_verify, "reroute": cmd_reroute,
         "variants": cmd_variants,
     }[args.cmd](args)
