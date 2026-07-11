@@ -1,0 +1,31 @@
+# Nightwatch operational config — every key is optional. Shipped defaults (shown below)
+# apply when a key is absent, and an empty or missing file is valid. Lives at
+# .nightwatch/config.yaml in the host repo. Declarations that no tool can infer live in
+# STATE.md, not here.
+
+cadence:  {repo-reconcile: nightly, arch-review: weekly, release-progress: nightly}
+budget_tokens: {repo-reconcile: 200000, arch-review: 300000, release-progress: 100000}
+effort:   {repo-reconcile: medium, arch-review: high, release-progress: medium}
+caps:     {brief_total: 25, reconcile: 10, arch_candidates: 7}
+
+# Two-tier analysis scoping. Both lists EXTEND the shipped defaults (below) rather than
+# replacing them; prefix an entry with "!" to re-include a default-excluded path.
+ignore:                     # never analyzed; extends shipped defaults ("!pattern" re-includes)
+  - bash.exe.stackdump      # crash dump — noise
+  - answer.md               # scratch Q&A at repo root
+  - question.md             # scratch Q&A at repo root
+                            # defaults: dist/**, build/**, out/**, vendor/**, node_modules/**,
+                            #           .git/**, coverage/**, **/*.lock, .nightwatch/**
+dev_tooling: [".claude/**", ".devcontainer/**", "_bmad-output/**", "_bmad/**", "q_a/**"]  # confirmed by /nightwatch init — extends shipped defaults
+                            # defaults: _bmad/**, _bmad-output/**, .claude/**, .cursor/**, q_a/**
+                            # excluded from all analysis; exclusions are stated on the brief's
+                            # one-line scope statement, never silently.
+extractors: auto            # or a list, e.g. [node, python]
+layers: []                  # e.g. [{name: core, path: "src/core/**", may_depend_on: []}]
+release_checks: {disable: []}   # e.g. [changelog] ; also: {todo_threshold: 40}
+release_path: .nightwatch/RELEASE.md   # where the tracker writes RELEASE.md; default keeps the
+                            # repo root clean. Set to RELEASE.md (root) or docs/RELEASE.md for a
+                            # public deliverable. A legacy root RELEASE.md is read until migrated.
+tracking: {backend: markdown}   # tracker/ledger store backend (markdown ships; others opt-in)
+patch_branch: false         # true -> also apply derived-doc patches on nightwatch/* branches
+timeout_minutes: 30

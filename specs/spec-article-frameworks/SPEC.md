@@ -6,6 +6,7 @@ companions:
 sources:
   - ../../../website/q_a/2/question.md  # external: website repo (sibling checkout), traceability only
   - ../../../website/q_a/2/answer.md    # external: website repo (sibling checkout), traceability only
+  - ../../docs/interview-architecture.md # 2026-07-11 Stage-2 interview decision behind the per-slot skip-semantics constraint
 ---
 
 > **Vendored copy.** Adopted verbatim from the website repo (`website/_bmad-output/specs/spec-article-frameworks/`, 2026-07-09) per SPEC-writing-assistant; this copy is now the canonical version for this project. Repo-internal references (`docs/…`, `q_a/…`, `content/articles/`, spec §-numbers) refer to the website repo.
@@ -37,6 +38,7 @@ A pain to solve: the owner writes self-branding technical articles for dev.to (E
 - Category set is fixed to the four above; a category outside spec §9's sanctioned genres (e.g. generic tutorials) must not get a framework.
 - **Length is an outcome, not a target** (added 2026-07-10, `q_a/a1.md` Q2): frameworks bound structure — every slot filled, no slot padded — and never define or optimize toward a word count. Platform hard limits, where they exist, are validation (publish blockers), not optimization targets.
 - **Visual slots** (added 2026-07-10): each framework's expected visuals — F1 one overview diagram, F2 optional before/after or timeline, F3 one comparison table (required), F4 one landscape table or concept map — are defined by SPEC-article-visuals CAP-1; a declined slot is omitted entirely, never left as a placeholder.
+- **Skip semantics per slot** (added 2026-07-11, `docs/interview-architecture.md` D2): each framework slot fed by an interview question declares the effect of a skipped input — omit the slot, defer the decision, accept the recommended answer later, fill with `[VERIFY]`-marked inference, or raise a publish blocker. The interview engine records only the skip disposition; the slot's declared contract determines the consequence, and the skip choice's label states it. Per-slot values are template content, authored with the templates.
 
 ## Non-goals
 

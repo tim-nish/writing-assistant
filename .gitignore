@@ -27,5 +27,9 @@ __pycache__/
 
 # Local crash / scratch artifacts (e.g. Cygwin/WSL stack dumps).
 *.stackdump
+
+# Nightwatch: only the transient per-run out/ dir is disposable. The rest of
+# .nightwatch/ (ledger.jsonl, briefs/, STATE.md, config.yaml, RELEASE.md) is
+# the system's memory and MUST be committed — a previous `.nightwatch/*` line
+# here silently discarded it (dogfooding finding 0024).
 .nightwatch/out/
-.nightwatch/*
