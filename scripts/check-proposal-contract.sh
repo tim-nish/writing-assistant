@@ -37,6 +37,12 @@ has 'concrete effect'  "(c) choices state their concrete effect on the artifact"
 has 'shorthand'                 "forbids shorthand labels"
 has 'repository knowledge alone' "first-time owner answers from repository knowledge alone"
 
+# 2b. Extended contract (Story 10.1): selective presentation + payload validation.
+has 'selective presentation'    "(d) selective presentation is the primary interaction model"
+has 'free-form text'            "(d) free-form text only for owner-only knowledge"
+has 'validate-proposal-payload.py' "(e) references the payload validator"
+has 'untruncated'               "(e) requires present, non-empty, untruncated fields"
+
 # 3. Both skills reference the single convention (not their own wording).
 ref() {
   file=$1; label=$2

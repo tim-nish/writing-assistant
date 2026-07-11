@@ -31,3 +31,34 @@ A choice labelled only with an internal token — "option A", "regen", "mode 2",
 "approve / modify / delete" with no effect spelled out — is **non-conforming**.
 Every label states its concrete effect on the article so the meaning is legible
 without inferring the generation logic behind it.
+
+## (d) Selective presentation is the primary interaction model
+
+Every proposal surface presents **choice-based selective prompts** — the owner
+decides by picking an effect-stating option, not by composing prose. **Free-form
+text entry appears only** as the input mode for **owner-only knowledge**: the
+*open* interview outcome and the *modify* / *replace* paths on a recommended
+answer. Collecting answers as free-form text where choices are mandated (e.g. a
+blank `q1: <answer>` prompt for a question the repo could ground) is a **contract
+violation**, not a presentation preference.
+
+## (e) Payloads are validated before the owner sees them
+
+A proposal's payload is validated **mechanically before presentation**, the way
+`verify-markers` gates stage progression: every item must carry its **Where**,
+**Why**, and **Effect** fields, each **present, non-empty, and untruncated**. A
+payload with a missing Effect line or a field cut off mid-sentence **blocks
+presentation** — the damaged prompt never ships.
+
+Content that would exceed a field's display budget is **re-written shorter by
+authorship, never clipped**: a field is made to fit by saying less, not by
+truncating mid-word. Validate an assembled payload with:
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/validate-proposal-payload.py <payload.json>
+```
+
+A non-zero exit means the payload is not presentable — fix the named field and
+re-validate. This gate is **engine-wide**: the gap interview, review arbitration,
+Stage-4 verification, and visual proposals all inherit it by referencing this
+convention, with no restated wording.
