@@ -266,16 +266,26 @@ the capped (≤10), severity-tagged findings **format** from *Findings contract*
 - The round is **top-down and single-pass**: the highest-leverage findings (which
   each pass placed first) are arbitrated before the nits.
 
+**Rubric-mapped findings are blocker-eligible (Story 12.2).** A structure or
+prose finding that **maps to a quality-rubric dimension** (Epic 11: narrative
+arc, paragraph flow, explanation calibration, readability mechanics — the same
+dimensions a blocker's `Why blocker:` rationale names, per Story 12.1) is
+**blocker-eligible**: it may be assigned `blocker`, exactly as a cold-read Q1/Q2
+mismatch or a configuration defect. Review is a real **second net** for the
+Stage 3→4 quality gate, not merely advisory — a rubric violation that slipped the
+gate is a publication-stopping finding here.
+
 **Second-cycle gate.** After the round:
 
-- If a **blocker-severity finding survived** the fixes (the canonical case: a
-  cold-read **claim/audience mismatch** still present after edits), trigger
+- If a **blocker-severity finding survived** the fixes (the canonical cases: a
+  cold-read **claim/audience mismatch**, or a **rubric-mapped structure/prose
+  blocker**, still present after edits), trigger
   **exactly one additional full cycle** — lint → structure → prose → cold read
   again on the new draft version. **One** — the workflow never loops unbounded.
-- **Otherwise the draft is publishable.** No surviving blocker ⇒ done — **unless a
-  configuration blocker is still open**, in which case review does **not** report
-  the draft "publishable" until it is fixed (the zero-token lint pass re-checks
-  configuration as the backstop to Story 7.4).
+- **Otherwise the draft is publishable.** No surviving blocker ⇒ done — **unless
+  an open rubric-mapped blocker or a configuration blocker remains**, in which
+  case review does **not** report the draft "publishable" until it is fixed (the
+  zero-token lint pass re-checks configuration as the backstop to Story 7.4).
 
 **Per-pass model routing (recap).** Each pass runs on the tier and grounding in
 the *Model routing* table above: **lint** is the zero-token script; **structure**
@@ -290,7 +300,8 @@ End every review run with the shared
 (`${CLAUDE_PLUGIN_ROOT}/skills/completion-summary.md`): the three labelled buckets
 — **informational notes**, **publish blockers**, **optional cleanup** — then an
 explicit **next step** (e.g. "apply the accepted findings, then re-run review" or
-"the draft is publishable"). A surviving blocker-severity finding, an unresolved
+"the draft is publishable"). A surviving blocker-severity finding — including a
+**rubric-mapped structure/prose blocker** (Story 12.2) — an unresolved
 `[VERIFY]` marker, an unrendered figure, or a **configuration defect**
 (placeholder, malformed URL, config-caused frontmatter invalidity) goes under
 **publish blockers** and nowhere else — a config defect is never routed into the
