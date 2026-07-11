@@ -189,6 +189,26 @@ It enforces the D2 rules — an **approved** answer must inherit ≥1 pointer;
 judgment); a **skip** carries neither. The recorded answer text is kept
 **verbatim**, keyed by question `id`, for stage-3 traceability.
 
+### Interview journal — the boundary diagnostic (Story 10.4)
+
+When Stage 2 finishes, write an **interview journal** to the run workspace, one
+entry per **candidate** question, so a mis-asked or mis-suppressed question is
+attributable from run state — never discovered by the owner mid-interview:
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py journal \
+  --interview <interview.json> --answers <answers.json> > "$WS/interview-journal.json"
+```
+
+Each **asked** question records its **survival rationale** (`topic-absent` /
+`needs-owner-reraise` / `owner-judgment`), the recommendation's **grounding
+pointers** (when recommended), and the owner's **disposition**; each
+**suppressed** question records its **covering fact-sheet entries**. A question
+asked that the declared sources could in fact answer is then attributable from
+the journal — harvest scope gap vs. de-dup miss vs. triage error — without owner
+intervention. The command **fails closed** if an asked question has no recorded
+disposition, so an unattributable interview never ships.
+
 ## Stage 3 — fill the framework (with `[VERIFY]` markers)
 
 Fill the chosen framework's slots from the fact sheet and the interview answers.
