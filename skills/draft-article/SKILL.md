@@ -369,6 +369,46 @@ Mermaid source, a figure spec, an image-generation prompt block, or ASCII —
 `mermaid-cli`, any image tooling, or an image-generation API — rendering is the
 owner's tooling. The plugin bundles no such tools.
 
+## Stage 3→4 — mandatory quality gate (Story 11.4)
+
+Before the draft reaches the owner's verification pass, it must **pass the
+article-quality gate** ([`quality-rubric.md`](quality-rubric.md)). This is a
+**stage-progression precondition** — like `verify-markers`, not an advisory
+review finding: **Stage 3 does not complete until the gate passes**, so the
+owner's ~4-minute budget never lands on a draft that reads like a stitched fact
+sheet.
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py quality-gate \
+  --draft <draft> --map "$WS/provenance-map.txt" --judge "$WS/rubric-verdicts.txt"
+```
+
+- **Dimension 4 (readability mechanics) is checked mechanically** here (zero
+  tokens): sentence/paragraph-length distributions, heading density, and — from
+  the provenance map — the **stitched-fact-sheet** signature (wall-to-wall
+  `sourced` claims, no `derived`/`narration` tissue).
+- **Dimensions 1–3** are judged by **one single-pass cheap-tier rubric judge**
+  emitting **pass/fail per dimension + failing locations, no rewritten text**;
+  its verdicts feed `--judge`.
+
+**On failure — bounded retry, then surface (never silent):**
+
+1. Stage 3 **revises against the named failing dimensions only**, then re-runs
+   **both** the quality gate **and** `verify-provenance` — readability revision
+   is exactly where an unmarked claim would re-enter, so both gates run every
+   cycle.
+2. **At most 2 revision cycles.** If the gate still fails after two, the failure
+   is surfaced as a **publish blocker** in the completion summary (FR20 bucket)
+   naming the **failing dimensions and locations** — never silently retried,
+   never waived.
+3. A revision **never silently alters or drops owner-approved content** (approved
+   interview answers used as sourced claims, approved visuals) (NFR12); a change
+   that would touch it surfaces to the owner instead (same principle as
+   ">1 rewrite → new interview question").
+
+A **fact-sheet-stitched draft fails** this gate (dimension 4) and does **not**
+reach Stage 4 unrevised.
+
 ## Stage 4 — owner verification pass
 
 A bounded pass where the owner resolves the draft's `[VERIFY]` markers within a
