@@ -193,6 +193,21 @@ judgment); a **skip** carries neither. The recorded answer text is kept
 
 Fill the chosen framework's slots from the fact sheet and the interview answers.
 
+**Applying a skipped input's declared slot effect (Story 10.5).** When the owner
+**skipped** the question feeding a slot, read that slot's `[SKIP: <effect>]` tag
+(declared in the framework template; see
+[`frameworks/CONVENTIONS.md`](frameworks/CONVENTIONS.md)) and apply exactly it —
+the interview engine recorded only the skip disposition, so the **framework
+contract decides the consequence**:
+
+- **omit** → drop the slot, leaving no `{…}` or placeholder residue;
+- **defer** → leave the slot for a later pass, unfilled but not blocking;
+- **accept-later** → adopt the source-grounded recommended answer now, without
+  further owner confirmation;
+- **verify** → fill from inference and mark the claim `[VERIFY]` for Stage 4;
+- **blocker** → raise a publish blocker (every GATE slot's skip effect) — a GATE
+  is never silently dropped.
+
 **Frontmatter** is generated from the config `article` schema — never hardcoded —
 so a schema change propagates without editing the fill:
 

@@ -31,11 +31,11 @@ Config-bound `article` frontmatter (rendered per language from user config; see
 - `topics` — *({kebab-case} tags)*
 - `related.publications` — *(your preprint slug — F4's paper+code pairing)*
 
-## {Scope and audience}                             (~80 words)
+## {Scope and audience}                             (~80 words) [SKIP: verify]
 {(What's covered, what's excluded, who this is for, and the as-of date —
 surveys age; dating them keeps them citable.)}
 
-## {The map}                                        (table or diagram + ~100 words)
+## {The map}                                        (table or diagram + ~100 words) [SKIP: verify]
 {(A taxonomy of approaches. The map is the artifact readers bookmark. Every
 approach named here must resolve to a citation — no uncited claims.)}
 
@@ -43,25 +43,25 @@ approach named here must resolve to a citation — no uncited claims.)}
      count). Each branch carries its OWN 2–4 key-paper citations. Do NOT repeat
      Scope, the map, My take, or the reading list. -->
 
-## {Branch: core idea / key papers / when to use / open problems}   (~150 words each)
+## {Branch: core idea / key papers / when to use / open problems}   (~150 words each) [SKIP: verify]
 {(Per branch: the idea in 2 sentences, 2–4 key papers, the practical
 'use this when', and what's unsolved. The key papers are this branch's OWN
 resolvable citations — every claim in the branch points to one.)}
 
 <!-- Branch unit END -->
 
-## GATE {My take}                                   (~150 words)
+## GATE {My take}                                   (~150 words) [SKIP: blocker]
 {(Where the field goes and what YOU are building on it — the owner-evidence
 slot that keeps a survey within AP-10. REQUIRES BOTH: your angle on the field's
 direction AND a link to your preprint/repo. An opinion with no link, or a link
 with no angle, does not satisfy this GATE.)}
 
-## {Reading list}
+## {Reading list} [SKIP: accept-later]
 {(The papers, ordered by 'read this first', one-line annotations. This is a
 distinct deliverable — the curated entry path — not a concatenation of the
 per-branch key papers.)}
 
-## GATE {Pointer block}
+## GATE {Pointer block} [SKIP: blocker]
 *(The shared pointer block — see [`CONVENTIONS.md`](CONVENTIONS.md). Rendered
 from user config; unfilled = not publishable. This GATE is independent of the
 My-take GATE — satisfying one does not satisfy the other.)*
