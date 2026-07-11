@@ -29,32 +29,32 @@ canonical for EN/dev.to, `mode: external` for JA-on-Zenn; see
 - `topics` — *({kebab-case} tags)*
 - `related.projects` — *(the introduced project's slug; F1 is about a project, so this is populated — not a features list)*
 
-## {The problem}                                    (~120 words)
+## {The problem}                                    (~120 words) [SKIP: verify]
 {(Describe the pain as the READER experiences it. Your project is not
 mentioned yet. A reader with this problem must think "yes, that's me".)}
 
-## {Why existing options fall short}                (~100 words)
+## {Why existing options fall short}                (~100 words) [SKIP: omit]
 {(Name 1–2 real alternatives and be fair to them — the gap you fill,
 not a strawman. Fairness here is a credibility signal.)}
 
-## {What I built}                                   (~150 words + 1 demo)
+## {What I built}                                   (~150 words + 1 demo) [SKIP: verify]
 {(One-paragraph definition in plain language, then ONE concrete demo:
 code block, screenshot, or command + output. Show, don't enumerate features.)}
 
-## {The design decision that matters}               (~150 words)
+## {The design decision that matters}               (~150 words) [SKIP: verify]
 {(The one non-obvious decision — e.g. "why JAX-native" — and what it COST.
 A decision with no tradeoff stated reads as marketing.)}
 
-## GATE {Evidence}                                  (~100 words + 1 figure/table)
+## GATE {Evidence}                                  (~100 words + 1 figure/table) [SKIP: blocker]
 {(A result, benchmark number, or worked example produced by the real system.
 This slot empty = article not publishable (AP-10).)}
 
-## {Limits and roadmap}                             (~80 words)
+## {Limits and roadmap}                             (~80 words) [SKIP: defer]
 {(What it does NOT do, honestly. Highest-trust section for a technical reader.)}
 
-## {Try it}                                         (3 steps max)
+## {Try it}                                         (3 steps max) [SKIP: omit]
 {(Install → minimal run → where to go next. Link repo/leaderboard/datasets.)}
 
-## GATE {Pointer block}
+## GATE {Pointer block} [SKIP: blocker]
 *(The shared pointer block — see [`CONVENTIONS.md`](CONVENTIONS.md). Rendered
 from user config; unfilled = not publishable.)*

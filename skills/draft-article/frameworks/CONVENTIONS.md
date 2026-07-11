@@ -27,6 +27,28 @@ block, a `NOT PUBLISHABLE` marker — see below). The fill preserves the `GATE`
 marking verbatim, so a partially-filled draft with any GATE still showing its
 prompt reads as not-publishable.
 
+## Skipped interview inputs — per-slot effect (Story 10.5)
+
+A slot **fed by an interview input** declares what happens when the owner
+**skips** that question, as a `[SKIP: <effect>]` tag on the slot heading. The
+interview engine records only the skip disposition (Story 10.3); **stage 3
+applies the slot's declared effect** — the engine never decides it. The skip
+choice's label in the interview states that slot's declared effect, so the owner
+sees the consequence before choosing.
+
+`<effect>` is exactly one of:
+
+- **omit** — drop the slot from the article (structurally optional; no residue);
+- **defer** — leave the slot for a later pass, unfilled but not blocking;
+- **accept-later** — adopt the recommended answer at stage 3 without owner
+  confirmation (used when a source-grounded default is safe to take silently);
+- **verify** — fill the slot from inference and mark it `[VERIFY]` for the
+  stage-4 owner pass;
+- **blocker** — raise a publish blocker: the slot cannot be skipped away.
+
+**Every GATE slot's skip effect is `blocker`** — a GATE is mandatory by
+definition, so skipping its feeding question cannot silently drop it.
+
 ## Config-bound frontmatter
 
 Every framework opens with an `article` frontmatter block. Its **field set,

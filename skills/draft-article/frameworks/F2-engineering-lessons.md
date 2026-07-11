@@ -36,25 +36,25 @@ context to make the lesson intelligible — this is not the project intro.)}
      >3 lessons → split into two articles. Do NOT repeat Context or the pointer
      block; each repeat is one lesson with its OWN "What actually happened" artifact. -->
 
-## {What I believed going in}                       (~60 words)
+## {What I believed going in}                       (~60 words) [SKIP: omit]
 {(The reasonable-sounding assumption. Readers must recognize themselves in it.)}
 
-## GATE {What actually happened}                    (~120 words + artifact)
+## GATE {What actually happened}                    (~120 words + artifact) [SKIP: blocker]
 {(The surprise, WITH the artifact: log excerpt, diff, number, screenshot.
 This slot empty = article not publishable (AP-10). Each lesson needs its OWN
 artifact — the evidence gate is enforced once per lesson, not once per article.)}
 
-## {Why — the mechanism}                            (~120 words)
+## {Why — the mechanism}                            (~120 words) [SKIP: verify]
 {(Root cause, not symptom. This is the transferable part; be precise.)}
 
-## {What I changed, and what it cost}               (~100 words)
+## {What I changed, and what it cost}               (~100 words) [SKIP: verify]
 {(The fix or decision, with the tradeoff you accepted stated plainly.)}
 
-## {When this applies to you — and when it doesn't} (~80 words)
+## {When this applies to you — and when it doesn't} (~80 words) [SKIP: verify]
 {(Generalize with boundaries. Scoping the lesson honestly beats overselling it.)}
 
 <!-- Lesson unit END -->
 
-## GATE {Pointer block}
+## GATE {Pointer block} [SKIP: blocker]
 *(The shared pointer block — see [`CONVENTIONS.md`](CONVENTIONS.md). Rendered
 from user config; unfilled = not publishable.)*

@@ -30,35 +30,35 @@ Config-bound `article` frontmatter (rendered per language from user config; see
 - `topics` — *({kebab-case} tags)*
 - `related.projects` — *(the benchmark/evaluation project the method comes from)*
 
-## {The measurement question}                       (~100 words)
+## {The measurement question}                       (~100 words) [SKIP: verify]
 {(The question practitioners actually have, phrased as they'd ask it.)}
 
-## {Why the naive approach fails}                   (~150 words + demo)
+## {Why the naive approach fails}                   (~150 words + demo) [SKIP: omit]
 {(DEMONSTRATE the failure — a leaked scenario, a variance plot — don't assert it.
 Name the specific measurement being demonstrated; the "What it caught" GATE below
 must report the after-result on THIS same measurement.)}
 
-## {The method}                                     (~200 words + sketch)
+## {The method}                                     (~200 words + sketch) [SKIP: verify]
 {(Design principle first, implementation sketch second. WHAT the method
 guarantees and why, before HOW it's coded.)}
 
-## GATE {What it caught}                            (results table/figure + ~100 words)
+## GATE {What it caught}                            (results table/figure + ~100 words) [SKIP: blocker]
 {(Real results from running it. This slot empty = article not publishable.
 Requires an actual results table/figure produced by the run — prose or a bare
 [VERIFY] placeholder does NOT satisfy this GATE — reporting the after-result on
 the SAME measurement the naive approach demonstrated above.)}
 
-## {What this measurement cannot tell you}          (~80 words)
+## {What this measurement cannot tell you}          (~80 words) [SKIP: verify]
 {(Scope the metric's validity. For an evaluation audience this section IS the
 credential. Mandatory: a methodology article that omits its limits is not
 publishable.)}
 
-## {Reproduce it}                                   (links + ~50 words)
+## {Reproduce it}                                   (links + ~50 words) [SKIP: accept-later]
 {(Code, dataset, leaderboard. A methodology article without reproduction links
 undercuts its own thesis. Links must resolve to real code/dataset/leaderboard —
 not prose promises; an empty or placeholder link blocks completion, per the
 source-pointing invariant.)}
 
-## GATE {Pointer block}
+## GATE {Pointer block} [SKIP: blocker]
 *(The shared pointer block — see [`CONVENTIONS.md`](CONVENTIONS.md). Rendered
 from user config; unfilled = not publishable.)*
