@@ -1,6 +1,6 @@
 # Article-quality harness — architecture decision
 
-**Status:** proposed (owner review pending) · **Date:** 2026-07-11
+**Status:** accepted (owner, 2026-07-11; derivation rule owner-set on review) · **Date:** 2026-07-11
 **Drives:** amendments to SPEC-article-draft-pipeline, SPEC-article-review,
 SPEC-writing-assistant
 **Evidence:** `docs/dogfood-findings.md` — 2026-07-11 "pipeline outcome

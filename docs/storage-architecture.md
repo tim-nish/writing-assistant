@@ -1,6 +1,6 @@
 # Plugin storage & footprint — architecture decision
 
-**Status:** proposed (owner review pending) · **Date:** 2026-07-11
+**Status:** accepted (owner, 2026-07-11) · **Date:** 2026-07-11
 **Drives:** amendments to SPEC-writing-assistant, SPEC-article-draft-pipeline
 (pipeline-stages); closes `docs/harness-architecture.md` open question 4
 **Evidence:** `docs/dogfood-findings.md` — 2026-07-11 "plugin footprint on the
