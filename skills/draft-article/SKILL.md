@@ -118,18 +118,34 @@ Select the interview questions from the stage-1 state:
 python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py interview --framework <F> <state>
 ```
 
-This returns **at most 5** questions, and:
+**Three-outcome triage over the harvest output (Story 10.2).** Every candidate
+question is triaged against the harvest output **only** — the fact sheet and the
+NEEDS-OWNER list, reading **no source material** beyond them (it may read the
+framework contract, config, and run-state metadata needed to run the interview).
+The `triage` array classifies **each** bank question into exactly one outcome:
 
-- draws them from the fixed question bank, **prioritized by the framework's GATE
+- **suppressed** — a fact-sheet entry already covers the question's information
+  need (matched semantically via a synonym set, not literal text), and no
+  NEEDS-OWNER gap re-raises it. **The owner never sees it** (`covered_by` names
+  the covering entries, for the journal in Story 10.4);
+- **recommended** — a NEEDS-OWNER entry re-raises the topic → **always
+  recommended** (confirm/deny the claim), grounded on that entry;
+- **open** — neither → genuinely owner-only knowledge, answered as a bullet.
+
+Where a question triaged **open** is in fact groundable from a fact-sheet
+**owner-judgment** entry (a dev-log note of what surprised them *is* a sourced
+owner statement), present it as **recommended** instead — this recommendation
+pass is a **view over the harvest output**, introducing no new unsourced material.
+
+The surviving (non-suppressed) questions are returned as `questions`, and are:
+
+- drawn from the fixed question bank, **prioritized by the framework's GATE
   slots** (not bank order), so the same fact sheet yields a stable interview;
-- puts **confirmed NEEDS-OWNER gaps first**, using the GATE-slot order as the
+- **confirmed NEEDS-OWNER gaps first**, using the GATE-slot order as the
   deterministic tie-break when more than five could apply — the ≤5 cap holds even
   when the NEEDS-OWNER list is longer;
-- **de-duplicates against the fact sheet**: a question whose information harvest
-  already found (matched semantically via a synonym set, not literal text) is
-  suppressed — unless a NEEDS-OWNER gap re-raises it;
-- asks **zero** questions when harvest already covers everything — it never pads
-  to five.
+- **at most 5**, and **zero** when harvest already covers everything — never
+  padded to five.
 
 Present each selected question under the
 [owner-facing proposal contract](../owner-facing-proposal-contract.md): show

@@ -377,9 +377,28 @@ def cmd_variants(args):
 
 
 def cmd_interview(args):
-    """Stage 2: select at most 5 gap-interview questions, prioritized by the
-    framework's GATE slots and by confirmed NEEDS-OWNER gaps, de-duped against
-    fact-sheet content. Deterministic; asks zero when nothing is left to ask.
+    """Stage 2: triage every candidate question against the harvest output
+    (fact sheet + NEEDS-OWNER) into exactly one of three outcomes, then present
+    the surviving (non-suppressed) ones, at most 5, prioritized by the
+    framework's GATE slots with confirmed NEEDS-OWNER gaps first.
+
+    Three-outcome triage (Story 10.2; `docs/interview-architecture.md` D1),
+    reading NOTHING beyond the harvest output carried in the state:
+
+      - suppressed  : a fact-sheet entry already covers the question's
+                      information need (semantic de-dup) and no NEEDS-OWNER
+                      gap re-raises it — the owner never sees it;
+      - recommended : a NEEDS-OWNER entry re-raises the topic — always
+                      recommended (confirm/deny the claim), grounded on that
+                      entry (D1: re-raises are never `open`);
+      - open        : neither — genuinely owner-only knowledge, answered as a
+                      bullet.
+
+    The recommended/open split here is the deterministic baseline the script
+    can compute from harvest output alone; the SKILL's recommendation pass may
+    additionally ground an `open` question from a fact-sheet owner-judgment
+    entry and present it as recommended (rationale `owner-judgment`). Zero
+    questions are asked when everything is covered — never padded.
     """
     framework = args.framework.upper()
     if framework not in FRAMEWORK_PRIORITY:
@@ -387,27 +406,51 @@ def cmd_interview(args):
         return 2
     text = sys.stdin.read() if args.state == "-" else open(args.state, encoding="utf-8").read()
     state = json.loads(text)
-    fs_blob = "\n".join(e.get("claim", "").lower() for e in state.get("fact_sheet", []))
-    gap_topics = {n.get("topic") for n in state.get("needs_owner", [])}
+    fact_sheet = state.get("fact_sheet", [])
+    needs_owner = state.get("needs_owner", [])
+    gap_topics = {n.get("topic") for n in needs_owner}
 
-    def covered(qid):
-        return any(kw in fs_blob for kw in QUESTION_BANK[qid]["covers"])
+    def covering_entries(qid):
+        """Fact-sheet entries whose claim contains one of the question's synonym
+        keywords — the semantic (not literal) de-dup evidence."""
+        kws = QUESTION_BANK[qid]["covers"]
+        return [e.get("claim", "") for e in fact_sheet
+                if any(kw in e.get("claim", "").lower() for kw in kws)]
 
-    # Walk the framework's GATE-slot order; keep a question if it is a confirmed
-    # NEEDS-OWNER gap, or a GATE-slot question the fact sheet has not answered.
-    picked = []
+    def grounding_for(topic):
+        """NEEDS-OWNER candidates re-raising this topic — the recommended
+        answer's grounding (confirm/deny)."""
+        return [n.get("candidate", n.get("reason", "")) for n in needs_owner
+                if n.get("topic") == topic]
+
+    # Triage EVERY bank question (the journal, Story 10.4, records all of them),
+    # walking the framework's GATE-slot order so the classification is stable.
+    triage = []
     for qid in FRAMEWORK_PRIORITY[framework]:
-        is_gap = QUESTION_BANK[qid]["topic"] in gap_topics
-        if is_gap or not covered(qid):
-            picked.append((qid, is_gap))
-    # Confirmed gaps first (stable → framework order preserved within each
-    # group), then hard-cap at the ≤5 budget.
-    picked.sort(key=lambda t: 0 if t[1] else 1)
-    picked = picked[:QUESTION_BUDGET]
+        topic = QUESTION_BANK[qid]["topic"]
+        is_gap = topic in gap_topics
+        covers = covering_entries(qid)
+        rec = {"id": qid, "text": QUESTION_BANK[qid]["text"], "topic": topic}
+        if is_gap:
+            rec.update(outcome="recommended", rationale="needs-owner-reraise",
+                       grounding=grounding_for(topic))
+        elif covers:
+            rec.update(outcome="suppressed", covered_by=covers)
+        else:
+            rec.update(outcome="open", rationale="topic-absent")
+        triage.append(rec)
 
-    questions = [{"id": qid, "text": QUESTION_BANK[qid]["text"],
-                  "topic": QUESTION_BANK[qid]["topic"], "from_gap": is_gap}
-                 for qid, is_gap in picked]
+    # Survivors = the non-suppressed questions. Confirmed gaps first (stable →
+    # framework order preserved within each group), then hard-cap at ≤5.
+    survivors = [r for r in triage if r["outcome"] != "suppressed"]
+    survivors.sort(key=lambda r: 0 if r["outcome"] == "recommended" else 1)
+    survivors = survivors[:QUESTION_BUDGET]
+
+    questions = [{"id": r["id"], "text": r["text"], "topic": r["topic"],
+                  "from_gap": r["outcome"] == "recommended", "outcome": r["outcome"],
+                  "rationale": r["rationale"],
+                  **({"grounding": r["grounding"]} if "grounding" in r else {})}
+                 for r in survivors]
     out = {
         "stage": "interview",
         "next_stage": "fill",
@@ -415,6 +458,7 @@ def cmd_interview(args):
         "budget": QUESTION_BUDGET,
         "asked": len(questions),
         "questions": questions,
+        "triage": triage,
     }
     print(json.dumps(out, indent=2))
     return 0
