@@ -274,9 +274,26 @@ Structurally validate it (each class's pointer contract) and write it to `$WS`:
 python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py provenance --map <map> && cp <map> "$WS/provenance-map.txt"
 ```
 
-`sourced` carries ≥1 pointer, `derived` ≥2, `narration`/`verify` none. The
-independent `verify-provenance` check (Story 11.2) grades the claim/narration
-boundary the drafting agent must not grade itself.
+`sourced` carries ≥1 pointer, `derived` ≥2, `narration`/`verify` none.
+
+**Independent verify-provenance (Story 11.2).** The map is then graded by
+`verify-provenance` — a **standalone** check that does **not** share this
+drafting context (NFR13), so the agent that wrote the text never grades its own
+claim/narration boundary:
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/verify-provenance.py --map "$WS/provenance-map.txt" \
+  --fact-sheet "$WS/fact-sheet-ids.txt" --judge-findings "$WS/provenance-verdicts.txt"
+```
+
+It resolves every `derived` (and `sourced`) pointer against the declared
+fact-sheet entries **mechanically**, and consumes an **independent cheap-tier
+judge's** verdicts for the semantic tests — a `narration` sentence that asserts a
+checkable proposition **fails the falsifiability test** (a gate failure), and a
+`derived` claim adding any of the six forbidden categories is a gate failure.
+Run the judge on the sentences `--list-narration` / `--list-derived` surface,
+from a context with no access to the drafting rationale. A clean map passes with
+no findings; any finding blocks stage progression.
 
 The marker format is **exactly `[VERIFY: <reason>]`** (uppercase, colon-space,
 non-empty reason) so Stage 4 and the lint (Story 5.1) can find every one. Check
