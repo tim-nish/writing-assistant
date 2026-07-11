@@ -6,7 +6,7 @@
 |---|---|---|---|---|
 | 0 | Invoke: `draft article <framework> from <sources>` (framework = F1–F4 from SPEC-article-frameworks; sources = paths/globs/commit ranges) | Owner | ~0 min | Run started |
 | 1 | Harvest: read sources, extract candidate claims/results/numbers | AI | 0 | Fact sheet, every entry source-pointed (CAP-1) |
-| 2 | Gap interview: ≤5 questions on what sources cannot answer | AI asks, owner answers in bullets | ~5 min | Interview answers (CAP-2) |
+| 2 | Gap interview: candidates triaged (suppress / recommend / open); survivors presented as selective prompts with source-pointed recommended answers as defaults | AI asks; owner approves/modifies/replaces/skips (bullets for open questions) | ~5 min | Interview answers + interview journal (CAP-2) |
 | 3 | Fill: populate the framework's slots from fact sheet + answers; frontmatter from the article schema; every sentence classed in the provenance map (sourced / derived / narration); inferred claims marked `[VERIFY]` | AI | 0 | Draft + provenance map (CAP-3) |
 | 3→4 | Quality gate: four-dimension rubric + `verify-provenance`; fail → revise against named dimensions and re-run both, ≤2 cycles, then publish blocker (CAP-6) | AI | 0 | Gate-passing draft (CAP-7) |
 | 4 | Verification pass: resolve `[VERIFY]` markers, veto off-voice text; >1 rewrite needed → new interview question, not editing | Owner | ~4 min | Draft ready for review |
@@ -30,7 +30,20 @@ location is contract, not agent default.
 
 ## Interview question bank (stage 2)
 
-Ask only questions whose answers are absent from the fact sheet; pick ≤5, prioritized top-down; tailor wording to the framework's GATE slots:
+Every candidate question is triaged against the harvest output — the fact
+sheet and NEEDS-OWNER list, reading nothing else (`docs/interview-architecture.md` D1):
+
+- **suppress** when fact-sheet entries fully cover the question's
+  information need — the question never reaches the owner;
+- **recommend** when entries provide a groundable candidate answer
+  (including recorded owner judgments in sources) — the source-pointed
+  candidate is presented as the default choice; NEEDS-OWNER re-raises are
+  always recommended (confirm/deny the claim, its context as grounding);
+- **open** when neither — genuinely owner-only knowledge, answered as a
+  bullet.
+
+Pick ≤5 survivors, prioritized top-down; tailor wording to the framework's
+GATE slots:
 
 1. What surprised you most while building this? (feeds F2 slot 3 / F1 slot 4)
 2. Which single result or number matters most, and why that one? (feeds evidence GATE slots)
@@ -39,6 +52,36 @@ Ask only questions whose answers are absent from the fact sheet; pick ≤5, prio
 5. Who exactly is this article for, and what should they do after reading? (feeds hook + pointer block)
 6. What opinion in this piece are you willing to defend in comments? (voice anchor)
 7. What would you do differently if starting over? (feeds F2 slot 6)
+
+## Interview journal (stage 2)
+
+Written to the run workspace (`docs/storage-architecture.md` D2). One line
+per triaged question — format illustrative, the recorded fields are the
+contract:
+
+```
+Q1: asked   outcome=recommended  rationale=owner-judgment      rec<-fs-22,fs-31  disposition=approved
+Q2: asked   outcome=recommended  rationale=needs-owner-reraise rec<-no-17        disposition=modified
+Q3: asked   outcome=open         rationale=topic-absent                          disposition=answered
+Q6: suppressed                   covered-by=fs-08,fs-12
+```
+
+- Every **asked** question records its survival rationale (`topic-absent` |
+  `needs-owner-reraise` | `owner-judgment`), the recommendation's grounding
+  pointers (when recommended), and the owner's disposition.
+- Every **suppressed** question records its covering entries.
+- Answers carry their disposition into stage 3's provenance: an **approved**
+  answer keeps its source pointers and grounds sourced claims like a
+  fact-sheet entry; **modified**/**replaced** answers are interview-sourced
+  owner judgment (harness classes, `docs/harness-architecture.md` D1).
+- A **skip** records intent only — its slot effect is the framework slot's
+  declared contract (SPEC-article-frameworks), resolved at stage 3, never
+  by the interview engine.
+
+The journal is the boundary diagnostic: a question asked that sources could
+answer, or a suppression that should not have happened, is attributable from
+run state (harvest scope gap vs. de-dup miss vs. triage error) instead of
+being discovered by the owner mid-interview.
 
 ## Provenance map (stage 3)
 
