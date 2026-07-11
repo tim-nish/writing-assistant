@@ -535,6 +535,59 @@ def cmd_answer(args):
     return 0
 
 
+def cmd_journal(args):
+    """Stage 2: assemble the interview journal — one entry per candidate question —
+    from the triage (Story 10.2) and the recorded answers (Story 10.3), so a
+    mis-asked or mis-suppressed question is attributable from run state rather
+    than discovered mid-interview (Story 10.4; `docs/interview-architecture.md` D3).
+
+    Merges what each side already recorded:
+      - every ASKED question (recommended/open) → its survival rationale
+        (`topic-absent` | `needs-owner-reraise` | `owner-judgment`), the
+        recommendation's grounding pointers (when recommended), and the owner's
+        disposition;
+      - every SUPPRESSED question → the covering fact-sheet entries.
+
+    The journal is written to the run workspace by the SKILL; this command emits
+    it. It fails closed if an asked question has no recorded disposition — an
+    unattributable interview is a contract violation, not a silent gap.
+    """
+    itext = sys.stdin.read() if args.interview == "-" else open(args.interview, encoding="utf-8").read()
+    interview = json.loads(itext)
+    triage = interview.get("triage")
+    if triage is None:
+        sys.stderr.write("error: interview JSON has no `triage` array (run `interview` first)\n")
+        return 1
+
+    answers = {}
+    if args.answers:
+        atext = sys.stdin.read() if args.answers == "-" else open(args.answers, encoding="utf-8").read()
+        parsed = json.loads(atext)
+        for a in (parsed if isinstance(parsed, list) else [parsed]):
+            answers[a.get("id")] = a.get("disposition")
+
+    entries = []
+    for t in triage:
+        qid = t["id"]
+        if t["outcome"] == "suppressed":
+            entries.append({"id": qid, "status": "suppressed",
+                            "covered_by": t.get("covered_by", [])})
+            continue
+        disposition = answers.get(qid)
+        if disposition is None:
+            sys.stderr.write(f"error: asked question {qid} has no recorded disposition — "
+                             "the interview is not attributable (Story 10.4)\n")
+            return 1
+        entry = {"id": qid, "status": "asked", "outcome": t["outcome"],
+                 "rationale": t.get("rationale"), "disposition": disposition}
+        if "grounding" in t:
+            entry["grounding"] = t["grounding"]
+        entries.append(entry)
+
+    print(json.dumps({"stage": "interview", "journal": entries}, indent=2))
+    return 0
+
+
 def cmd_consume(args):
     """Stage 1: consume harvest's output document (fact sheet + NEEDS-OWNER) into
     pipeline state — WITHOUT re-reading any source. Source pointers are carried
@@ -629,6 +682,9 @@ def main(argv=None):
     sp.add_argument("--text", help="the answer text (adopted recommendation, or owner's bullet)")
     sp.add_argument("--pointer", action="append",
                     help="inherited source pointer (approved answers only; repeatable)")
+    sp = sub.add_parser("journal")
+    sp.add_argument("--interview", required=True, help="the `interview` output JSON (carries triage), or - for stdin")
+    sp.add_argument("--answers", help="recorded answer records (JSON list), or - for stdin")
     sp = sub.add_parser("verify-markers")
     sp.add_argument("draft", nargs="?", default="-", help="draft file, or - for stdin")
     sp.add_argument("--count", action="store_true", help="print the count of well-formed markers")
@@ -649,7 +705,7 @@ def main(argv=None):
     args = p.parse_args(argv)
     return {
         "start": cmd_start, "consume": cmd_consume, "interview": cmd_interview,
-        "answer": cmd_answer,
+        "answer": cmd_answer, "journal": cmd_journal,
         "verify-markers": cmd_verify_markers, "verify": cmd_verify, "reroute": cmd_reroute,
         "variants": cmd_variants,
     }[args.cmd](args)
