@@ -257,3 +257,5 @@ harvest→interview de-dup diagnostic.
 4. **Where the provenance map lives.** Sidecar file next to the draft vs.
    the run's workspace — interacts with the plugin-footprint finding
    (intermediate outputs polluting the host repo); decide both together.
+   **Answered 2026-07-11:** the run workspace —
+   `docs/storage-architecture.md` D2.

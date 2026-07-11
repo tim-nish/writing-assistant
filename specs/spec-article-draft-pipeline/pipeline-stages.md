@@ -24,6 +24,10 @@ Draft then exits this pipeline into SPEC-article-review.
 
 Entries the AI wants to use but cannot source go to a `NEEDS-OWNER` list feeding stage 2 — never into the draft unmarked.
 
+The fact sheet and `NEEDS-OWNER` list are written to the run workspace
+(`docs/storage-architecture.md` D2), never into the host working tree — the
+location is contract, not agent default.
+
 ## Interview question bank (stage 2)
 
 Ask only questions whose answers are absent from the fact sheet; pick ≤5, prioritized top-down; tailor wording to the framework's GATE slots:
@@ -38,11 +42,9 @@ Ask only questions whose answers are absent from the fact sheet; pick ≤5, prio
 
 ## Provenance map (stage 3)
 
-Sidecar file, never inline — the draft body stays clean for variants and
-review. (Its location is decided together with the plugin-footprint fix for
-intermediate outputs, `docs/dogfood-findings.md` 2026-07-11; this contract
-fixes only that it exists and what it records.) One line per sentence, keyed
-by paragraph/sentence position:
+Sidecar file in the run workspace (`docs/storage-architecture.md` D2), never
+inline — the draft body stays clean for variants and review. One line per
+sentence, keyed by paragraph/sentence position:
 
 ```
 P4.S2: derived <- fs-12, fs-14

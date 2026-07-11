@@ -19,6 +19,7 @@ writing-assistant/
       SKILL.md
   scripts/
     lint-article.(sh|py)     # pass 0 of review: zero-token mechanical checks — POSIX shell or stdlib-only Python, no JS/TS
+    resolve-paths.py         # THE path resolver (docs/storage-architecture.md D1): config lookup, state root, run workspaces — the only place storage paths live
   config/
     user-config.example.yaml # CAP-6: identity — name, site URL, pointer block, canonical policy, frontmatter schema
     writing-sources.example.yaml
@@ -31,7 +32,7 @@ writing-assistant/
 ## Per-host-repo files (created on first use in a repo, not shipped)
 
 ```
-<host-repo>/writing-sources.yaml   # CAP-2: declared sources
+<host-repo>/writing-sources.yaml   # CAP-2: declared sources — placement under review (docs/storage-architecture.md O1); current contract stands
 ```
 
 ```yaml
@@ -47,6 +48,18 @@ output:
 Draft output location comes from `output.drafts` — there is no fixed `drafts/` default. If the key is missing, the pipeline asks once and offers to write the key into `writing-sources.yaml`.
 
 User identity config resolves from `~/.config/writing-assistant/user-config.yaml` (machine-global, since identity is per-person not per-repo), overridable by a repo-local file.
+
+## Machine-side storage (resolver-internal — `docs/storage-architecture.md`)
+
+All state and intermediates live outside host repos, resolved exclusively by `scripts/resolve-paths.py`:
+
+```
+$XDG_STATE_HOME/writing-assistant/   # default ~/.local/state/writing-assistant
+  <repo-key>/                        # path slug of the repo's git toplevel
+    runs/<run-id>/                   # per-invocation workspace: fact sheet, NEEDS-OWNER, interview answers, provenance map, gate output, scratch
+```
+
+This layout is not contractual: specs reference the footprint invariant and the resolver; the scheme evolves inside the resolver (D3).
 
 ## Development and distribution flow
 

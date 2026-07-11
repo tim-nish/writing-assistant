@@ -9,11 +9,13 @@ sources:
   - ../../q_a/a1.md                     # dogfooding Q&A round 1, traceability only
   - ../../docs/dogfood-findings.md      # dogfood evidence behind the 2026-07-10 amendments
   - ../../docs/harness-architecture.md  # 2026-07-11 article-quality harness decision (D1–D5) behind the 2026-07-11 amendments
+  - ../../docs/storage-architecture.md  # 2026-07-11 storage & footprint decision behind the intermediates-location constraint
 ---
 
 > **Vendored copy.** Adopted verbatim from the website repo (`website/_bmad-output/specs/spec-article-draft-pipeline/`, 2026-07-09) per SPEC-writing-assistant; this copy is now the canonical version for this project. Repo-internal references (`q_a/…`, AP/AC numbers) refer to the website repo.
 > **Amended 2026-07-10** per accepted dogfood findings (`docs/dogfood-findings.md`, `q_a/a1.md`): CAP-5 (up-front config validation) and CAP-6 (completion-summary contract) added; interview/verification constraints now reference SPEC-writing-assistant's owner-facing proposal contract.
 > **Amended 2026-07-11** per the article-quality harness decision (`docs/harness-architecture.md`, D1–D5): CAP-3 reworked to three provenance classes with a sidecar provenance map; CAP-7 (mandatory stage 3→4 quality gate) added; the no-invented-evidence and rewrite constraints updated accordingly.
+> **Amended 2026-07-11 (storage)** per the storage & footprint decision (`docs/storage-architecture.md`, D1–D2): all intermediates live in the per-run workspace resolved by the path resolver, never in the host working tree.
 
 > **Canonical contract.** This SPEC and the files in `companions:` are the complete, preservation-validated contract for what to build, test, and validate. Source documents listed in frontmatter are for traceability only — consult them only if you need narrative rationale or prose color this contract intentionally omits.
 
@@ -55,6 +57,7 @@ A pain to solve plus an opportunity to capture: the owner wants a publishable te
 - Interview questions (CAP-2) and owner-verification items obey SPEC-writing-assistant's **owner-facing proposal contract**: each shows where the item lands in the article (outline context + short section preview), why it is asked, and choices stating their concrete effect on the article — the owner answers from repository knowledge alone, never by inferring the generation logic.
 - Consumes the framework templates from SPEC-article-frameworks verbatim; category structure is not redesigned per run.
 - Implemented as a Claude Code skill (`.claude/skills/`) so harvest can read the repo directly.
+- All intermediates — fact sheet, NEEDS-OWNER list, interview answers, provenance map, quality-gate judge output, scratch — are written to the run's workspace resolved by the path resolver (`docs/storage-architecture.md` D1–D2), never into the host repository's working tree; the location is a stated contract, not an agent default. Only declared products land in the host repo, at `output.drafts` (SPEC-writing-assistant footprint invariant).
 
 ## Non-goals
 
