@@ -235,21 +235,48 @@ so a schema change propagates without editing the fill:
 python3 ${CLAUDE_PLUGIN_ROOT}/scripts/render-frontmatter.py --language <en|ja>
 ```
 
-**Provenance — every claim traces to exactly one of three things:**
+**Provenance — every sentence is one of three classes (Story 11.1;
+`docs/harness-architecture.md` D1).** Synthesis is legal without abandoning the
+zero-unmarked-claims guarantee, because provenance attaches at the **claim**
+level while connective reasoning is legal at the **paragraph** level:
 
-1. a **source pointer** carried from the fact sheet (kept verbatim and traceable
-   — `path:line@sha` / sha / URL, not paraphrased away);
-2. an **interview answer**, referenced by its question `id`;
-3. an inline **`[VERIFY: <reason>]`** marker naming why it is unverified.
+1. **sourced** — asserts something traceable to **one** fact-sheet entry or
+   interview answer; carries that **pointer** (`path:line@sha` / sha / URL /
+   question `id`), kept verbatim;
+2. **derived** — a synthesis over **≥2 named sourced claims** that **compresses,
+   combines, or restates** them; it **inherits all their pointers**. Introducing
+   new **causality, significance, evaluation, comparison, intent, or scope** is
+   *not* derivation — that sentence is inferred and takes `[VERIFY]` (or, if it
+   is genuinely the owner's judgment, routes to the interview);
+3. **narration** — asserts **nothing checkable** (the *falsifiability test*:
+   could a reviewer with all sources mark it false? if no, it is narration);
+   transitions, signposting, framing. **No pointer, no marker.**
 
-**Never an unmarked assertion.** A claim that is neither source-pointed nor
-interview-sourced carries a `[VERIFY]` marker. So does a claim only *partially*
-supported by a source but **extended by inference** — the source pointer does not
-wave the inferred part through. When in doubt, mark it.
+An **inferred** claim — beyond sources, interview, or legal derivation — carries
+an inline **`[VERIFY: <reason>]`** marker exactly as before. **Never an unmarked
+assertion.**
 
-**Copy facts, don't summarize them into new claims.** Summarizing source content
-can silently introduce an assertion the sources don't make — if a rewrite adds
-anything beyond the source, that addition is inferred and takes a `[VERIFY]`.
+**The sidecar provenance map.** When Stage 3 completes, write a **sidecar
+provenance map** to the run workspace (never inline — the draft body stays clean
+for variants and review), one line per sentence keyed by paragraph/sentence
+position:
+
+```
+P4.S2: derived <- fs-12, fs-14
+P4.S3: narration
+P4.S4: sourced <- fs-15
+P4.S5: verify            # sentence carries an inline [VERIFY] in the draft body
+```
+
+Structurally validate it (each class's pointer contract) and write it to `$WS`:
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py provenance --map <map> && cp <map> "$WS/provenance-map.txt"
+```
+
+`sourced` carries ≥1 pointer, `derived` ≥2, `narration`/`verify` none. The
+independent `verify-provenance` check (Story 11.2) grades the claim/narration
+boundary the drafting agent must not grade itself.
 
 The marker format is **exactly `[VERIFY: <reason>]`** (uppercase, colon-space,
 non-empty reason) so Stage 4 and the lint (Story 5.1) can find every one. Check

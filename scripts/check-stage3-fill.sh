@@ -20,9 +20,14 @@ python3 -c "import py_compile; py_compile.compile('$DP', doraise=True)" 2>/dev/n
 
 # 1. Skill documents the fill contract.
 grep -q 'render-frontmatter.py' "$SKILL" && ok "frontmatter from the config article schema (not hardcoded)" || err "frontmatter not config-bound"
-grep -q 'Never an unmarked assertion' "$SKILL" && ok "states the never-unmarked-assertion invariant" || err "invariant not stated"
-grep -q 'extended by inference' "$SKILL" && ok "partial-source-but-inferred still marked" || err "partial-inference rule missing"
-grep -qi "don't summarize" "$SKILL" && ok "warns against summarizing into new claims" || err "summarize caution missing"
+# Provenance drafting rule amended to the three classes (Story 11.1; harness D1).
+grep -qi 'zero-unmarked-claims\|unmarked assertion' "$SKILL" && ok "states the never-unmarked-assertion invariant" || err "invariant not stated"
+for cls in sourced derived narration; do
+  grep -qi "\*\*$cls\*\*" "$SKILL" || err "provenance class not documented: $cls"
+done
+ok "documents the three provenance classes (sourced/derived/narration)"
+grep -qi 'compress' "$SKILL" && grep -qi 'restate' "$SKILL" \
+  && ok "states the derivation rule (compress/combine/restate over ≥2 sourced claims)" || err "derivation rule missing"
 grep -q '\[VERIFY: <reason>\]' "$SKILL" && ok "documents the exact marker format" || err "marker format not documented"
 grep -q 'verify-markers' "$SKILL" && ok "wires in the marker validator" || err "validator not wired in"
 
