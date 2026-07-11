@@ -147,19 +147,47 @@ The surviving (non-suppressed) questions are returned as `questions`, and are:
 - **at most 5**, and **zero** when harvest already covers everything — never
   padded to five.
 
-Present each selected question under the
+Present each surviving question under the
 [owner-facing proposal contract](../owner-facing-proposal-contract.md): show
 **where** the section it concerns sits in the article outline and a **short
 preview of the current section** (when one already exists), **why** the question
-is asked, and **choices whose labels state their concrete effect** on the article
-— e.g. *approve* → "keep the section as drafted", *modify* → "rewrite the section
-from your answer", *delete* → "drop the section from the article" — never a bare
-approve/modify/delete shorthand the owner must decode. A first-time owner answers
-from **repository knowledge alone**, without having read the generated draft.
+is asked, and **choices whose labels state their concrete effect** — never a
+shorthand the owner must decode. A first-time owner answers from **repository
+knowledge alone**. Assemble the prompt payload and **validate it before showing
+it** (contract (e)): `validate-proposal-payload.py` blocks a missing Effect line
+or a truncated field.
 
-Then accept **bullet answers** and capture them **verbatim**, keyed by question
-`id`, into the run state. Stage 3 depends on that answer text being preserved
-unaltered for traceability.
+### Recommended answers with dispositions (Story 10.3)
+
+A **recommended** question arrives with its **source-pointed candidate answer as
+the default choice**, and dispositions **labeled by concrete effect**:
+
+- **Approve** → "adopt this answer as written" — the recommendation becomes the
+  interview answer **verbatim** and **keeps its source pointers**, grounding
+  sourced claims in stage 3 exactly like a fact-sheet entry;
+- **Modify** → "edit this answer, then use it" — the owner's edit is their
+  contribution on top of the grounding; the answer is **interview-sourced**;
+- **Replace** → "discard this and use my own" — the owner's bullet; also
+  **interview-sourced**;
+- **Skip** → the question goes unanswered; **only the skip is recorded** — what
+  it *means* is the target framework slot's declared effect (Story 10.5),
+  resolved at stage 3, never by the interview engine. The skip choice's label
+  states that slot's declared effect.
+
+An **open** question carries **bullet free-text** as its primary input (no
+recommendation to approve).
+
+Record each answer — with the disposition that fixes its provenance class — via:
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py answer --id <qid> \
+  --disposition <approved|modified|replaced|answered|skipped> [--text <answer>] [--pointer <p> ...]
+```
+
+It enforces the D2 rules — an **approved** answer must inherit ≥1 pointer;
+**modified/replaced/answered** carry owner text and **no** pointers (owner
+judgment); a **skip** carries neither. The recorded answer text is kept
+**verbatim**, keyed by question `id`, for stage-3 traceability.
 
 ## Stage 3 — fill the framework (with `[VERIFY]` markers)
 
