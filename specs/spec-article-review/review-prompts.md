@@ -22,7 +22,19 @@
 > highest-leverage change FIRST.
 >
 > Finding format:
-> `- [blocker|should|nit] {section/paragraph}: {issue in one sentence}. Fix: {concrete suggestion in one sentence}.`
+> `- [blocker|should|nit] {section/paragraph}: {issue in one sentence}. Why {severity}: {criterion from the severity table}. Fix: {concrete suggestion in one sentence}.`
+
+## Severity criteria (all passes — added 2026-07-11 per `docs/harness-architecture.md` D3)
+
+Severity is assigned by naming a criterion, never by unstated judgment:
+
+| Severity | Criterion — a finding takes this level only by naming one |
+|---|---|
+| blocker | Violates a quality-rubric dimension (narrative arc, paragraph flow, explanation calibration, readability mechanics — the draft pipeline's stage 3→4 gate, re-checked here as the second net); **or** cold-read Q1/Q2 mismatch; **or** configuration defect (routes to the publish-blocker bucket, never into these findings lists) |
+| should | Cold-read Q3/Q4 hit; **or** a structure/prose issue that degrades the article without violating a rubric dimension |
+| nit | Optional polish — no rubric dimension and no reader-rubric question implicated |
+
+An open blocker — rubric-mapped or configuration — blocks the "publishable" verdict.
 
 ## Structural pass rubric (CAP-2)
 

@@ -11,6 +11,7 @@ sources:
   - ../../q_a/q1.md                     # dogfooding Q&A round 1, traceability only
   - ../../q_a/a1.md                     # dogfooding Q&A round 1, traceability only
   - ../../docs/dogfood-findings.md      # dogfood evidence behind the 2026-07-10 amendments
+  - ../../docs/harness-architecture.md  # 2026-07-11 article-quality harness decision behind the 2026-07-11 amendments
 ---
 
 > **Canonical contract.** This SPEC and the files in `companions:` are the complete, preservation-validated contract for what to build, test, and validate. Source documents listed in frontmatter are for traceability only — consult them only if you need narrative rationale or prose color this contract intentionally omits.
@@ -29,9 +30,9 @@ An opportunity to capture plus a vision to realize: the article specs already pr
 - **CAP-2**
   - **intent:** A harvest step gathers facts from the host repo and any additional sources declared in a per-repo `writing-sources.yaml` (local paths, sibling repos such as research-notes), with every fact carrying a source pointer (file/line, commit, or URL).
   - **success:** A harvest run against QuantScenarioBench with research-notes declared as a source produces a fact sheet whose every entry resolves to an exact location in one of the two repos; undeclared repos are never read.
-- **CAP-3**
-  - **intent:** The draft pipeline (SPEC-article-draft-pipeline: harvest → ≤5-question interview → framework fill with `[VERIFY]` markers → platform variants) runs as a plugin skill inside the host repo.
-  - **success:** The pipeline's existing success criterion holds when run from a non-website repo: draft in ≤10 minutes of owner attention, zero unmarked invented claims.
+- **CAP-3** (amended 2026-07-11 per `docs/harness-architecture.md`)
+  - **intent:** The draft pipeline (SPEC-article-draft-pipeline: harvest → ≤5-question interview → framework fill with `[VERIFY]` markers → article-quality gate → platform variants) runs as a plugin skill inside the host repo.
+  - **success:** The pipeline's existing success criterion holds when run from a non-website repo: draft in ≤10 minutes of owner attention, zero unmarked invented claims, and the draft passes the article-quality gate (SPEC-article-draft-pipeline CAP-7).
 - **CAP-4**
   - **intent:** The review workflow (SPEC-article-review: lint → structure → prose → cold read, capped severity-tagged findings) runs as a plugin skill against a draft file in the host repo.
   - **success:** Each pass runs once per draft version and emits findings, not rewrites, per that spec's contract.

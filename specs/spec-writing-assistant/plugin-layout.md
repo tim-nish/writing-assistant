@@ -8,9 +8,10 @@ writing-assistant/
     plugin.json              # plugin manifest: name, version, skills/commands exposed
     marketplace.json         # makes this repo its own marketplace (/plugin marketplace add <owner>/writing-assistant)
   skills/
-    draft-article/           # CAP-3: harvest → interview → framework fill → variants
+    draft-article/           # CAP-3: harvest → interview → framework fill → quality gate → variants
       SKILL.md
       frameworks/            # CAP-5: F1–F4 templates from SPEC-article-frameworks
+      quality-rubric.md      # stage 3→4 gate rubric (SPEC-article-draft-pipeline CAP-7) — versioned asset; exemplar-derived threshold tuning edits this file, not the specs
     review-article/          # CAP-4: lint → structure → prose → cold read
       SKILL.md
       review-prompts.md      # ported from spec-article-review companion
