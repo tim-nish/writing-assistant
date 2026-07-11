@@ -35,6 +35,22 @@ The design goal is **maximum defect yield per pass** at a fixed, small cost: the
 mechanical checks cost zero tokens, each LLM pass runs **once per draft version**
 on a cheap-tier model, and the owner arbitrates all findings in a single round.
 
+## Host-repo footprint (leave nothing behind)
+
+Review **writes no files into the host working tree** — findings are reported to
+the owner, never saved as artifacts in the repo. If a pass needs to persist
+anything (scratch, a findings log), it goes to the run's **workspace outside the
+host repo**, resolved by the path resolver
+(`docs/storage-architecture.md` D1–D2), never a path you compose yourself:
+
+```
+WS=$(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-paths.py new-run)
+```
+
+After a review run the host repo's `git status` shows **nothing new** — no
+`scratch/`, no stray intermediate. The plugin's only host-tree footprint across
+the whole pipeline is the declared draft products at `output.drafts`.
+
 ## Stage 0 — configuration validation
 
 Before any review pass, validate the resolved configuration (CAP-5):
