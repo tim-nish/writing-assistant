@@ -194,6 +194,125 @@ def cmd_provenance(args):
     return 0
 
 
+# Stage-3→4 quality gate (Story 11.4; `docs/harness-architecture.md` D3–D5).
+# Dimension 4 (readability mechanics) is checked here MECHANICALLY (zero tokens);
+# dimensions 1–3 are judged by one single-pass cheap-tier rubric judge whose
+# pass/fail verdicts this command consumes. The gate is a stage-progression
+# PRECONDITION, not an advisory finding: any failing dimension blocks stage 4.
+# Conservative v1 thresholds live in the rubric asset (skills/draft-article/
+# quality-rubric.md); mirror them here.
+QG_MEAN_SENTENCE_WORDS = 30
+QG_LONG_SENTENCE_WORDS = 40
+QG_LONG_SENTENCE_FRACTION = 0.25
+QG_PARA_MAX_SENTENCES = 8
+QG_PARA_MAX_WORDS = 160
+QG_STITCH_SOURCED_FRACTION = 0.70
+_SENT_SPLIT = re.compile(r"(?<=[.!?])\s+")
+
+
+def _draft_body(text):
+    """Strip YAML frontmatter and heading lines; return prose paragraphs."""
+    if text.startswith("---"):
+        parts = text.split("\n---", 1)
+        if len(parts) == 2:
+            text = parts[1]
+    lines = [ln for ln in text.splitlines() if not ln.lstrip().startswith("#")]
+    blocks, cur = [], []
+    for ln in lines:
+        if ln.strip() == "":
+            if cur:
+                blocks.append(" ".join(cur)); cur = []
+        else:
+            cur.append(ln.strip())
+    if cur:
+        blocks.append(" ".join(cur))
+    return blocks
+
+
+def _sentences(paragraph):
+    return [s for s in _SENT_SPLIT.split(paragraph.strip()) if s.strip()]
+
+
+def _dimension4(draft_text, prov_entries):
+    """Mechanical readability-mechanics checks; returns a list of failing
+    locations (empty = pass)."""
+    fails = []
+    paragraphs = _draft_body(draft_text)
+    sentences = [s for p in paragraphs for s in _sentences(p)]
+    if sentences:
+        lens = [len(s.split()) for s in sentences]
+        mean = sum(lens) / len(lens)
+        if mean > QG_MEAN_SENTENCE_WORDS:
+            fails.append(f"sentence length: mean {mean:.0f} words > {QG_MEAN_SENTENCE_WORDS}")
+        long = sum(1 for n in lens if n > QG_LONG_SENTENCE_WORDS)
+        if long / len(lens) > QG_LONG_SENTENCE_FRACTION:
+            fails.append(f"sentence length: {long}/{len(lens)} sentences over {QG_LONG_SENTENCE_WORDS} words")
+    for i, p in enumerate(paragraphs):
+        ns, nw = len(_sentences(p)), len(p.split())
+        if ns > QG_PARA_MAX_SENTENCES or nw > QG_PARA_MAX_WORDS:
+            fails.append(f"paragraph {i + 1}: {ns} sentences / {nw} words (wall of text)")
+    if "## " not in draft_text and "\n#" not in draft_text:
+        fails.append("heading density: no section headings")
+    # Stitched-fact-sheet signature: wall-to-wall sourced claims, no
+    # derived/narration connective tissue (reads the provenance map).
+    if prov_entries:
+        classes = [c for _, c, _ in prov_entries]
+        total = len(classes)
+        sourced = classes.count("sourced")
+        tissue = classes.count("derived") + classes.count("narration")
+        if tissue == 0 and sourced > 0:
+            fails.append("stitched fact sheet: all sourced claims, no derived/narration tissue")
+        elif total and sourced / total > QG_STITCH_SOURCED_FRACTION and tissue == 0:
+            fails.append(f"stitched fact sheet: {sourced}/{total} sourced, no connective tissue")
+    return fails
+
+
+def cmd_quality_gate(args):
+    """Stage 3→4 quality gate (Story 11.4). Dimension 4 is mechanical here;
+    dimensions 1–3 come from the single-pass judge's verdicts (--judge, a file of
+    `dim1|dim2|dim3: pass|fail [locations]`). Emits a per-dimension verdict; a
+    non-zero exit BLOCKS stage 4 (a precondition, not an advisory finding).
+    """
+    draft = sys.stdin.read() if args.draft == "-" else open(args.draft, encoding="utf-8").read()
+    prov_entries = []
+    if args.map:
+        try:
+            prov_entries = parse_provenance_map(_read_text(args.map))
+        except ValueError as e:
+            sys.stderr.write(f"error: provenance map: {e}\n")
+            return 2
+
+    results = {}
+    # Dimensions 1–3: judge verdicts.
+    judged = {}
+    if args.judge:
+        for ln in _read_text(args.judge).splitlines():
+            ln = ln.strip()
+            if not ln or ln.startswith("#"):
+                continue
+            dim, _, rest = ln.partition(":")
+            judged[dim.strip()] = rest.strip()
+    for dim in ("dim1", "dim2", "dim3"):
+        verdict = judged.get(dim, "")
+        passed = verdict.lower().startswith("pass")
+        results[dim] = ("pass" if passed else "fail",
+                        "" if passed else (verdict[4:].strip(" :-") if verdict else "no judge verdict"))
+    # Dimension 4: mechanical.
+    d4 = _dimension4(draft, prov_entries)
+    results["dim4"] = ("pass", "") if not d4 else ("fail", "; ".join(d4))
+
+    failing = [d for d, (v, _) in results.items() if v == "fail"]
+    out = {"gate": "quality", "pass": not failing,
+           "dimensions": {d: {"verdict": v, "locations": loc} for d, (v, loc) in results.items()},
+           "failing_dimensions": failing}
+    print(json.dumps(out, indent=2))
+    return 0 if not failing else 1
+
+
+def _read_text(path):
+    return sys.stdin.read() if path == "-" else open(path, encoding="utf-8").read()
+
+
 def cmd_verify_markers(args):
     """Stage 3/4: validate the `[VERIFY: reason]` markers in a draft. Every
     VERIFY-shaped bracket must match the canonical form exactly; anything else
@@ -768,6 +887,10 @@ def main(argv=None):
     sp = sub.add_parser("provenance")
     sp.add_argument("--map", default="-", help="the sidecar provenance map, or - for stdin")
     sp.add_argument("--count", action="store_true", help="print per-class tallies as JSON")
+    sp = sub.add_parser("quality-gate")
+    sp.add_argument("--draft", default="-", help="the filled draft, or - for stdin")
+    sp.add_argument("--map", help="the sidecar provenance map (for the stitched-fact-sheet check)")
+    sp.add_argument("--judge", help="rubric judge verdicts for dims 1-3: `dimN: pass|fail [locations]` per line")
     sp = sub.add_parser("verify-markers")
     sp.add_argument("draft", nargs="?", default="-", help="draft file, or - for stdin")
     sp.add_argument("--count", action="store_true", help="print the count of well-formed markers")
@@ -789,6 +912,7 @@ def main(argv=None):
     return {
         "start": cmd_start, "consume": cmd_consume, "interview": cmd_interview,
         "answer": cmd_answer, "journal": cmd_journal, "provenance": cmd_provenance,
+        "quality-gate": cmd_quality_gate,
         "verify-markers": cmd_verify_markers, "verify": cmd_verify, "reroute": cmd_reroute,
         "variants": cmd_variants,
     }[args.cmd](args)
