@@ -88,6 +88,24 @@ the list is empty, so the pipeline can rely on its presence. Validate with:
 python3 ${CLAUDE_PLUGIN_ROOT}/scripts/validate-needs-owner.py <harvest-doc>
 ```
 
+## Where the harvest document lands (never the host repo)
+
+The fact sheet + NEEDS-OWNER list is an **intermediate**, not a product: it is
+written to the run's **workspace outside the host repo**
+(`docs/storage-architecture.md` D2), never into the host working tree. Get the
+workspace from the path resolver — in pipeline mode the draft-article skill
+passes its run workspace in (`$WS` from its Stage 0); standalone, mint one:
+
+```
+WS=$(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-paths.py new-run)
+# write the harvest document to "$WS/fact-sheet.md"
+```
+
+Pass that `$WS/fact-sheet.md` path as `<harvest-doc>` to the validators above.
+Never compose a storage path yourself, and never write the fact sheet, the
+NEEDS-OWNER list, or any scratch into the host working tree — only declared
+products land in the host repo (at `output.drafts`), and harvest produces none.
+
 ## Harvest output contract
 
 Identical whether invoked standalone or as pipeline stage 1, so the pipeline

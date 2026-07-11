@@ -55,13 +55,16 @@ eq "repo-dir: state-root/repo-key" \
    "$sr/$rk"
 
 # 5. Single-source invariant (AC2): no state/workspace path literal is
-#    constructed anywhere in skills/ or scripts/ except resolve-paths.py.
-#    We look for the state-root literals and any hand-built runs/ workspace path.
+#    constructed anywhere in production skills/ or scripts/ except
+#    resolve-paths.py. We look for the state-root literals and any hand-built
+#    runs/ workspace path. check-*.sh are test harnesses that reference these
+#    patterns to assert the resolver's behaviour, not to build production
+#    paths, so they are excluded.
 pat='\.local/state|XDG_STATE_HOME|runs/[^ )"'"'"']*<|runs/<run'
 offenders=$(grep -REnoI "$pat" skills scripts 2>/dev/null \
   | grep -v '/__pycache__/' \
   | grep -v '^scripts/resolve-paths.py:' \
-  | grep -v '^scripts/check-path-resolver.sh:' || true)
+  | grep -v '^scripts/check-[^:]*\.sh:' || true)
 if [ -z "$offenders" ]; then
   ok "single-source: no state/workspace path literal outside resolve-paths.py"
 else

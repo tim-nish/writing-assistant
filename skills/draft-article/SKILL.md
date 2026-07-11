@@ -62,10 +62,29 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py start <framework> <sourc
   framework file, and the **raw sources verbatim** plus their classification
   (path / glob / commit-range). Carry this record into the next stage unchanged.
 
+### Resolve the run workspace (all intermediates land here)
+
+Mint this run's workspace once, and write **every** intermediate under it:
+
+```
+WS=$(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-paths.py new-run)
+```
+
+`$WS` is a fresh per-run workspace directory **outside the host repo**
+(`docs/storage-architecture.md` D2), resolved by the path resolver — never a
+path you compose yourself, and never the host working tree. Its internal layout
+is resolver-internal; always ask the resolver, never spell it out. The harvest fact
+sheet and NEEDS-OWNER list, interview answers, the provenance map, quality-gate
+output, and any scratch all live under `$WS/`; there is no state-vs-cache split.
+The **only** files this pipeline writes into the host repo are the declared
+products at `output.drafts` (Stage 5). Pass `$WS` to Stage 1 so harvest writes
+there rather than minting its own workspace.
+
 ## Stage 1 — harvest and consume its output
 
-Hand the run to the `harvest` skill to produce its output document (the
-source-pointed fact sheet **and** the NEEDS-OWNER list). The stage-0 sources are
+Hand the run to the `harvest` skill to produce its output document at
+`$WS/fact-sheet.md` (the source-pointed fact sheet **and** the NEEDS-OWNER
+list) — give harvest the `$WS` from Stage 0 so it writes there. The stage-0 sources are
 a **selection**, not a scope widener: harvest enumerates the
 writing-sources-declared files (`resolve-writing-sources.py files`) and
 **intersects** this selection with them, so a path passed on the command line can

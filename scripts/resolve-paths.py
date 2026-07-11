@@ -26,9 +26,14 @@ Subcommands:
   config-home                the machine-global config dir (~/.config/writing-assistant)
   repo-key   [--root R]      path slug of the repo's git toplevel
   repo-dir   [--root R]      <state-root>/<repo-key> (the per-repo state directory)
+  new-run    [--root R] [--run-id ID]
+                             create and print a fresh per-run workspace (Story 9.2)
+  run-workspace --run-id ID [--root R]
+                             print an existing run workspace path (no create)
 """
 
 import argparse
+import datetime
 import os
 import re
 import subprocess
@@ -99,6 +104,50 @@ def repo_dir(root):
     return os.path.join(state_root(), repo_key(root))
 
 
+def runs_dir(root):
+    return os.path.join(repo_dir(root), "runs")
+
+
+def _timestamp_run_id():
+    """A timestamp-based, per-invocation-unique run id (D3): local time down to
+    the microsecond, so two runs never collide on the same id."""
+    now = datetime.datetime.now()
+    return now.strftime("%Y%m%dT%H%M%S-") + f"{now.microsecond:06d}"
+
+
+def new_run(root, run_id=None):
+    """Create <repo-dir>/runs/<run-id>/ and return it (Story 9.2).
+
+    Every intermediate a pipeline run produces — fact sheet, NEEDS-OWNER list,
+    interview journal, provenance map, quality-gate output, scratch — lives
+    under this one directory: one run = one debuggable, disposable unit, and
+    the host working tree stays clean by construction. There is no
+    state-vs-cache split (D2): all per-run artifacts share the workspace.
+
+    An explicit --run-id must be fresh; without one, a unique id is minted, and
+    on the astronomically unlikely microsecond collision a random suffix is
+    appended until the directory does not already exist.
+    """
+    base = runs_dir(root)
+    if run_id is not None:
+        ws = os.path.join(base, run_id)
+        os.makedirs(ws)  # exist_ok=False: an explicit id must be new
+        return ws
+    while True:
+        ws = os.path.join(base, _timestamp_run_id())
+        try:
+            os.makedirs(ws)
+            return ws
+        except FileExistsError:
+            ws = os.path.join(base, _timestamp_run_id() + "-" + os.urandom(3).hex())
+            os.makedirs(ws, exist_ok=False)
+            return ws
+
+
+def run_workspace(root, run_id):
+    return os.path.join(runs_dir(root), run_id)
+
+
 # --------------------------------------------------------------------------
 # CLI
 # --------------------------------------------------------------------------
@@ -122,6 +171,16 @@ def cmd_repo_dir(args):
     return 0
 
 
+def cmd_new_run(args):
+    print(new_run(host_root(args.root), args.run_id))
+    return 0
+
+
+def cmd_run_workspace(args):
+    print(run_workspace(host_root(args.root), args.run_id))
+    return 0
+
+
 def main(argv=None):
     p = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
@@ -137,12 +196,22 @@ def main(argv=None):
     sp = sub.add_parser("repo-dir", help="print <state-root>/<repo-key>")
     sp.add_argument("--root", help="host-repo root (default: git top-level, else cwd)")
 
+    sp = sub.add_parser("new-run", help="create and print a fresh per-run workspace")
+    sp.add_argument("--root", help="host-repo root (default: git top-level, else cwd)")
+    sp.add_argument("--run-id", help="explicit run id (must not already exist; default: fresh timestamp id)")
+
+    sp = sub.add_parser("run-workspace", help="print an existing run workspace path (no create)")
+    sp.add_argument("--root", help="host-repo root (default: git top-level, else cwd)")
+    sp.add_argument("--run-id", required=True, help="the run id whose workspace to print")
+
     args = p.parse_args(argv)
     return {
         "state-root": cmd_state_root,
         "config-home": cmd_config_home,
         "repo-key": cmd_repo_key,
         "repo-dir": cmd_repo_dir,
+        "new-run": cmd_new_run,
+        "run-workspace": cmd_run_workspace,
     }[args.cmd](args)
 
 
