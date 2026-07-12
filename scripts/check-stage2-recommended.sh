@@ -59,11 +59,39 @@ ans --id q3 --disposition skipped --text "oops" >/dev/null 2>&1 && err "skip wit
 # invalid disposition rejected.
 ans --id q1 --disposition bogus --text x >/dev/null 2>&1 && err "invalid disposition accepted" || ok "invalid disposition rejected"
 
+# Story 13.6 — batch validation reports EVERY rejection in one pass (round-trip cut).
+work=$(mktemp -d); trap 'rm -rf "$work"' EXIT
+cat > "$work/batch.json" <<'JSON'
+[
+  {"id": "q1", "disposition": "answered", "text": "a good bullet"},
+  {"id": "q2", "disposition": "approved", "text": "no pointer here"},
+  {"id": "q3", "disposition": "modified", "text": "owner note", "pointers": ["x:1@ab"]}
+]
+JSON
+# two bad answers (q2 missing pointer, q3 has pointers) -> both reported at once.
+report=$(python3 "$DP" answer --batch "$work/batch.json" 2>&1 >/dev/null || true)
+echo "$report" | grep -q 'id=q2' && echo "$report" | grep -q 'id=q3' \
+  && ok "batch reports every rejection at once (q2 and q3)" || err "batch did not report all rejections"
+echo "$report" | grep -q 'id=q1' && err "batch reported a valid answer (q1) as rejected" || ok "batch leaves the valid answer (q1) unrejected"
+python3 "$DP" answer --batch "$work/batch.json" >/dev/null 2>&1 && err "batch with bad answers exited 0" || ok "batch is a hard gate (non-zero on any rejection)"
+# an all-valid batch passes and emits the records as a JSON list.
+cat > "$work/good.json" <<'JSON'
+[
+  {"id": "q1", "disposition": "answered", "text": "a good bullet"},
+  {"id": "q2", "disposition": "approved", "text": "grounded", "pointers": ["bench/r.md:42@a1b2c3d"]},
+  {"id": "q4", "disposition": "skipped"}
+]
+JSON
+python3 "$DP" answer --batch "$work/good.json" | jget 'len(d)==3 and d[1]["provenance"]=="sourced"' | grep -q True \
+  && ok "all-valid batch emits the records (same rules as single-answer)" || err "valid batch did not emit records"
+
 # AC1 — SKILL documents the four dispositions + recommended default + records via the answer command.
 for term in Approve Modify Replace Skip "default choice" "draft-pipeline.py answer"; do
   grep -qi -- "$term" "$SKILL" || err "SKILL missing disposition contract term: $term"
 done
 grep -qi 'recommended' "$SKILL" && ok "SKILL documents recommended answers + dispositions" || err "SKILL missing recommended-answer contract"
+grep -qi 'answer --batch' "$SKILL" && grep -qi 'one consolidated report' "$SKILL" \
+  && ok "SKILL documents the batch answer validation (Story 13.6)" || err "SKILL missing batch-answer flow"
 
 if [ "$fail" -eq 0 ]; then
   printf '\nAll stage-2 recommended-answer checks passed.\n'; exit 0
