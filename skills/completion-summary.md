@@ -16,11 +16,35 @@ Partition everything the run surfaced into exactly three labelled buckets:
    informational notes or optional cleanup.
 3. **Optional cleanup** — nice-to-have polish the owner may skip.
 
+## Partial progress — never a silent loss (Story 13.7, CAP-6)
+
+Wall-clock is unconstrained but the **turn/compute budget is a real ceiling**. A
+run that stopped before finishing — it hit the ceiling, was interrupted, or is
+being resumed — reports its progress in the **informational notes** bucket so the
+owner can pick it back up instead of starting over:
+
+- the **last completed stage** and the **resume path** for the run workspace, read
+  straight from the pipeline checkpoint (Story 13.5):
+
+  ```
+  python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py resume --ws "$WS"
+  ```
+
+  When it reports `resumed: true` and a `next_stage` short of the end, the summary
+  names the last completed stage and gives the resume command; a completed run
+  reports nothing here. This item is informational, not a blocker — a partial run
+  is recoverable, not broken.
+
+Before a stage hard-fails at the ceiling, **surface a budget-triage signal** (a
+warning that the turn budget is nearly spent) rather than dying silently at
+`error_max_turns`, so the run can be checkpointed and resumed rather than lost.
+
 ## Explicit next step
 
 After the three buckets, state **one concrete next step** — e.g. "run
 review-article on the draft"; for a standalone harvest, "review the fact sheet, or
-run draft-article to turn it into a draft".
+run draft-article to turn it into a draft". For a **partially-completed run**, the
+next step is the resume command above.
 
 ## Reading-time estimate (article body only)
 
