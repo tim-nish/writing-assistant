@@ -23,7 +23,7 @@ python3 -c "import py_compile; py_compile.compile('$root/$VNO', doraise=True)" 2
 # 1. Skill documents the NEEDS-OWNER contract.
 grep -q 'NEEDS-OWNER' "$SKILL" && ok "skill documents NEEDS-OWNER" || err "NEEDS-OWNER not documented"
 grep -q 'CANDIDATE / REASON / TOPIC' "$SKILL" && ok "skill documents the entry schema" || err "schema not documented"
-grep -q 'surprise, significance, opinion, warning, other' "$SKILL" && ok "skill documents the TOPIC set" || err "TOPIC set not documented"
+grep -q 'surprise, significance, opinion, warning, tradeoff, audience' "$SKILL" && ok "skill documents the TOPIC set (incl. tradeoff/audience, #145)" || err "TOPIC set not documented"
 grep -q 'exactly one' "$SKILL" && ok "skill states the strict partition rule" || err "partition rule not stated"
 grep -q 'even when' "$SKILL" && ok "skill requires emitting the section even when empty" || err "always-emit rule not stated"
 
@@ -50,6 +50,9 @@ printf '# Fact sheet: x\n\n# NEEDS-OWNER\n- just a bare claim\n' > "$work/bare.m
 reason "$work/bare.md" | grep -q 'malformed' && ok "reject: bare string (needs CANDIDATE / REASON / TOPIC)" || err "bare string accepted"
 printf '# Fact sheet: x\n\n# NEEDS-OWNER\n- A claim / a reason / musings\n' > "$work/topic.md"
 reason "$work/topic.md" | grep -q 'invalid TOPIC' && ok "reject: TOPIC outside the interview categories" || err "bad TOPIC accepted"
+# #145: tradeoff and audience are now valid TOPICs (they are the interview's q4/q5 topics).
+printf '# Fact sheet: x\n\n# NEEDS-OWNER\n- what we gave up / owner framing / tradeoff\n- who this is for / owner framing / audience\n' > "$work/newtopics.md"
+NO "$work/newtopics.md" && ok "accept: tradeoff + audience TOPICs (#145)" || err "tradeoff/audience TOPIC rejected"
 
 # 4. Strict partition: a candidate cannot also be a fact-sheet CLAIM.
 cat > "$work/overlap.md" <<'EOF'
@@ -76,6 +79,8 @@ python3 "$root/$VNO" "$work/ok.md" --group | grep -q '\[surprise\]' \
   && ok "--group buckets items by TOPIC for the interview" || err "--group did not group by topic"
 
 # 8. Section-awareness: the fact-sheet validator ignores the NEEDS-OWNER section.
+# (validate-fact-sheet requires a writing-sources.yaml at --root since #122's fail-loud change.)
+printf 'sources:\n  - path: .\n' > "$work/writing-sources.yaml"
 n=$(python3 "$root/$VFS" "$work/ok.md" --root "$work" 2>/dev/null | grep -c 'entries,' || true)
 python3 "$root/$VFS" "$work/ok.md" --root "$work" 2>/dev/null | grep -q '^2 entries,' \
   && ok "fact-sheet validator reads only the fact-sheet section (2, not 4)" || err "fact-sheet validator leaked into NEEDS-OWNER"

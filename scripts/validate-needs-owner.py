@@ -16,7 +16,7 @@ This enforces:
     stages can rely on) — even with zero entries;
   * every NEEDS-OWNER entry is `CANDIDATE / REASON / TOPIC` with all fields
     non-empty (context to seed the interview, not a bare string), and
-    TOPIC ∈ {surprise, significance, opinion, warning, other} — the gap-
+    TOPIC ∈ {surprise, significance, opinion, warning, tradeoff, audience, other} — the gap-
     interview categories so items are groupable/prioritizable;
   * the partition is strict — no candidate text appears both here and as a fact-
     sheet CLAIM (mutual exclusion; nothing double-counted).
@@ -31,7 +31,7 @@ import argparse
 import re
 import sys
 
-TOPICS = {"surprise", "significance", "opinion", "warning", "other"}
+TOPICS = {"surprise", "significance", "opinion", "warning", "tradeoff", "audience", "other"}
 
 
 def split_sections(text):
