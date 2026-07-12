@@ -286,16 +286,25 @@ def cmd_files(args):
 
 def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("--root", help="host-repo root (default: git top-level of cwd; errors outside a git repo)")
+    ROOT_HELP = "host-repo root (default: git top-level of cwd; errors outside a git repo)"
+    p.add_argument("--root", help=ROOT_HELP)
+    # --root is accepted in BOTH positions — before OR after the subcommand — so
+    # the invocation the SKILLs document (`… files --root <host>`) works (#138).
+    # SUPPRESS default on the subparser copy avoids clobbering a --root given
+    # before the subcommand.
+    root_parent = argparse.ArgumentParser(add_help=False)
+    root_parent.add_argument("--root", default=argparse.SUPPRESS, help=ROOT_HELP)
     sub = p.add_subparsers(dest="cmd", required=True)
-    sub.add_parser("draft-location")
-    sp = sub.add_parser("set-draft-location")
+    sub.add_parser("draft-location", parents=[root_parent])
+    sp = sub.add_parser("set-draft-location", parents=[root_parent])
     sp.add_argument("path")
-    sub.add_parser("sources")
-    sp = sub.add_parser("is-declared")
+    sub.add_parser("sources", parents=[root_parent])
+    sp = sub.add_parser("is-declared", parents=[root_parent])
     sp.add_argument("path")
-    sub.add_parser("files")
+    sub.add_parser("files", parents=[root_parent])
     args = p.parse_args(argv)
+    if not hasattr(args, "root"):
+        args.root = None
     return {
         "draft-location": cmd_draft_location,
         "set-draft-location": cmd_set_draft_location,

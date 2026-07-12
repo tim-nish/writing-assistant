@@ -59,6 +59,20 @@ got=$($PY --root "$work/host" draft-location)
 [ "$got" = "articles/drafts/" ] && ok "draft-location returns declared value" \
   || err "draft-location returned '$got', expected 'articles/drafts/'"
 
+# 2b. --root works AFTER the subcommand too (the form the SKILLs document, #138):
+#     `resolve-writing-sources.py <cmd> --root <host>` must not error.
+after=$($PY draft-location --root "$work/host" 2>&1)
+[ "$after" = "articles/drafts/" ] \
+  && ok "--root accepted AFTER the subcommand (matches the documented invocation, #138)" \
+  || err "--root after the subcommand failed: '$after'"
+# every subcommand accepts --root in that position (no 'unrecognized arguments').
+for c in draft-location sources is-declared files; do
+  case "$c" in is-declared) extra=".";; *) extra="";; esac
+  $PY "$c" $extra --root "$work/host" >/dev/null 2>&1
+  [ $? -ne 2 ] && ok "subcommand '$c' accepts --root after it" \
+    || err "subcommand '$c' rejects --root after it (argparse code 2)"
+done
+
 # 3. Missing output.drafts -> exit 3 (prompt), no fallback.
 cat > "$work/host2.yaml" <<'YAML'
 sources:
