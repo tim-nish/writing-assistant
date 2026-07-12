@@ -54,6 +54,17 @@ and the fix — before any generation work. A clean, fully resolved config passe
 so no configuration finding appears anywhere later in the run. Relay any report
 and stop.
 
+**A missing `writing-sources.yaml` is a hard stop, not a self-service fix
+(Story 13.11).** When the report says no sources are declared, **do not proceed**
+into harvest or any later stage on a config you invented — a fabricated source
+declaration run without owner review is exactly the failure to avoid. Instead:
+relay the error (it names the example's full path and that the file must live at
+the **host-repo root**), then **offer to scaffold** a starter `writing-sources.yaml`
+at the host-repo root as an explicit, owner-confirmed step. On consent, create it
+from the example and **show the owner the path and contents** before re-running
+Stage 0; without consent, stop. Never scaffold silently, and never treat "add a
+`- path:` entry" as licence to continue the run yourself.
+
 Then validate the framework and record the run with:
 
 ```
