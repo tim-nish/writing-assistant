@@ -90,6 +90,18 @@ reason | grep -q 'backwards' && ok "reject: backwards quote range" || err "backw
 emit "- Unpinned range / notes.md:4-5 / quote"
 reason | grep -q 'not pinned to a commit' && ok "reject: unpinned line range" || err "unpinned range accepted"
 
+# 5d. Verbatim REJECT names the cause + prefixed quotes are rejected (#137).
+emit '- Decision from batch 16: "exact quoted words" / notes.md:3@'"$sha"' / quote'
+reason | grep -qi 'verbatim source text only' \
+  && ok "reject: prefixed/labelled quote rejected with the verbatim-only cause named (#137)" \
+  || err "prefixed quote accepted or REJECT message generic"
+# a partial quote (CLAIM is a sub-span of the source line) still passes.
+emit '- exact quoted / notes.md:3@'"$sha"' / quote'
+V && ok "valid: partial quote (CLAIM is a sub-span of the source line) still accepted" || err "partial quote wrongly rejected"
+# the non-quote range REJECT names the constraint AND the fix.
+emit "- Ranged fact / notes.md:2-3@$sha / number"
+reason | grep -Eq 'single line for KIND|split 2-3' && ok "reject: non-quote range names constraint + fix (#137)" || err "non-quote range REJECT generic"
+
 # 6. Exit status is a hard gate + --rejected lists rejects for Story 3.3.
 printf -- '- Good / notes.md:2@%s / result\n- Bad / nope:1 / result\n' "$sha" > "$work/fs.md"
 python3 "$root/$VAL" "$work/fs.md" --root "$h" >/dev/null 2>&1 && err "exit 0 despite a rejected entry" \

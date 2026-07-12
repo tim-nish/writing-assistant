@@ -62,14 +62,18 @@ def source_form_ok(source, kind):
 
 
 def _quote_matches(claim, src_text):
-    """Verbatim test, lenient about surrounding quote marks and whitespace, as
-    the single-line check has always been. `src_text` is the source line(s)
-    with each physical line stripped and joined by a single space."""
+    """Verbatim test: the CLAIM's quoted text must be the source text — a sub-span
+    of a line, or the whole line(s), tolerating surrounding quote marks. `src_text`
+    is the source line(s), each physical line stripped and joined by a single
+    space. The CLAIM may not carry text BEYOND the source (a label/prefix/suffix
+    like "Decision from batch 16:"): that is not verbatim (#137). Hence
+    `quoted in src_text` (claim ⊆ source) matches, but `src_text in quoted`
+    (claim adds text) no longer does."""
     quoted = claim.strip()
     inner = re.match(r'^["“](.*)["”]$', quoted)
     if inner:
         quoted = inner.group(1)
-    return quoted in src_text or src_text in quoted
+    return quoted in src_text
 
 
 def _load_rws():
@@ -149,7 +153,9 @@ def validate_source(source, kind, claim, host, sources):
             return f"line {l2} out of range at {rel}@{sha} ({len(lines)} lines)"
         span = " ".join(lines[i].strip() for i in range(l1 - 1, l2))
         if not _quote_matches(claim, span):
-            return "quote CLAIM does not match the source lines verbatim (check the span boundary)"
+            return ("quote CLAIM must be the verbatim source text only — no label, "
+                    "attribution, or prefix, and no paraphrase; it did not match the "
+                    "spanned source lines (also check the span boundary l1-l2)")
         return None
 
     m = FILEPIN_RE.match(source)
@@ -170,7 +176,9 @@ def validate_source(source, kind, claim, host, sources):
         return f"line {line} out of range at {rel}@{sha} ({len(lines)} lines)"
     if kind == "quote":
         if not _quote_matches(claim, lines[line - 1].strip()):
-            return "quote CLAIM does not match the source line verbatim"
+            return ("quote CLAIM must be the verbatim source text only — no label, "
+                    "attribution, or prefix (e.g. drop a leading 'Decision from batch 16:') "
+                    "and no paraphrase; it did not match the source line")
     return None
 
 
