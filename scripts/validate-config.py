@@ -30,6 +30,7 @@ HERE = os.path.dirname(os.path.realpath(__file__))
 USER_RES = os.path.join(HERE, "resolve-user-config.py")
 SRC_RES = os.path.join(HERE, "resolve-writing-sources.py")
 EXAMPLE = os.path.realpath(os.path.join(HERE, "..", "config", "user-config.example.yaml"))
+SOURCES_EXAMPLE = os.path.realpath(os.path.join(HERE, "..", "config", "writing-sources.example.yaml"))
 
 USER_FILE = "user-config.yaml"
 SOURCES_FILE = "writing-sources.yaml"
@@ -169,9 +170,11 @@ def validate_writing_sources(args, findings):
     cmd += ["sources"]
     p = subprocess.run(cmd, capture_output=True, text=True)
     if p.returncode != 0 or not p.stdout.strip():
+        root_hint = os.path.realpath(args.root) if args.root else "the host-repo root"
         findings.append((SOURCES_FILE, "sources",
-                         "no readable sources are declared. Fix: add at least one "
-                         "`- path:` entry (see writing-sources.example.yaml)."))
+                         f"no readable sources are declared. Fix: create `{SOURCES_FILE}` "
+                         f"at {root_hint} with at least one `- path:` entry — copy the example "
+                         f"at {SOURCES_EXAMPLE} as a starting point."))
 
 
 def main(argv=None):

@@ -87,6 +87,17 @@ if [ "$rc" -ne 0 ] && printf '%s' "$out" | grep -q 'owner.site_url' \
   ok "missing required key halts naming the key + file"
 else err "missing key not caught (rc=$rc)"; fi
 
+# 5. Missing/empty writing-sources -> error names the example's full path + the
+#    required location (host-repo root), so a first-time user can act (#144).
+mkdir -p "$work/emptyroot"
+printf 'sources:\n' > "$work/emptyroot/writing-sources.yaml"   # declared but no readable sources
+if out=$(python3 "$VAL" --repo-config /dev/null --root "$work/emptyroot" --global-config "$work/clean.yaml" 2>&1); then rc=0; else rc=$?; fi
+if [ "$rc" -ne 0 ] \
+   && printf '%s' "$out" | grep -q 'writing-sources.example.yaml' \
+   && printf '%s' "$out" | grep -q 'emptyroot'; then
+  ok "missing sources names the example's full path + required location (#144)"
+else err "missing-sources error lacks example path/location (rc=$rc, out='$out')"; fi
+
 # 5. Both skills wire the validator in as their up-front stage 0.
 for f in "$DRAFT" "$REVIEW"; do
   grep -q 'validate-config.py' "$f" && ok "$f wires in validate-config" \
@@ -96,6 +107,13 @@ for f in "$DRAFT" "$REVIEW"; do
   grep -qi 'silently' "$f" && ok "$f documents the silent-clean path" \
     || err "$f missing silent-clean note"
 done
+
+# 6. Draft SKILL: a missing writing-sources is a hard stop with an owner-confirmed
+#    scaffold, not silent self-remediation (#144).
+grep -qi 'hard stop' "$DRAFT" && grep -qi 'owner-confirmed' "$DRAFT" \
+  && grep -qi 'never scaffold silently\|show the owner the path and contents' "$DRAFT" \
+  && ok "draft SKILL: missing sources halts with an owner-confirmed scaffold (#144)" \
+  || err "draft SKILL missing the hard-stop/scaffold contract for missing sources"
 
 if [ "$fail" -eq 0 ]; then
   printf '\nAll config-validation checks passed.\n'; exit 0
