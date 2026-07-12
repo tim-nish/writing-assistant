@@ -33,71 +33,54 @@ one exists), **why** it is asked, and **choices whose labels state their concret
 effect** on the article — never a shorthand label the owner must decode. This
 skill references that one convention rather than restating its own wording.
 
-## Stage 0 — start the run
+## Stage 0 — start the run (one call)
 
-**Configuration validation (CAP-5) runs first — before any generation.** Validate
-the resolved configuration:
+**Stage 0 is a single invocation (Story 13.13)** — configuration validation
+(CAP-5), the framework check, and workspace **autostart** (Story 13.12) fold into
+one command so the run spends one turn here, not three:
 
 ```
-python3 ${CLAUDE_PLUGIN_ROOT}/scripts/validate-config.py --root <host-repo>
+S0=$(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py stage0 <framework> <sources...> --root <host-repo>)
+WS=$(printf '%s' "$S0" | python3 -c "import json,sys; print(json.load(sys.stdin)['ws'])")
 ```
 
 (`--root` — accepted by every plugin script that resolves the host repo —
-defaults to the git top-level of the current directory and errors if cwd is
-not inside a git repo; pass it explicitly whenever the session's working
-directory might not be the host repo.)
+defaults to the git top-level of the current directory and errors if cwd is not
+inside a git repo; pass it explicitly whenever the session's working directory
+might not be the host repo.)
 
-It **halts** on any unresolved example placeholder, malformed URL (e.g. a
-double-slash `canonical_url`), or missing required key, printing a
-**per-key report** naming the file (`user-config.yaml` / `writing-sources.yaml`)
-and the fix — before any generation work. A clean, fully resolved config passes **silently**,
-so no configuration finding appears anywhere later in the run. Relay any report
-and stop.
+It does, in order, halting on the first problem so nothing starts on a bad
+config or framework:
 
-**A missing `writing-sources.yaml` is a hard stop, not a self-service fix
-(Story 13.11).** When the report says no sources are declared, **do not proceed**
-into harvest or any later stage on a config you invented — a fabricated source
-declaration run without owner review is exactly the failure to avoid. Instead:
-relay the error (it names the example's full path and that the file must live at
-the **host-repo root**), then **offer to scaffold** a starter `writing-sources.yaml`
-at the host-repo root as an explicit, owner-confirmed step. On consent, create it
-from the example and **show the owner the path and contents** before re-running
-Stage 0; without consent, stop. Never scaffold silently, and never treat "add a
-`- path:` entry" as licence to continue the run yourself.
+- **Configuration validation (CAP-5).** Halts on any unresolved example
+  placeholder, malformed URL (e.g. a double-slash `canonical_url`), or missing
+  required key, printing a **per-key report** naming the file
+  (`user-config.yaml` / `writing-sources.yaml`) and the fix — the report is
+  `validate-config.py`'s verbatim. A clean config is silent. Relay any report and
+  stop.
+  - **A missing `writing-sources.yaml` is a hard stop, not a self-service fix
+    (Story 13.11).** Do **not** proceed on a config you invented. Relay the error
+    (it names the example's full path and that the file must live at the
+    **host-repo root**), then **offer to scaffold** a starter `writing-sources.yaml`
+    at the host-repo root as an explicit, owner-confirmed step; on consent create
+    it from the example and **show the owner the path and contents** before
+    re-running Stage 0; without consent, stop. Never scaffold silently.
+- **Framework check** against the **closed set {F1, F2, F3, F4}** — an invalid
+  name exits non-zero and **nothing starts** (no workspace minted). Relay and stop.
+- **Workspace autostart** — resumption is **automatic, not opt-in**. It resumes
+  the **newest in-progress run** (a workspace whose checkpoint records a
+  `next_stage` other than `done`) when one exists, returning `"resumed": true`
+  and the `next_stage` to continue from — **skip straight to that stage**, reusing
+  the persisted intermediates. Otherwise it mints a fresh workspace with
+  `"resumed": false` and `next_stage: harvest` (the no-false-resume path). A large
+  multi-source draft completing across several invocations is the **normal
+  model** — a turn-ceiling casualty simply continues next invocation.
 
-Then validate the framework and record the run with:
-
-```
-python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py start <framework> <sources...>
-```
-
-- The framework is checked against the **closed set {F1, F2, F3, F4}**. An
-  invalid name is rejected — the command reports the valid set, exits non-zero,
-  and **nothing starts** (no harvest, no partial run state). Relay that and stop.
-- On success it prints the **run-state** JSON — the chosen framework, its
-  framework file, and the **raw sources verbatim** plus their classification
-  (path / glob / commit-range). Carry this record into the next stage unchanged.
-
-### Resolve the run workspace — resume automatically, or start fresh (Story 13.12)
-
-Resumption is **automatic, not opt-in**: rather than always minting a new run,
-ask the pipeline whether an in-progress run for this repo should be continued.
-Do this **once**, at Stage 0, and write **every** intermediate under the
-workspace it returns:
-
-```
-AUTO=$(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py autostart --root <host-repo>)
-WS=$(printf '%s' "$AUTO" | python3 -c "import json,sys; print(json.load(sys.stdin)['ws'])")
-```
-
-`autostart` finds the **newest in-progress run** (a workspace whose checkpoint
-records a `next_stage` other than `done`) and returns it with `"resumed": true`
-and the `next_stage` to continue from — **skip straight to that stage**, reusing
-the persisted intermediates. When there is no in-progress run it mints a fresh
-workspace with `"resumed": false` and `next_stage: harvest` (the no-false-resume
-path). A large multi-source draft completing across several invocations is the
-**normal model**, not a failure — a turn-ceiling casualty simply continues on the
-next invocation.
+On success `stage0` prints one JSON: `{"config_ok": true, "run_state": {…framework,
+framework_file, sources…}, "resumed": …, "ws": …, "next_stage": …}`. Carry
+`run_state` into the next stage unchanged and write every intermediate under `ws`.
+(The underlying `validate-config`, `start`, and `autostart` commands still exist
+for standalone use; `stage0` composes them.)
 
 `$WS` is a fresh per-run workspace directory **outside the host repo**
 (`docs/storage-architecture.md` D2), resolved by the path resolver — never a
