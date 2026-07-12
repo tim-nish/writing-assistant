@@ -53,6 +53,15 @@ iv "$rr" F3 | jget '[t.get("rationale") for t in d["triage"] if t["id"]=="q3"][0
 iv "$rr" F3 | jget '[bool(t.get("grounding")) for t in d["triage"] if t["id"]=="q3"][0]' | grep -q True \
   && ok "recommended re-raise carries grounding pointers" || err "grounding missing on re-raise"
 
+# 3b. The new tradeoff/audience TOPICs (#145) re-raise their interview questions
+#     (q4 tradeoff, q5 audience) — previously they could never reach recommendation.
+tr='{"fact_sheet":[],"needs_owner":[{"topic":"tradeoff","candidate":"we gave up incremental builds"}]}'
+iv "$tr" F3 | jget '[t["outcome"] for t in d["triage"] if t["id"]=="q4"][0]' | grep -q recommended \
+  && ok "NEEDS-OWNER topic=tradeoff re-raises q4 (#145)" || err "tradeoff did not re-raise q4"
+au='{"fact_sheet":[],"needs_owner":[{"topic":"audience","candidate":"backend SREs specifically"}]}'
+iv "$au" F3 | jget '[t["outcome"] for t in d["triage"] if t["id"]=="q5"][0]' | grep -q recommended \
+  && ok "NEEDS-OWNER topic=audience re-raises q5 (#145)" || err "audience did not re-raise q5"
+
 # 4. A question with neither coverage nor a re-raise is open.
 op='{"fact_sheet":[],"needs_owner":[]}'
 iv "$op" F1 | jget 'all(t["outcome"]=="open" for t in d["triage"])' | grep -q True \
