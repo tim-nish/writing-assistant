@@ -61,8 +61,10 @@ Read the in-scope files and extract facts. Every entry is one line —
   a **single** commit-pinned line — `path:line@sha`, **not** a range (`12-19` is
   rejected; split it into per-line pointers).
 - **KIND** ∈ {result, decision, number, quote, event}.
-- A `quote` entry's CLAIM is the source text **verbatim** — never paraphrased or
-  normalized. Its SOURCE pins the exact physical line(s): `path:line@sha` for a
+- A `quote` entry's CLAIM is the source text **verbatim and ONLY the source text**
+  — no label, attribution, or prefix (not "Decision from batch 16: …"), and never
+  paraphrased or normalized. A CLAIM carrying anything beyond the quoted words is
+  rejected. Its SOURCE pins the exact physical line(s): `path:line@sha` for a
   single-line quote, or `path:line1-line2@sha` when the quoted text genuinely
   spans consecutive physical lines (e.g. a wrapped markdown-table cell). Never
   fold in unrelated adjacent text to force a single-line match — pin the real
