@@ -222,6 +222,22 @@ It enforces the D2 rules — an **approved** answer must inherit ≥1 pointer;
 judgment); a **skip** carries neither. The recorded answer text is kept
 **verbatim**, keyed by question `id`, for stage-3 traceability.
 
+**Validate the answers in one batch, not one round-trip per answer (Story 13.6).**
+When you have the owner's answers to the surviving questions, pass them all at
+once as a JSON list of answer specs and get **one consolidated report of every
+rejection** — instead of a reject-and-retry cycle per bad answer, which burns
+turns against the pipeline budget (#118):
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py answer --batch <answers.json>
+```
+
+Each list entry is `{"id", "disposition", "text"?, "pointers"?}` — the same
+fields and the **same D2 rules** as the single form. A clean batch emits the
+records as a JSON list; any rejection names the offending `id` and the fix, and
+the whole batch is a hard gate (non-zero exit) so a malformed answer never
+reaches stage 3.
+
 ### Interview journal — the boundary diagnostic (Story 10.4)
 
 When Stage 2 finishes, write an **interview journal** to the run workspace, one

@@ -691,51 +691,103 @@ DISPOSITION_PROVENANCE = {
 }
 
 
-def cmd_answer(args):
-    """Stage 2: record one interview answer with its disposition and the
-    provenance class that disposition implies (Story 10.3). Enforces the D2
-    rules so a malformed answer record cannot reach stage 3:
+def _validate_answer(spec):
+    """Validate one interview answer spec against the D2 disposition rules.
 
-      - approved  → must carry ≥1 inherited source pointer and the adopted text;
+    Returns (record, None) when valid, or (None, reason) when not. `spec` is a
+    dict with `id`, `disposition`, optional `text`, optional `pointers` — the
+    same fields the single-answer flags carry. This is the shared core of both
+    the single-answer and the batch paths so their rules can never diverge."""
+    qid = spec.get("id")
+    if not qid:
+        return None, "missing `id` (the question this answer keys to)"
+    disposition = spec.get("disposition")
+    if disposition not in DISPOSITION_PROVENANCE:
+        return None, (f"invalid disposition {disposition!r} "
+                      f"(valid: {', '.join(DISPOSITION_PROVENANCE)})")
+    provenance = DISPOSITION_PROVENANCE[disposition]
+    text = (spec.get("text") or "").strip()
+    pointers = list(spec.get("pointers") or [])
+
+    if disposition == "skipped":
+        if text or pointers:
+            return None, ("a skipped answer records only the disposition (no text, no "
+                          "pointers); its slot effect is the framework's (Story 10.5)")
+    elif disposition == "approved":
+        if not pointers:
+            return None, ("an approved answer must inherit >=1 source pointer "
+                          "(it grounds sourced claims like a fact-sheet entry)")
+        if not text:
+            return None, "an approved answer must carry the adopted recommendation text"
+    else:  # modified / replaced / answered
+        if not text:
+            return None, f"a {disposition} answer must carry the owner's text"
+        if pointers:
+            return None, (f"a {disposition} answer is owner judgment (interview-sourced); "
+                          "it carries no source pointers")
+
+    return ({"id": qid, "disposition": disposition, "provenance": provenance,
+             "answer": text or None, "pointers": pointers}, None)
+
+
+def cmd_answer(args):
+    """Stage 2: record interview answers with their disposition and the
+    provenance class it implies (Story 10.3), enforcing the D2 rules so a
+    malformed record cannot reach stage 3:
+
+      - approved  → must carry >=1 inherited source pointer and the adopted text;
       - modified / replaced / answered → must carry owner text, no pointers
         (owner judgment is interview-sourced, not source-pointed);
       - skipped   → carries neither text nor pointers; only the disposition,
         its slot effect deferred to the framework (Story 10.5).
+
+    Two forms share one validation core (`_validate_answer`):
+      - single answer via the flags (--id/--disposition/--text/--pointer);
+      - a batch via `--batch <file|->` (a JSON list of answer specs), validated
+        in one pass that reports EVERY rejection at once rather than failing on
+        the first — the round-trip cut of Story 13.6, so the interview does not
+        pay one reject-and-retry cycle per bad answer.
     """
-    disposition = args.disposition
-    if disposition not in DISPOSITION_PROVENANCE:
-        sys.stderr.write(
-            f"error: invalid disposition {disposition!r}. "
-            f"Valid: {', '.join(DISPOSITION_PROVENANCE)}.\n")
+    if args.batch is not None:
+        text = _read_text(args.batch)
+        try:
+            specs = json.loads(text)
+        except json.JSONDecodeError as e:
+            sys.stderr.write(f"error: --batch is not valid JSON: {e}\n")
+            return 1
+        if not isinstance(specs, list):
+            sys.stderr.write("error: --batch must be a JSON list of answer specs\n")
+            return 1
+        records, rejects = [], []
+        for i, spec in enumerate(specs):
+            if not isinstance(spec, dict):
+                rejects.append((i, "?", "answer spec must be a JSON object"))
+                continue
+            record, reason = _validate_answer(spec)
+            if reason is None:
+                records.append(record)
+            else:
+                rejects.append((i, spec.get("id", "?"), reason))
+        if rejects:
+            # One consolidated, actionable report — every problem, its id, and
+            # the fix — instead of one reject per attempt.
+            sys.stderr.write(f"{len(rejects)} of {len(specs)} answers rejected:\n")
+            for i, qid, reason in rejects:
+                sys.stderr.write(f"  [{i}] id={qid}: {reason}\n")
+            return 1
+        print(json.dumps(records, indent=2))
+        return 0
+
+    if not args.id or not args.disposition:
+        sys.stderr.write("error: single-answer form needs --id and --disposition "
+                         "(or use --batch for a list)\n")
         return 2
-    provenance = DISPOSITION_PROVENANCE[disposition]
-    text = (args.text or "").strip()
-    pointers = list(args.pointer or [])
-
-    if disposition == "skipped":
-        if text or pointers:
-            sys.stderr.write("error: a skipped answer records only the disposition "
-                             "(no text, no pointers); its slot effect is the framework's (Story 10.5)\n")
-            return 1
-    elif disposition == "approved":
-        if not pointers:
-            sys.stderr.write("error: an approved answer must inherit ≥1 source pointer "
-                             "(it grounds sourced claims like a fact-sheet entry)\n")
-            return 1
-        if not text:
-            sys.stderr.write("error: an approved answer must carry the adopted recommendation text\n")
-            return 1
-    else:  # modified / replaced / answered
-        if not text:
-            sys.stderr.write(f"error: a {disposition} answer must carry the owner's text\n")
-            return 1
-        if pointers:
-            sys.stderr.write(f"error: a {disposition} answer is owner judgment (interview-sourced); "
-                             "it carries no source pointers\n")
-            return 1
-
-    record = {"id": args.id, "disposition": disposition, "provenance": provenance,
-              "answer": text or None, "pointers": pointers}
+    record, reason = _validate_answer(
+        {"id": args.id, "disposition": args.disposition,
+         "text": args.text, "pointers": args.pointer})
+    if reason is not None:
+        sys.stderr.write(f"error: {reason}\n")
+        return 1
     print(json.dumps(record, indent=2))
     return 0
 
@@ -953,12 +1005,14 @@ def main(argv=None):
     sp.add_argument("--framework", required=True)
     sp.add_argument("state", nargs="?", default="-", help="stage-1 pipeline state JSON, or - for stdin")
     sp = sub.add_parser("answer")
-    sp.add_argument("--id", required=True, help="the question id this answer keys to")
-    sp.add_argument("--disposition", required=True,
-                    help="approved | modified | replaced | answered | skipped")
+    sp.add_argument("--id", help="the question id this answer keys to (single-answer form)")
+    sp.add_argument("--disposition",
+                    help="approved | modified | replaced | answered | skipped (single-answer form)")
     sp.add_argument("--text", help="the answer text (adopted recommendation, or owner's bullet)")
     sp.add_argument("--pointer", action="append",
                     help="inherited source pointer (approved answers only; repeatable)")
+    sp.add_argument("--batch", help="validate a JSON list of answer specs in one pass "
+                                    "(FILE or - for stdin); reports every rejection at once")
     sp = sub.add_parser("journal")
     sp.add_argument("--interview", required=True, help="the `interview` output JSON (carries triage), or - for stdin")
     sp.add_argument("--answers", help="recorded answer records (JSON list), or - for stdin")
