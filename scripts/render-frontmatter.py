@@ -84,7 +84,7 @@ def render(cfg, lang):
 def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--config-json", help="resolved config as JSON (FILE or - for stdin)")
-    p.add_argument("--root")
+    p.add_argument("--root", help="host-repo root (default: git top-level of cwd; errors outside a git repo)")
     p.add_argument("--global-config")
     p.add_argument("--repo-config")
     p.add_argument("--language", choices=["en", "ja"], default="en")

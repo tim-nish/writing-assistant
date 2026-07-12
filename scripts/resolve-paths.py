@@ -46,13 +46,22 @@ PLUGIN = "writing-assistant"
 # Roots
 # --------------------------------------------------------------------------
 def host_root(arg_root):
-    """The host repo root: explicit --root, else git toplevel, else cwd.
+    """The host repo root: explicit --root, else git toplevel of cwd.
 
-    Mirrors scripts/resolve-user-config.py so both resolvers agree on which
-    repo they are keyed to.
+    Never falls back to a bare cwd — outside a git repo this exits 2 telling
+    the caller to pass --root, instead of silently keying to whatever
+    directory the script happened to run from. Mirrors
+    scripts/resolve-user-config.py and scripts/resolve-writing-sources.py so
+    all resolvers agree on which repo they are keyed to; keep the three in
+    sync.
     """
     if arg_root:
-        return os.path.realpath(arg_root)
+        real = os.path.realpath(arg_root)
+        if not os.path.isdir(real):
+            print(f"error: --root {arg_root!r} resolved to {real}, which is not a directory",
+                  file=sys.stderr)
+            sys.exit(2)
+        return real
     try:
         top = subprocess.run(
             ["git", "rev-parse", "--show-toplevel"],
@@ -62,7 +71,9 @@ def host_root(arg_root):
             return os.path.realpath(top)
     except (subprocess.CalledProcessError, FileNotFoundError):
         pass
-    return os.path.realpath(os.getcwd())
+    print(f"error: cannot resolve the host repo: {os.getcwd()} is not inside a git repository; "
+          "pass --root <host-repo>", file=sys.stderr)
+    sys.exit(2)
 
 
 def state_root():
@@ -191,17 +202,17 @@ def main(argv=None):
     sub.add_parser("config-home", help="print the machine-global config dir")
 
     sp = sub.add_parser("repo-key", help="print the repo key (path slug of git toplevel)")
-    sp.add_argument("--root", help="host-repo root (default: git top-level, else cwd)")
+    sp.add_argument("--root", help="host-repo root (default: git top-level of cwd; errors outside a git repo)")
 
     sp = sub.add_parser("repo-dir", help="print <state-root>/<repo-key>")
-    sp.add_argument("--root", help="host-repo root (default: git top-level, else cwd)")
+    sp.add_argument("--root", help="host-repo root (default: git top-level of cwd; errors outside a git repo)")
 
     sp = sub.add_parser("new-run", help="create and print a fresh per-run workspace")
-    sp.add_argument("--root", help="host-repo root (default: git top-level, else cwd)")
+    sp.add_argument("--root", help="host-repo root (default: git top-level of cwd; errors outside a git repo)")
     sp.add_argument("--run-id", help="explicit run id (must not already exist; default: fresh timestamp id)")
 
     sp = sub.add_parser("run-workspace", help="print an existing run workspace path (no create)")
-    sp.add_argument("--root", help="host-repo root (default: git top-level, else cwd)")
+    sp.add_argument("--root", help="host-repo root (default: git top-level of cwd; errors outside a git repo)")
     sp.add_argument("--run-id", required=True, help="the run id whose workspace to print")
 
     args = p.parse_args(argv)

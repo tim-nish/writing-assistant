@@ -22,11 +22,16 @@ with the **same output contract** both times:
 Enumerate the exact set of files you may read by running:
 
 ```
-python3 ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-writing-sources.py files
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-writing-sources.py files --root <host-repo>
 ```
 
 (In a checkout run via `claude --plugin-dir`, `${CLAUDE_PLUGIN_ROOT}` is that
-checkout.) This list is the **only** material in scope. It already:
+checkout.) Every plugin script that resolves the host repo takes
+`--root <host-repo>`; when omitted it defaults to the git top-level of the
+current directory and **errors if cwd is not inside a git repo** — it never
+silently resolves against cwd. Pass `--root` explicitly whenever the session's
+working directory might not be the host repo. This list is the **only**
+material in scope. It already:
 
 - includes **only** the paths declared in the host repo's `writing-sources.yaml`
   (the host repo `.` and any sibling checkouts such as `../research-notes`);
@@ -63,8 +68,12 @@ A claim you cannot pin to a resolvable SOURCE does **not** go on the fact sheet 
 it routes to the **NEEDS-OWNER** list below. Validate the emitted sheet with:
 
 ```
-python3 ${CLAUDE_PLUGIN_ROOT}/scripts/validate-fact-sheet.py <harvest-doc>
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/validate-fact-sheet.py <harvest-doc> --root <host-repo>
 ```
+
+(`--root` defaults to the git top-level of cwd; the validator errors if the
+resolved host has no `writing-sources.yaml`, rather than mass-rejecting every
+pointer against an empty source list.)
 
 Every entry must pass; the rejects are exactly what the NEEDS-OWNER list captures.
 
@@ -97,7 +106,7 @@ workspace from the path resolver — in pipeline mode the draft-article skill
 passes its run workspace in (`$WS` from its Stage 0); standalone, mint one:
 
 ```
-WS=$(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-paths.py new-run)
+WS=$(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-paths.py new-run --root <host-repo>)
 # write the harvest document to "$WS/fact-sheet.md"
 ```
 
