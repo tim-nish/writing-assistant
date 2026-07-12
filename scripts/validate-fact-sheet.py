@@ -10,12 +10,17 @@ Contract enforced per entry (a `- ` bullet line):
   * SOURCE is one of:
       path:line@sha   a file pointer PINNED to a commit sha, so it stays
                       resolvable after edits shift line numbers
+      path:l1-l2@sha  a line-range pointer, accepted ONLY for a `quote` whose
+                      verbatim text spans consecutive physical lines (#119)
       sha             a commit sha (7-40 hex)
       https://…       a URL (external, declared-source citation)
-    A bare `path:line` with no `@sha` is rejected — pointers must pin.
+    A bare `path:line` with no `@sha` is rejected — pointers must pin. A line
+    range on any KIND except `quote` is rejected: single-line-only for facts,
+    with the REJECT naming the fix (split the range into per-line pointers).
   * A file pointer must resolve INSIDE a declared source repo (Story 3.1 scope);
-    the sha must exist there, the path must exist at that sha, and the line must
-    be in range. A `quote` entry's CLAIM must match the source line verbatim.
+    the sha must exist there, the path must exist at that sha, and the line(s)
+    must be in range. A `quote` entry's CLAIM must match the source line(s)
+    verbatim (the joined physical lines, for a multi-line span).
 
 An entry that fails any check is REJECTED (it belongs on the needs-owner list —
 Story 3.3 — not the fact sheet). Exit status is non-zero if any entry is
@@ -34,7 +39,22 @@ import sys
 KINDS = {"result", "decision", "number", "quote", "event"}
 SHA_RE = re.compile(r"^[0-9a-f]{7,40}$")
 FILEPIN_RE = re.compile(r"^(?P<path>.+):(?P<line>\d+)@(?P<sha>[0-9a-f]{7,40})$")
+# A line-range pointer `path:line1-line2@sha` — accepted ONLY for a `quote`
+# whose verbatim text genuinely spans consecutive physical lines (#119).
+FILEPINRANGE_RE = re.compile(
+    r"^(?P<path>.+):(?P<l1>\d+)-(?P<l2>\d+)@(?P<sha>[0-9a-f]{7,40})$")
 URL_RE = re.compile(r"^https?://\S+$")
+
+
+def _quote_matches(claim, src_text):
+    """Verbatim test, lenient about surrounding quote marks and whitespace, as
+    the single-line check has always been. `src_text` is the source line(s)
+    with each physical line stripped and joined by a single space."""
+    quoted = claim.strip()
+    inner = re.match(r'^["“](.*)["”]$', quoted)
+    if inner:
+        quoted = inner.group(1)
+    return quoted in src_text or src_text in quoted
 
 
 def _load_rws():
@@ -60,6 +80,26 @@ def declared_repo_for(abspath, sources):
     return None
 
 
+def _resolve_lines(path, sha, host, sources):
+    """Resolve a pinned file pointer to its source lines at the commit.
+
+    Returns (lines, rel, None) on success, (None, None, reason) on rejection,
+    or (None, rel, None) for the not-a-git-repo structural pass."""
+    abspath = os.path.realpath(os.path.join(host, path))
+    repo = declared_repo_for(abspath, sources)
+    if repo is None:
+        return None, None, f"source path is outside the declared repos: {path}"
+    rel = os.path.relpath(abspath, repo)
+    if _git(repo, "rev-parse", "--git-dir").returncode != 0:
+        return None, rel, None           # not a git repo: structural pass (pin present)
+    if _git(repo, "cat-file", "-e", f"{sha}^{{commit}}").returncode != 0:
+        return None, None, f"commit {sha} not found in {os.path.basename(repo)}"
+    show = _git(repo, "show", f"{sha}:{rel}")
+    if show.returncode != 0:
+        return None, None, f"path {rel} does not exist at commit {sha}"
+    return show.stdout.split("\n"), rel, None
+
+
 def validate_source(source, kind, claim, host, sources):
     """Return None if the source is valid, else a rejection reason."""
     if URL_RE.match(source):
@@ -70,34 +110,51 @@ def validate_source(source, kind, claim, host, sources):
                 if _git(s["path"], "cat-file", "-e", f"{source}^{{commit}}").returncode == 0:
                     return None
         return f"commit {source} not found in any declared repo"
+
+    # Line-range pointer `path:line1-line2@sha` — only a `quote` may span
+    # consecutive physical lines; every other KIND is single-line (#119).
+    rng = FILEPINRANGE_RE.match(source)
+    if rng:
+        l1, l2, sha, path = int(rng["l1"]), int(rng["l2"]), rng["sha"], rng["path"]
+        if kind != "quote":
+            return (f"SOURCE must be a single line for KIND '{kind}'; a line range is "
+                    f"only allowed for a 'quote' that spans consecutive physical lines "
+                    f"— split {l1}-{l2} into per-line pointers")
+        if l2 < l1:
+            return f"quote range {l1}-{l2} is backwards (line1 must be <= line2)"
+        if l1 == l2:
+            return (f"quote range {l1}-{l2} spans a single line; use a single-line "
+                    f"pointer path:{l1}@{sha}")
+        lines, rel, reason = _resolve_lines(path, sha, host, sources)
+        if reason:
+            return reason
+        if lines is None:
+            return None                  # not a git repo: structural pass
+        if l2 > len(lines):
+            return f"line {l2} out of range at {rel}@{sha} ({len(lines)} lines)"
+        span = " ".join(lines[i].strip() for i in range(l1 - 1, l2))
+        if not _quote_matches(claim, span):
+            return "quote CLAIM does not match the source lines verbatim (check the span boundary)"
+        return None
+
     m = FILEPIN_RE.match(source)
     if not m:
+        if re.match(r"^.+:\d+-\d+$", source):
+            return ("file pointer is not pinned to a commit (use path:line1-line2@sha; "
+                    "a line range is valid only for a multi-line 'quote')")
         if re.match(r"^.+:\d+$", source):
             return "file pointer is not pinned to a commit (use path:line@sha)"
         return f"unrecognized SOURCE form: {source!r}"
     path, line, sha = m["path"], int(m["line"]), m["sha"]
-    abspath = os.path.realpath(os.path.join(host, path))
-    repo = declared_repo_for(abspath, sources)
-    if repo is None:
-        return f"source path is outside the declared repos: {path}"
-    rel = os.path.relpath(abspath, repo)
-    if _git(repo, "rev-parse", "--git-dir").returncode != 0:
-        return None                      # not a git repo: structural pass (pin present)
-    if _git(repo, "cat-file", "-e", f"{sha}^{{commit}}").returncode != 0:
-        return f"commit {sha} not found in {os.path.basename(repo)}"
-    show = _git(repo, "show", f"{sha}:{rel}")
-    if show.returncode != 0:
-        return f"path {rel} does not exist at commit {sha}"
-    lines = show.stdout.split("\n")
+    lines, rel, reason = _resolve_lines(path, sha, host, sources)
+    if reason:
+        return reason
+    if lines is None:
+        return None                      # not a git repo: structural pass
     if line < 1 or line > len(lines):
         return f"line {line} out of range at {rel}@{sha} ({len(lines)} lines)"
     if kind == "quote":
-        src_line = lines[line - 1].strip()
-        quoted = claim.strip()
-        inner = re.match(r'^[\"“](.*)[\"”]$', quoted)
-        if inner:
-            quoted = inner.group(1)
-        if quoted not in src_line and src_line not in quoted:
+        if not _quote_matches(claim, lines[line - 1].strip()):
             return "quote CLAIM does not match the source line verbatim"
     return None
 

@@ -32,7 +32,8 @@ grep -q 'validate-fact-sheet.py' "$SKILL" && ok "skill wires in the validator" |
 work=$(mktemp -d); trap 'rm -rf "$work"' EXIT
 h="$work/host"; mkdir -p "$h"
 git -C "$h" init -q
-printf 'intro line\nThroughput doubled under load\n"exact quoted words"\n' > "$h/notes.md"
+# lines 4-5 are a naturally two-line quote (e.g. a wrapped table cell), #119.
+printf 'intro line\nThroughput doubled under load\n"exact quoted words"\nfirst half of a wrapped\nsecond half of the cell\n' > "$h/notes.md"
 git -C "$h" add notes.md
 git -C "$h" -c user.email=t@e -c user.name=t commit -q -m init
 sha=$(git -C "$h" rev-parse HEAD)
@@ -74,6 +75,20 @@ reason | grep -q 'verbatim' && ok "reject: quote not matching the source line ve
 # 5. Scope consistency with Story 3.1 — undeclared repo is unsourceable.
 emit "- Leaked / ../secret/x.md:1@$sha / event"
 reason | grep -q 'outside the declared repos' && ok "reject: pointer into an undeclared repo" || err "undeclared-repo pointer accepted"
+
+# 5b. SOURCE grammar (#119): single-line for facts, multi-line spans for quotes.
+emit "- Ranged fact / notes.md:2-3@$sha / result"
+reason | grep -Eq 'single line|split 2-3' && ok "reject: line range on a non-quote KIND names the fix" || err "range on a fact accepted"
+emit '- "first half of a wrapped second half of the cell" / notes.md:4-5@'"$sha"' / quote'
+V && ok "valid: multi-line quote span matches joined physical lines" || err "valid multi-line quote span rejected"
+emit '- "text that is not on those lines" / notes.md:4-5@'"$sha"' / quote'
+reason | grep -q 'verbatim' && ok "reject: multi-line quote not matching the span verbatim" || err "non-verbatim multi-line quote accepted"
+emit "- Collapsed range / notes.md:4-4@$sha / quote"
+reason | grep -q 'single line' && ok "reject: single-line range steered to path:line@sha" || err "collapsed range accepted"
+emit '- "wrapped" / notes.md:5-4@'"$sha"' / quote'
+reason | grep -q 'backwards' && ok "reject: backwards quote range" || err "backwards range accepted"
+emit "- Unpinned range / notes.md:4-5 / quote"
+reason | grep -q 'not pinned to a commit' && ok "reject: unpinned line range" || err "unpinned range accepted"
 
 # 6. Exit status is a hard gate + --rejected lists rejects for Story 3.3.
 printf -- '- Good / notes.md:2@%s / result\n- Bad / nope:1 / result\n' "$sha" > "$work/fs.md"
