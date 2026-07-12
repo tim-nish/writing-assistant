@@ -94,8 +94,17 @@ A useful candidate you cannot attach a resolvable source to goes to the
 - **REASON** — why it could not be sourced (e.g. "no artifact in declared
   sources", "owner's opinion", "unverified number") — enough context to seed the
   gap interview.
-- **TOPIC** ∈ {surprise, significance, opinion, warning, other} — the gap-
-  interview categories (Epic 4), so items are groupable into ≤5 questions.
+- **TOPIC** ∈ {surprise, significance, opinion, warning, tradeoff, audience,
+  other} — the gap-interview categories, so items are groupable into ≤5
+  questions (the cap is on questions asked, not on the topic set). Pick the one
+  that best fits, using these one-line senses (amended 2026-07-13, #142):
+  - **surprise** — something unexpected the owner learned while building it;
+  - **significance** — why a result/number matters, which one counts most;
+  - **opinion** — a stance the owner holds and would defend, not a fact;
+  - **warning** — a caveat/limitation/pitfall a reader must know before adopting;
+  - **tradeoff** — what a decision cost — what was given up to get it;
+  - **audience** — who the piece is for and what they should do after reading;
+  - **other** — a real gap that fits none of the above.
 
 Partition rule: a candidate lands in **exactly one** of the fact sheet or
 NEEDS-OWNER — never both. **Always emit the `# NEEDS-OWNER` heading**, even when
