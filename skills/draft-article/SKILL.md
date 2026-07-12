@@ -281,10 +281,12 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py provenance --map <map> &
 
 `sourced` carries ≥1 pointer, `derived` ≥2, `narration`/`verify` none.
 
-**Independent verify-provenance (Story 11.2).** The map is then graded by
+**Independent verify-provenance (Story 11.2, NFR13).** The map is then graded by
 `verify-provenance` — a **standalone** check that does **not** share this
-drafting context (NFR13), so the agent that wrote the text never grades its own
-claim/narration boundary:
+drafting context, so the agent that wrote the text never grades its own
+claim/narration boundary. Operationally, this means the semantic judgment runs
+in a **fresh judge subagent that never saw the drafting turn** — spawn it with
+the harness Task tool, never as an inline continuation of this context:
 
 ```
 python3 ${CLAUDE_PLUGIN_ROOT}/scripts/verify-provenance.py --map "$WS/provenance-map.txt" \
@@ -292,13 +294,17 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/verify-provenance.py --map "$WS/provenance
 ```
 
 It resolves every `derived` (and `sourced`) pointer against the declared
-fact-sheet entries **mechanically**, and consumes an **independent cheap-tier
-judge's** verdicts for the semantic tests — a `narration` sentence that asserts a
-checkable proposition **fails the falsifiability test** (a gate failure), and a
+fact-sheet entries **mechanically**, and consumes the **isolated judge
+subagent's** verdicts for the semantic tests — a `narration` sentence that asserts
+a checkable proposition **fails the falsifiability test** (a gate failure), and a
 `derived` claim adding any of the six forbidden categories is a gate failure.
-Run the judge on the sentences `--list-narration` / `--list-derived` surface,
-from a context with no access to the drafting rationale. A clean map passes with
-no findings; any finding blocks stage progression.
+**Spawn a cheap-tier judge subagent** and hand it *only* the sentences
+`--list-narration` / `--list-derived` surface **plus the fact-sheet entries they
+cite** — never the drafting rationale, the interview, or your reasons for each
+classification. The subagent writes its pass/fail verdicts to
+`$WS/provenance-verdicts.txt`, which the command consumes. A clean map passes
+with no findings; any finding blocks stage progression. (These judge spawns cost
+turns against the pipeline budget — see #118's durability/resume constraint.)
 
 The marker format is **exactly `[VERIFY: <reason>]`** (uppercase, colon-space,
 non-empty reason) so Stage 4 and the lint (Story 5.1) can find every one. Check
@@ -394,7 +400,12 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py quality-gate \
   `sourced` claims, no `derived`/`narration` tissue).
 - **Dimensions 1–3** are judged by **one single-pass cheap-tier rubric judge**
   emitting **pass/fail per dimension + failing locations, no rewritten text**;
-  its verdicts feed `--judge`.
+  its verdicts feed `--judge`. Like `verify-provenance` (NFR13), this judge runs
+  in a **fresh subagent that never saw the drafting turn** — spawn it with the
+  harness Task tool, never inline; hand it only the draft, the rubric, and the
+  provenance map, never the drafting rationale.
+  So the drafting context never grades its own rubric pass. (These spawns cost
+  turns against the pipeline budget — see #118.)
 
 **On failure — bounded retry, then surface (never silent):**
 
