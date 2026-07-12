@@ -165,9 +165,12 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/lint-article <draft>
 ```
 
 It checks frontmatter conformance to the config `article` schema, title length +
-claim verb, pointer-block presence, heading density, dead links, and residual
-`[VERIFY]` markers — reporting each with `path:line` and consuming **no LLM
-tokens**. Fix every lint defect before spending a model pass; a draft with
+claim verb, pointer-block presence, heading density, dead links, residual
+`[VERIFY]` markers, and **un-stripped framework-template residue** — `{slot}`
+placeholders, `*(prompt)*` guidance, `[SKIP: …]` / `(~N words)` annotations, and
+the renderer's `NOT PUBLISHABLE` marker (an unfilled GATE slot is mechanically
+detected here, never left to reviewer discipline) — reporting each with
+`path:line` and consuming **no LLM tokens**. Fix every lint defect before spending a model pass; a draft with
 `[VERIFY]` markers is not review-ready.
 
 **Configuration backstop (CAP-5, Story 7.4).** The lint pass also re-runs the

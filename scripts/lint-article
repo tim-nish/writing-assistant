@@ -18,6 +18,13 @@ Checks (all against the config `article` schema, never a hardcoded site schema):
      verifies http(s) links (off by default so the lint stays hermetic/offline).
   6. markers     — no `[VERIFY]` marker remains (draft-pipeline stage-4 exit gate,
      re-checked here so an unverified claim can never reach review).
+  7. template    — no framework-template residue remains in the body (issue #121):
+     `{slot}` placeholders, `*(prompt)*` guidance, `[SKIP: …]` / `(~N words)`
+     slot annotations, or the renderer's `NOT PUBLISHABLE` marker. Per
+     frameworks/CONVENTIONS.md a slot is unfilled while it still shows this
+     text, and an unfilled GATE slot is not publishable — checked mechanically
+     here because self-review is unreliable on this defect class. Fenced code
+     blocks and inline code spans are exempt.
 
 Config source: `--config-json FILE` (or `-` for stdin), else `resolve-user-config.py`
 resolves it exactly as every other skill does (machine-global + repo-local override).
@@ -233,6 +240,40 @@ def check_verify_markers(lines, findings):
             findings.append((idx + 1, "markers", "unresolved [VERIFY] marker"))
 
 
+_FENCE_RE = re.compile(r"^\s{0,3}(```|~~~)")
+_INLINE_CODE_RE = re.compile(r"`[^`]*`")
+_TEMPLATE_RESIDUE = (
+    (re.compile(r"\{[^{}\n]*\}"), "unfilled {slot} placeholder"),
+    (re.compile(r"\*\([^)]*\)\*"), "template *(prompt)* text"),
+    (re.compile(r"\[SKIP:\s*[^\]]+\]"), "[SKIP: …] slot annotation"),
+    (re.compile(r"\(~\d+\s*words?\b[^)]*\)"), "(~N words) slot annotation"),
+)
+
+
+def check_template_residue(lines, body_start, findings):
+    """Un-stripped framework-template placeholders (issue #121). Body only —
+    frontmatter legitimately uses YAML flow-map braces — with fenced code
+    blocks and inline code spans exempt, since prose about the slot syntax
+    belongs in code markup."""
+    in_fence = False
+    for idx in range(body_start - 1, len(lines)):
+        line = lines[idx]
+        if _FENCE_RE.match(line):
+            in_fence = not in_fence
+            continue
+        if in_fence:
+            continue
+        stripped = _INLINE_CODE_RE.sub("", line)
+        for pat, what in _TEMPLATE_RESIDUE:
+            m = pat.search(stripped)
+            if m:
+                findings.append((idx + 1, "template",
+                                 f"{what} not stripped: {m.group(0)!r}"))
+        if "NOT PUBLISHABLE" in stripped:
+            findings.append((idx + 1, "template",
+                             "renderer NOT PUBLISHABLE marker present"))
+
+
 # --------------------------------------------------------------------------
 # Driver
 # --------------------------------------------------------------------------
@@ -251,6 +292,7 @@ def lint_file(path, cfg, check_http):
     check_heading_density(lines, body_start, findings)
     check_links(lines, path, check_http, findings)
     check_verify_markers(lines, findings)
+    check_template_residue(lines, body_start, findings)
     findings.sort(key=lambda f: (f[0], f[1]))
     return findings
 

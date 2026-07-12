@@ -60,7 +60,8 @@ fi
 
 # 2. A draft with one seeded defect of each kind — every kind must be reported.
 #    Seeds: missing `date` (schema), bare-noun title, no site_url (pointer),
-#    a >250-word heading gap, a dead relative link, a remaining [VERIFY] marker.
+#    a >250-word heading gap, a dead relative link, a remaining [VERIFY] marker,
+#    and un-stripped framework-template residue (issue #121).
 cat > "$work/dirty.md" <<'EOF'
 ---
 slug: x
@@ -77,6 +78,11 @@ Intro paragraph with no heading at all.
 See [the notes](./does-not-exist.md) for details.
 
 This claim is unsupported [VERIFY: no source yet] and stays in the body.
+
+## GATE {What actually happened}                    (~120 words) [SKIP: blocker]
+{(The surprise, WITH the artifact.)}
+*(The shared pointer block — rendered from user config.)*
+NOT PUBLISHABLE
 EOF
 python3 -c "print('lorem ipsum dolor '*90)" >> "$work/dirty.md"
 
@@ -96,6 +102,41 @@ check_code pointer  "pointer-block (site_url absent)"
 check_code headings "heading-density (>250-word gap)"
 check_code links    "dead-link"
 check_code markers  "[VERIFY] marker"
+check_code template "template residue (unfilled GATE slot)"
+
+# 2b. Each residue form is individually reported, and code markup is exempt.
+res_count=$(printf '%s\n' "$out" | grep -c '\[template\]')
+[ "$res_count" -ge 5 ] && ok "all residue forms reported ({slot}, *(prompt)*, [SKIP], (~N words), NOT PUBLISHABLE)" \
+  || err "expected >=5 [template] findings, got $res_count"
+
+cat > "$work/codeok.md" <<'EOF'
+---
+slug: slots
+title: "Slot syntax beats ad-hoc templates"
+date: 2026-07-09
+mode: canonical
+language: en
+summary: s.
+topics: [a]
+related: { projects: [], publications: [], products: [] }
+---
+
+## H
+
+A filled draft may mention `{slot}` and `*(prompt)*` in inline code, or fenced:
+
+```
+## GATE {Evidence} (~120 words) [SKIP: blocker]
+NOT PUBLISHABLE
+```
+
+Body more at [example.com](https://example.com).
+EOF
+if python3 "$LINT" "$work/codeok.md" --config-json "$work/cfg.json" 2>/dev/null | grep -q '\[template\]'; then
+  err "template residue inside code markup should not be flagged"
+else
+  ok "code-markup slot syntax is exempt from the template check"
+fi
 
 # 3. Every reported defect carries a file:line location.
 if printf '%s\n' "$out" | grep -vq "^$work/dirty.md:[0-9][0-9]*:"; then
