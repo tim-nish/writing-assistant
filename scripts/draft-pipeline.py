@@ -903,7 +903,7 @@ def main(argv=None):
     sp = sub.add_parser("variants")
     sp.add_argument("draft", nargs="?", default="-", help="verified draft, or - for stdin")
     sp.add_argument("--config-json", help="resolved config as JSON (FILE or - for stdin)")
-    sp.add_argument("--root")
+    sp.add_argument("--root", help="host-repo root (default: git top-level of cwd; errors outside a git repo)")
     sp.add_argument("--global-config")
     sp.add_argument("--repo-config")
     sp.add_argument("--out", help="output dir (default: resolved output.drafts)")

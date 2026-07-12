@@ -116,11 +116,18 @@ def validate_entry(raw, host, sources):
 def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("factsheet", nargs="?", default="-", help="fact-sheet file, or - for stdin")
-    p.add_argument("--root", help="host-repo root (default: git top-level, else cwd)")
+    p.add_argument("--root", help="host-repo root (default: git top-level of cwd; errors outside a git repo)")
     p.add_argument("--rejected", action="store_true", help="print only rejected entries (for the needs-owner list)")
     args = p.parse_args(argv)
 
     host = rws.host_root(args.root)
+    # Validating against a host with no writing-sources.yaml would reject every
+    # file pointer as "outside the declared repos" — a misleading mass-REJECT
+    # when the real problem is a wrong root. Fail loudly instead.
+    if not os.path.isfile(os.path.join(host, rws.SOURCES_FILE)):
+        print(f"error: no {rws.SOURCES_FILE} in host root {host} — "
+              "wrong --root, or run from inside the host repo", file=sys.stderr)
+        return 2
     sources = rws.get_sources(rws.read_lines(host), host)
     text = sys.stdin.read() if args.factsheet == "-" else open(args.factsheet, encoding="utf-8").read()
 

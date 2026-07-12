@@ -5,7 +5,8 @@ Stdlib-only by design (host repos guarantee no venv / no PyYAML), so this reads
 the small, flat writing-sources.yaml subset directly rather than through a YAML
 library. Write-back is line surgery, so existing comments and ordering survive.
 
-Subcommands (each takes --root; default: the git top-level, else cwd):
+Subcommands (each takes --root; default: the git top-level of cwd — outside a
+git repo the script errors rather than silently resolving against cwd):
 
   draft-location            Print the declared output.drafts value and exit 0.
                             If it is undeclared, exit 3 (the draft skill then
@@ -47,9 +48,21 @@ NEEDS_PROMPT = 3  # draft-location: no output.drafts declared
 
 
 def host_root(arg_root):
-    """Resolve the host-repo root: explicit --root, else git top-level, else cwd."""
+    """Resolve the host-repo root: explicit --root, else git top-level of cwd.
+
+    Never falls back to a bare cwd — outside a git repo this exits 2 telling
+    the caller to pass --root, instead of silently keying to whatever
+    directory the script happened to run from. Mirrored in
+    scripts/resolve-paths.py and scripts/resolve-user-config.py; keep the
+    three in sync.
+    """
     if arg_root:
-        return os.path.realpath(arg_root)
+        real = os.path.realpath(arg_root)
+        if not os.path.isdir(real):
+            print(f"error: --root {arg_root!r} resolved to {real}, which is not a directory",
+                  file=sys.stderr)
+            sys.exit(2)
+        return real
     try:
         top = subprocess.run(
             ["git", "rev-parse", "--show-toplevel"],
@@ -59,7 +72,9 @@ def host_root(arg_root):
             return os.path.realpath(top)
     except (subprocess.CalledProcessError, FileNotFoundError):
         pass
-    return os.path.realpath(os.getcwd())
+    print(f"error: cannot resolve the host repo: {os.getcwd()} is not inside a git repository; "
+          "pass --root <host-repo>", file=sys.stderr)
+    sys.exit(2)
 
 
 def read_lines(root):
@@ -271,7 +286,7 @@ def cmd_files(args):
 
 def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("--root", help="host-repo root (default: git top-level, else cwd)")
+    p.add_argument("--root", help="host-repo root (default: git top-level of cwd; errors outside a git repo)")
     sub = p.add_subparsers(dest="cmd", required=True)
     sub.add_parser("draft-location")
     sp = sub.add_parser("set-draft-location")

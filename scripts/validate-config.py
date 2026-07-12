@@ -177,7 +177,7 @@ def validate_writing_sources(args, findings):
 def main(argv=None):
     p = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("--root", help="host-repo root (default: git top-level, else cwd)")
+    p.add_argument("--root", help="host-repo root (default: git top-level of cwd; errors outside a git repo)")
     p.add_argument("--global-config", help="override the machine-global user-config path")
     p.add_argument("--repo-config", help="override the repo-local user-config path")
     p.add_argument("--skip-writing-sources", action="store_true",

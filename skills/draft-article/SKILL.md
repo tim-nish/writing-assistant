@@ -39,8 +39,13 @@ skill references that one convention rather than restating its own wording.
 the resolved configuration:
 
 ```
-python3 ${CLAUDE_PLUGIN_ROOT}/scripts/validate-config.py
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/validate-config.py --root <host-repo>
 ```
+
+(`--root` — accepted by every plugin script that resolves the host repo —
+defaults to the git top-level of the current directory and errors if cwd is
+not inside a git repo; pass it explicitly whenever the session's working
+directory might not be the host repo.)
 
 It **halts** on any unresolved example placeholder, malformed URL (e.g. a
 double-slash `canonical_url`), or missing required key, printing a
@@ -67,7 +72,7 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py start <framework> <sourc
 Mint this run's workspace once, and write **every** intermediate under it:
 
 ```
-WS=$(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-paths.py new-run)
+WS=$(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-paths.py new-run --root <host-repo>)
 ```
 
 `$WS` is a fresh per-run workspace directory **outside the host repo**
