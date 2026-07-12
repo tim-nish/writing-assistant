@@ -104,13 +104,36 @@ Every LLM pass emits **findings only**, in this exact format, one per line:
   summary** of the article back to the owner. Output spent on anything but
   findings is wasted.
 
+## Intent anchors (claim & audience)
+
+Two facts about the author's intent anchor this review: the article's **claim**
+(the one point it exists to communicate) and its **intended audience**. Resolve
+each, in this order:
+
+1. **Interview journal** — when the draft came out of the draft-article
+   pipeline, its run workspace holds an interview journal keyed by question id
+   (Story 10.4). The claim anchor is the answer to **q2 (significance — the
+   result that matters most and why)**; the audience anchor is the answer to
+   **q5 (audience)**. Every framework's interview asks both. A question the
+   journal records as *suppressed* was covered by the fact sheet — use the
+   covering entries it names as the anchor.
+2. **Owner, once** — for a hand-written draft (no journal), ask the owner the
+   two anchor questions at review start — "what is this article's one claim?"
+   and "who exactly is it for?" — and use those answers.
+3. **Degraded mode** — if the owner is unavailable or declines, run all passes
+   anyway, but the cold-read comparison below cannot produce a mismatch
+   **blocker**: report its Q1/Q2 answers as **informational** ("the cold reader
+   took the claim to be … / the audience to be …") and let the owner judge.
+   Never invent an anchor from the draft itself — comparing the draft to
+   intent derived from the draft is circular.
+
 ## Shared reviewer preamble (structure & prose passes)
 
 Both repo-grounded LLM passes open with this framing, filled from the draft:
 
 > You are a senior engineer skimming {dev.to | Zenn}. You give an article 60
 > seconds to earn a full read; your time is scarce and your standards are high.
-> The intended reader: {audience from the article's interview answer #5}.
+> The intended reader: {the audience intent anchor}.
 > You have repo access — when the draft states a fact about the project, check it
 > against the sources before flagging or passing it.
 >
@@ -230,12 +253,16 @@ the reader rubric:
 5. Would you **read past the first screen**? Why / why not?
 6. What would you **do after** reading it?
 
-**Then compare the cold-read answers to the author's intent** — the article's
-interview answers **#2 (the point/claim)** and **#5 (the intended audience)**:
+**Then compare the cold-read answers to the author's intent** — the two
+**intent anchors** resolved above (journal **q2** for the claim, journal **q5**
+for the audience; owner-stated for a journal-less draft):
 
-- A **mismatch on Q1 (claim) or Q2 (audience)** is a **blocker** — the draft does
-  not communicate its own claim or reader, which unexplained repo-internal context
-  typically causes.
+- A **mismatch on Q1 (claim) or Q2 (audience)** against the anchors is a
+  **blocker** — the draft does not communicate its own claim or reader, which
+  unexplained repo-internal context typically causes. In **degraded mode** (no
+  journal and no owner-stated anchors) this comparison has nothing to compare
+  against: report the cold reader's Q1/Q2 answers as informational instead —
+  never fabricate anchors, and never skip the cold read itself.
 - **Q3 (confusion) and Q4 (assumed knowledge)** hits are **should-fixes**.
 - Q5/Q6 answers inform severity but are not themselves findings.
 
