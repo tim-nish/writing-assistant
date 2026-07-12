@@ -75,6 +75,10 @@ python3 "$VP" --map "$work/good.txt" --list-derived | grep -q 'P1.S2: fs-12, fs-
 # SKILL wires the independent check and states it does not share drafting context.
 grep -q 'verify-provenance.py' "$SKILL" && grep -qi 'does .*not.*share\|not share this' "$SKILL" \
   && ok "SKILL wires the independent verify-provenance (no shared context)" || err "SKILL does not wire independent verify-provenance"
+# NFR13 operationalized (#123): the semantic judge runs in a subagent that never
+# saw the drafting turn, spawned via the Task tool — not an inline continuation.
+grep -qi 'subagent' "$SKILL" && grep -qi 'never saw the drafting turn' "$SKILL" \
+  && ok "SKILL spawns the provenance judge as an isolated subagent (NFR13)" || err "SKILL does not spawn an isolated judge subagent"
 
 if [ "$fail" -eq 0 ]; then
   printf '\nAll verify-provenance checks passed.\n'; exit 0

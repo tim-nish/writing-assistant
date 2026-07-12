@@ -87,6 +87,12 @@ grep -qiE '2 revision cycles|at most 2' "$SKILL" && ok "SKILL: at most 2 revisio
 grep -qi 'verify-provenance' "$SKILL" && grep -qi 're-run' "$SKILL" && ok "SKILL: revision re-runs both rubric and verify-provenance" || err "SKILL missing both-gates re-run"
 grep -qi 'publish blocker' "$SKILL" && ok "SKILL: surviving failure surfaces as a publish blocker" || err "SKILL missing blocker surface"
 grep -qi 'NFR12\|owner-approved content' "$SKILL" && ok "SKILL: owner-approved content never silently altered (NFR12)" || err "SKILL missing NFR12 protection"
+# NFR13 extended to the CAP-7 rubric judge (#123): dims 1-3 judged in a fresh
+# subagent that never saw the drafting turn, so the drafting context never grades
+# its own rubric pass.
+grep -qi 'fresh subagent that never saw the drafting turn' "$SKILL" \
+  && grep -qi 'never grades its own rubric pass' "$SKILL" \
+  && ok "SKILL: CAP-7 rubric judge runs in an isolated subagent (NFR13)" || err "SKILL missing rubric-judge isolation"
 
 if [ "$fail" -eq 0 ]; then
   printf '\nAll quality-gate checks passed.\n'; exit 0
