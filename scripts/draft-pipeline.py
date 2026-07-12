@@ -991,6 +991,46 @@ def cmd_resume(args):
     return 0
 
 
+# A completed run's final checkpoint carries next_stage == DONE_STAGE so
+# `autostart` never resumes it (Story 13.12).
+DONE_STAGE = "done"
+
+
+def cmd_autostart(args):
+    """Stage 0: automatic resume (Story 13.12). Resumption is the DEFAULT, not an
+    agent choice — so instead of always minting a new run, find the newest
+    in-progress run for this repo (a run workspace whose checkpoint records a
+    `next_stage` other than `done`) and resume it; if none exists, mint a fresh
+    run at stage 1. Prints the workspace to use and where to start:
+      {"resumed": true,  "ws": …, "run_id": …, "next_stage": …}  # continue here
+      {"resumed": false, "ws": …, "run_id": …, "next_stage": "harvest"}  # new run
+    A large draft completing across several invocations is the normal model."""
+    rp = _load("resolve-paths.py")
+    root = rp.host_root(args.root)
+    base = rp.runs_dir(root)
+    if os.path.isdir(base):
+        # Run ids are timestamp-based, so reverse-lexicographic == newest-first.
+        for run_id in sorted(os.listdir(base), reverse=True):
+            cp = os.path.join(base, run_id, CHECKPOINT_FILE)
+            if not os.path.isfile(cp):
+                continue
+            try:
+                with open(cp, encoding="utf-8") as f:
+                    state = json.load(f)
+            except (OSError, json.JSONDecodeError):
+                continue
+            if state.get("next_stage") and state["next_stage"] != DONE_STAGE:
+                out = {"resumed": True, "ws": os.path.join(base, run_id), "run_id": run_id}
+                out.update(state)
+                print(json.dumps(out, indent=2))
+                return 0
+    # No in-progress run — start fresh (this is the AC4 no-false-resume path).
+    ws = rp.new_run(root)
+    print(json.dumps({"resumed": False, "ws": ws,
+                      "run_id": os.path.basename(ws), "next_stage": "harvest"}, indent=2))
+    return 0
+
+
 def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -1004,6 +1044,8 @@ def main(argv=None):
     sp.add_argument("state", nargs="?", default="-", help="the stage's output state JSON, or - for stdin")
     sp = sub.add_parser("resume", help="report where to resume a run from its workspace checkpoint (Story 13.5)")
     sp.add_argument("--ws", required=True, help="the run workspace ($WS) to resume")
+    sp = sub.add_parser("autostart", help="auto-resume the newest in-progress run, else mint a fresh one (Story 13.12)")
+    sp.add_argument("--root", help="host-repo root (default: git top-level of cwd; errors outside a git repo)")
     sp = sub.add_parser("interview")
     sp.add_argument("--framework", required=True)
     sp.add_argument("state", nargs="?", default="-", help="stage-1 pipeline state JSON, or - for stdin")
@@ -1046,7 +1088,7 @@ def main(argv=None):
     args = p.parse_args(argv)
     return {
         "start": cmd_start, "consume": cmd_consume, "interview": cmd_interview,
-        "checkpoint": cmd_checkpoint, "resume": cmd_resume,
+        "checkpoint": cmd_checkpoint, "resume": cmd_resume, "autostart": cmd_autostart,
         "answer": cmd_answer, "journal": cmd_journal, "provenance": cmd_provenance,
         "quality-gate": cmd_quality_gate,
         "verify-markers": cmd_verify_markers, "verify": cmd_verify, "reroute": cmd_reroute,

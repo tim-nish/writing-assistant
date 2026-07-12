@@ -54,9 +54,38 @@ python3 "$DP" resume --ws "$WS" | jget 'd["next_stage"]' | grep -q quality-gate 
 printf '{"stage":"consume"}' | python3 "$DP" checkpoint --ws "$WS" - 2>&1 | grep -q 'no .next_stage' \
   && ok "reject: state without next_stage is not a valid checkpoint" || err "state without next_stage accepted"
 
+# --- Automatic resume (Story 13.12) — autostart picks the workspace ----------
+# Sandboxed state root + a git host repo so resolve-paths resolves hermetically.
+host="$work/host"; mkdir -p "$host"; git -C "$host" init -q
+export XDG_STATE_HOME="$work/state"
+AUTO() { python3 "$DP" autostart --root "$host"; }
+
+# 1. No runs yet -> resumed=false, fresh run at harvest (the AC4 no-false-resume path).
+out=$(AUTO)
+echo "$out" | jget 'd["resumed"]' | grep -q False && ok "autostart: no run -> resumed=false (fresh)" || err "autostart false-resumed with no run"
+echo "$out" | jget 'd["next_stage"]' | grep -q harvest && ok "autostart: fresh run starts at harvest" || err "fresh autostart not at harvest"
+ws1=$(echo "$out" | jget 'd["ws"]')
+[ -d "$ws1" ] && ok "autostart: minted a real workspace dir" || err "autostart workspace missing"
+
+# 2. An in-progress checkpoint in that run -> autostart auto-resumes it.
+printf '{"stage":"consume","next_stage":"interview"}' | python3 "$DP" checkpoint --ws "$ws1" - >/dev/null
+out=$(AUTO)
+echo "$out" | jget 'd["resumed"]' | grep -q True && ok "autostart: in-progress run -> resumed=true (automatic)" || err "autostart did not auto-resume"
+echo "$out" | jget 'd["next_stage"]' | grep -q interview && ok "autostart: resumes at the recorded next_stage" || err "autostart resumed at wrong stage"
+[ "$(echo "$out" | jget 'd["ws"]')" = "$ws1" ] && ok "autostart: reuses the in-progress workspace (no new run)" || err "autostart minted a new run instead of resuming"
+
+# 3. Marking the run done -> autostart does NOT resume it (starts fresh).
+printf '{"stage":"variants","next_stage":"done"}' | python3 "$DP" checkpoint --ws "$ws1" - >/dev/null
+out=$(AUTO)
+echo "$out" | jget 'd["resumed"]' | grep -q False && ok "autostart: a done run is not resumed (fresh run)" || err "autostart resumed a completed run"
+[ "$(echo "$out" | jget 'd["ws"]')" != "$ws1" ] && ok "autostart: a fresh run gets a new workspace after done" || err "autostart reused the done run's workspace"
+unset XDG_STATE_HOME
+
 # SKILL documents the durability contract.
 grep -qi 'checkpoint' "$SKILL" && grep -qi 'resume from the last completed' "$SKILL" \
   && ok "SKILL documents checkpoint/resume durability" || err "SKILL missing durability contract"
+grep -qi 'resumption is .*automatic\|automatic, not opt-in' "$SKILL" && grep -qi 'autostart' "$SKILL" \
+  && ok "SKILL wires automatic resume via autostart (Story 13.12)" || err "SKILL missing automatic-resume/autostart"
 grep -qi 'never re-runs a completed stage' "$SKILL" && ok "SKILL states resume never re-runs a completed stage" || err "SKILL missing idempotent-resume note"
 
 if [ "$fail" -eq 0 ]; then
