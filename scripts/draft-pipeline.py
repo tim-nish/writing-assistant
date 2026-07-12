@@ -91,9 +91,15 @@ QUESTION_BANK = {
 # question-bank order) — so the same fact sheet yields a stable, framework-
 # tailored interview and the ordering is the deterministic tie-break under the
 # ≤5 cap.
+#
+# Invariant: every framework's list contains q2 (significance — the claim the
+# article exists to communicate) and q5 (audience). They are the review skill's
+# intent anchors: the cold-read pass compares its reader answers against the
+# journal's q2/q5 entries, so a framework that never asks them would make that
+# comparison unexecutable (issue #120).
 FRAMEWORK_PRIORITY = {
     "F1": ["q2", "q4", "q3", "q5", "q1"],   # evidence GATE, decision cost, limits, audience, surprise
-    "F2": ["q1", "q4", "q3", "q2", "q7"],   # what-happened, mechanism/cost, applicability, significance, retro
+    "F2": ["q1", "q4", "q3", "q2", "q5"],   # what-happened, mechanism/cost, applicability, significance, audience
     "F3": ["q2", "q3", "q4", "q5", "q6"],   # what-it-caught, cannot-tell, tradeoff, audience, opinion
     "F4": ["q6", "q2", "q3", "q5", "q1"],   # my-take opinion, significance, warning, audience, surprise
 }
