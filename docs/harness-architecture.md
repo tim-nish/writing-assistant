@@ -105,6 +105,13 @@ hide," so it must be an operational test, not a vibe:
   belief *about the subject matter* changes, it was a claim; if only the
   flow degrades, it was narration.
 
+> **Amended 2026-07-12 (triage #123).** "Independent of the drafting context"
+> is operationalized: the `verify-provenance` judge runs in a **subagent that
+> never saw the drafting turn**, and the D3 CAP-7 rubric judge (dimensions 1–3)
+> inherits the same isolation — the drafting context grades neither its own
+> claim/narration boundary nor its own rubric pass. See NFR13 and CAP-7 in
+> SPEC-article-draft-pipeline.
+
 Sentences that smuggle assertions into connective form ("this naturally led
 to a 3× speedup", "as every practitioner knows") fail the falsifiability
 test and are claims regardless of their rhetorical dress.

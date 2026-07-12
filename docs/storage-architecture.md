@@ -82,7 +82,9 @@ Every pipeline invocation gets a workspace:
 
 All intermediates live there: the harvest fact sheet and NEEDS-OWNER list,
 interview answers, the provenance map (closing harness OQ4), quality-gate
-judge output, and any scratch the run needs. Properties this buys:
+judge output, **per-stage checkpoint state** (added 2026-07-12, triage #118 —
+the state a re-invocation reads to resume from the last completed stage), and
+any scratch the run needs. Properties this buys:
 
 - one run = one debuggable, resumable unit;
 - garbage collection is "delete old run directories" (policy deferred —

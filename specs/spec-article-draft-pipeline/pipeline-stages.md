@@ -14,13 +14,28 @@
 
 Draft then exits this pipeline into SPEC-article-review.
 
+**Durability across the stage boundaries (added 2026-07-12).** Each stage
+persists its completion state to the run workspace (`$WS`) alongside its
+intermediates, so a re-invocation resumes from the last completed stage rather
+than restarting — the turn/compute budget is a real ceiling even though
+wall-clock is unconstrained (SPEC constraints). A stage that nears the ceiling
+surfaces a budget-triage signal before hard failure, and a resumed or partial
+run reports its last completed stage and resume path in the completion summary
+(CAP-6). The AI-actor stages are the checkpoint boundaries.
+
 ## Fact-sheet entry format (stage 1)
 
 ```
 - CLAIM: <one sentence>
-  SOURCE: <path:line | commit sha | URL>
+  SOURCE: <path:line@sha | commit sha | URL>
   KIND: result | decision | number | quote | event
 ```
+
+SOURCE is a **single** commit-pinned line (`path:line@sha`, not a range) for
+every KIND except `quote`; a `quote` SOURCE may span consecutive physical lines
+(`path:line1-line2@sha`) when the verbatim text does (e.g. a wrapped table cell),
+so a natural quote boundary is never forced to fold in unrelated adjacent text
+(`skills/harvest/SKILL.md` §3).
 
 Entries the AI wants to use but cannot source go to a `NEEDS-OWNER` list feeding stage 2 — never into the draft unmarked.
 
@@ -122,8 +137,10 @@ diagrams are claims by that spec's contract, so they get no narration class.
   (sentence/paragraph-length distributions, heading density, per-section
   quote density from the provenance map).
 - Dimension 4 is mechanical (lint-class, zero tokens); dimensions 1–3 are
-  judged by one single-pass cheap-tier rubric judge: pass/fail per dimension
-  + failing locations, findings format, no rewritten text.
+  judged by one single-pass cheap-tier rubric judge **run in a subagent that
+  never saw the drafting turn** (same isolation as `verify-provenance`, NFR13,
+  so the drafting context never grades its own rubric pass): pass/fail per
+  dimension + failing locations, findings format, no rewritten text.
 - Fail → stage 3 revises against the named dimensions and re-runs the
   rubric **and** `verify-provenance` (readability revision is where unmarked
   claims would re-enter). At most 2 revision cycles; then the failure lands
