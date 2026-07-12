@@ -85,6 +85,34 @@ The **only** files this pipeline writes into the host repo are the declared
 products at `output.drafts` (Stage 5). Pass `$WS` to Stage 1 so harvest writes
 there rather than minting its own workspace.
 
+### Durability — checkpoint each stage, resume from the last completed one (Story 13.5)
+
+Wall-clock is unconstrained but the **turn/compute budget is a real ceiling**, so
+the pipeline is resumable: **after each stage command emits its output state,
+checkpoint it** so a re-invocation continues from where it stopped instead of
+restarting (a turn-ceiling casualty is recoverable, not a total loss). The stage
+state already carries `next_stage`; persist it:
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py checkpoint --ws "$WS" <stage-state.json>
+```
+
+The write is atomic and idempotent — checkpointing the same stage twice is a
+no-op, and because the checkpoint records `next_stage`, resuming
+**never re-runs a completed stage**. To resume, re-open the existing workspace
+(`resolve-paths.py run-workspace --run-id <id>` instead of minting a new run) and
+ask where to pick up:
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py resume --ws "$WS"
+```
+
+It prints `{"resumed": true, "next_stage": …, …}` to continue from the recorded
+stage, or `{"resumed": false, "next_stage": "harvest"}` when the workspace has no
+checkpoint yet (a fresh run starts at Stage 1). Checkpoint state lives under
+`$WS` with the other intermediates (`docs/storage-architecture.md` D2), never in
+the host tree.
+
 ## Stage 1 — harvest and consume its output
 
 Hand the run to the `harvest` skill to produce its output document at

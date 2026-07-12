@@ -869,6 +869,73 @@ def cmd_start(args):
     return 0
 
 
+# --- Durability: per-stage checkpoint + resume (Story 13.5) ------------------
+# The pipeline's turn/compute budget is a real ceiling even though wall-clock is
+# unconstrained (SPEC constraints, 2026-07-12). Each stage's output state already
+# carries `next_stage`; persisting that state to the run workspace after a stage
+# completes makes a re-invocation resume from the last completed stage instead of
+# restarting — a turn-ceiling casualty is recoverable, not a total loss. The
+# checkpoint file IS the stage state, so writing it twice is idempotent and
+# resuming never re-runs a completed stage (next_stage points past it).
+
+CHECKPOINT_FILE = "checkpoint.json"
+
+
+def _checkpoint_path(ws):
+    return os.path.join(ws, CHECKPOINT_FILE)
+
+
+def cmd_checkpoint(args):
+    """Persist a completed stage's output state to `<ws>/checkpoint.json` so the
+    run can resume from `next_stage`. Idempotent: re-writing the same stage's
+    state yields an identical file. The write is atomic (temp + os.replace) so an
+    interrupted write never leaves a half-written checkpoint to resume from."""
+    if not os.path.isdir(args.ws):
+        sys.stderr.write(f"error: run workspace does not exist: {args.ws}\n")
+        return 1
+    text = _read_text(args.state)
+    try:
+        state = json.loads(text)
+    except json.JSONDecodeError as e:
+        sys.stderr.write(f"error: checkpoint state is not valid JSON: {e}\n")
+        return 1
+    if not isinstance(state, dict):
+        sys.stderr.write("error: checkpoint state must be a JSON object\n")
+        return 1
+    if "next_stage" not in state:
+        sys.stderr.write(
+            "error: checkpoint state has no `next_stage` — pass a stage's output "
+            "state (start/consume/interview/...), which records where to resume\n")
+        return 1
+    path = _checkpoint_path(args.ws)
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(state, f, indent=2)
+    os.replace(tmp, path)
+    print(f"checkpoint: next_stage={state['next_stage']} -> {path}")
+    return 0
+
+
+def cmd_resume(args):
+    """Report where to resume a run from its workspace checkpoint. Prints a JSON
+    object: `{"resumed": true, ...state}` when a checkpoint exists (resume from
+    its `next_stage`), or `{"resumed": false, "next_stage": "harvest"}` when none
+    exists yet (a fresh run starts at stage 1)."""
+    if not os.path.isdir(args.ws):
+        sys.stderr.write(f"error: run workspace does not exist: {args.ws}\n")
+        return 1
+    path = _checkpoint_path(args.ws)
+    if not os.path.isfile(path):
+        print(json.dumps({"resumed": False, "next_stage": "harvest"}, indent=2))
+        return 0
+    with open(path, encoding="utf-8") as f:
+        state = json.load(f)
+    out = {"resumed": True}
+    out.update(state)
+    print(json.dumps(out, indent=2))
+    return 0
+
+
 def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -877,6 +944,11 @@ def main(argv=None):
     sp.add_argument("sources", nargs="*")
     sp = sub.add_parser("consume")
     sp.add_argument("doc", nargs="?", default="-", help="harvest output document, or - for stdin")
+    sp = sub.add_parser("checkpoint", help="persist a completed stage's state to <ws>/checkpoint.json (Story 13.5)")
+    sp.add_argument("--ws", required=True, help="the run workspace ($WS) to checkpoint into")
+    sp.add_argument("state", nargs="?", default="-", help="the stage's output state JSON, or - for stdin")
+    sp = sub.add_parser("resume", help="report where to resume a run from its workspace checkpoint (Story 13.5)")
+    sp.add_argument("--ws", required=True, help="the run workspace ($WS) to resume")
     sp = sub.add_parser("interview")
     sp.add_argument("--framework", required=True)
     sp.add_argument("state", nargs="?", default="-", help="stage-1 pipeline state JSON, or - for stdin")
@@ -917,6 +989,7 @@ def main(argv=None):
     args = p.parse_args(argv)
     return {
         "start": cmd_start, "consume": cmd_consume, "interview": cmd_interview,
+        "checkpoint": cmd_checkpoint, "resume": cmd_resume,
         "answer": cmd_answer, "journal": cmd_journal, "provenance": cmd_provenance,
         "quality-gate": cmd_quality_gate,
         "verify-markers": cmd_verify_markers, "verify": cmd_verify, "reroute": cmd_reroute,
