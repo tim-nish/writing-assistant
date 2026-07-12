@@ -46,6 +46,21 @@ FILEPINRANGE_RE = re.compile(
 URL_RE = re.compile(r"^https?://\S+$")
 
 
+def source_form_ok(source, kind):
+    """Grammar-only check (no repo resolution): is `source` a syntactically valid
+    SOURCE pointer FORM for `kind`? This is the single SOURCE grammar shared by
+    the validator and the pipeline's `consume` step, so the two cannot diverge
+    (Story 13.8). A multi-line range `path:l1-l2@sha` is valid ONLY for `quote`;
+    every other KIND is single-line. Resolution (sha exists, line in range,
+    verbatim match) is a separate, deeper check the validator does and consume
+    deliberately does not (it never re-reads sources)."""
+    if URL_RE.match(source) or SHA_RE.match(source) or FILEPIN_RE.match(source):
+        return True
+    if kind == "quote" and FILEPINRANGE_RE.match(source):
+        return True
+    return False
+
+
 def _quote_matches(claim, src_text):
     """Verbatim test, lenient about surrounding quote marks and whitespace, as
     the single-line check has always been. `src_text` is the source line(s)

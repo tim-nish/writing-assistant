@@ -871,8 +871,11 @@ def cmd_consume(args):
         if kind not in vfs.KINDS:
             sys.stderr.write(f"error: fact-sheet KIND {kind!r} outside the harvest contract: {e}\n")
             return 1
-        if not (vfs.URL_RE.match(source) or vfs.SHA_RE.match(source) or vfs.FILEPIN_RE.match(source)):
-            sys.stderr.write(f"error: fact-sheet SOURCE {source!r} is not a valid pointer form: {e}\n")
+        # Use the validator's shared SOURCE grammar so consume can never diverge
+        # from it (Story 13.8): a multi-line `quote` range that validate-fact-sheet
+        # accepts must not be rejected here.
+        if not vfs.source_form_ok(source, kind):
+            sys.stderr.write(f"error: fact-sheet SOURCE {source!r} is not a valid pointer form for KIND {kind!r}: {e}\n")
             return 1
         fact_sheet.append({"claim": claim, "source": source, "kind": kind})   # source verbatim
 
