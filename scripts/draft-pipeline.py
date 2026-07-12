@@ -902,24 +902,9 @@ def cmd_consume(args):
 
 
 def cmd_start(args):
-    key = args.framework.lower()
-    if key not in FRAMEWORKS:
-        sys.stderr.write(
-            f"error: invalid framework {args.framework!r}. "
-            f"Valid frameworks: F1, F2, F3, F4. Nothing started.\n"
-        )
-        return 2
-    framework_file = os.path.join("skills", "draft-article", "frameworks", FRAMEWORKS[key])
-    if not os.path.isfile(os.path.join(plugin_root(), framework_file)):
-        sys.stderr.write(f"error: framework asset missing: {framework_file}\n")
-        return 1
-    state = {
-        "next_stage": "harvest",
-        "framework": key.upper(),
-        "framework_file": framework_file,
-        "sources_raw": list(args.sources),
-        "sources": [{"value": t, "form": classify(t)} for t in args.sources],
-    }
+    state, code = _run_state(args.framework, args.sources)
+    if state is None:
+        return code
     print(json.dumps(state, indent=2))
     return 0
 
@@ -996,17 +981,12 @@ def cmd_resume(args):
 DONE_STAGE = "done"
 
 
-def cmd_autostart(args):
-    """Stage 0: automatic resume (Story 13.12). Resumption is the DEFAULT, not an
-    agent choice — so instead of always minting a new run, find the newest
-    in-progress run for this repo (a run workspace whose checkpoint records a
-    `next_stage` other than `done`) and resume it; if none exists, mint a fresh
-    run at stage 1. Prints the workspace to use and where to start:
-      {"resumed": true,  "ws": …, "run_id": …, "next_stage": …}  # continue here
-      {"resumed": false, "ws": …, "run_id": …, "next_stage": "harvest"}  # new run
-    A large draft completing across several invocations is the normal model."""
+def _autostart(root):
+    """Core of automatic resume (Story 13.12): return the workspace to use and
+    where to start — resuming the newest in-progress run (checkpoint next_stage
+    != done), or minting a fresh run when none is in progress. Shared by the
+    `autostart` and `stage0` commands."""
     rp = _load("resolve-paths.py")
-    root = rp.host_root(args.root)
     base = rp.runs_dir(root)
     if os.path.isdir(base):
         # Run ids are timestamp-based, so reverse-lexicographic == newest-first.
@@ -1022,12 +1002,76 @@ def cmd_autostart(args):
             if state.get("next_stage") and state["next_stage"] != DONE_STAGE:
                 out = {"resumed": True, "ws": os.path.join(base, run_id), "run_id": run_id}
                 out.update(state)
-                print(json.dumps(out, indent=2))
-                return 0
+                return out
     # No in-progress run — start fresh (this is the AC4 no-false-resume path).
     ws = rp.new_run(root)
-    print(json.dumps({"resumed": False, "ws": ws,
-                      "run_id": os.path.basename(ws), "next_stage": "harvest"}, indent=2))
+    return {"resumed": False, "ws": ws, "run_id": os.path.basename(ws), "next_stage": "harvest"}
+
+
+def cmd_autostart(args):
+    """Stage 0: automatic resume (Story 13.12). Resumption is the DEFAULT, not an
+    agent choice — so instead of always minting a new run, find the newest
+    in-progress run for this repo (a run workspace whose checkpoint records a
+    `next_stage` other than `done`) and resume it; if none exists, mint a fresh
+    run at stage 1. Prints the workspace to use and where to start:
+      {"resumed": true,  "ws": …, "run_id": …, "next_stage": …}  # continue here
+      {"resumed": false, "ws": …, "run_id": …, "next_stage": "harvest"}  # new run
+    A large draft completing across several invocations is the normal model."""
+    rp = _load("resolve-paths.py")
+    print(json.dumps(_autostart(rp.host_root(args.root)), indent=2))
+    return 0
+
+
+def _run_state(framework, sources):
+    """Build the stage-0 run-state (framework + classified sources), or return
+    (None, exit_code) on a framework error — shared by `start` and `stage0`."""
+    key = framework.lower()
+    if key not in FRAMEWORKS:
+        sys.stderr.write(
+            f"error: invalid framework {framework!r}. "
+            f"Valid frameworks: F1, F2, F3, F4. Nothing started.\n")
+        return None, 2
+    framework_file = os.path.join("skills", "draft-article", "frameworks", FRAMEWORKS[key])
+    if not os.path.isfile(os.path.join(plugin_root(), framework_file)):
+        sys.stderr.write(f"error: framework asset missing: {framework_file}\n")
+        return None, 1
+    return {
+        "next_stage": "harvest",
+        "framework": key.upper(),
+        "framework_file": framework_file,
+        "sources_raw": list(sources),
+        "sources": [{"value": t, "form": classify(t)} for t in sources],
+    }, 0
+
+
+def cmd_stage0(args):
+    """Story 13.13: fold the whole of Stage 0 into ONE invocation instead of
+    three — configuration validation (CAP-5), framework check, and workspace
+    autostart (Story 13.12). The agent pays one round-trip, not three, so a run
+    makes progress per turn instead of exhausting the budget on orchestration.
+
+    Halts (non-zero) with `validate-config.py`'s exact per-key report on a bad
+    config (delegated verbatim, so diagnostics never diverge); a bad framework
+    halts before any workspace is minted. On success prints a combined JSON:
+      {"config_ok": true, "run_state": {…}, "resumed": …, "ws": …, "next_stage": …}
+    """
+    here = os.path.dirname(os.path.realpath(__file__))
+    # 1. Config validation — delegate verbatim (same report, same exit code).
+    cmd = [sys.executable, os.path.join(here, "validate-config.py")]
+    if args.root:
+        cmd += ["--root", args.root]
+    rc = subprocess.run(cmd).returncode
+    if rc != 0:
+        return rc
+    # 2. Framework check (before minting a workspace, as `start` does).
+    run_state, code = _run_state(args.framework, args.sources)
+    if run_state is None:
+        return code
+    # 3. Workspace autostart (mint or resume).
+    rp = _load("resolve-paths.py")
+    out = {"config_ok": True, "run_state": run_state}
+    out.update(_autostart(rp.host_root(args.root)))
+    print(json.dumps(out, indent=2))
     return 0
 
 
@@ -1045,6 +1089,10 @@ def main(argv=None):
     sp = sub.add_parser("resume", help="report where to resume a run from its workspace checkpoint (Story 13.5)")
     sp.add_argument("--ws", required=True, help="the run workspace ($WS) to resume")
     sp = sub.add_parser("autostart", help="auto-resume the newest in-progress run, else mint a fresh one (Story 13.12)")
+    sp.add_argument("--root", help="host-repo root (default: git top-level of cwd; errors outside a git repo)")
+    sp = sub.add_parser("stage0", help="fold Stage 0 into one call: config validation + framework + autostart (Story 13.13)")
+    sp.add_argument("framework")
+    sp.add_argument("sources", nargs="*")
     sp.add_argument("--root", help="host-repo root (default: git top-level of cwd; errors outside a git repo)")
     sp = sub.add_parser("interview")
     sp.add_argument("--framework", required=True)
@@ -1089,6 +1137,7 @@ def main(argv=None):
     return {
         "start": cmd_start, "consume": cmd_consume, "interview": cmd_interview,
         "checkpoint": cmd_checkpoint, "resume": cmd_resume, "autostart": cmd_autostart,
+        "stage0": cmd_stage0,
         "answer": cmd_answer, "journal": cmd_journal, "provenance": cmd_provenance,
         "quality-gate": cmd_quality_gate,
         "verify-markers": cmd_verify_markers, "verify": cmd_verify, "reroute": cmd_reroute,
