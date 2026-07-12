@@ -58,6 +58,12 @@ grep -qi 'context-free' "$SKILL" && ok "cold read is context-free by design" || 
 grep -qi 'owner is the sole arbiter' "$SKILL" \
   && ok "owner is the sole arbiter" || err "owner-arbiter statement missing"
 
+# #143: the required frontmatter schema is knowable from the skill, not only by
+# running lint or grepping the config.
+grep -qi 'required frontmatter' "$SKILL" && grep -q 'frontmatter.schema' "$SKILL" \
+  && ok "documents the required frontmatter schema (config-driven, #143)" \
+  || err "required frontmatter schema not documented in the skill"
+
 if [ "$fail" -eq 0 ]; then
   printf '\nAll review-skill checks passed.\n'; exit 0
 else

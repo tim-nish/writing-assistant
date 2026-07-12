@@ -173,6 +173,15 @@ detected here, never left to reviewer discipline) — reporting each with
 `path:line` and consuming **no LLM tokens**. Fix every lint defect before spending a model pass; a draft with
 `[VERIFY]` markers is not review-ready.
 
+**Required frontmatter (know it before you lint).** The required fields come from
+the config `frontmatter.schema` — by default `slug`, `title`, `date`, `mode`,
+`language`, `summary`, `topics`, `related` (see `config/user-config.example.yaml`),
+plus the pointer block. A draft reviewed on a fresh repo must carry these; when
+the frontmatter block is absent, the lint names the full required set in one
+finding rather than one field at a time. When a repo customizes the schema,
+consult its config `frontmatter.schema` — that list, not this default, is
+authoritative.
+
 **Configuration backstop (CAP-5, Story 7.4).** The lint pass also re-runs the
 stage-0 configuration validation as a zero-token backstop:
 
