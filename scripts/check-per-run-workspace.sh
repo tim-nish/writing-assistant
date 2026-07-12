@@ -86,7 +86,9 @@ if [ "$rc" -ne 0 ]; then ok "explicit existing --run-id is rejected"; else err "
 # 7. Prompt contract: harvest and draft-article route intermediates through the
 #    resolver workspace (AC2 surface — the prompts must not default into the tree).
 for f in skills/draft-article/SKILL.md skills/harvest/SKILL.md; do
-  if grep -q 'resolve-paths.py new-run' "$f" && grep -qi 'workspace' "$f"; then
+  # The resolver workspace is reached via `new-run` directly, or via
+  # `draft-pipeline.py autostart` (Story 13.12), which mints/resumes one.
+  if grep -qE 'resolve-paths.py new-run|draft-pipeline.py autostart' "$f" && grep -qi 'workspace' "$f"; then
     ok "prompt routes intermediates through the run workspace: $f"
   else
     err "prompt does not reference the resolver run workspace: $f"

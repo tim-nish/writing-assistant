@@ -78,13 +78,26 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py start <framework> <sourc
   framework file, and the **raw sources verbatim** plus their classification
   (path / glob / commit-range). Carry this record into the next stage unchanged.
 
-### Resolve the run workspace (all intermediates land here)
+### Resolve the run workspace — resume automatically, or start fresh (Story 13.12)
 
-Mint this run's workspace once, and write **every** intermediate under it:
+Resumption is **automatic, not opt-in**: rather than always minting a new run,
+ask the pipeline whether an in-progress run for this repo should be continued.
+Do this **once**, at Stage 0, and write **every** intermediate under the
+workspace it returns:
 
 ```
-WS=$(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-paths.py new-run --root <host-repo>)
+AUTO=$(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py autostart --root <host-repo>)
+WS=$(printf '%s' "$AUTO" | python3 -c "import json,sys; print(json.load(sys.stdin)['ws'])")
 ```
+
+`autostart` finds the **newest in-progress run** (a workspace whose checkpoint
+records a `next_stage` other than `done`) and returns it with `"resumed": true`
+and the `next_stage` to continue from — **skip straight to that stage**, reusing
+the persisted intermediates. When there is no in-progress run it mints a fresh
+workspace with `"resumed": false` and `next_stage: harvest` (the no-false-resume
+path). A large multi-source draft completing across several invocations is the
+**normal model**, not a failure — a turn-ceiling casualty simply continues on the
+next invocation.
 
 `$WS` is a fresh per-run workspace directory **outside the host repo**
 (`docs/storage-architecture.md` D2), resolved by the path resolver — never a
@@ -110,19 +123,26 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py checkpoint --ws "$WS" <s
 
 The write is atomic and idempotent — checkpointing the same stage twice is a
 no-op, and because the checkpoint records `next_stage`, resuming
-**never re-runs a completed stage**. To resume, re-open the existing workspace
-(`resolve-paths.py run-workspace --run-id <id>` instead of minting a new run) and
-ask where to pick up:
+**never re-runs a completed stage**. Stage 0's `autostart` (above) already picks
+the right workspace and `next_stage` automatically; `resume --ws "$WS"` inspects a
+specific workspace's checkpoint directly when you need it:
 
 ```
 python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py resume --ws "$WS"
 ```
 
-It prints `{"resumed": true, "next_stage": …, …}` to continue from the recorded
-stage, or `{"resumed": false, "next_stage": "harvest"}` when the workspace has no
-checkpoint yet (a fresh run starts at Stage 1). Checkpoint state lives under
-`$WS` with the other intermediates (`docs/storage-architecture.md` D2), never in
-the host tree.
+**Mark the run done on completion.** When the pipeline finishes (Stage 5
+variants emitted), write a final checkpoint with `next_stage: done` so
+`autostart` treats the run as complete and starts fresh next time rather than
+re-resuming it:
+
+```
+printf '{"stage":"variants","next_stage":"done"}' | \
+  python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py checkpoint --ws "$WS" -
+```
+
+Checkpoint state lives under `$WS` with the other intermediates
+(`docs/storage-architecture.md` D2), never in the host tree.
 
 ## Stage 1 — harvest and consume its output
 
