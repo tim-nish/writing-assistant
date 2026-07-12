@@ -58,6 +58,17 @@ else
   err "clean draft reported defects: $(cat "$work/clean.out")"
 fi
 
+# 1b. A draft with NO frontmatter names the FULL required schema in one finding (#143),
+#     from the config schema (not hardcoded), so a fresh draft learns the set here.
+printf '## Just a body\n\nNo frontmatter at all.\n' > "$work/nofm.md"
+nofm=$(python3 "$LINT" "$work/nofm.md" --config-json "$work/cfg.json" 2>/dev/null || true)
+printf '%s\n' "$nofm" | grep -qi 'required frontmatter fields:' \
+  && ok "no-frontmatter draft names the required frontmatter set (#143)" \
+  || err "no-frontmatter draft did not name the required set"
+printf '%s\n' "$nofm" | grep -q 'slug' && printf '%s\n' "$nofm" | grep -q 'related' \
+  && ok "the named set is the full config schema (slug…related)" \
+  || err "named set is not the full schema"
+
 # 2. A draft with one seeded defect of each kind — every kind must be reported.
 #    Seeds: missing `date` (schema), bare-noun title, no site_url (pointer),
 #    a >250-word heading gap, a dead relative link, a remaining [VERIFY] marker,

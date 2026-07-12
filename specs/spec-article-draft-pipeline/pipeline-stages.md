@@ -23,6 +23,16 @@ surfaces a budget-triage signal before hard failure, and a resumed or partial
 run reports its last completed stage and resume path in the completion summary
 (CAP-6). The AI-actor stages are the checkpoint boundaries.
 
+**Automatic resumption + round-trip economy (added 2026-07-13, #142).** Resumption
+is **automatic, not opt-in**: on invocation the pipeline detects an in-progress
+run for the workspace and continues from the last checkpoint without the agent
+deciding to resume; a large multi-source draft completing across several
+invocations is the normal model, not a failure. Each stage also folds its
+mechanical checks into as few script invocations as its contract allows (config
+validation, path resolution, and source enumeration need not be separate
+round-trips when one call can carry the others), so a realistic run makes
+progress per turn instead of exhausting the budget on orchestration overhead.
+
 ## Fact-sheet entry format (stage 1)
 
 ```

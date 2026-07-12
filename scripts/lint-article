@@ -285,6 +285,15 @@ def lint_file(path, cfg, check_http):
     fm_text, fm, body_start, err = split_frontmatter(text)
     if err:
         findings.append((1, "schema", err))
+        # When the whole frontmatter block is absent/unparseable, per-field
+        # checks never run — so name the full required set once, from the config
+        # schema (never hardcoded), so a fresh draft learns the requirement here
+        # instead of by grepping this script (#143).
+        schema = (cfg.get("frontmatter", {}) or {}).get("schema") or []
+        if schema:
+            findings.append((1, "schema",
+                             "required frontmatter fields: " + ", ".join(schema)
+                             + " (config `frontmatter.schema`; see config/user-config.example.yaml)"))
     if fm is not None:
         check_frontmatter(fm, cfg, findings)
         check_title(fm, findings)
