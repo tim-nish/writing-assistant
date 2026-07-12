@@ -73,6 +73,27 @@ cp "$work/harvest.md" "$bare/h.md"
   || err "consume tried to read sources"
 rm -rf "$bare"
 
+# 5b. SOURCE grammar matches validate-fact-sheet.py (Story 13.8): a multi-line
+#     quote range that the validator accepts must not be rejected by consume.
+cat > "$work/mlquote.md" <<'EOF'
+# Fact sheet: multiline
+
+- "wrapped table cell first half second half" / notes.md:4-5@a1b2c3d / quote
+
+# NEEDS-OWNER
+EOF
+python3 "$DP" consume "$work/mlquote.md" >/dev/null 2>&1 \
+  && ok "consume accepts a multi-line quote range (path:l1-l2@sha) like validate-fact-sheet.py" \
+  || err "consume rejected a multi-line quote range the validator accepts (regression #136)"
+# a range on a NON-quote KIND is rejected here, exactly as the validator rejects it.
+printf '# Fact sheet: x\n- Ranged fact / notes.md:4-5@a1b2c3d / result\n\n# NEEDS-OWNER\n' > "$work/mlrange.md"
+python3 "$DP" consume "$work/mlrange.md" >/dev/null 2>&1 \
+  && err "consume accepted a line range on a non-quote KIND" \
+  || ok "consume rejects a range on a non-quote KIND (single-line-only, like the validator)"
+# Divergence guard: consume routes through the validator's shared grammar function.
+grep -q 'source_form_ok' "$DP" && ok "consume uses validate-fact-sheet.py's shared source_form_ok grammar" \
+  || err "consume does not route through the shared SOURCE grammar (can diverge again)"
+
 # 6. Empty-but-valid harvest output advances (total stage contract).
 printf '# Fact sheet: empty\n\n# NEEDS-OWNER\n' > "$work/empty.md"
 python3 "$DP" consume "$work/empty.md" | python3 -c '
