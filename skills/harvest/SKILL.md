@@ -63,11 +63,16 @@ Read the in-scope files and extract facts. Every entry is one line —
 - **KIND** ∈ {result, decision, number, quote, event}.
 - A `quote` entry's CLAIM is the source text **verbatim and ONLY the source text**
   — no label, attribution, or prefix (not "Decision from batch 16: …"), and never
-  paraphrased or normalized. A CLAIM carrying anything beyond the quoted words is
-  rejected. Its SOURCE pins the exact physical line(s): `path:line@sha` for a
-  single-line quote, or `path:line1-line2@sha` when the quoted text genuinely
-  spans consecutive physical lines (e.g. a wrapped markdown-table cell). Never
-  fold in unrelated adjacent text to force a single-line match — pin the real
+  paraphrased. A CLAIM carrying anything beyond the quoted words is rejected.
+  Matching is **whitespace-normalized (amended 2026-07-13, #154)**: the CLAIM
+  matches when its text, with runs of whitespace and line breaks collapsed to a
+  single space, is a **contiguous span** of the source text normalized the same
+  way — so a real sentence that wraps across physical lines is quotable by its
+  true boundary, while the no-extra-text rule above still holds (the CLAIM is a
+  sub-span of the source, never more). Its SOURCE pins the physical line(s):
+  `path:line@sha` for a single-line quote, or `path:line1-line2@sha` when the
+  quoted text spans consecutive physical lines (e.g. a wrapped markdown-table
+  cell). Never fold in unrelated adjacent text to force a match — pin the real
   boundary.
 - Every file pointer resolves inside a **declared** repo (Story 3.1 scope); a
   pointer into an undeclared repo is unsourceable.
