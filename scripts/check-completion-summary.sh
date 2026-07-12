@@ -36,6 +36,13 @@ hasc 'here and nowhere else\|nowhere else' "a blocker appears in exactly one buc
 hasc '200 wpm'              "reading time: ~200 wpm EN"
 hasc '500 cpm'             "reading time: ~500 cpm JA"
 
+# 1b. Partial-progress reporting + budget-triage signal (Story 13.7, CAP-6).
+hasc 'last completed stage' "partial run reports the last completed stage"
+hasc 'resume --ws'          "partial run gives the resume path (pairs with Story 13.5)"
+hasc 'budget-triage signal' "budget-triage signal surfaced before hard failure"
+grep -qi 'informational' "$CONV" && grep -qi 'not a blocker\|recoverable, not broken' "$CONV" \
+  && ok "partial progress is informational, not a blocker" || err "partial-progress bucket unclear"
+
 # 2. reading-time.py computes EN words/200 and JA chars/500.
 python3 -c "import py_compile; py_compile.compile('$root/$RT', doraise=True)" 2>/dev/null \
   && ok "reading-time helper compiles" || { err "reading-time syntax error"; }
@@ -68,6 +75,12 @@ grep -qi 'omits.*reading-time\|omits the reading-time' "$HARVEST" \
 grep -q 'reading-time.py' "$HARVEST" \
   && err "harvest should NOT invoke reading-time (no article body)" \
   || ok "harvest does not invoke reading-time"
+
+# 5. Draft SKILL wires the budget-triage/partial-progress reporting (Story 13.7).
+grep -qi 'budget-triage signal before hard failure' "$DRAFT" \
+  && grep -qi 'last completed stage and the resume path' "$DRAFT" \
+  && ok "draft SKILL surfaces budget-triage + partial-progress reporting" \
+  || err "draft SKILL missing budget-triage/partial-progress wiring"
 
 if [ "$fail" -eq 0 ]; then
   printf '\nAll completion-summary checks passed.\n'; exit 0

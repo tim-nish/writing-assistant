@@ -577,3 +577,13 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/reading-time.py --language <en|ja> <draft>
 
 Any unresolved `[VERIFY]` marker or unrendered figure is a **publish blocker**,
 listed under that bucket and nowhere else.
+
+**Partial progress and the turn budget (Story 13.7).** The turn/compute budget is
+a real ceiling. As a stage nears it,
+**surface a budget-triage signal before hard failure** so the run can be
+checkpointed (Story 13.5) and resumed rather than lost at `error_max_turns`.
+When a run stops short or is resumed, the
+completion summary reports the **last completed stage and the resume path** under
+informational notes — read from `draft-pipeline.py resume --ws "$WS"` — per the
+shared completion-summary contract; a partial run is recoverable, never a silent
+loss.
