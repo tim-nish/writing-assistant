@@ -57,10 +57,16 @@ Read the in-scope files and extract facts. Every entry is one line —
 - **SOURCE** is a resolvable pointer: `path:line@sha` (a file line PINNED to the
   commit it came from, so it survives later edits that shift line numbers), a
   commit `sha`, or a URL for a declared external source. A bare `path:line`
-  without `@sha` is not accepted.
+  without `@sha` is not accepted. For every KIND **except `quote`**, SOURCE names
+  a **single** commit-pinned line — `path:line@sha`, **not** a range (`12-19` is
+  rejected; split it into per-line pointers).
 - **KIND** ∈ {result, decision, number, quote, event}.
 - A `quote` entry's CLAIM is the source text **verbatim** — never paraphrased or
-  normalized.
+  normalized. Its SOURCE pins the exact physical line(s): `path:line@sha` for a
+  single-line quote, or `path:line1-line2@sha` when the quoted text genuinely
+  spans consecutive physical lines (e.g. a wrapped markdown-table cell). Never
+  fold in unrelated adjacent text to force a single-line match — pin the real
+  boundary.
 - Every file pointer resolves inside a **declared** repo (Story 3.1 scope); a
   pointer into an undeclared repo is unsourceable.
 
@@ -137,8 +143,11 @@ NEEDS-OWNER list:
 ```
 
 Fact-sheet entries are `CLAIM / SOURCE / KIND` (resolvable, commit-pinned, no
-entry without a source). NEEDS-OWNER entries are `CANDIDATE / REASON / TOPIC`.
-A candidate never appears in both.
+entry without a source). SOURCE is a **single** commit-pinned line
+(`path:line@sha`, not a range) for every KIND except `quote`, whose SOURCE may
+span consecutive physical lines (`path:line1-line2@sha`) when the quoted text
+does. NEEDS-OWNER entries are `CANDIDATE / REASON / TOPIC`. A candidate never
+appears in both.
 
 ## Completion summary
 
