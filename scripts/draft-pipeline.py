@@ -716,12 +716,14 @@ def _validate_answer(spec):
     elif disposition == "approved":
         if not pointers:
             return None, ("an approved answer must inherit >=1 source pointer "
-                          "(it grounds sourced claims like a fact-sheet entry)")
+                          "(pass --pointer; it grounds sourced claims like a "
+                          "fact-sheet entry)")
         if not text:
-            return None, "an approved answer must carry the adopted recommendation text"
+            return None, ("an approved answer must carry the adopted recommendation "
+                          "text (pass --text)")
     else:  # modified / replaced / answered
         if not text:
-            return None, f"a {disposition} answer must carry the owner's text"
+            return None, f"a {disposition} answer must carry the owner's text (pass --text)"
         if pointers:
             return None, (f"a {disposition} answer is owner judgment (interview-sourced); "
                           "it carries no source pointers")
