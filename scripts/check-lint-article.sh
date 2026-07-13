@@ -179,6 +179,42 @@ else
   err "out-of-enum mode value not flagged"
 fi
 
+# 5. #160: link-shaped syntax inside inline code spans / fenced blocks is NOT a
+#    dead link, while a real dead link in prose still is (surgical exemption).
+cat > "$work/codelinks.md" <<'EOF'
+---
+slug: codelinks
+title: "Code-span links are not dead links"
+date: 2026-07-09
+mode: canonical
+language: en
+summary: s.
+topics: [a]
+related: { projects: [], publications: [], products: [] }
+---
+
+## H
+
+Use the pattern `[one_liner](ideas/<slug>.md)` to link an idea. Fenced too:
+
+```
+see [example](fenced-missing.md)
+```
+
+But this real one is broken: [the notes](./prose-missing.md).
+
+More at [example.com](https://example.com).
+EOF
+clout=$(python3 "$LINT" "$work/codelinks.md" --config-json "$work/cfg.json" 2>/dev/null || true)
+printf '%s\n' "$clout" | grep -q 'prose-missing.md' \
+  && ok "#160: a real dead link in prose is still flagged" \
+  || err "#160: real prose dead link not flagged"
+if printf '%s\n' "$clout" | grep -Eq 'ideas/<slug>.md|fenced-missing.md'; then
+  err "#160: link syntax inside code (span/fence) flagged as a dead link"
+else
+  ok "#160: link syntax inside inline code + fenced blocks is exempt from the dead-link check"
+fi
+
 if [ "$fail" -eq 0 ]; then
   printf '\nAll lint-article checks passed.\n'; exit 0
 else
