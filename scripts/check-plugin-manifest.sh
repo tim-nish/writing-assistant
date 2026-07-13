@@ -51,13 +51,19 @@ for s in draft-article harvest; do
   [ -f "skills/$s/SKILL.md" ] && ok "skills/$s/SKILL.md discoverable" || err "skills/$s/SKILL.md missing"
 done
 
-# Additive packaging: this story adds only the manifest, changing no skill file.
-changed=$(git diff --name-only main -- skills 2>/dev/null || true)
-if [ -z "$changed" ]; then
-  ok "packaging is additive (no skill content changed vs main)"
-else
-  err "skill files changed by this story: $changed"
-fi
+# Additive packaging: adding the manifest (Story 6.1) must not delete or empty
+# any skill's SKILL.md. The original guard froze the whole skills/ tree against
+# `main`, which turned a one-time "this commit changes no skill file" assertion
+# into a standing gate that blocked every later skill edit (F36). Assert the
+# real invariant instead — the three declared skills still ship a non-empty
+# SKILL.md — so skills can evolve while packaging stays additive.
+for s in draft-article review-article harvest; do
+  if [ -s "skills/$s/SKILL.md" ]; then
+    ok "packaging additive: skills/$s/SKILL.md still present and non-empty"
+  else
+    err "packaging regression: skills/$s/SKILL.md missing or empty"
+  fi
+done
 
 if [ "$fail" -eq 0 ]; then
   printf '\nAll plugin-manifest checks passed.\n'; exit 0
