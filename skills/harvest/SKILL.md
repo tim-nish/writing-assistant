@@ -72,6 +72,25 @@ Read the in-scope files and extract facts. Every entry is one line —
 - Every file pointer resolves inside a **declared** repo (Story 3.1 scope); a
   pointer into an undeclared repo is unsourceable.
 
+**Pin the `@sha` in one call — don't `git blame` per line.** You read a file at
+its current line numbers; to turn a `path:line` (or several) into the required
+`path:line@sha` form, hand them to the pin helper instead of resolving the sha by
+hand for each cited line:
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/pin-source.py --root <host-repo> \
+  README.md:88 bench/results.md:42
+# or pipe a column of pointers:
+printf 'README.md:88\nbench/results.md:42\n' | \
+  python3 ${CLAUDE_PLUGIN_ROOT}/scripts/pin-source.py --root <host-repo>
+```
+
+It resolves each pointer with a **single `git blame -L` per file** (batched — the
+cost is bounded by file count, not line count), and prints the fully-pinned
+`path:line@sha` the validator already accepts (no new SOURCE grammar). Pass a
+quote's `path:l1-l2` the same way to pin a range. A line you have not committed
+yet cannot be pinned — the helper says so and skips it.
+
 A claim you cannot pin to a resolvable SOURCE does **not** go on the fact sheet —
 it routes to the **NEEDS-OWNER** list below. Validate the emitted sheet with:
 
