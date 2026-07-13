@@ -63,6 +63,9 @@ _PRESENT_VERBS = {
     "ran", "build", "builds", "built", "scale", "scales", "boost", "boosts",
     "slash", "slashes", "power", "powers", "drive", "drives", "solve", "solves",
     "handle", "handles", "replace", "replaces", "beats", "why", "how",
+    "keep", "keeps", "kept", "let", "lets", "give", "gives", "gave",
+    "teach", "teaches", "taught", "prevent", "prevents", "avoid", "avoids",
+    "enable", "enables", "unlock", "unlocks", "stop", "stops",
 }
 
 
