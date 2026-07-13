@@ -202,8 +202,19 @@ _LINK_RE = re.compile(r"(?<!\!)\[[^\]]*\]\(([^)]+)\)")
 
 def check_links(lines, draft_path, check_http, findings):
     draft_dir = os.path.dirname(os.path.realpath(draft_path))
+    in_fence = False
     for idx, line in enumerate(lines):
-        for m in _LINK_RE.finditer(line):
+        # Code carries illustrative link SYNTAX, not real links (#160): skip fenced
+        # blocks and strip inline code spans before matching, exactly as
+        # check_template_residue does — so `[x](ideas/<slug>.md)` in backticks or a
+        # fenced example is not reported as a dead link.
+        if _FENCE_RE.match(line):
+            in_fence = not in_fence
+            continue
+        if in_fence:
+            continue
+        scan = _INLINE_CODE_RE.sub("", line)
+        for m in _LINK_RE.finditer(scan):
             target = m.group(1).strip()
             # Strip an optional link title:  (url "title")
             target = re.split(r"\s+", target, 1)[0]
