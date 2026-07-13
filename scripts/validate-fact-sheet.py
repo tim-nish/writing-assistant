@@ -61,19 +61,28 @@ def source_form_ok(source, kind):
     return False
 
 
+def _norm_ws(s):
+    """Collapse every run of whitespace (spaces, tabs, newlines) to a single
+    space and strip the ends — the shared normalization for quote matching."""
+    return re.sub(r"\s+", " ", s).strip()
+
+
 def _quote_matches(claim, src_text):
-    """Verbatim test: the CLAIM's quoted text must be the source text — a sub-span
-    of a line, or the whole line(s), tolerating surrounding quote marks. `src_text`
-    is the source line(s), each physical line stripped and joined by a single
-    space. The CLAIM may not carry text BEYOND the source (a label/prefix/suffix
-    like "Decision from batch 16:"): that is not verbatim (#137). Hence
-    `quoted in src_text` (claim ⊆ source) matches, but `src_text in quoted`
-    (claim adds text) no longer does."""
+    """Whitespace-normalized verbatim test (amended #154): the CLAIM's quoted text
+    must be a CONTIGUOUS span of the source text once both sides collapse runs of
+    whitespace/newlines to a single space. This lets a real sentence that wraps
+    across physical lines (or carries doubled spaces) be quoted by its true
+    boundary without exact-whitespace fiddling. `src_text` is the source line(s),
+    each physical line stripped and joined by a single space. The no-extra-text
+    guarantee still holds: the CLAIM must be a SUB-span of the source (a
+    label/prefix/suffix like "Decision from batch 16:" is not verbatim, #137) —
+    `quoted in src_text` (claim ⊆ source) matches, `src_text in quoted` (claim
+    adds text) does not."""
     quoted = claim.strip()
     inner = re.match(r'^["“](.*)["”]$', quoted)
     if inner:
         quoted = inner.group(1)
-    return quoted in src_text
+    return _norm_ws(quoted) in _norm_ws(src_text)
 
 
 def _load_rws():
@@ -155,7 +164,8 @@ def validate_source(source, kind, claim, host, sources):
         if not _quote_matches(claim, span):
             return ("quote CLAIM must be the verbatim source text only — no label, "
                     "attribution, or prefix, and no paraphrase; it did not match the "
-                    "spanned source lines (also check the span boundary l1-l2)")
+                    "spanned source lines (also check the span boundary l1-l2)"
+                    f" — source {l1}-{l2}: {span!r}")
         return None
 
     m = FILEPIN_RE.match(source)
@@ -175,10 +185,12 @@ def validate_source(source, kind, claim, host, sources):
     if line < 1 or line > len(lines):
         return f"line {line} out of range at {rel}@{sha} ({len(lines)} lines)"
     if kind == "quote":
-        if not _quote_matches(claim, lines[line - 1].strip()):
+        src = lines[line - 1].strip()
+        if not _quote_matches(claim, src):
             return ("quote CLAIM must be the verbatim source text only — no label, "
                     "attribution, or prefix (e.g. drop a leading 'Decision from batch 16:') "
-                    "and no paraphrase; it did not match the source line")
+                    "and no paraphrase; it did not match the source line"
+                    f" — source {line}: {src!r}")
     return None
 
 

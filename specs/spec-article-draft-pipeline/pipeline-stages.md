@@ -43,8 +43,12 @@ progress per turn instead of exhausting the budget on orchestration overhead.
 
 SOURCE is a **single** commit-pinned line (`path:line@sha`, not a range) for
 every KIND except `quote`; a `quote` SOURCE may span consecutive physical lines
-(`path:line1-line2@sha`) when the verbatim text does (e.g. a wrapped table cell),
-so a natural quote boundary is never forced to fold in unrelated adjacent text
+(`path:line1-line2@sha`) when the quoted text does (e.g. a wrapped table cell),
+so a natural quote boundary is never forced to fold in unrelated adjacent text.
+Quote matching is **whitespace-normalized** (amended 2026-07-13, #154): the
+CLAIM matches when its whitespace-collapsed text is a contiguous span of the
+whitespace-collapsed source, so a sentence that wraps is quotable by its real
+boundary while still carrying no text beyond the source
 (`skills/harvest/SKILL.md` §3).
 
 Entries the AI wants to use but cannot source go to a `NEEDS-OWNER` list feeding stage 2 — never into the draft unmarked.
