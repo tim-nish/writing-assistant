@@ -84,8 +84,9 @@ python3 -c "import py_compile; py_compile.compile('$root/$RES', doraise=True)" 2
 python3 -c "import py_compile; py_compile.compile('$root/scripts/pin-source.py', doraise=True)" 2>/dev/null \
   && ok "pin-source.py is stdlib-only Python (compiles)" || err "pin-source.py syntax error"
 
-# 7. @sha pin helper (Story 13.15): path:line -> path:line@sha in one blame per
-#    file, and the emitted pointer validates against the fact-sheet contract.
+# 7. @sha pin helper (Story 13.15, #159): path:line -> path:line@HEAD keeping the
+#    caller's OWN line numbers, verified committed-at-HEAD, and the emitted pointer
+#    validates against the fact-sheet contract.
 has "pin-source.py" "documents the @sha pin helper in the skill"
 PIN="$root/scripts/pin-source.py"
 VFS="$root/scripts/validate-fact-sheet.py"
@@ -99,10 +100,11 @@ pin=$(mktemp -d); trap 'rm -rf "$work" "$pin"' EXIT
   git add -A; git commit -qm init
 ) >/dev/null 2>&1
 
-# a) single line -> path:line@sha form
+# a) single line -> path:line@sha, preserving the CALLER's line number (#159).
 out=$(python3 "$PIN" --root "$pin" doc.md:2 2>/dev/null)
-printf '%s\n' "$out" | grep -Eq '^doc\.md:[0-9]+@[0-9a-f]{7,40}$' \
-  && ok "pins path:line to path:line@sha" || err "pin form wrong: '$out'"
+printf '%s\n' "$out" | grep -Eq '^doc\.md:2@[0-9a-f]{7,40}$' \
+  && ok "pins path:line to path:line@sha with the caller's line number preserved" \
+  || err "pin form/line wrong: '$out' (expected doc.md:2@sha)"
 
 # b) batched: two lines in one file -> two pointers, one call
 out=$(python3 "$PIN" --root "$pin" doc.md:1 doc.md:3 2>/dev/null | grep -c '@') || true
@@ -128,6 +130,26 @@ else
   [ -s /tmp/pin_out.$$ ] && err "emitted a pointer for an uncommitted line" \
     || ok "uncommitted line is skipped, not pinned"
 fi
+rm -f /tmp/pin_out.$$
+
+# e) #159 regression: when a line's CURRENT number differs from its blame-origin
+#    number (an insertion shifted it), the pointer must carry the CURRENT line, not
+#    the origin line, and still validate. Reset d)'s edit, then prepend + commit so
+#    the quote moves from line 2 to line 4 (origin line stays 2).
+git -C "$pin" checkout -- doc.md 2>/dev/null
+{ printf 'inserted top A\ninserted top B\n'; cat "$pin/doc.md"; } > "$pin/doc.md.new"
+mv "$pin/doc.md.new" "$pin/doc.md"
+git -C "$pin" add doc.md >/dev/null 2>&1
+git -C "$pin" commit -qm "prepend two lines (shifts the quote to line 4)" >/dev/null 2>&1
+out=$(python3 "$PIN" --root "$pin" doc.md:4 2>/dev/null)
+printf '%s\n' "$out" | grep -Eq '^doc\.md:4@[0-9a-f]{7,40}$' \
+  && ok "#159: emitted line is the caller's current line (4), not the blame-origin line (2)" \
+  || err "#159 regression: expected doc.md:4@sha, got '$out'"
+printf '%s\n' "# Fact sheet: t
+" "- we deliberately leak no test scenarios / $out / quote" \
+  | python3 "$VFS" --root "$pin" >/dev/null 2>&1 \
+  && ok "#159: caller-line HEAD pointer resolves/validates at the shifted line" \
+  || err "#159: shifted-line pointer rejected ($out)"
 rm -f /tmp/pin_out.$$
 
 if [ "$fail" -eq 0 ]; then
