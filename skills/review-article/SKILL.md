@@ -30,9 +30,15 @@ mandatory pointer block, and it passes `lint-article` **unchanged**, so the shap
 is authoritative rather than aspirational:
 
 ```
+mkdir -p <output.drafts>                     # output.drafts default: articles/drafts/
 cp ${CLAUDE_PLUGIN_ROOT}/skills/review-article/starter-article.md \
-   <output.drafts>/my-first-article.md      # output.drafts default: articles/drafts/
+   <output.drafts>/my-first-article.md
 ```
+
+On a fresh repo the `output.drafts` directory (default `articles/drafts/`) does
+not exist yet — create it first, as shown, rather than inferring the location
+from `writing-sources.yaml`. It is the one place review-article writes into the
+host tree; everything else stays in the run workspace.
 
 Then fill in the frontmatter and replace each section with your own content. The
 pointer block in the template uses the example-config site; regenerate it for
