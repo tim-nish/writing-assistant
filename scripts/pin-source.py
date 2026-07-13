@@ -8,21 +8,24 @@ per-line burn is a large share of the draft turn budget. This is a convenience
 helper: it emits the existing pointer form, introduces NO new SOURCE grammar.
 
 What it does, per pointer:
-  * `path:line`      -> `path:origline@sha`  — blame reports the commit the line
-                       came from AND its line number in that commit (`origline`),
-                       so the emitted pointer resolves at `sha` by construction.
-  * `path:l1-l2`     -> `path:o1-o2@sha`      — a quote range; emitted only when
-                       every line l1..l2 shares one commit with contiguous origin
-                       numbering. Otherwise it falls back to the current commit:
-                       `path:l1-l2@HEAD` (current numbers are valid at HEAD).
+  * `path:line`      -> `path:line@HEAD`   — the SAME line number you passed,
+                       pinned to the current commit (HEAD). Because HEAD is the
+                       committed state, the pointer resolves to the exact line you
+                       cited: a human opening the current file at that line sees
+                       the quoted text (#159 — the earlier blame-origin form
+                       emitted a DIFFERENT line number that only resolved at a
+                       historical sha, so the label did not match the live file).
+  * `path:l1-l2`     -> `path:l1-l2@HEAD`  — a quote range, same line numbers.
 
-Batching is the point (AC2): all lines requested for one file are resolved with a
-SINGLE `git blame -L min,max` over that file, so pinning a fact sheet costs one
-blame per file, not one process per line — bounded by file count, not line count.
+The pointer keeps the caller's line numbers, so it is verifiable by eye. It is
+still `@sha`-pinned (to HEAD), so it survives later edits that shift line numbers.
 
-A line with no commit (uncommitted working-tree change, all-zero blame sha) cannot
-be pinned; it is reported to stderr and skipped rather than emitting a pointer that
-would not resolve.
+A line that is not committed OR differs from the committed (HEAD) version — an
+uncommitted edit, or an uncommitted insertion/deletion above it that shifted its
+number relative to HEAD — cannot be pinned to HEAD verbatim; it is reported to
+stderr and skipped rather than emitting a pointer that resolves to the wrong text.
+Resolution costs one `git show HEAD:<file>` per file (cached), not one process per
+line — bounded by file count, not line count.
 
 Input pointers come from positional args and/or stdin (one per line; blank lines
 and `#` comments ignored), so a driver can pipe a column of `path:line` pointers.
@@ -40,7 +43,6 @@ import subprocess
 import sys
 
 POINTER_RE = re.compile(r"^(?P<path>.+):(?P<l1>\d+)(?:-(?P<l2>\d+))?$")
-ZERO_SHA = "0" * 40
 
 
 def _load_rws():
@@ -65,58 +67,61 @@ def repo_for(abspath):
     return os.path.realpath(r.stdout.strip()) if r.returncode == 0 and r.stdout.strip() else None
 
 
-def blame_map(repo, rel, lo, hi):
-    """One `git blame -L lo,hi --porcelain` over `rel`, parsed into
-    {current_line: (sha, orig_line)}. Returns (map, None) or (None, reason)."""
-    r = _git(repo, "blame", "-L", f"{lo},{hi}", "--porcelain", "--", rel)
-    if r.returncode != 0:
-        return None, r.stderr.strip() or f"cannot blame {rel} (lines {lo}-{hi})"
-    out = {}
-    sha = orig = None
-    for ln in r.stdout.split("\n"):
-        # Porcelain header: `<40-hex> <orig_line> <final_line> [<num_lines>]`
-        m = re.match(r"^([0-9a-f]{40})\s+(\d+)\s+(\d+)(?:\s+\d+)?$", ln)
-        if m:
-            sha, orig, final = m.group(1), int(m.group(2)), int(m.group(3))
-            out[final] = (sha, orig)
-    return out, None
+def _head_sha(repo, cache):
+    """HEAD sha for `repo`, cached; None if it can't be resolved."""
+    key = ("sha", repo)
+    if key not in cache:
+        h = _git(repo, "rev-parse", "HEAD")
+        cache[key] = h.stdout.strip() if h.returncode == 0 else None
+    return cache[key]
 
 
-def pin_one(path, l1, l2, host, head_cache):
-    """Resolve one pointer to its pinned form, or (None, reason)."""
+def _head_lines(repo, sha, rel, cache):
+    """The lines of `rel` as of `sha` (HEAD), cached; (lines, None) or (None, reason)."""
+    key = ("lines", repo, rel)
+    if key not in cache:
+        show = _git(repo, "show", f"{sha}:{rel}")
+        cache[key] = show.stdout.split("\n") if show.returncode == 0 else None
+    if cache[key] is None:
+        return None, f"{rel} does not exist at HEAD ({sha[:9]})"
+    return cache[key], None
+
+
+def pin_one(path, l1, l2, host, cache):
+    """Resolve one pointer to `path:line@HEAD` (same line numbers), or (None, reason).
+
+    The pointer keeps the caller's line numbers and pins to HEAD, and every cited
+    line is verified to match its committed (HEAD) version, so the emitted pointer
+    resolves to exactly the text the caller sees at that line (#159)."""
     abspath = os.path.realpath(os.path.join(host, path))
     repo = repo_for(abspath)
     if repo is None:
         return None, f"{path}: not inside a git repository"
     rel = os.path.relpath(abspath, repo)
-    lo, hi = (l1, l1) if l2 is None else (l1, l2)
-    bmap, reason = blame_map(repo, rel, lo, hi)
+    head = _head_sha(repo, cache)
+    if not head:
+        return None, f"{path}: cannot resolve HEAD"
+    head_lines, reason = _head_lines(repo, head, rel, cache)
     if reason:
         return None, f"{path}: {reason}"
+    try:
+        with open(abspath, encoding="utf-8") as fh:
+            wt_lines = fh.read().split("\n")
+    except OSError as exc:
+        return None, f"{path}: {exc}"
+
+    lo, hi = (l1, l1) if l2 is None else (l1, l2)
     for cur in range(lo, hi + 1):
-        if cur not in bmap:
-            return None, f"{path}:{cur}: line not found (file shorter than {cur} lines?)"
-        if bmap[cur][0] == ZERO_SHA:
-            return None, f"{path}:{cur}: line is not committed yet — commit it before pinning"
+        if cur > len(wt_lines):
+            return None, f"{path}:{cur}: line past end of file ({len(wt_lines)} lines)"
+        # The line must be committed AND unchanged at HEAD — otherwise `path:cur@HEAD`
+        # would resolve to different text than the caller is citing.
+        if cur > len(head_lines) or head_lines[cur - 1] != wt_lines[cur - 1]:
+            return None, (f"{path}:{cur}: line differs from HEAD (uncommitted edit, or an "
+                          "uncommitted change above it shifted its number) — commit before pinning")
 
-    if l2 is None:                                   # single line
-        sha, orig = bmap[l1]
-        return f"{path}:{orig}@{sha}", None
-
-    # Range (quote span): emit an origin-pinned range only when every line shares
-    # one commit with contiguous origin numbering; else pin to HEAD (current
-    # numbers are valid at the current commit).
-    shas = {bmap[c][0] for c in range(lo, hi + 1)}
-    o1, o2 = bmap[lo][1], bmap[hi][1]
-    if len(shas) == 1 and (o2 - o1) == (hi - lo):
-        return f"{path}:{o1}-{o2}@{shas.pop()}", None
-    if repo not in head_cache:
-        h = _git(repo, "rev-parse", "HEAD")
-        head_cache[repo] = h.stdout.strip() if h.returncode == 0 else None
-    head = head_cache[repo]
-    if not head:
-        return None, f"{path}: cannot resolve HEAD to pin the range {l1}-{l2}"
-    return f"{path}:{l1}-{l2}@{head}", None
+    span = str(l1) if l2 is None else f"{l1}-{l2}"
+    return f"{path}:{span}@{head}", None
 
 
 def parse_pointer(raw):
@@ -143,7 +148,7 @@ def main(argv=None):
         print("error: no pointers given (pass path:line args or pipe them on stdin)", file=sys.stderr)
         return 2
 
-    head_cache = {}
+    cache = {}
     failed = 0
     for raw in raw_ptrs:
         parsed = parse_pointer(raw)
@@ -152,7 +157,7 @@ def main(argv=None):
             failed += 1
             continue
         path, l1, l2 = parsed
-        pinned, reason = pin_one(path, l1, l2, host, head_cache)
+        pinned, reason = pin_one(path, l1, l2, host, cache)
         if pinned is None:
             print(f"skip: {reason}", file=sys.stderr)
             failed += 1
