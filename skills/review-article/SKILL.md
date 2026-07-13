@@ -20,6 +20,30 @@ review article <draft>
 - **draft** — a path to a framework-complete draft (the unit of review is a
   filled draft, never an outline or idea).
 
+## Starting from a blank repo — the starter template
+
+Reviewing needs a draft, and on a fresh repo there is none. Rather than
+hand-writing a schema-valid draft from scratch just to exercise review, copy the
+shipped **starter template** — it carries valid `article` frontmatter (`slug`,
+`title`, `date`, `mode`, `language`, `summary`, `topics`, `related`) plus the
+mandatory pointer block, and it passes `lint-article` **unchanged**, so the shape
+is authoritative rather than aspirational:
+
+```
+cp ${CLAUDE_PLUGIN_ROOT}/skills/review-article/starter-article.md \
+   <output.drafts>/my-first-article.md      # output.drafts default: articles/drafts/
+```
+
+Then fill in the frontmatter and replace each section with your own content. The
+pointer block in the template uses the example-config site; regenerate it for
+your own identity with:
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/render-pointer-block.py --language en
+```
+
+Run `lint-article` (pass 1 below) on the result before spending a model pass.
+
 ## Owner-facing proposals
 
 Arbitration hands each finding to the owner to accept or reject; that
