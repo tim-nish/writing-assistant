@@ -51,8 +51,13 @@ sources are declared and point the owner at
 
 ## 3. Extract facts, each as `CLAIM / SOURCE / KIND`
 
-Read the in-scope files and extract facts. Every entry is one line —
-`CLAIM / SOURCE / KIND`:
+Read the in-scope files and extract facts. **Read every file you cite fresh with
+a line-numbered tool (the `Read` tool) at harvest time, and take each line number
+from what that tool shows you — never cite a line number from memory, from an
+earlier turn's context, or from a summary.** A pointer's line number is only as
+trustworthy as the read that produced it; a remembered number is how off-by-one
+and fabricated pointers reach the sheet (the `pin-source.py` step below fixes the
+`@sha`, not the line you chose). Every entry is one line — `CLAIM / SOURCE / KIND`:
 
 - **SOURCE** is a resolvable pointer: `path:line@sha` (a file line PINNED to the
   commit it came from, so it survives later edits that shift line numbers), a
@@ -150,6 +155,12 @@ passes its run workspace in (`$WS` from its Stage 0); standalone, mint one:
 WS=$(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-paths.py new-run --root <host-repo>)
 # write the harvest document to "$WS/fact-sheet.md"
 ```
+
+Because this path lives **outside** the host repo (under `~/.local/state` by
+default), a first-time user has no way to guess it. **Print the resolved absolute
+`$WS/fact-sheet.md` path to the user** — in the completion summary's
+informational notes below (standalone runs), so "where is my fact sheet?" has a
+copy-pasteable answer rather than a `$WS` the user cannot expand.
 
 Pass that `$WS/fact-sheet.md` path as `<harvest-doc>` to the validators above.
 Never compose a storage path yourself, and never write the fact sheet, the
