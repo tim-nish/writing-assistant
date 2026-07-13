@@ -81,6 +81,54 @@ n=$(python3 "$root/$RES" --root "$work/bare" files | wc -l | tr -d ' ')
 # 6. Backing helper is stdlib-only Python (no JS/TS) — compiles clean.
 python3 -c "import py_compile; py_compile.compile('$root/$RES', doraise=True)" 2>/dev/null \
   && ok "harvest's backing helper is stdlib-only Python (compiles)" || err "helper syntax error"
+python3 -c "import py_compile; py_compile.compile('$root/scripts/pin-source.py', doraise=True)" 2>/dev/null \
+  && ok "pin-source.py is stdlib-only Python (compiles)" || err "pin-source.py syntax error"
+
+# 7. @sha pin helper (Story 13.15): path:line -> path:line@sha in one blame per
+#    file, and the emitted pointer validates against the fact-sheet contract.
+has "pin-source.py" "documents the @sha pin helper in the skill"
+PIN="$root/scripts/pin-source.py"
+VFS="$root/scripts/validate-fact-sheet.py"
+pin=$(mktemp -d); trap 'rm -rf "$work" "$pin"' EXIT
+(
+  cd "$pin"
+  git init -q
+  git config user.email t@e.st; git config user.name t
+  printf 'sources:\n  - path: .\n' > writing-sources.yaml
+  printf 'alpha line one\nwe deliberately leak no test scenarios\ngamma line three\n' > doc.md
+  git add -A; git commit -qm init
+) >/dev/null 2>&1
+
+# a) single line -> path:line@sha form
+out=$(python3 "$PIN" --root "$pin" doc.md:2 2>/dev/null)
+printf '%s\n' "$out" | grep -Eq '^doc\.md:[0-9]+@[0-9a-f]{7,40}$' \
+  && ok "pins path:line to path:line@sha" || err "pin form wrong: '$out'"
+
+# b) batched: two lines in one file -> two pointers, one call
+out=$(python3 "$PIN" --root "$pin" doc.md:1 doc.md:3 2>/dev/null | grep -c '@') || true
+[ "$out" = "2" ] && ok "batches multiple lines from one file" || err "expected 2 pinned, got $out"
+
+# c) the emitted pointer validates as a quote against validate-fact-sheet.py
+pinned=$(python3 "$PIN" --root "$pin" doc.md:2 2>/dev/null)
+sheet="# Fact sheet: t
+
+- we deliberately leak no test scenarios / $pinned / quote
+"
+if printf '%s' "$sheet" | python3 "$VFS" --root "$pin" >/dev/null 2>&1; then
+  ok "pinned pointer validates against the fact-sheet contract"
+else
+  err "pinned pointer rejected by validate-fact-sheet.py ($pinned)"
+fi
+
+# d) an uncommitted line cannot be pinned -> skipped, non-zero, nothing emitted
+printf 'brand new uncommitted line\n' >> "$pin/doc.md"
+if python3 "$PIN" --root "$pin" doc.md:4 >/tmp/pin_out.$$ 2>/dev/null; then
+  err "uncommitted line was pinned (should fail)"
+else
+  [ -s /tmp/pin_out.$$ ] && err "emitted a pointer for an uncommitted line" \
+    || ok "uncommitted line is skipped, not pinned"
+fi
+rm -f /tmp/pin_out.$$
 
 if [ "$fail" -eq 0 ]; then
   printf '\nAll harvest checks passed.\n'; exit 0
