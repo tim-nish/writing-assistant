@@ -33,7 +33,8 @@ work=$(mktemp -d); trap 'rm -rf "$work"' EXIT
 h="$work/host"; mkdir -p "$h"
 git -C "$h" init -q
 # lines 4-5 are a naturally two-line quote (e.g. a wrapped table cell), #119.
-printf 'intro line\nThroughput doubled under load\n"exact quoted words"\nfirst half of a wrapped\nsecond half of the cell\n' > "$h/notes.md"
+# line 6 carries DOUBLED internal whitespace (#154: matching is whitespace-normalized).
+printf 'intro line\nThroughput doubled under load\n"exact quoted words"\nfirst half of a wrapped\nsecond half of the cell\nthe  build   cache saved minutes\n' > "$h/notes.md"
 git -C "$h" add notes.md
 git -C "$h" -c user.email=t@e -c user.name=t commit -q -m init
 sha=$(git -C "$h" rev-parse HEAD)
@@ -101,6 +102,31 @@ V && ok "valid: partial quote (CLAIM is a sub-span of the source line) still acc
 # the non-quote range REJECT names the constraint AND the fix.
 emit "- Ranged fact / notes.md:2-3@$sha / number"
 reason | grep -Eq 'single line for KIND|split 2-3' && ok "reject: non-quote range names constraint + fix (#137)" || err "non-quote range REJECT generic"
+
+# 5e. Whitespace-normalized quote matching (#154, Story 13.17).
+# a) a claim with single spaces matches a source line carrying doubled whitespace.
+emit '- "the build cache saved minutes" / notes.md:6@'"$sha"' / quote'
+V && ok "valid: quote matches across normalized whitespace (doubled spaces collapsed)" \
+  || err "whitespace-normalized single-line quote rejected"
+# b) a real sentence spanning a physical-line wrap is quotable by its true boundary.
+emit '- "first half of a wrapped second half of the cell" / notes.md:4-5@'"$sha"' / quote'
+V && ok "valid: wrapped-sentence quote matches its true boundary (normalized span)" \
+  || err "wrapped-sentence quote rejected"
+# c) the no-extra-text guarantee still holds under normalization (prefix rejected).
+emit '- Decision: "the build cache saved minutes" / notes.md:6@'"$sha"' / quote'
+reason | grep -qi 'verbatim source text only' \
+  && ok "reject: prefixed quote still rejected under whitespace normalization (#137 preserved)" \
+  || err "prefixed quote accepted under normalization"
+# d) a genuine mismatch REJECT shows the ACTUAL source line so the fix is visible.
+emit '- "words that are simply not present" / notes.md:6@'"$sha"' / quote'
+reason | grep -q 'cache saved minutes' \
+  && ok "reject: mismatch REJECT includes the actual source line (#154)" \
+  || err "mismatch REJECT does not show the source line"
+# and the same for a multi-line span mismatch.
+emit '- "text that is not on those lines" / notes.md:4-5@'"$sha"' / quote'
+reason | grep -q 'first half of a wrapped second half of the cell' \
+  && ok "reject: multi-line mismatch REJECT shows the spanned source lines" \
+  || err "multi-line mismatch REJECT does not show the span"
 
 # 6. Exit status is a hard gate + --rejected lists rejects for Story 3.3.
 printf -- '- Good / notes.md:2@%s / result\n- Bad / nope:1 / result\n' "$sha" > "$work/fs.md"
