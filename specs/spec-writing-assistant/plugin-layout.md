@@ -29,10 +29,20 @@ writing-assistant/
   README.md
 ```
 
-## Per-host-repo files (created on first use in a repo, not shipped)
+## Per-repo configuration (machine-global — never in the host repo)
+
+> **Amended 2026-07-15 (#211, storage O1 resolved).** `writing-sources.yaml`
+> moved out of the host repo: repository boundaries follow publication
+> boundaries, and a host repo that is (or may become) public must never commit
+> a file carrying private pointers (`policy_source`, private article
+> destinations). The resolver owns the lookup (storage D1), so the move is
+> resolver-internal; the previous in-repo contract is retired.
 
 ```
-<host-repo>/writing-sources.yaml   # CAP-2: declared sources — placement under review (docs/storage-architecture.md O1); current contract stands
+~/.config/writing-assistant/repos/<repo-key>/writing-sources.yaml
+                                   # CAP-2: declared sources for one host repo;
+                                   # <repo-key> is the same path slug the state
+                                   # root uses (docs/storage-architecture.md D3)
 ```
 
 ```yaml
@@ -42,10 +52,16 @@ sources:
   - path: ../research-notes        # sibling checkout
     include: ["notes/**", "specs/**"]
 output:
-  drafts: articles/drafts/         # where the pipeline writes drafts + platform variants in this repo
+  drafts: ~/work/articles/drafts/  # where drafts + platform variants land — an
+                                   # external (private) articles repo by default,
+                                   # never required to be inside the host repo
 ```
 
-Draft output location comes from `output.drafts` — there is no fixed `drafts/` default. If the key is missing, the pipeline asks once and offers to write the key into `writing-sources.yaml`.
+Draft output location comes from `output.drafts` — there is no fixed `drafts/`
+default. If the key is missing, the pipeline asks once and offers to write the
+key into the machine-global file. No writing-assistant file is created inside a
+host repo; the host-repo footprint is exactly the declared products at
+`output.drafts` — and only when `output.drafts` itself points inside the host.
 
 User identity config resolves from `~/.config/writing-assistant/user-config.yaml` (machine-global, since identity is per-person not per-repo), overridable by a repo-local file.
 

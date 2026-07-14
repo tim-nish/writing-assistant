@@ -115,6 +115,16 @@ reference the invariant and the resolver, not these literals.
 
 ## O1 — `writing-sources.yaml` placement stays open (owner-directed)
 
+> **Resolved 2026-07-15 (#211): candidate 2 — machine-global
+> `~/.config/writing-assistant/repos/<repo-key>/writing-sources.yaml`, no
+> in-repo file.** The tripwire fired as config-placement friction against a
+> maybe-public host: the file carries private pointers (`policy_source`,
+> article destinations) and articles are private assets, so any in-repo
+> placement crosses the publication boundary; `output.drafts` should target an
+> external private articles repo for the same reason. Executed via the resolver
+> seam (D1) exactly as designed below. The section is preserved as the decision
+> record; the candidate list below is historical.
+
 The long-term model for per-repo configuration is **explicitly not decided**
 (owner, 2026-07-11): one dogfooded repo is not enough signal, and a
 machine-global default with per-repo overrides — though appealing — may be
