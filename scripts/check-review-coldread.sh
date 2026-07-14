@@ -18,7 +18,7 @@ ok()  { printf 'ok:   %s\n' "$1"; }
 
 [ -f "$SKILL" ] && ok "review-article SKILL.md exists" || { err "SKILL.md missing"; printf '\nFAILED.\n' >&2; exit 1; }
 
-sec=$(awk '/^## Pass 4 — Cold read/{f=1} f&&/^## Arbitration/{exit} f{print}' "$SKILL")
+sec=$(awk '/^## Pass [45] — Cold read/{f=1} f&&/^## Arbitration/{exit} f{print}' "$SKILL")
 [ -n "$sec" ] && ok "cold-read pass section present" || { err "Pass 4 section missing"; printf '\nFAILED.\n' >&2; exit 1; }
 
 has() { printf '%s\n' "$sec" | grep -qi "$1" && ok "$2" || err "$2 — missing"; }

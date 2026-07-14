@@ -1,6 +1,6 @@
 #!/usr/bin/env sh
 # check-review-skill.sh — verify the review-article skill scaffold (Story 5.2):
-# the fixed pass order (lint → structure → prose → cold read), once-per-version
+# the fixed pass order (lint → structure → prose → policy consistency → cold read), once-per-version
 # execution, the strict findings contract, the lint (pass-1) wiring, and model
 # routing. POSIX shell.
 
@@ -19,11 +19,11 @@ ok()  { printf 'ok:   %s\n' "$1"; }
 [ -f "$SKILL" ] && ok "review-article SKILL.md exists" || { err "SKILL.md missing"; printf '\nFAILED.\n' >&2; exit 1; }
 grep -q '^name: review-article$' "$SKILL" && ok "declares name: review-article" || err "name frontmatter missing"
 
-# Fixed pass order: lint → structure → prose → cold read, in that sequence.
-order=$(grep -nEi '^[0-9]+\. \*\*(Lint|Structure|Prose|Cold read)\*\*' "$SKILL" \
+# Fixed pass order: lint → structure → prose → policy consistency → cold read.
+order=$(grep -nEi '^[0-9]+\. \*\*(Lint|Structure|Prose|Policy consistency|Cold read)\*\*' "$SKILL" \
   | sed -E 's/.*\*\*([A-Za-z ]+)\*\*.*/\1/' | tr 'A-Z' 'a-z' | tr '\n' ',')
-[ "$order" = "lint,structure,prose,cold read," ] \
-  && ok "fixed pass order is lint → structure → prose → cold read" \
+[ "$order" = "lint,structure,prose,policy consistency,cold read," ] \
+  && ok "fixed pass order is lint → structure → prose → policy consistency → cold read" \
   || err "pass order wrong or incomplete: '$order'"
 
 grep -qi 'structure precedes prose' "$SKILL" \
