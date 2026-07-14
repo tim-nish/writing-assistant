@@ -904,7 +904,7 @@ def cmd_consume(args):
 
 
 def cmd_start(args):
-    state, code = _run_state(args.framework, args.sources)
+    state, code = _run_state(args.framework, args.sources, args.root)
     if state is None:
         return code
     print(json.dumps(state, indent=2))
@@ -1024,7 +1024,44 @@ def cmd_autostart(args):
     return 0
 
 
-def _run_state(framework, sources):
+def _entry_gate_ok(key, framework_file, root):
+    """Evaluate the selected framework's ENTRY gate — the framework-selection
+    precondition stated at the top of its framework file (F1: a tagged release,
+    F1-project-introduction.md "GATE (entry)"). Returns (ok, message).
+
+    Frameworks that declare no entry precondition pass. Enforcement is bound to
+    the framework file's own text: it fires only while the file still states the
+    gate, so this mirrors the spec rather than hardcoding a precondition the
+    framework no longer claims. Checked here — before any framework file is read
+    into the draft or a workspace is minted — so an unsatisfiable framework fails
+    fast instead of forcing a wasted mid-pipeline switch (Story 13.19)."""
+    try:
+        with open(os.path.join(plugin_root(), framework_file), encoding="utf-8") as f:
+            head = f.read(2000)
+    except OSError:
+        return True, ""
+    # F1 is the only framework that currently declares a machine-checkable entry
+    # precondition ("GATE (entry) — ... the project has a tagged release ...").
+    if key == "f1" and "GATE (entry)" in head and "tagged release" in head:
+        try:
+            r = subprocess.run(["git", "tag"], cwd=(root or None),
+                               capture_output=True, text=True)
+            has_tag = r.returncode == 0 and r.stdout.strip() != ""
+        except OSError:
+            has_tag = False
+        if not has_tag:
+            return False, (
+                "framework F1 (project introduction) has an entry GATE: the "
+                "project must have a tagged release (or an equivalent shipped "
+                "artifact), and this repository has no git tags — F1's "
+                "precondition is unmet before any drafting begins.\n"
+                "Choose a framework without a release precondition: "
+                "F2 (engineering lessons), F3 (evaluation methodology), or "
+                "F4 (research survey).")
+    return True, ""
+
+
+def _run_state(framework, sources, root=None):
     """Build the stage-0 run-state (framework + classified sources), or return
     (None, exit_code) on a framework error — shared by `start` and `stage0`."""
     key = framework.lower()
@@ -1037,6 +1074,10 @@ def _run_state(framework, sources):
     if not os.path.isfile(os.path.join(plugin_root(), framework_file)):
         sys.stderr.write(f"error: framework asset missing: {framework_file}\n")
         return None, 1
+    gate_ok, gate_msg = _entry_gate_ok(key, framework_file, root)
+    if not gate_ok:
+        sys.stderr.write(f"error: {gate_msg}\nNothing started.\n")
+        return None, 2
     return {
         "next_stage": "harvest",
         "framework": key.upper(),
@@ -1065,8 +1106,8 @@ def cmd_stage0(args):
     rc = subprocess.run(cmd).returncode
     if rc != 0:
         return rc
-    # 2. Framework check (before minting a workspace, as `start` does).
-    run_state, code = _run_state(args.framework, args.sources)
+    # 2. Framework check + entry-gate precondition (before minting a workspace).
+    run_state, code = _run_state(args.framework, args.sources, args.root)
     if run_state is None:
         return code
     # 3. Workspace autostart (mint or resume).
@@ -1083,6 +1124,8 @@ def main(argv=None):
     sp = sub.add_parser("start")
     sp.add_argument("framework")
     sp.add_argument("sources", nargs="*")
+    sp.add_argument("--root", help="host-repo root, for the framework entry-gate check "
+                                   "(default: cwd; e.g. F1 requires a tagged release)")
     sp = sub.add_parser("consume")
     sp.add_argument("doc", nargs="?", default="-", help="harvest output document, or - for stdin")
     sp = sub.add_parser("checkpoint", help="persist a completed stage's state to <ws>/checkpoint.json (Story 13.5)")
