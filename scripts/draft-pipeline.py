@@ -672,6 +672,22 @@ def cmd_interview(args):
     # Triage EVERY bank question (the journal, Story 10.4, records all of them),
     # walking the framework's GATE-slot order so the classification is stable.
     triage = []
+    # Policy-seeded tension items (validated above) join the candidate set as
+    # ASKED questions: a tension between the material and a recorded position
+    # is owner-only by nature — the fact sheet cannot cover it, so suppression
+    # does not apply, and the policy source supplies QUESTIONS only, never a
+    # recommended answer (NFR15). Their seed rides into the journal (`seed`)
+    # and the consulted: line (Story 14.4).
+    for item in seeded_candidates:
+        rec = {"id": item["id"], "text": item["question"],
+               "topic": item["gap_type"], "outcome": "open"}
+        if item.get("seed"):
+            rec.update(rationale="policy-seed", seed=item["seed"])
+        else:
+            # A supplied item without a seed is a generic extra candidate,
+            # not a policy-seeded one — attribution stays honest.
+            rec.update(rationale="topic-absent")
+        triage.append(rec)
     for qid in FRAMEWORK_PRIORITY[framework]:
         topic = QUESTION_BANK[qid]["topic"]
         is_gap = topic in gap_topics
@@ -686,16 +702,20 @@ def cmd_interview(args):
             rec.update(outcome="open", rationale="topic-absent")
         triage.append(rec)
 
-    # Survivors = the non-suppressed questions. Confirmed gaps first (stable →
-    # framework order preserved within each group), then hard-cap at ≤5.
+    # Survivors = the non-suppressed questions. Confirmed gaps first, then
+    # policy-seeded tension questions, then generic open (stable → framework
+    # order preserved within each group), and the ≤5 hard cap holds even with
+    # seeded candidates in play — never padded, never exceeded.
     survivors = [r for r in triage if r["outcome"] != "suppressed"]
-    survivors.sort(key=lambda r: 0 if r["outcome"] == "recommended" else 1)
+    survivors.sort(key=lambda r: 0 if r["outcome"] == "recommended"
+                   else 1 if r["rationale"] == "policy-seed" else 2)
     survivors = survivors[:QUESTION_BUDGET]
 
     questions = [{"id": r["id"], "text": r["text"], "topic": r["topic"],
                   "from_gap": r["outcome"] == "recommended", "outcome": r["outcome"],
                   "rationale": r["rationale"],
-                  **({"grounding": r["grounding"]} if "grounding" in r else {})}
+                  **({"grounding": r["grounding"]} if "grounding" in r else {}),
+                  **({"seed": r["seed"]} if "seed" in r else {})}
                  for r in survivors]
     out = {
         "stage": "interview",
@@ -706,10 +726,6 @@ def cmd_interview(args):
         "questions": questions,
         "triage": triage,
     }
-    if seeded_candidates:
-        # Validated pass-through: folding seeded items into the asked set,
-        # the journal's seed<- field, and the consulted: line is Story 14.4.
-        out["seeded_candidates"] = seeded_candidates
     print(json.dumps(out, indent=2))
     return 0
 
@@ -868,12 +884,26 @@ def cmd_journal(args):
         for a in (parsed if isinstance(parsed, list) else [parsed]):
             answers[a.get("id")] = a.get("disposition")
 
+    # The asked set is the ≤5 survivors the owner actually saw; a candidate
+    # that survived triage but fell to the question budget was never asked, so
+    # it needs no disposition — it is journaled as `capped`, keeping the
+    # boundary attributable without inventing owner input (Story 14.4: policy
+    # seeds can push the candidate count past the budget).
+    asked_ids = {q["id"] for q in interview.get("questions", triage)}
+
     entries = []
     for t in triage:
         qid = t["id"]
         if t["outcome"] == "suppressed":
             entries.append({"id": qid, "status": "suppressed",
                             "covered_by": t.get("covered_by", [])})
+            continue
+        if qid not in asked_ids:
+            entry = {"id": qid, "status": "capped", "outcome": t["outcome"],
+                     "rationale": t.get("rationale")}
+            if "seed" in t:
+                entry["seed"] = [t["seed"]["pointer"]]
+            entries.append(entry)
             continue
         disposition = answers.get(qid)
         if disposition is None:
@@ -884,9 +914,26 @@ def cmd_journal(args):
                  "rationale": t.get("rationale"), "disposition": disposition}
         if "grounding" in t:
             entry["grounding"] = t["grounding"]
+        if "seed" in t:
+            # Policy-seeded question: the journal's seed<- field, parallel to
+            # the recommendation grounding (Story 14.4).
+            entry["seed"] = [t["seed"]["pointer"]]
         entries.append(entry)
 
-    print(json.dumps({"stage": "interview", "journal": entries}, indent=2))
+    # The /ask-style consulted: line the run artifact must end with (CAP-5):
+    # pin + seed -> question map when the run was policy-seeded, else an
+    # explicit `none` naming why (unset vs unavailable, from --policy-note).
+    seeds = [(t["seed"]["pointer"], t["id"]) for t in triage
+             if t.get("seed") and t["id"] in asked_ids]
+    if seeds:
+        pin = seeds[0][0].rsplit("@", 1)[1]
+        mapping = "; ".join(f"{ptr.rsplit('@', 1)[0]} → {qid}" for ptr, qid in seeds)
+        consulted = f"consulted: product-lab@{pin} — {mapping}"
+    else:
+        consulted = f"consulted: none ({args.policy_note or 'policy_source unset'})"
+
+    print(json.dumps({"stage": "interview", "journal": entries,
+                      "consulted": consulted}, indent=2))
     return 0
 
 
@@ -1199,6 +1246,8 @@ def main(argv=None):
     sp = sub.add_parser("journal")
     sp.add_argument("--interview", required=True, help="the `interview` output JSON (carries triage), or - for stdin")
     sp.add_argument("--answers", help="recorded answer records (JSON list), or - for stdin")
+    sp.add_argument("--policy-note", help="why the run was not policy-seeded, for the consulted: line "
+                                          "(e.g. 'policy_source unavailable: <reason>'; default: unset)")
     sp = sub.add_parser("provenance")
     sp.add_argument("--map", default="-", help="the sidecar provenance map, or - for stdin")
     sp.add_argument("--count", action="store_true", help="print per-class tallies as JSON")

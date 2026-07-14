@@ -164,10 +164,47 @@ Story 3.1 scope boundary. It:
 
 ## Stage 2 — bounded gap interview
 
-Select the interview questions from the stage-1 state:
+### Policy-seeded tension questions (Story 14.4)
+
+Before selecting questions, probe the host repo's optional `policy_source`
+(SPEC-policy-source-seam) — the owner's policy repo, read-only and bounded
+**in code** to GLOSSARY.md, LESSONS.md, and ≤2 track-matched `topics/*.md`:
 
 ```
-python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py interview --framework <F> <state>
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/read-policy-source.py --root "$HOST" read > "$WS/policy-surface.txt"
+```
+
+Branch on its exit code — **the policy source is an enhancer, never a
+dependency; no exit code here may abort the run**:
+
+- **0** — the output leads with the run's pin (`pin: product-lab@<commit>`)
+  and each file's content line-numbered. Author **tension items** from it:
+  questions whose `gap_type` is `contradiction`, `ambiguity`,
+  `missing-rationale`, or `reversal-candidate`, each carrying its seed
+  `{quote, pointer: file:line@commit}` quoted **verbatim** from the surface at
+  the pinned commit. The policy source supplies **questions only** — never an
+  answer, never a recommendation (NFR15: triage and recommendations stay a
+  view over harvest output). A question that merely restates its seed will be
+  rejected (R4) — ask the tension, not the quote. Write the items to
+  `"$WS/policy-items.json"` (seam-formats.md §2) and pass them via `--items`
+  below; they are schema-validated **before** triage.
+- **10** (`policy_source` unset) — generic interview, **silently**: no items,
+  no log line, behavior identical to a repo without the seam.
+- **11 / 12** (path missing / not a git repo) — the reader printed exactly one
+  `policy_source unavailable: <reason>` line; **relay that one line once** and
+  continue with the generic interview. Do not retry, do not warn again — one
+  line, then generic mode. Keep the reason: the journal's `consulted:` line
+  records it (`--policy-note`).
+- **4** (malformed block) — a stage-0 configuration error slipped through;
+  halt and report it like any CAP-5 finding (this cannot happen after a clean
+  `stage0`).
+
+Then select the interview questions from the stage-1 state (with policy items
+when the probe produced them):
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py interview --framework <F> \
+  [--items "$WS/policy-items.json"] <state>
 ```
 
 **Three-outcome triage over the harvest output (Story 10.2).** Every candidate
@@ -189,15 +226,28 @@ Where a question triaged **open** is in fact groundable from a fact-sheet
 owner statement), present it as **recommended** instead — this recommendation
 pass is a **view over the harvest output**, introducing no new unsourced material.
 
+Validated policy items join the candidate set as **asked** questions
+(`outcome: open`, `rationale: policy-seed`, their `seed` carried through): a
+tension between the material and a recorded position is owner-only by nature,
+so suppression does not apply — and there is never a recommended answer for
+one (NFR15).
+
 The surviving (non-suppressed) questions are returned as `questions`, and are:
 
 - drawn from the fixed question bank, **prioritized by the framework's GATE
   slots** (not bank order), so the same fact sheet yields a stable interview;
-- **confirmed NEEDS-OWNER gaps first**, using the GATE-slot order as the
-  deterministic tie-break when more than five could apply — the ≤5 cap holds even
-  when the NEEDS-OWNER list is longer;
+- **confirmed NEEDS-OWNER gaps first**, then **policy-seeded tension
+  questions**, then generic open questions, using the GATE-slot order as the
+  deterministic tie-break when more than five could apply — the ≤5 cap holds
+  even when the NEEDS-OWNER list is longer or policy items are in play;
 - **at most 5**, and **zero** when harvest already covers everything — never
   padded to five.
+
+Present a policy-seeded question under the same proposal contract as every
+other: its **Why** context is the seed — the verbatim quote plus its
+`file:line@commit` pointer — so the owner sees exactly which recorded position
+the question probes. Its primary input is bullet free-text, like any open
+question.
 
 Present each surviving question under the
 [owner-facing proposal contract](../owner-facing-proposal-contract.md): show
@@ -265,17 +315,30 @@ attributable from run state — never discovered by the owner mid-interview:
 
 ```
 python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py journal \
-  --interview <interview.json> --answers <answers.json> > "$WS/interview-journal.json"
+  --interview <interview.json> --answers <answers.json> \
+  [--policy-note "policy_source unavailable: <reason>"] > "$WS/interview-journal.json"
 ```
 
 Each **asked** question records its **survival rationale** (`topic-absent` /
-`needs-owner-reraise` / `owner-judgment`), the recommendation's **grounding
-pointers** (when recommended), and the owner's **disposition**; each
-**suppressed** question records its **covering fact-sheet entries**. A question
-asked that the declared sources could in fact answer is then attributable from
-the journal — harvest scope gap vs. de-dup miss vs. triage error — without owner
-intervention. The command **fails closed** if an asked question has no recorded
-disposition, so an unattributable interview never ships.
+`needs-owner-reraise` / `owner-judgment` / `policy-seed`), the recommendation's
+**grounding pointers** (when recommended), the **seed pointers** (when
+policy-seeded — the `seed` field, parallel to the grounding), and the owner's
+**disposition**; each **suppressed** question records its **covering fact-sheet
+entries**. A question asked that the declared sources could in fact answer is
+then attributable from the journal — harvest scope gap vs. de-dup miss vs.
+triage error — without owner intervention. The command **fails closed** if an
+asked question has no recorded disposition, so an unattributable interview
+never ships.
+
+**The journal ends with the `consulted:` line (Story 14.4, CAP-5).** Its last
+key maps every seed to the question it seeded, under the run's pin —
+`consulted: product-lab@<commit> — LESSONS.md:41 → t1; …` — the /ask-style
+audit trail of which policy lines drove which questions. A run that was not
+policy-seeded records `consulted: none (policy_source unset)`, or, when the
+probe degraded, `consulted: none (policy_source unavailable: <reason>)` via
+`--policy-note` — every interview run states its policy provenance, including
+the generic ones. Surface the line in the completion summary's informational
+notes when it names a pin.
 
 ## Stage 3 — fill the framework (with `[VERIFY]` markers)
 

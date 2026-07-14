@@ -70,14 +70,14 @@ set +e
 out=$(printf '%s' "$state" | python3 "$PIPE" interview --framework F1 \
       --items "$FIX/valid.json" - 2>/dev/null); rc=$?
 set -e
-[ "$rc" -eq 0 ] && printf '%s' "$out" | grep -q '"seeded_candidates"' \
-  && ok "valid items pass the gate and ride the interview output" \
+[ "$rc" -eq 0 ] && printf '%s' "$out" | grep -q '"policy-seed"' \
+  && ok "valid items pass the gate and join the interview (rationale policy-seed)" \
   || err "valid items through interview: rc=$rc"
 
-# without --items, behavior is unchanged (no seeded_candidates key)
+# without --items, behavior is unchanged (no policy-seed rationale)
 out=$(printf '%s' "$state" | python3 "$PIPE" interview --framework F1 - 2>/dev/null)
-printf '%s' "$out" | grep -q '"seeded_candidates"' \
-  && err "no-items run leaked a seeded_candidates key" \
+printf '%s' "$out" | grep -q '"policy-seed"' \
+  && err "no-items run leaked a policy-seed rationale" \
   || ok "no --items: interview output unchanged"
 
 if [ "$fail" -eq 0 ]; then
