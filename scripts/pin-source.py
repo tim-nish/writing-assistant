@@ -30,8 +30,18 @@ line — bounded by file count, not line count.
 Input pointers come from positional args and/or stdin (one per line; blank lines
 and `#` comments ignored), so a driver can pipe a column of `path:line` pointers.
 
+With `--emit-entry` (#207) the helper emits the complete fact-sheet entry line
+instead of the bare pointer — `- CLAIM / SOURCE / KIND` — with the CLAIM filled
+from the verbatim committed source text, so quote entries are copied from tool
+output rather than re-typed (the validator pass becomes a confirmation, not a
+search). KIND defaults to `quote`; pass `--kind` for the other kinds, where the
+verbatim text is a placeholder CLAIM to replace with your claim wording (only a
+`quote` CLAIM must stay verbatim). A line range is emitted only for `quote`,
+matching validate-fact-sheet.py's grammar. Still no new SOURCE grammar.
+
 Usage:
   pin-source.py [--root HOSTROOT] POINTER [POINTER ...]
+  pin-source.py [--root HOSTROOT] --emit-entry [--kind KIND] POINTER [POINTER ...]
   printf 'README.md:88\nbench/results.md:42\n' | pin-source.py --root .
 """
 
@@ -43,6 +53,10 @@ import subprocess
 import sys
 
 POINTER_RE = re.compile(r"^(?P<path>.+):(?P<l1>\d+)(?:-(?P<l2>\d+))?$")
+
+# validate-fact-sheet.py's closed KIND set — kept in lockstep by the round-trip
+# check in check-harvest.sh (emitted entries must validate with zero rejects).
+KINDS = ("result", "decision", "number", "quote", "event")
 
 
 def _load_rws():
@@ -121,7 +135,10 @@ def pin_one(path, l1, l2, host, cache):
                           "uncommitted change above it shifted its number) — commit before pinning")
 
     span = str(l1) if l2 is None else f"{l1}-{l2}"
-    return f"{path}:{span}@{head}", None
+    # The verbatim cited text: physical lines stripped and joined by a single
+    # space — the same shape validate-fact-sheet.py matches a quote CLAIM against.
+    text = " ".join(wt_lines[cur - 1].strip() for cur in range(lo, hi + 1))
+    return (f"{path}:{span}@{head}", text), None
 
 
 def parse_pointer(raw):
@@ -137,6 +154,11 @@ def main(argv=None):
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("pointers", nargs="*", help="path:line or path:l1-l2 (quote range)")
     p.add_argument("--root", help="host-repo root (default: git top-level of cwd; errors outside a git repo)")
+    p.add_argument("--emit-entry", action="store_true",
+                   help="emit the full fact-sheet entry line `- CLAIM / SOURCE / KIND` "
+                        "with the CLAIM filled from the verbatim committed text")
+    p.add_argument("--kind", choices=KINDS, default="quote",
+                   help="KIND for --emit-entry entries (default: quote)")
     args = p.parse_args(argv)
 
     host = rws.host_root(args.root)
@@ -157,12 +179,31 @@ def main(argv=None):
             failed += 1
             continue
         path, l1, l2 = parsed
-        pinned, reason = pin_one(path, l1, l2, host, cache)
-        if pinned is None:
+        if args.emit_entry and l2 is not None and args.kind != "quote":
+            # validate-fact-sheet.py accepts a line range only for a quote —
+            # refuse here rather than emit a would-be-rejected entry.
+            print(f"skip: {path}:{l1}-{l2}: a line range is only valid for KIND 'quote' "
+                  f"(got '{args.kind}') — split into per-line pointers", file=sys.stderr)
+            failed += 1
+            continue
+        resolved, reason = pin_one(path, l1, l2, host, cache)
+        if resolved is None:
             print(f"skip: {reason}", file=sys.stderr)
             failed += 1
-        else:
+            continue
+        pinned, text = resolved
+        if not args.emit_entry:
             print(pinned)
+            continue
+        if not text.strip():
+            print(f"skip: {pinned}: cited line(s) are blank — nothing to quote", file=sys.stderr)
+            failed += 1
+            continue
+        print(f"- {text} / {pinned} / {args.kind}")
+        if args.kind != "quote":
+            print(f"note: {pinned}: CLAIM is the verbatim source text as a placeholder — "
+                  f"replace it with your claim wording (only a 'quote' CLAIM must stay verbatim)",
+                  file=sys.stderr)
     return 1 if failed else 0
 
 
