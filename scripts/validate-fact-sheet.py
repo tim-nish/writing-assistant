@@ -215,10 +215,13 @@ def main(argv=None):
     host = rws.host_root(args.root)
     # Validating against a host with no writing-sources.yaml would reject every
     # file pointer as "outside the declared repos" — a misleading mass-REJECT
-    # when the real problem is a wrong root. Fail loudly instead.
-    if not os.path.isfile(os.path.join(host, rws.SOURCES_FILE)):
-        print(f"error: no {rws.SOURCES_FILE} in host root {host} — "
-              "wrong --root, or run from inside the host repo", file=sys.stderr)
+    # when the real problem is a wrong root. Fail loudly instead. Resolution is
+    # machine-global-first with legacy in-repo fallback (O1, #211).
+    ws_path, ws_kind = rws.sources_path(host, notice=True)
+    if ws_kind == "none":
+        print(f"error: no {rws.SOURCES_FILE} for host {host} — create it at "
+              f"{ws_path} (see config/writing-sources.example.yaml), or check --root",
+              file=sys.stderr)
         return 2
     sources = rws.get_sources(rws.read_lines(host), host)
     text = sys.stdin.read() if args.factsheet == "-" else open(args.factsheet, encoding="utf-8").read()

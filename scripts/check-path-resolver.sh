@@ -42,17 +42,75 @@ got=$(XDG_STATE_HOME= $PY state-root)
 eq "state-root: empty XDG_STATE_HOME -> default" "$got" "$HOME/.local/state/writing-assistant"
 
 # 3. Repo key is the path slug of the git toplevel (AC4): non-alnum runs -> '-'.
-eq "repo-key: path slug of --root" \
-   "$($PY repo-key --root /home/ada/work/blog)" "-home-ada-work-blog"
-eq "repo-key: collapses runs of non-alnum" \
-   "$($PY repo-key --root /a//b.c_d)" "-a-b-c-d"
+#    --root validates isdir (a later guard), so slug fixtures are real temp dirs.
+slugroot=$(mktemp -d /tmp/blog.a_b.XXXXXX)
+trap 'rm -rf "$slugroot" "${cfg:-}" "${hostwork:-}"' EXIT
+want=$(printf '%s' "$slugroot" | sed 's/[^A-Za-z0-9][^A-Za-z0-9]*/-/g')
+eq "repo-key: path slug of --root (non-alnum runs -> '-')" \
+   "$($PY repo-key --root "$slugroot")" "$want"
 
 # 4. repo-dir composes state-root/repo-key.
 sr=$(XDG_STATE_HOME=/tmp/xdgstate $PY state-root)
-rk=$($PY repo-key --root /home/ada/work/blog)
+rk=$($PY repo-key --root "$slugroot")
 eq "repo-dir: state-root/repo-key" \
-   "$(XDG_STATE_HOME=/tmp/xdgstate $PY repo-dir --root /home/ada/work/blog)" \
+   "$(XDG_STATE_HOME=/tmp/xdgstate $PY repo-dir --root "$slugroot")" \
    "$sr/$rk"
+
+# 4b. Per-repo config dir composes config-home/repos/repo-key (Story 13.23, #211).
+ch=$(XDG_CONFIG_HOME=/tmp/xdgconf $PY config-home)
+eq "config-home: honours XDG_CONFIG_HOME" "$ch" "/tmp/xdgconf/writing-assistant"
+eq "repo-config-dir: config-home/repos/repo-key" \
+   "$(XDG_CONFIG_HOME=/tmp/xdgconf $PY repo-config-dir --root "$slugroot")" \
+   "$ch/repos/$rk"
+
+# 4c. sources-file resolution (Story 13.23, #211): global wins > legacy read
+#     with deprecation > neither exits 3 naming the machine-global path.
+cfg=$(mktemp -d); hostwork=$(mktemp -d)
+rk2=$($PY repo-key --root "$hostwork")
+gdir="$cfg/writing-assistant/repos/$rk2"
+
+# neither -> exit 3, prints the machine-global path, stderr says create-there
+out=$(XDG_CONFIG_HOME="$cfg" $PY sources-file --root "$hostwork" 2>/tmp/sf_err.$$) && rc=0 || rc=$?
+[ "$rc" = "3" ] && ok "sources-file: neither -> exit 3" || err "sources-file: neither -> exit $rc (want 3)"
+eq "sources-file: neither names the machine-global path" "$out" "$gdir/writing-sources.yaml"
+grep -q "never in the host repo" /tmp/sf_err.$$ \
+  && ok "sources-file: neither-case stderr points away from the host repo" \
+  || err "sources-file: neither-case stderr misses the boundary note"
+
+# legacy only -> resolves to the in-repo file, deprecation on stderr
+printf 'sources:\n  - path: .\n' > "$hostwork/writing-sources.yaml"
+out=$(XDG_CONFIG_HOME="$cfg" $PY sources-file --root "$hostwork" 2>/tmp/sf_err.$$) || err "sources-file: legacy-only exited non-zero"
+eq "sources-file: legacy only -> in-repo path" "$out" "$(realpath "$hostwork")/writing-sources.yaml"
+grep -q "deprecated" /tmp/sf_err.$$ \
+  && ok "sources-file: legacy-only emits a deprecation notice" \
+  || err "sources-file: legacy-only missing deprecation notice"
+
+# both -> machine-global wins
+mkdir -p "$gdir"
+printf 'sources:\n  - path: .\n' > "$gdir/writing-sources.yaml"
+out=$(XDG_CONFIG_HOME="$cfg" $PY sources-file --root "$hostwork" 2>/dev/null)
+eq "sources-file: both exist -> machine-global wins" "$out" "$gdir/writing-sources.yaml"
+
+# global only -> machine-global, no deprecation
+rm -f "$hostwork/writing-sources.yaml"
+out=$(XDG_CONFIG_HOME="$cfg" $PY sources-file --root "$hostwork" 2>/tmp/sf_err.$$)
+eq "sources-file: global only -> machine-global path" "$out" "$gdir/writing-sources.yaml"
+[ -s /tmp/sf_err.$$ ] && err "sources-file: global-only should be silent on stderr" \
+  || ok "sources-file: global-only is silent"
+rm -f /tmp/sf_err.$$
+
+# 4d. Consumers resolve through the same seam: resolve-writing-sources.py reads
+#     the machine-global file (global-only case) and both-exist prefers global.
+RWS="python3 $root/scripts/resolve-writing-sources.py"
+got=$(XDG_CONFIG_HOME="$cfg" $RWS sources --root "$hostwork" 2>/dev/null)
+eq "consumer: rws sources reads the machine-global file" "$got" "$(realpath "$hostwork")"
+printf 'sources:\n  - path: /nonexistent-legacy-marker\n' > "$hostwork/writing-sources.yaml"
+got=$(XDG_CONFIG_HOME="$cfg" $RWS sources --root "$hostwork" 2>/tmp/sf_err.$$)
+eq "consumer: both exist -> global content wins" "$got" "$(realpath "$hostwork")"
+grep -q "ignoring legacy" /tmp/sf_err.$$ \
+  && ok "consumer: both-exist emits the ignoring-legacy notice" \
+  || err "consumer: both-exist notice missing"
+rm -f /tmp/sf_err.$$ "$hostwork/writing-sources.yaml"
 
 # 5. Single-source invariant (AC2): no state/workspace path literal is
 #    constructed anywhere in production skills/ or scripts/ except
