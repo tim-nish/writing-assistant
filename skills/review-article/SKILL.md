@@ -3,7 +3,7 @@ name: review-article
 description: >
   Review a framework-complete draft article for publication. Invoke as
   "review article <draft>" to run the fixed pass order: lint → structure →
-  prose → cold read, each LLM pass once per draft version, emitting capped
+  prose → policy consistency → cold read, each LLM pass once per draft version, emitting capped
   severity-tagged findings (blocker/should/nit) with no rewrites. The owner is
   the sole arbiter of every finding.
 ---
@@ -97,19 +97,24 @@ article-quality finding. A clean config passes **silently**.
 
 ## Fixed pass order
 
-Run the passes in this exact order — **lint → structure → prose → cold read** —
-and never reorder them:
+Run the passes in this exact order — **lint → structure → prose → policy
+consistency → cold read** — and never reorder them:
 
 1. **Lint** (script, zero tokens)
 2. **Structure** (LLM, once per draft version)
 3. **Prose** (LLM, once per draft version)
-4. **Cold read** (LLM, once per draft version)
+4. **Policy consistency** (LLM, once per draft version; runs only when the host
+   repo declares a `policy_source` — Story 15.1, SPEC-policy-consistency-pass)
+5. **Cold read** (LLM, once per draft version)
 
 **Structure precedes prose** because structural changes (cuts, reordering,
 missing sections) invalidate prose feedback — polishing a sentence that a
-structural finding later deletes wastes the pass. Each LLM pass runs **exactly
-once per draft version**; a pass is not re-run within a cycle. A second full
-cycle happens only when a blocker survives arbitration (see *Arbitration*).
+structural finding later deletes wastes the pass. **Policy consistency runs
+after prose** — by then the draft's claims are stable — and **before the cold
+read**, which stays last so its context-free isolation is never contaminated
+by the policy surface. Each LLM pass runs **exactly once per draft version**;
+a pass is not re-run within a cycle. A second full cycle happens only when a
+blocker survives arbitration (see *Arbitration*).
 
 ## Pass execution — who runs each pass, and what gates what
 
@@ -124,6 +129,7 @@ manual step is the owner's single arbitration round at the end.
 | Lint | a **script** the invoking agent runs (`lint-article`) — zero tokens | — |
 | Structure | the **invoking agent itself**, acting as the reviewer | repo access |
 | Prose | the **invoking agent itself** | repo access |
+| Policy consistency | the **invoking agent itself** | repo access + the seam's **bounded policy surface** (`read-policy-source.py`) |
 | Cold read | a **separate, context-free model invocation** — a subagent or fresh session given **only the draft** | **none, by design** |
 
 **Cold-read isolation is a mechanism, not a wish.** The cold read must run in a
@@ -174,6 +180,10 @@ Every LLM pass emits **findings only**, in this exact format, one per line:
 - **No rewrites** (never reproduce a rewritten passage), **no praise**, **no
   summary** of the article back to the owner. Output spent on anything but
   findings is wasted.
+- **Policy-consistency findings carry no `Fix:` field** (Story 15.1): that pass
+  is contradiction detection, never conformity — it pairs the article quote
+  with the conflicting policy quote (both with pointers) and **proposes no
+  diffs**; resolution is the owner's arbitration call alone.
 
 ## Intent anchors (claim & audience)
 
@@ -221,6 +231,7 @@ Each pass uses the cheapest tier that can do its job, with the grounding it need
 | Lint | none (script) | — |
 | Structure | Sonnet class | repo access |
 | Prose | Sonnet class (Haiku acceptable) | repo access |
+| Policy consistency | Sonnet class | repo access + bounded policy surface |
 | Cold read | any cheap model | **none — context-free by design** |
 
 Drafting (SPEC-article-draft-pipeline) uses the strongest available model; review
@@ -327,7 +338,48 @@ Emit findings in the standard contract format (severity, location, issue, fix),
 capped at 10, highest-leverage change first. **No rewrites** — name the prose
 issue and a one-line fix; the owner edits.
 
-## Pass 4 — Cold read
+## Pass 4 — Policy consistency
+
+Contradiction detection against the owner's recorded positions
+(SPEC-policy-consistency-pass; the second consumer of the A1 seam). Run **once
+per draft version** on a **Sonnet-class model with repo access**, only when the
+host repo declares a `policy_source`; if the source is absent or unusable the
+pass is **skipped** — one line, never an abort (wiring in Story 15.3).
+
+Read the bounded policy surface through the seam's reader — never any other
+path into the policy repo:
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/read-policy-source.py --root "$HOST" read
+```
+
+The output leads with the run's pin (`pin: product-lab@<commit>`) and each
+whitelisted file's content line-numbered (GLOSSARY.md, LESSONS.md, ≤2
+track-matched topics — the whitelist is code-enforced). Then compare the
+draft's checkable claims against the surface and flag **conflicts only**:
+
+- a draft claim that **asserts the opposite** of a recorded position;
+- a draft claim a recorded position **declines or supersedes**.
+
+Each finding is **quote-vs-quote** — the article quote with its `path:line`,
+the recall-surface quote with its `file:line@commit` at the run's pin — with
+severity, criterion `policy-contradiction` (default **should**, never blocker
+alone: a flagged reversal may be *correct*), and the issue in one sentence.
+**No `Fix:` field, no suggested rewrite** — alignment is never proposed;
+whether the article or the recall surface should move is the owner's call in
+arbitration. Format (rendering illustrative, fields contractual):
+
+```
+- [should] {draft path:line}: {issue in one sentence}. Why should: policy-contradiction.
+  article: "{verbatim draft quote}" ({draft path:line})
+  policy:  "{verbatim policy quote}" ({file:line@commit})
+```
+
+Cap at 10, highest-leverage conflict first. **A draft with no conflicting
+claims emits nothing** — no praise, no "policy check passed" summary, no
+placeholder. Never show this pass's surface or findings to the cold read.
+
+## Pass 5 — Cold read
 
 A read by **any cheap model given ONLY the draft** — **no repo access, no project
 context, no interview answers** — so it simulates the actual reader and surfaces
@@ -360,8 +412,8 @@ first, no rewrites. This is the final pass; its findings feed arbitration.
 
 ## Arbitration
 
-After lint, structure, prose, and cold read have run, collect their findings into
-one list and hand it to the owner. The **owner is the sole arbiter**.
+After lint, structure, prose, policy consistency, and cold read have run,
+collect their findings into one list and hand it to the owner. The **owner is the sole arbiter**.
 
 **Present each finding under the
 [owner-facing proposal contract](../owner-facing-proposal-contract.md):** show

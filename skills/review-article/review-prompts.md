@@ -18,7 +18,7 @@ table. The finding format is:
 | Severity | Criterion (what earns this severity) |
 |---|---|
 | **blocker** | a **quality-rubric dimension violation** (Epic 11: narrative arc / paragraph flow / explanation calibration / readability mechanics), a **cold-read Q1 (claim) or Q2 (audience) mismatch**, or a **configuration defect** |
-| **should** | a **cold-read Q3 or Q4** finding, or a **non-rubric structure/prose** issue (real, but not a rubric-dimension violation) |
+| **should** | a **cold-read Q3 or Q4** finding, a **non-rubric structure/prose** issue (real, but not a rubric-dimension violation), or a **policy-contradiction** (Story 15.1: the article quote conflicts with a pinned recall-surface quote — never blocker alone, since a flagged reversal may be correct; the owner may escalate an individual finding in arbitration) |
 | **nit** | **polish** — optional refinement with no correctness, clarity, or publishability cost |
 
 - A **blocker** is publication-stopping: an open rubric-mapped blocker (or a
