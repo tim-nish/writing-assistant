@@ -79,24 +79,26 @@ for f in skills/harvest/SKILL.md skills/draft-article/SKILL.md skills/review-art
   fi
 done
 
-# 5. AC3: writing-sources.yaml in-repo contract unchanged.
-#    5a. plugin-layout still documents the host-root writing-sources.yaml.
-if grep -q '<host-repo>/writing-sources.yaml' specs/spec-writing-assistant/plugin-layout.md; then
-  ok "plugin-layout still documents host-root writing-sources.yaml"
+# 5. AC3 (amended by Story 13.23, #211 — storage O1 resolved): writing-sources.yaml
+#    is machine-global per-repo config, and the RESOLVER owns its placement.
+#    5a. plugin-layout documents the machine-global location, not a host-root file.
+if grep -q 'repos/<repo-key>/' specs/spec-writing-assistant/plugin-layout.md \
+   && ! grep -q '<host-repo>/writing-sources.yaml' specs/spec-writing-assistant/plugin-layout.md; then
+  ok "plugin-layout documents machine-global writing-sources.yaml (no host-root contract)"
 else
-  err "host-root writing-sources.yaml contract changed in plugin-layout.md"
+  err "plugin-layout does not document the machine-global writing-sources.yaml contract (#211)"
 fi
-#    5b. storage-architecture O1 leaves it open with the current contract standing.
-if grep -qi 'current contract stands' docs/storage-architecture.md; then
-  ok "storage-architecture O1 keeps writing-sources.yaml contract standing"
+#    5b. storage-architecture records O1 as resolved.
+if grep -q 'Resolved 2026-07-15 (#211)' docs/storage-architecture.md; then
+  ok "storage-architecture records the O1 resolution"
 else
-  err "storage-architecture O1 note for writing-sources.yaml is missing"
+  err "storage-architecture O1 resolution record is missing (#211)"
 fi
-#    5c. the resolver did NOT take over writing-sources placement (still host-root).
-if grep -q 'writing-sources' scripts/resolve-paths.py; then
-  err "resolve-paths.py unexpectedly handles writing-sources placement (O1 is out of scope)"
+#    5c. the resolver is the single owner of writing-sources placement.
+if grep -q 'def sources_file' scripts/resolve-paths.py; then
+  ok "resolver owns writing-sources.yaml placement (sources_file)"
 else
-  ok "resolver leaves writing-sources placement alone (O1 out of scope)"
+  err "resolve-paths.py does not own writing-sources placement (#211 expects sources_file)"
 fi
 
 if [ "$fail" -eq 0 ]; then

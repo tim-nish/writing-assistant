@@ -49,12 +49,60 @@ git repo the script errors rather than silently resolving against cwd):
 
 import argparse
 import glob
+import importlib.util
 import os
 import re
 import subprocess
 import sys
 
 SOURCES_FILE = "writing-sources.yaml"
+
+
+def _load_paths():
+    here = os.path.dirname(os.path.realpath(__file__))
+    spec = importlib.util.spec_from_file_location(
+        "rp", os.path.join(here, "resolve-paths.py"))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+rp = _load_paths()
+
+# One notice per process — read_lines is called repeatedly by some consumers.
+_NOTICED = set()
+
+
+def _notice(key, msg):
+    if key not in _NOTICED:
+        _NOTICED.add(key)
+        sys.stderr.write(msg)
+
+
+def sources_path(root, notice=False):
+    """The resolved writing-sources.yaml for `root` — (path, kind), kind in
+    {'global','legacy','none'}. Resolution lives in resolve-paths.py (O1, #211).
+
+    Library calls stay SILENT by default: several consumers own a structured
+    stderr protocol (read-policy-source.py's relayed config errors, parsed by
+    validate-config.py) that a free-text line would corrupt. CLI entry points —
+    which own their stderr — pass notice=True to surface the migration notices:
+      both exist   -> the machine-global file wins; one line names the ignored
+                      in-repo file and the migration path
+      legacy only  -> read it (compatibility), one deprecation line
+    """
+    path, kind = rp.sources_file(root)
+    legacy = rp.legacy_sources_file(root)
+    if notice:
+        if kind == "global" and os.path.isfile(legacy):
+            _notice(("both", root),
+                    f"notice: ignoring legacy {legacy} — the machine-global config wins "
+                    f"({path}); delete the in-repo file after migrating (#211)\n")
+        elif kind == "legacy":
+            _notice(("legacy", root),
+                    f"deprecated: {path} lives in the host repo; move it to "
+                    f"{os.path.join(rp.repo_config_dir(root), SOURCES_FILE)} (#211)\n")
+    return path, kind
 
 NEEDS_PROMPT = 3      # draft-location: no output.drafts declared
 POLICY_MALFORMED = 4  # policy-source: block present but malformed
@@ -92,16 +140,24 @@ def host_root(arg_root):
 
 
 def read_lines(root):
-    """Return the raw lines (no trailing newlines) of writing-sources.yaml, or []."""
-    path = os.path.join(root, SOURCES_FILE)
-    if not os.path.isfile(path):
+    """Return the raw lines (no trailing newlines) of the RESOLVED
+    writing-sources.yaml (machine-global first, legacy in-repo second — O1,
+    #211), or [] when neither exists."""
+    path, kind = sources_path(root)
+    if kind == "none":
         return []
     with open(path, encoding="utf-8") as fh:
         return fh.read().split("\n")
 
 
 def write_lines(root, lines):
-    path = os.path.join(root, SOURCES_FILE)
+    """Write back to the SAME file read resolution chose — global stays global,
+    a legacy in-repo file is updated in place during migration (never silently
+    forked into a global copy that would shadow its sources). When neither file
+    exists yet, create the machine-global one (#211) — never a host-repo file."""
+    path, kind = sources_path(root)
+    if kind == "none":
+        os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", encoding="utf-8") as fh:
         fh.write("\n".join(lines))
 
@@ -348,7 +404,7 @@ def cmd_draft_location(args):
     val = get_output_drafts(read_lines(root))
     if val is None:
         sys.stderr.write(
-            f"no output.drafts declared in {os.path.join(root, SOURCES_FILE)}; "
+            f"no output.drafts declared in {sources_path(root)[0]}; "
             f"ask the owner for a location, then run:\n"
             f"  resolve-writing-sources.py set-draft-location <path> --root {root}\n"
         )
@@ -444,6 +500,11 @@ def main(argv=None):
     args = p.parse_args(argv)
     if not hasattr(args, "root"):
         args.root = None
+    # The CLI owns its stderr: surface the O1 migration notices (legacy in-repo
+    # file / ignored legacy) once per invocation. Library importers never see
+    # them — see sources_path(). host_root() here exits identically to the
+    # handler's own call, so this adds no new failure mode.
+    sources_path(host_root(args.root), notice=True)
     return {
         "draft-location": cmd_draft_location,
         "set-draft-location": cmd_set_draft_location,

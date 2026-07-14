@@ -61,7 +61,9 @@ got=$($PY --root "$work/host" draft-location)
 
 # 2b. --root works AFTER the subcommand too (the form the SKILLs document, #138):
 #     `resolve-writing-sources.py <cmd> --root <host>` must not error.
-after=$($PY draft-location --root "$work/host" 2>&1)
+# stdout only: the fixture uses legacy in-repo placement, which (correctly)
+# emits the O1 deprecation notice on stderr (Story 13.23, #211).
+after=$($PY draft-location --root "$work/host" 2>/dev/null)
 [ "$after" = "articles/drafts/" ] \
   && ok "--root accepted AFTER the subcommand (matches the documented invocation, #138)" \
   || err "--root after the subcommand failed: '$after'"

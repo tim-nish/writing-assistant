@@ -46,7 +46,10 @@ output:
   drafts: articles/drafts/
 YAML
 out=$($PY --root "$work/plain" policy-source 2>"$work/e1"); rc=$?
-[ "$rc" -eq 0 ] && [ "$out" = '{"declared": false}' ] && [ ! -s "$work/e1" ] \
+# "silent" means no POLICY warning; the fixture's legacy in-repo placement
+# correctly draws the O1 deprecation notice (Story 13.23, #211) — exclude it.
+if grep -v '^deprecated:' "$work/e1" | grep -q .; then policy_noise=1; else policy_noise=0; fi
+[ "$rc" -eq 0 ] && [ "$out" = '{"declared": false}' ] && [ "$policy_noise" -eq 0 ] \
   && ok "absent block: {\"declared\": false}, exit 0, silent" \
   || err "absent block: got rc=$rc out='$out'"
 

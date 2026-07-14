@@ -181,8 +181,9 @@ WS=$(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-paths.py new-run --root <host
 # write the harvest document to "$WS/fact-sheet.md"
 ```
 
-Because this path lives **outside** the host repo (under `~/.local/state` by
-default), a first-time user has no way to guess it. **Print the resolved absolute
+Because this path lives **outside** the host repo (in the resolver's
+machine-local state root — its layout is resolver-internal), a first-time user
+has no way to guess it. **Print the resolved absolute
 `$WS/fact-sheet.md` path to the user** — in the completion summary's
 informational notes below (standalone runs), so "where is my fact sheet?" has a
 copy-pasteable answer rather than a `$WS` the user cannot expand.

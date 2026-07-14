@@ -14,9 +14,18 @@ Layout (D3 — evolvable behind the commands, not contractual):
       <repo-key>/                          # path slug of the repo's git toplevel
         runs/<run-id>/                     # per-invocation workspace (Story 9.2)
 
-Config lookup (machine-global identity, `~/.config/writing-assistant`) is exposed
-here too so nothing else hardcodes it; the existing config resolvers keep their
-current contract pending `docs/storage-architecture.md` O1.
+Config lookup (machine-global, `~/.config/writing-assistant`) is exposed here so
+nothing else hardcodes it. Per-repo configuration (O1 resolved 2026-07-15, #211)
+lives under the config home too:
+
+    $XDG_CONFIG_HOME/writing-assistant/    # config home; default ~/.config/writing-assistant
+      repos/<repo-key>/
+        writing-sources.yaml               # per-repo declared sources — NEVER in the host repo
+
+`sources_file()` is the single resolution point for that file: the machine-global
+path wins; a legacy in-repo `writing-sources.yaml` is still honoured during
+migration (with the caller expected to surface a deprecation notice — see
+resolve-writing-sources.py). No other script may compose either location.
 
 Stdlib-only by design (host repos guarantee no venv), matching the no-JS
 constraint. Every command prints one absolute path to stdout.
@@ -26,6 +35,11 @@ Subcommands:
   config-home                the machine-global config dir (~/.config/writing-assistant)
   repo-key   [--root R]      path slug of the repo's git toplevel
   repo-dir   [--root R]      <state-root>/<repo-key> (the per-repo state directory)
+  repo-config-dir [--root R] <config-home>/repos/<repo-key> (per-repo config, O1/#211)
+  sources-file [--root R]    the resolved writing-sources.yaml path for the repo:
+                             machine-global if present, else a legacy in-repo file
+                             (deprecation notice on stderr), else the machine-global
+                             path where the file should be created (exit 3)
   new-run    [--root R] [--run-id ID]
                              create and print a fresh per-run workspace (Story 9.2)
   run-workspace --run-id ID [--root R]
@@ -115,6 +129,43 @@ def repo_dir(root):
     return os.path.join(state_root(), repo_key(root))
 
 
+SOURCES_BASENAME = "writing-sources.yaml"
+
+
+def repo_config_dir(root):
+    """<config-home>/repos/<repo-key> — the per-repo configuration directory
+    (O1 resolved 2026-07-15, #211). Same key scheme as the state root, so config
+    and state for one repo always agree."""
+    return os.path.join(config_home(), "repos", repo_key(root))
+
+
+def sources_file(root):
+    """Resolve the writing-sources.yaml for a host repo (O1, #211).
+
+    Returns (path, kind):
+      kind = 'global'  — machine-global file exists (wins even if a legacy
+                         in-repo file also exists; callers surface the notice)
+      kind = 'legacy'  — only the in-repo file exists (migration compatibility;
+                         callers surface a deprecation notice)
+      kind = 'none'    — neither exists; path is the machine-global location
+                         where the file SHOULD be created (never the host root)
+    The publication boundary behind this: a host repo may be public, and this
+    file can carry private pointers — it must never need to live in the repo.
+    """
+    global_path = os.path.join(repo_config_dir(root), SOURCES_BASENAME)
+    legacy_path = os.path.join(root, SOURCES_BASENAME)
+    if os.path.isfile(global_path):
+        return global_path, "global"
+    if os.path.isfile(legacy_path):
+        return legacy_path, "legacy"
+    return global_path, "none"
+
+
+def legacy_sources_file(root):
+    """The legacy in-repo path (for callers composing the 'both exist' notice)."""
+    return os.path.join(root, SOURCES_BASENAME)
+
+
 def runs_dir(root):
     return os.path.join(repo_dir(root), "runs")
 
@@ -182,6 +233,28 @@ def cmd_repo_dir(args):
     return 0
 
 
+def cmd_repo_config_dir(args):
+    print(repo_config_dir(host_root(args.root)))
+    return 0
+
+
+def cmd_sources_file(args):
+    root = host_root(args.root)
+    path, kind = sources_file(root)
+    if kind == "none":
+        sys.stderr.write(
+            f"no {SOURCES_BASENAME} for this repo; create it at {path} "
+            f"(see config/writing-sources.example.yaml) — never in the host repo (#211)\n")
+        print(path)
+        return 3
+    if kind == "legacy":
+        sys.stderr.write(
+            f"deprecated: {path} lives in the host repo; move it to "
+            f"{os.path.join(repo_config_dir(root), SOURCES_BASENAME)} (#211)\n")
+    print(path)
+    return 0
+
+
 def cmd_new_run(args):
     print(new_run(host_root(args.root), args.run_id))
     return 0
@@ -207,6 +280,12 @@ def main(argv=None):
     sp = sub.add_parser("repo-dir", help="print <state-root>/<repo-key>")
     sp.add_argument("--root", help="host-repo root (default: git top-level of cwd; errors outside a git repo)")
 
+    sp = sub.add_parser("repo-config-dir", help="print <config-home>/repos/<repo-key>")
+    sp.add_argument("--root", help="host-repo root (default: git top-level of cwd; errors outside a git repo)")
+
+    sp = sub.add_parser("sources-file", help="print the resolved writing-sources.yaml path")
+    sp.add_argument("--root", help="host-repo root (default: git top-level of cwd; errors outside a git repo)")
+
     sp = sub.add_parser("new-run", help="create and print a fresh per-run workspace")
     sp.add_argument("--root", help="host-repo root (default: git top-level of cwd; errors outside a git repo)")
     sp.add_argument("--run-id", help="explicit run id (must not already exist; default: fresh timestamp id)")
@@ -221,6 +300,8 @@ def main(argv=None):
         "config-home": cmd_config_home,
         "repo-key": cmd_repo_key,
         "repo-dir": cmd_repo_dir,
+        "repo-config-dir": cmd_repo_config_dir,
+        "sources-file": cmd_sources_file,
         "new-run": cmd_new_run,
         "run-workspace": cmd_run_workspace,
     }[args.cmd](args)
