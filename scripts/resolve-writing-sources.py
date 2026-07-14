@@ -194,6 +194,37 @@ def _contains(parent, child):
     return child.startswith(parent + os.sep)
 
 
+# Well-known VCS / tool / editor / build directories that a whole-tree `path: .`
+# scope sweeps into harvest as noise. This list drives an ADVISORY WARNING only —
+# it never prunes. The read-scope invariant is unchanged (scope = declared paths
+# minus `.git/`); owners narrow scope with an `include:` allowlist. Story 13.20 /
+# issue #170 decided warn-only precisely to preserve that invariant.
+NOISE_DIRS = {
+    ".claude", ".obsidian", ".devcontainer", ".vscode", ".idea",
+    "_bmad", "_bmad-output", "node_modules", "__pycache__",
+    ".venv", "venv", ".mypy_cache", ".pytest_cache", ".ruff_cache",
+}
+
+
+def noise_report(sources, files):
+    """For each whole-tree source (declared with no `include:`), count resolved
+    files that fall under a well-known noise directory. Returns {dir_name: count},
+    aggregated across whole-tree sources. Advisory only — nothing is pruned, so
+    the file list this run returns is unaffected."""
+    whole_tree_roots = [s["path"] for s in sources
+                        if not s["include"] and os.path.isdir(s["path"])]
+    counts = {}
+    for full in files:
+        base = next((r for r in whole_tree_roots if _contains(r, full)), None)
+        if base is None:
+            continue
+        parts = os.path.relpath(full, base).split(os.sep)
+        hit = next((p for p in parts if p in NOISE_DIRS), None)
+        if hit:
+            counts[hit] = counts.get(hit, 0) + 1
+    return counts
+
+
 def enumerate_files(sources):
     """The concrete allowlist of files harvest may read: declared sources only,
     narrowed by any `include` globs, with `.git/` pruned and every path checked
@@ -279,8 +310,23 @@ def cmd_is_declared(args):
 
 def cmd_files(args):
     root = host_root(args.root)
-    for f in enumerate_files(get_sources(read_lines(root), root)):
+    sources = get_sources(read_lines(root), root)
+    files = enumerate_files(sources)
+    for f in files:
         print(f)
+    report = noise_report(sources, files)
+    if report:
+        total = sum(report.values())
+        listed = ", ".join(f"{d}/ ({n})" for d, n in
+                           sorted(report.items(), key=lambda kv: (-kv[1], kv[0])))
+        sys.stderr.write(
+            f"warning: a whole-tree source (`path: .`, no `include:`) pulled "
+            f"{total} file(s) from well-known tool/editor/build directories into "
+            f"harvest scope: {listed}. These are usually noise, not article "
+            f"material. Narrow scope with an `include:` allowlist in "
+            f"{SOURCES_FILE} (e.g. `include: [\"specs/**\", \"docs/**\"]`); see "
+            f"config/writing-sources.example.yaml. Default scope is unchanged — "
+            f"this is advisory only.\n")
     return 0
 
 
