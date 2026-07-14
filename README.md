@@ -75,9 +75,13 @@ output:
 ```
 
 `harvest` reads **only** the declared `sources` (undeclared repos are never
-read). **`output.drafts` has no default** — the pipeline writes drafts and
-platform variants there; if the key is missing it asks once and offers to write
-your choice back into `writing-sources.yaml`.
+read). For a whole-repo scope (`path: .`), add an **`include:` allowlist** so
+harvest reads article material and skips tool/editor/build directories
+(`.claude/`, `_bmad/`, `node_modules/`, …); without one, `path: .` sweeps the
+whole tree and harvest **warns** about the noise it pulled in (the default scope
+is never silently narrowed). **`output.drafts` has no default** — the pipeline
+writes drafts and platform variants there; if the key is missing it asks once
+and offers to write your choice back into `writing-sources.yaml`.
 
 ## Usage
 

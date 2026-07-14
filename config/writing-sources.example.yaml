@@ -12,6 +12,11 @@
 
 sources:
   - path: .                              # the host repo itself (whole tree in scope)
+    # Recommended for a whole-repo scope: add an `include:` allowlist so harvest
+    # reads only article material and skips tool/editor/build dirs (.claude/,
+    # _bmad/, node_modules/, …). Without it, `path: .` sweeps the whole tree and
+    # harvest warns about the noise it pulled in.
+    # include: ["specs/**", "docs/**", "README.md"]
   - path: ../research-notes              # a sibling checkout on local disk
     include: ["notes/**", "specs/**"]    # optional: narrow to these globs. Omit = whole path in scope.
 
