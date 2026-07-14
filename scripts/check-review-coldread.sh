@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 # check-review-coldread.sh — verify the cold-read pass (Story 5.5): context-free
 # (draft only, no repo/project context), the six-question reader rubric, the
-# comparison to interview answers #2/#5, and the severity mapping (claim/audience
+# comparison to the journal q2/q5 intent anchors, capped-anchor tolerance, and the severity mapping (claim/audience
 # mismatch = blocker; confusion/assumed-knowledge = should-fix). POSIX shell.
 
 set -eu
@@ -37,11 +37,44 @@ has 'read past the first screen'              "rubric Q5: read past first screen
 has 'do after'                                "rubric Q6: next action"
 
 # Comparison to interview answers and severity mapping.
-has 'interview answers'                       "compares to the author's interview answers"
-has '#2'                                       "references interview answer #2 (claim)"
-has '#5'                                       "references interview answer #5 (audience)"
+has 'intent anchor'                           "compares to the author's intent anchors"
+has 'q2'                                       "claim anchor comes from journal q2"
+has 'q5'                                       "audience anchor comes from journal q5"
+
+# Capped-anchor tolerance (Story 15.4): a q5 displaced by policy seeds is an
+# absent anchor — informational note, partial comparison, never a failure.
+FULL=$(cat "$SKILL")
+printf '%s' "$FULL" | tr '\n' ' ' | tr -s ' ' | grep -qi 'recorded as .*capped.* (Story 15.4: displaced by policy-seeded' \
+  && ok "capped journal entry recognized as an absent anchor" \
+  || err "capped-anchor handling missing"
+printf '%s' "$FULL" | tr '\n' ' ' | tr -s ' ' | grep -qi 'never fail or block on the absence' \
+  && ok "absent anchor never fails or blocks the pass" \
+  || err "never-fail rule missing"
+printf '%s' "$FULL" | tr '\n' ' ' | tr -s ' ' | grep -qi 'a partial anchor set is a note, never a pass failure' \
+  && ok "single absent anchor: partial comparison + informational note" \
+  || err "partial-anchor comparison rule missing"
 has 'blocker'                                 "claim/audience mismatch = blocker"
 has 'should-fix'                              "confusion/assumed-knowledge = should-fix"
+
+# Behavioral: the capped-q5 input case is REAL — produce a journal with the
+# actual interview+journal commands (policy seeds displace q5 under the ≤5
+# budget on F1) and confirm q5 lands status=capped (Story 15.4 AC).
+work=$(mktemp -d); trap 'rm -rf "$work"' EXIT
+state='{"stage":"consume","fact_sheet":[],"needs_owner":[{"topic":"significance","candidate":"x","reason":"y"}]}'
+printf '%s' "$state" | python3 scripts/draft-pipeline.py interview --framework F1 \
+  --items scripts/fixtures/interview-items/valid.json - > "$work/iv.json" 2>/dev/null
+python3 - "$work/iv.json" "$work/ans.json" <<'PYE'
+import json, sys
+d = json.load(open(sys.argv[1]))
+json.dump([{"id": q["id"], "disposition": "skipped"} for q in d["questions"]],
+          open(sys.argv[2], "w"))
+PYE
+q5status=$(python3 scripts/draft-pipeline.py journal --interview "$work/iv.json" \
+  --answers "$work/ans.json" 2>/dev/null \
+  | python3 -c "import json,sys; d=json.load(sys.stdin); print(next(e['status'] for e in d['journal'] if e['id']=='q5'))")
+[ "$q5status" = "capped" ] \
+  && ok "real interview+journal run yields q5 status=capped (the case the cold read must tolerate)" \
+  || err "expected q5 capped from the real pipeline, got '$q5status'"
 
 if [ "$fail" -eq 0 ]; then
   printf '\nAll cold-read checks passed.\n'; exit 0
