@@ -627,6 +627,30 @@ def cmd_interview(args):
     if framework not in FRAMEWORK_PRIORITY:
         sys.stderr.write(f"error: invalid framework {args.framework!r}. Valid: F1, F2, F3, F4.\n")
         return 2
+
+    # Externally supplied candidate items (e.g. policy-seeded tension questions,
+    # Story 14.4) are schema-validated BEFORE any triage runs — an invalid item
+    # set halts here, so a malformed or confirmation-shaped question can never
+    # reach the owner (Story 14.3; SPEC-policy-source-seam CAP-3).
+    seeded_candidates = []
+    if getattr(args, "items", None):
+        vii = _load("validate-interview-items.py")
+        try:
+            with open(args.items, encoding="utf-8") as fh:
+                data = json.load(fh)
+        except (OSError, json.JSONDecodeError) as e:
+            sys.stderr.write(f"error: cannot load interview items {args.items!r}: {e}\n")
+            return 2
+        if isinstance(data, dict) and "items" in data:
+            data = data["items"]
+        rejections = vii.validate_items(data)
+        if rejections:
+            for iid, code, msg in rejections:
+                sys.stderr.write(f"[{iid}] {code}: {msg}\n")
+            sys.stderr.write("\ninterview items failed validation; triage not run.\n")
+            return 1
+        seeded_candidates = data
+
     state = _load_json_state(args.state, "stage-0 state capture")
     fact_sheet = state.get("fact_sheet", [])
     needs_owner = state.get("needs_owner", [])
@@ -682,6 +706,10 @@ def cmd_interview(args):
         "questions": questions,
         "triage": triage,
     }
+    if seeded_candidates:
+        # Validated pass-through: folding seeded items into the asked set,
+        # the journal's seed<- field, and the consulted: line is Story 14.4.
+        out["seeded_candidates"] = seeded_candidates
     print(json.dumps(out, indent=2))
     return 0
 
@@ -1156,6 +1184,8 @@ def main(argv=None):
     sp.add_argument("--root", help="host-repo root (default: git top-level of cwd; errors outside a git repo)")
     sp = sub.add_parser("interview")
     sp.add_argument("--framework", required=True)
+    sp.add_argument("--items", help="candidate interview-item JSON (e.g. policy-seeded questions); "
+                                    "schema-validated before triage — invalid items halt the stage")
     sp.add_argument("state", nargs="?", default="-", help="stage-1 pipeline state JSON, or - for stdin")
     sp = sub.add_parser("answer")
     sp.add_argument("--id", help="the question id this answer keys to (single-answer form)")

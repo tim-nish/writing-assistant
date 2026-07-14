@@ -1,0 +1,13 @@
+[
+  {"id": "q1", "gap_type": "surprise", "seed": null,
+   "question": "What surprised you most while building this?", "owner_answer": ""},
+  {"id": "t1", "gap_type": "contradiction",
+   "seed": {"quote": "report trust must be enforced by a mechanism that survives a bad prompt",
+            "pointer": "LESSONS.md:41@8f3c2d1e4a5b6c7d8e9f0a1b2c3d4e5f60718293"},
+   "question": "Your draft argues prompt discipline is sufficient for report trust — what changed since you recorded the mechanism-over-prompt position?",
+   "owner_answer": ""},
+  {"id": "t2", "gap_type": "reversal-candidate",
+   "seed": {"quote": "cross-repo /ask stays dropped", "pointer": "topics/knowledge-architecture.md:12-14@8f3c2d1e4a5b6c7d8e9f0a1b2c3d4e5f60718293"},
+   "question": "The new seam reads product-lab directly from another repo's tooling — does the declined cross-repo /ask position still hold, and where is the line?",
+   "owner_answer": ""}
+]
