@@ -61,9 +61,17 @@ any drafting starts — fill them once and they never resurface.
 Resolution order: `~/.config/writing-assistant/user-config.yaml` first, then an
 optional repo-local `config/user-config.yaml` as a per-key override.
 
-**2. Sources & draft location — per host repo.** In the repo you're writing
-about, create `writing-sources.yaml` (see
-[`config/writing-sources.example.yaml`](config/writing-sources.example.yaml)):
+**2. Sources & draft location — per host repo, stored machine-globally.**
+Create `writing-sources.yaml` in the **machine-global per-repo config — not in
+the repo you're writing about** (a host repo may be public or become public
+later, and this file can carry private pointers; see
+[`config/writing-sources.example.yaml`](config/writing-sources.example.yaml)).
+Print the exact destination for a repo with:
+
+```
+python3 scripts/resolve-paths.py sources-file --root <host-repo>
+# → ~/.config/writing-assistant/repos/<repo-key>/writing-sources.yaml
+```
 
 ```yaml
 sources:
@@ -71,8 +79,11 @@ sources:
   - path: ../research-notes      # sibling checkout (optional)
     include: ["notes/**", "specs/**"]
 output:
-  drafts: articles/drafts/       # where drafts + platform variants are written
+  drafts: ~/work/articles/drafts/  # recommended: a private articles repo OUTSIDE the host
 ```
+
+(A legacy in-repo `writing-sources.yaml` is still read during migration, with a
+deprecation notice; when both exist the machine-global file wins.)
 
 `harvest` reads **only** the declared `sources` (undeclared repos are never
 read). For a whole-repo scope (`path: .`), add an **`include:` allowlist** so

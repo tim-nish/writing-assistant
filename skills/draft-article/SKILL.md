@@ -64,12 +64,16 @@ config or framework:
   `validate-config.py`'s verbatim. A clean config is silent. Relay any report and
   stop.
   - **A missing `writing-sources.yaml` is a hard stop, not a self-service fix
-    (Story 13.11).** Do **not** proceed on a config you invented. Relay the error
-    (it names the example's full path and that the file must live at the
-    **host-repo root**), then **offer to scaffold** a starter `writing-sources.yaml`
-    at the host-repo root as an explicit, owner-confirmed step; on consent create
-    it from the example and **show the owner the path and contents** before
-    re-running Stage 0; without consent, stop. Never scaffold silently.
+    (Story 13.11; placement amended by #211).** Do **not** proceed on a config
+    you invented. The file lives in the **machine-global per-repo config —
+    never in the host repo** (a host repo may be public, and this file can
+    carry private pointers); resolve the exact destination with
+    `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-paths.py sources-file --root <host-repo>`.
+    Relay the error, then **offer to scaffold** a starter `writing-sources.yaml`
+    at that resolved machine-global path as an explicit, owner-confirmed step;
+    on consent create it from the example and show the owner the **path and
+    contents** before re-running Stage 0; without consent, stop.
+    Never scaffold silently, and never create the file inside the host repo.
 - **Framework check** against the **closed set {F1, F2, F3, F4}** — an invalid
   name exits non-zero and **nothing starts** (no workspace minted). Relay and stop.
 - **Workspace autostart** — resumption is **automatic, not opt-in**. It resumes

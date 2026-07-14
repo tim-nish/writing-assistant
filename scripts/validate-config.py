@@ -170,11 +170,19 @@ def validate_writing_sources(args, findings):
     cmd += ["sources"]
     p = subprocess.run(cmd, capture_output=True, text=True)
     if p.returncode != 0 or not p.stdout.strip():
-        root_hint = os.path.realpath(args.root) if args.root else "the host-repo root"
+        # The machine-global per-repo location (#211) — resolved by the path
+        # resolver (the single owner of that layout), never composed here.
+        here = os.path.dirname(os.path.realpath(__file__))
+        loc_cmd = [sys.executable, os.path.join(here, "resolve-paths.py"), "sources-file"]
+        if args.root:
+            loc_cmd += ["--root", args.root]
+        loc = subprocess.run(loc_cmd, capture_output=True, text=True).stdout.strip()
+        target = loc or f"the machine-global config (resolve-paths.py sources-file)"
         findings.append((SOURCES_FILE, "sources",
                          f"no readable sources are declared. Fix: create `{SOURCES_FILE}` "
-                         f"at {root_hint} with at least one `- path:` entry — copy the example "
-                         f"at {SOURCES_EXAMPLE} as a starting point."))
+                         f"at {target} (never in the host repo, #211) with at least one "
+                         f"`- path:` entry — copy the example at {SOURCES_EXAMPLE} "
+                         f"as a starting point."))
 
 
 def validate_policy_source(args, findings):

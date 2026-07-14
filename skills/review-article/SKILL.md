@@ -30,14 +30,16 @@ mandatory pointer block, and it passes `lint-article` **unchanged**, so the shap
 is authoritative rather than aspirational:
 
 ```
-mkdir -p <output.drafts>                     # output.drafts default: articles/drafts/
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-writing-sources.py draft-location --root <host-repo>
+mkdir -p <resolved output.drafts>
 cp ${CLAUDE_PLUGIN_ROOT}/skills/review-article/starter-article.md \
-   <output.drafts>/my-first-article.md
+   <resolved output.drafts>/my-first-article.md
 ```
 
-On a fresh repo the `output.drafts` directory (default `articles/drafts/`) does
-not exist yet — create it first, as shown, rather than inferring the location
-from `writing-sources.yaml`. It is the one place review-article writes into the
+On a fresh repo the resolved `output.drafts` directory does not exist yet —
+resolve it first (there is no default; the command above prints the absolute
+location, which may be an external private articles repo, #213), then create it
+as shown. It is the one place review-article writes into the
 host tree; everything else stays in the run workspace.
 
 Then fill in the frontmatter and replace each section with your own content. The

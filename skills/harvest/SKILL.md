@@ -3,8 +3,9 @@ name: harvest
 description: >
   Gather source-pointed facts from a repository into a fact sheet. Use when the
   owner asks to "harvest" facts, or as stage 1 of the draft-article pipeline.
-  Reads only the sources declared in the host repo's writing-sources.yaml; every
-  fact carries a resolvable source pointer (file:line, commit, or URL).
+  Reads only the sources declared in the repo's writing-sources.yaml (resolved
+  from the machine-global per-repo config, #211); every fact carries a
+  resolvable source pointer (file:line, commit, or URL).
 ---
 
 # Harvest
@@ -33,8 +34,11 @@ silently resolves against cwd. Pass `--root` explicitly whenever the session's
 working directory might not be the host repo. This list is the **only**
 material in scope. It already:
 
-- includes **only** the paths declared in the host repo's `writing-sources.yaml`
-  (the host repo `.` and any sibling checkouts such as `../research-notes`);
+- includes **only** the paths declared in the repo's `writing-sources.yaml`
+  (the host repo `.` and any sibling checkouts such as `../research-notes`) —
+  the file itself lives in the **machine-global per-repo config, never in the
+  host repo** (#211); resolve its location with
+  `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-paths.py sources-file --root <host-repo>`;
 - applies each source's `include:` globs as an allowlist;
 - prunes `.git/` and refuses any symlink or `..` that escapes a declared root.
 
@@ -46,7 +50,9 @@ filesystem. An undeclared repository is never read.
 
 If the command prints no files — `writing-sources.yaml` is missing, malformed,
 or declares only non-existent paths — **stop and read nothing**. Report that no
-sources are declared and point the owner at
+sources are declared, name the machine-global path where the file belongs
+(`resolve-paths.py sources-file --root <host-repo>` prints it — never create it
+in the host repo, #211), and point the owner at
 `config/writing-sources.example.yaml`. Never widen scope to compensate.
 
 ## 3. Extract facts, each as `CLAIM / SOURCE / KIND`
