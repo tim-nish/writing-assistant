@@ -100,6 +100,19 @@ if grep -q 'def sources_file' scripts/resolve-paths.py; then
 else
   err "resolve-paths.py does not own writing-sources placement (#211 expects sources_file)"
 fi
+#    5d. Story 13.25: no production script composes the per-repo config-root
+#        layout itself — the `repos/<repo-key>` segment under the config home is
+#        resolve-paths.py's alone. (Docs/skills may NAME the location for
+#        humans; composing it in code is the violation. check-*.sh fixtures
+#        assert resolver behavior and are excluded.)
+offenders=$(grep -RnoI 'writing-assistant/repos\|"repos"' scripts/*.py 2>/dev/null \
+  | grep -v '^scripts/resolve-paths.py:' || true)
+if [ -z "$offenders" ]; then
+  ok "single-source: no script outside resolve-paths.py composes the per-repo config path"
+else
+  err "per-repo config path composed outside the resolver:"
+  printf '%s\n' "$offenders" >&2
+fi
 
 if [ "$fail" -eq 0 ]; then
   printf '\nAll footprint-invariant checks passed.\n'; exit 0

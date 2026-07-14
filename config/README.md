@@ -6,7 +6,7 @@ Skills never hard-code identity — they read it from here (CAP-6).
 | File | Answers | Scope | Home | Resolver |
 |------|---------|-------|------|----------|
 | `user-config.yaml` | **who is writing**: owner identity (name, site, pointer block, frontmatter schema, syndication policy) | machine-global, per-person | `~/.config/writing-assistant/` | `scripts/resolve-user-config.py` |
-| `writing-sources.yaml` | **what this repo's articles draw from**: declared sources + draft output location | per host repo | host repo root | `scripts/resolve-writing-sources.py` |
+| `writing-sources.yaml` | **what this repo's articles draw from**: declared sources + draft output location | per host repo | machine-global: `resolve-paths.py sources-file` prints it (#211 — never in the host repo) | `scripts/resolve-writing-sources.py` |
 
 ## What the syndication / frontmatter sections are for
 
