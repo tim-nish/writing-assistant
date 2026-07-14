@@ -23,3 +23,15 @@ sources:
 output:
   # Draft + platform-variant output directory, relative to the host-repo root.
   drafts: articles/drafts/
+
+# Optional: point the Stage-2 interview at your policy repo (product-lab) so it
+# can seed tension questions from your recorded positions. Absent = the
+# interview runs exactly as before. The read is bounded IN CODE to GLOSSARY.md,
+# LESSONS.md, and at most 2 topics/*.md files — never q_a/, never a write — and
+# every run pins the repo's commit. An unusable path (missing, unreadable, not
+# a git repo) is not a config error: the interview logs one line and degrades
+# to generic questions.
+# policy_source:
+#   path: ../product-lab                 # local checkout; plain path, no URL/sync
+#   track: eval-engineering              # optional: article-backlog track; matches topics/<track>*.md
+#   topics: [eval-engineering.md]        # optional: explicit override, max 2, basenames only
