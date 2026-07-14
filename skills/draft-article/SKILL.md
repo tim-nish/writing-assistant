@@ -340,6 +340,29 @@ probe degraded, `consulted: none (policy_source unavailable: <reason>)` via
 the generic ones. Surface the line in the completion summary's informational
 notes when it names a pin.
 
+### Staging candidates — proposal-only contribute-back (Story 14.5)
+
+After the journal, emit staging-candidate blocks for the policy-seeded tension
+questions the owner actually answered (dispositions
+`answered`/`modified`/`replaced` — a skip proposes nothing):
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py staging-candidates \
+  --interview <interview.json> --answers <answers.json> \
+  --source-repo <host repo name> --created <run date YYYY-MM-DD> \
+  [--tag <track>] > "$WS/staging-candidates.md"
+```
+
+Each block mirrors product-lab's `q_a/staging/` frontmatter (`slug, created,
+source_repo, perishable, tags`) followed by the question and the owner's
+decision in full sentences (seam-formats.md §3). **This is where the tool
+stops**: the blocks land in the run workspace only — the owner copies accepted
+ones into `q_a/staging/` by hand, and nothing is ever written under
+`policy_source.path`. A run with no answered tension questions emits nothing —
+never an empty block. When candidates were emitted, the completion summary's
+**informational notes** must name the file (`$WS/staging-candidates.md`) and
+the block count, so a proposal is never silently buried in run output.
+
 ## Stage 3 — fill the framework (with `[VERIFY]` markers)
 
 Fill the chosen framework's slots from the fact sheet and the interview answers.
