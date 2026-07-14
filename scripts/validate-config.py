@@ -177,6 +177,26 @@ def validate_writing_sources(args, findings):
                          f"at {SOURCES_EXAMPLE} as a starting point."))
 
 
+def validate_policy_source(args, findings):
+    """Relay a malformed `policy_source` block (resolver exit 4) as stage-0
+    findings. An absent block is silent, and a well-formed block whose path is
+    unusable is deliberately NOT a config error — usability is checked at read
+    time and degrades the interview instead (SPEC-policy-source-seam CAP-6)."""
+    cmd = [sys.executable, SRC_RES]
+    if args.root:
+        cmd += ["--root", args.root]
+    cmd += ["policy-source"]
+    p = subprocess.run(cmd, capture_output=True, text=True)
+    if p.returncode != 4:
+        return
+    for line in p.stderr.strip().splitlines():
+        m = re.match(r"^\[(.+?)\]\s+(\S+):\s+(.*)$", line)
+        if m:
+            findings.append((m.group(1), m.group(2), m.group(3)))
+        else:  # pragma: no cover - defensive
+            findings.append((SOURCES_FILE, "policy_source", line))
+
+
 def main(argv=None):
     p = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -191,6 +211,7 @@ def main(argv=None):
     validate_user_config(args, findings)
     if not args.skip_writing_sources:
         validate_writing_sources(args, findings)
+        validate_policy_source(args, findings)
 
     if not findings:
         return 0  # clean config: silent, exit 0

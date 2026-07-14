@@ -33,6 +33,18 @@ git repo the script errors rather than silently resolving against cwd):
                             globs, with `.git/` pruned and symlink/.. escapes
                             excluded. Fail-closed — no/malformed writing-sources
                             or a non-existent declared path yields nothing.
+
+  policy-source             Print the optional `policy_source` block as JSON:
+                            {"declared": false} when absent (exit 0 — absence
+                            is not an error), else {"declared": true, "path":
+                            <abs>, "track": <str|null>, "topics": [<basename>…]}.
+                            A malformed block (missing/empty path, more than 2
+                            topics, a topics entry that is not a plain basename)
+                            exits 4 with per-key errors naming the fix — the
+                            stage-0 validator relays them. Whether the path is
+                            USABLE (exists, readable, a git repo) is
+                            deliberately not checked here: an unusable path is
+                            a read-time degradation, never a config error.
 """
 
 import argparse
@@ -44,7 +56,9 @@ import sys
 
 SOURCES_FILE = "writing-sources.yaml"
 
-NEEDS_PROMPT = 3  # draft-location: no output.drafts declared
+NEEDS_PROMPT = 3      # draft-location: no output.drafts declared
+POLICY_MALFORMED = 4  # policy-source: block present but malformed
+POLICY_MAX_TOPICS = 2 # SPEC-policy-source-seam CAP-2: at most 2 topic files
 
 
 def host_root(arg_root):
@@ -183,6 +197,68 @@ def get_sources(lines, root):
             items = [x.strip().strip('"').strip("'") for x in m.group(1).split(",")]
             current["include"] = [x for x in items if x]
     return result
+
+
+def get_policy_source(lines, root):
+    """Parse the optional `policy_source` block.
+
+    Returns (None, []) when the block is absent, else (block, errors) where
+    block = {"path": abs-or-None, "track": str-or-None, "topics": [str]} and
+    errors is a list of (key, message) pairs for a malformed block. Usability
+    of the path (exists / readable / git repo) is not checked here.
+    """
+    start = None
+    for i, ln in enumerate(lines):
+        if re.match(r"^policy_source:\s*(#.*)?$", ln):
+            start = i
+            break
+    if start is None:
+        return None, []
+
+    def _val(raw):
+        return re.sub(r"\s+#.*$", "", raw).strip().strip('"').strip("'")
+
+    block = {"path": None, "track": None, "topics": []}
+    errors = []
+    j = start + 1
+    while j < len(lines):
+        ln = lines[j]
+        j += 1
+        if ln.strip() == "" or ln.lstrip().startswith("#"):
+            continue
+        if _indent(ln) == 0:
+            break  # left the block
+        m = re.match(r"^\s+path:\s*(.*)$", ln)
+        if m:
+            raw = _val(m.group(1))
+            block["path"] = os.path.realpath(os.path.join(root, raw)) if raw else None
+            continue
+        m = re.match(r"^\s+track:\s*(.*)$", ln)
+        if m:
+            block["track"] = _val(m.group(1)) or None
+            continue
+        m = re.match(r"^\s+topics:\s*\[(.*)\]\s*(#.*)?$", ln)
+        if m:
+            items = [x.strip().strip('"').strip("'") for x in m.group(1).split(",")]
+            block["topics"] = [x for x in items if x]
+            continue
+
+    if block["path"] is None:
+        errors.append(("policy_source.path",
+                       "required when policy_source is declared. Fix: set it to "
+                       "the local product-lab checkout (a plain path; no URL)."))
+    if len(block["topics"]) > POLICY_MAX_TOPICS:
+        errors.append(("policy_source.topics",
+                       f"{len(block['topics'])} entries exceed the cap of "
+                       f"{POLICY_MAX_TOPICS}. Fix: keep at most {POLICY_MAX_TOPICS} "
+                       "topic files (the bounded-read invariant)."))
+    for t in block["topics"]:
+        if "/" in t or ".." in t or t.startswith("."):
+            errors.append(("policy_source.topics",
+                           f"entry {t!r} is not a plain basename. Fix: name files "
+                           "directly under the policy repo's topics/ directory "
+                           "(e.g. eval-engineering.md)."))
+    return block, errors
 
 
 def _contains(parent, child):
@@ -330,6 +406,22 @@ def cmd_files(args):
     return 0
 
 
+def cmd_policy_source(args):
+    import json
+    root = host_root(args.root)
+    block, errors = get_policy_source(read_lines(root), root)
+    if block is None:
+        print(json.dumps({"declared": False}))
+        return 0
+    if errors:
+        for key, msg in errors:
+            sys.stderr.write(f"[{SOURCES_FILE}] {key}: {msg}\n")
+        return POLICY_MALFORMED
+    print(json.dumps({"declared": True, "path": block["path"],
+                      "track": block["track"], "topics": block["topics"]}))
+    return 0
+
+
 def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ROOT_HELP = "host-repo root (default: git top-level of cwd; errors outside a git repo)"
@@ -348,6 +440,7 @@ def main(argv=None):
     sp = sub.add_parser("is-declared", parents=[root_parent])
     sp.add_argument("path")
     sub.add_parser("files", parents=[root_parent])
+    sub.add_parser("policy-source", parents=[root_parent])
     args = p.parse_args(argv)
     if not hasattr(args, "root"):
         args.root = None
@@ -357,6 +450,7 @@ def main(argv=None):
         "sources": cmd_sources,
         "is-declared": cmd_is_declared,
         "files": cmd_files,
+        "policy-source": cmd_policy_source,
     }[args.cmd](args)
 
 
