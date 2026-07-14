@@ -26,14 +26,19 @@ sec() { awk -v h="$1" '$0 ~ h {f=1} f && $0 ~ /^## / && $0 !~ h {exit} f {print}
 s2=$(sec '^## Stage 2')
 s4=$(sec '^## Stage 4')
 
-hasin() { printf '%s\n' "$1" | grep -qi -- "$2" && ok "$3" || err "$3 — missing"; }
+# Whitespace-collapsed match: a contract phrase that wraps across source lines
+# ("repository\nknowledge alone") must still anchor — line-based grep rotted
+# red the moment prose re-wrapped (#190).
+hasin() { printf '%s\n' "$1" | tr '\n' ' ' | tr -s ' ' | grep -qi -- "$2" && ok "$3" || err "$3 — missing"; }
 
 # Stage 2 — gap interview under the contract.
 hasin "$s2" 'owner-facing-proposal-contract'        "stage 2 references the shared contract"
 hasin "$s2" 'outline'                               "stage 2 shows where the section sits (outline context)"
 hasin "$s2" 'preview of the current section'        "stage 2 shows a preview of the current section"
 hasin "$s2" 'concrete effect'                       "stage 2 choices state their concrete effect"
-hasin "$s2" 'drop the section from the article\|keep the section' "stage 2 choices are effect-labelled (not shorthand)"
+# Anchor on the CURRENT disposition labels (Story 10.3 replaced the old
+# drop-the-section examples); both alternatives are live label text (#190).
+hasin "$s2" 'adopt this answer as written\|discard this and use my own' "stage 2 choices are effect-labelled (not shorthand)"
 hasin "$s2" 'repository knowledge alone'            "stage 2 answerable from repository knowledge alone"
 
 # Stage 4 — verification items under the contract, effect-named choices.
