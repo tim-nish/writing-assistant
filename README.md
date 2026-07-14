@@ -186,3 +186,13 @@ self-contained; implemented straight from the issue), `triage:story` (needs a
 bound BMAD story), or `triage:spec` (changes an invariant; the governing spec is
 amended first). Producer labels such as `tanuki` mark provenance, not queue
 state.
+
+**Epic-number allocation (#189).** Epic numbers are minted in two lanes —
+`_bmad-output/planning-artifacts/epics.md` delta sections *and* triage-created
+stories that never get an epics.md section (Epic 13 is such a bucket) — so the
+file's own numbering is not the full picture. The rule: **next epic number =
+max(epics.md epic list, story frontmatter `epic:` values, `epic-N` issue
+labels) + 1**, checked with `~/.claude/tools/story-sync status` before any new
+epic is cut. Every triage-lane epic also gets a one-line entry in epics.md's
+Epic List naming it a triage bucket, so the list stays complete even when the
+stories originated elsewhere.
