@@ -164,3 +164,11 @@ and harvest reads only the sources declared in the host repo's
 
 Packaging (`plugin.json` + `marketplace.json`) is finalized in Epic 6 once
 dogfooding proves the skills out.
+
+## Issue triage
+
+Open issues are classified with a `triage:*` label — `triage:direct` (small,
+self-contained; implemented straight from the issue), `triage:story` (needs a
+bound BMAD story), or `triage:spec` (changes an invariant; the governing spec is
+amended first). Producer labels such as `tanuki` mark provenance, not queue
+state.
