@@ -152,6 +152,66 @@ printf '%s\n' "# Fact sheet: t
   || err "#159: shifted-line pointer rejected ($out)"
 rm -f /tmp/pin_out.$$
 
+# 8. --emit-entry (Story 13.21, #207): the helper emits entry-ready
+#    `- CLAIM / SOURCE / KIND` lines with the verbatim committed text, and the
+#    round-trip through validate-fact-sheet.py rejects nothing — acceptance is
+#    reached by copying tool output, never by guessing (validator convergence).
+git -C "$pin" checkout -- doc.md 2>/dev/null
+
+# a) single line, default KIND quote -> complete entry that validates unchanged
+out=$(python3 "$PIN" --root "$pin" --emit-entry doc.md:4 2>/dev/null)
+[ "$out" = "- we deliberately leak no test scenarios / $(python3 "$PIN" --root "$pin" doc.md:4 2>/dev/null) / quote" ] \
+  && ok "emit-entry: single-line quote entry carries the verbatim text" \
+  || err "emit-entry single-line wrong: '$out'"
+
+# b) round-trip: emitted entries (single + range) validate with zero rejects
+{ printf '# Fact sheet: t\n\n'
+  python3 "$PIN" --root "$pin" --emit-entry doc.md:4 doc.md:1-2 2>/dev/null
+} | python3 "$VFS" --root "$pin" >/dev/null 2>&1 \
+  && ok "emit-entry: emitted entries round-trip through validate-fact-sheet.py (0 rejected)" \
+  || err "emit-entry round-trip: an emitted entry was rejected"
+
+# c) range entry joins the spanned lines verbatim with the range SOURCE form
+out=$(python3 "$PIN" --root "$pin" --emit-entry doc.md:1-2 2>/dev/null)
+printf '%s\n' "$out" | grep -Eq '^- inserted top A inserted top B / doc\.md:1-2@[0-9a-f]{7,40} / quote$' \
+  && ok "emit-entry: range quote joins spanned lines verbatim" \
+  || err "emit-entry range wrong: '$out'"
+
+# d) --kind overrides KIND, keeps a single-line pinned SOURCE, and says on
+#    stderr that the CLAIM is a placeholder to replace
+out=$(python3 "$PIN" --root "$pin" --emit-entry --kind number doc.md:4 2>/dev/null)
+printf '%s\n' "$out" | grep -Eq '^- .+ / doc\.md:4@[0-9a-f]{7,40} / number$' \
+  && ok "emit-entry: --kind number emits a number entry" \
+  || err "emit-entry --kind wrong: '$out'"
+python3 "$PIN" --root "$pin" --emit-entry --kind number doc.md:4 2>&1 >/dev/null | grep -q "placeholder" \
+  && ok "emit-entry: non-quote KIND flags the CLAIM as a placeholder to replace" \
+  || err "emit-entry: no placeholder note for non-quote KIND"
+
+# e) a range with a non-quote KIND is refused (the validator would reject it)
+if python3 "$PIN" --root "$pin" --emit-entry --kind number doc.md:1-2 >/tmp/emit_out.$$ 2>/dev/null; then
+  err "emit-entry: range with non-quote KIND was emitted (should be refused)"
+else
+  [ -s /tmp/emit_out.$$ ] && err "emit-entry: emitted an entry for a non-quote range" \
+    || ok "emit-entry: range with non-quote KIND is refused, nothing emitted"
+fi
+rm -f /tmp/emit_out.$$
+
+# f) an uncommitted line is skipped in emit mode too (same degradation as pinning)
+printf 'uncommitted emit line\n' >> "$pin/doc.md"
+if python3 "$PIN" --root "$pin" --emit-entry doc.md:6 >/tmp/emit_out.$$ 2>/dev/null; then
+  err "emit-entry: uncommitted line produced an entry (should fail)"
+else
+  [ -s /tmp/emit_out.$$ ] && err "emit-entry: emitted an entry for an uncommitted line" \
+    || ok "emit-entry: uncommitted line is skipped, not emitted"
+fi
+rm -f /tmp/emit_out.$$
+git -C "$pin" checkout -- doc.md 2>/dev/null
+
+# g) stdin batching works in emit mode (one entry per piped pointer)
+out=$(printf 'doc.md:4\ndoc.md:5\n' | python3 "$PIN" --root "$pin" --emit-entry 2>/dev/null | grep -c '^- ') || true
+[ "$out" = "2" ] && ok "emit-entry: stdin pointers emit one entry each" \
+  || err "emit-entry: expected 2 entries from stdin, got $out"
+
 if [ "$fail" -eq 0 ]; then
   printf '\nAll harvest checks passed.\n'; exit 0
 else
