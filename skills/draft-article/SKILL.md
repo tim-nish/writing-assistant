@@ -658,6 +658,17 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py variants <draft>
   canonical via repo-sync.
 - Each variant is written to the **resolved `output.drafts`** location (Story
   1.3; `--out <dir>` overrides). Files are named `{slug}.{platform}.md`.
+- **`output.drafts` may live outside the host repo — and should (#213):** the
+  recommended destination is a directory in the owner's **private articles
+  repository** (`~`/absolute paths supported; a relative value keeps resolving
+  against the host root). When `output.drafts` is **undeclared**, ask the owner
+  once, recommending that external default and saying why — articles are private
+  assets and a host repo may be public — then record the answer with
+  `resolve-writing-sources.py set-draft-location <path>` (it writes to the
+  machine-global config, never into the host repo). When the resolved external
+  directory **does not exist**, the stage stops and names it: confirm the
+  location with the owner, then re-run with `--create-out` (or create it by
+  hand) — the pipeline never silently creates directory trees outside the host.
 
 ### Visual rendering per platform (SPEC-article-visuals CAP-5)
 

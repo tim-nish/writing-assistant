@@ -519,6 +519,14 @@ def _zenn_variant(fields, body, variant_cfg):
 VARIANT_BUILDERS = {"devto": _devto_variant, "zenn": _zenn_variant}
 
 
+def _git_toplevel():
+    """realpath of the git toplevel of cwd, or None (mirrors the resolvers)."""
+    r = subprocess.run(["git", "rev-parse", "--show-toplevel"],
+                       capture_output=True, text=True)
+    top = r.stdout.strip()
+    return os.path.realpath(top) if r.returncode == 0 and top else None
+
+
 def _resolve_drafts_dir(root):
     """Resolve output.drafts via resolve-writing-sources.py (Story 1.3). Exit 3
     there means the location is undeclared — surface that, no silent default."""
@@ -572,6 +580,21 @@ def cmd_variants(args):
 
     slug = fields.get("slug") or "draft"
     out_dir = args.out if args.out else _resolve_drafts_dir(args.root)
+
+    # A config-resolved output.drafts OUTSIDE the host repo (the recommended
+    # home — a private articles repo, #213) is never silently scaffolded:
+    # creating directory trees outside the host needs explicit consent
+    # (--create-out, given after the skill asks the owner). Inside the host,
+    # creation stays automatic — and an explicit --out IS the consent.
+    if not args.dry_run and not args.out and not os.path.isdir(out_dir):
+        host = os.path.realpath(args.root) if args.root else _git_toplevel()
+        inside_host = host and os.path.realpath(out_dir).startswith(host + os.sep)
+        if not inside_host and not args.create_out:
+            sys.stderr.write(
+                f"error: output.drafts resolves outside the host repo to {out_dir}, "
+                "which does not exist. Create it yourself, or re-run with "
+                "--create-out after confirming the location with the owner.\n")
+            return 1
 
     emitted = []
     for name in policy.get("variants", []):
@@ -1426,6 +1449,9 @@ def main(argv=None):
     sp.add_argument("--global-config")
     sp.add_argument("--repo-config")
     sp.add_argument("--out", help="output dir (default: resolved output.drafts)")
+    sp.add_argument("--create-out", action="store_true",
+                    help="consent to creating a missing output directory OUTSIDE "
+                         "the host repo (inside the host it is created automatically)")
     sp.add_argument("--dry-run", action="store_true", help="do not write files; just report")
     args = p.parse_args(argv)
     return {

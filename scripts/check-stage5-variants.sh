@@ -111,6 +111,44 @@ EOF
 python3 "$DP" variants "$work/bad.md" --config-json "$work/cfg.json" --out "$work/o" >/dev/null 2>&1 \
   && err "emitted variants for an unverified draft" || ok "unresolved [VERIFY] aborts Stage 5"
 
+# 4b. External output.drafts guard (Story 13.24, #213): a config-resolved
+#     destination OUTSIDE the host repo that does not exist is refused without
+#     --create-out (nothing created); --create-out creates it. An in-host
+#     relative value keeps auto-creating. Hermetic config home.
+XDG_CONFIG_HOME="$work/xdg"; export XDG_CONFIG_HOME
+mkdir -p "$work/exthost"
+cat > "$work/exthost/writing-sources.yaml" <<YAML
+sources:
+  - path: .
+output:
+  drafts: $work/external-drafts/
+YAML
+if python3 "$DP" variants "$work/en.md" --config-json "$work/cfg.json" \
+     --root "$work/exthost" >/dev/null 2>"$work/e_ext"; then
+  err "external missing output dir was not refused"
+else
+  grep -q 'outside the host repo' "$work/e_ext" \
+    && ok "external missing output dir refused, names the boundary" \
+    || err "external refusal message wrong: $(cat "$work/e_ext")"
+fi
+[ ! -d "$work/external-drafts" ] && ok "refusal created nothing" || err "refusal still created the directory"
+python3 "$DP" variants "$work/en.md" --config-json "$work/cfg.json" \
+  --root "$work/exthost" --create-out >/dev/null 2>/dev/null \
+  && [ -f "$work/external-drafts/retry-storms.devto.md" ] \
+  && ok "--create-out consents to creating the external destination" \
+  || err "--create-out did not create/write the external destination"
+cat > "$work/exthost/writing-sources.yaml" <<'YAML'
+sources:
+  - path: .
+output:
+  drafts: articles/drafts/
+YAML
+python3 "$DP" variants "$work/en.md" --config-json "$work/cfg.json" \
+  --root "$work/exthost" >/dev/null 2>/dev/null \
+  && [ -f "$work/exthost/articles/drafts/retry-storms.devto.md" ] \
+  && ok "in-host relative output.drafts still auto-creates under the host root" \
+  || err "in-host relative output.drafts failed"
+
 # 5. --dry-run reports without writing.
 rm -rf "$work/dry"
 python3 "$DP" variants "$work/en.md" --config-json "$work/cfg.json" --out "$work/dry" --dry-run | python3 -c '
