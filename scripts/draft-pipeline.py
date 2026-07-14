@@ -1037,6 +1037,48 @@ def cmd_staging_candidates(args):
     return 0
 
 
+def cmd_review_consulted(args):
+    """Review-side consulted: line (Story 15.3, SPEC-policy-consistency-pass
+    CAP-4) — the same /ask-style audit grammar as the interview seam's, mapping
+    checked policy lines to the FINDINGS they produced instead of questions.
+
+    Modes:
+      * findings present: each finding's policy pointer (sans pin) -> `finding
+        <n>`; whitelisted files with no finding close as `(no conflict)`;
+      * pass ran, zero findings: every checked file -> `(no conflict)`;
+      * pass skipped: `consulted: none (policy_source unset)` or
+        `consulted: none (policy_source unavailable: <reason>)` via
+        --policy-note — every review run states its policy provenance.
+    """
+    if args.policy_note is not None:
+        print(f"consulted: none ({args.policy_note or 'policy_source unset'})")
+        return 0
+    if not args.pin:
+        sys.stderr.write("error: pass --pin product-lab@<sha> (seeded mode) "
+                         "or --policy-note (skipped mode)\n")
+        return 2
+    pin = args.pin.split("@", 1)[1] if "@" in args.pin else args.pin
+    findings = []
+    if args.findings:
+        data = _load_json_state(args.findings, "policy findings")
+        findings = data if isinstance(data, list) else [data]
+    parts = []
+    seen_files = set()
+    for i, f in enumerate(findings, 1):
+        ptr = ((f.get("policy") or {}).get("pointer") or "").rsplit("@", 1)[0]
+        if not ptr:
+            continue
+        parts.append(f"{ptr} → finding {i}")
+        seen_files.add(ptr.split(":", 1)[0])
+    for rel in (args.file or []):
+        if rel not in seen_files:
+            parts.append(f"{rel} → (no conflict)")
+    if not parts:
+        parts.append("(nothing checked)")
+    print(f"consulted: product-lab@{pin} — " + "; ".join(parts))
+    return 0
+
+
 def cmd_consume(args):
     """Stage 1: consume harvest's output document (fact sheet + NEEDS-OWNER) into
     pipeline state — WITHOUT re-reading any source. Source pointers are carried
@@ -1355,6 +1397,12 @@ def main(argv=None):
     sp.add_argument("--source-repo", required=True, help="the host repo's name, for the block frontmatter")
     sp.add_argument("--created", required=True, help="the run date (YYYY-MM-DD)")
     sp.add_argument("--tag", action="append", help="extra frontmatter tag (repeatable; e.g. the track)")
+    sp = sub.add_parser("review-consulted")
+    sp.add_argument("--pin", help="the run pin, product-lab@<sha> (seeded mode)")
+    sp.add_argument("--findings", help="policy findings JSON (entries carry policy.pointer)")
+    sp.add_argument("--file", action="append", help="checked whitelist file (repeatable); no-finding files close as (no conflict)")
+    sp.add_argument("--policy-note", nargs="?", const="", default=None,
+                    help="skipped mode: reason for consulted: none (empty = unset)")
     sp = sub.add_parser("provenance")
     sp.add_argument("--map", default="-", help="the sidecar provenance map, or - for stdin")
     sp.add_argument("--count", action="store_true", help="print per-class tallies as JSON")
@@ -1386,6 +1434,7 @@ def main(argv=None):
         "stage0": cmd_stage0,
         "answer": cmd_answer, "journal": cmd_journal, "provenance": cmd_provenance,
         "staging-candidates": cmd_staging_candidates,
+        "review-consulted": cmd_review_consulted,
         "quality-gate": cmd_quality_gate,
         "verify-markers": cmd_verify_markers, "verify": cmd_verify, "reroute": cmd_reroute,
         "variants": cmd_variants,
