@@ -967,7 +967,10 @@ def cmd_staging_candidates(args):
         a = by_id.get(qid)
         if not a or a.get("disposition") not in ("answered", "modified", "replaced"):
             continue
-        text = (a.get("text") or "").strip()
+        # `answer --batch` records carry the owner text as `answer`; accept the
+        # raw answer-spec `text` form too (found by the 2026-07-14 seam dogfood:
+        # real records emitted zero blocks).
+        text = (a.get("answer") or a.get("text") or "").strip()
         if not text:
             continue
         gist = re.sub(r"[^a-z0-9]+", "-", q["topic"].lower()).strip("-")
