@@ -384,6 +384,35 @@ Cap at 10, highest-leverage conflict first. **A draft with no conflicting
 claims emits nothing** — no praise, no "policy check passed" summary, no
 placeholder. Never show this pass's surface or findings to the cold read.
 
+**Degradation branches on the reader's exit code (Story 15.3)** — the policy
+source is an enhancer, never a dependency; no exit code here may abort the
+review:
+
+- **0** — run the pass as above.
+- **10** (`policy_source` unset) — skip the pass **silently**; every other
+  pass runs unchanged.
+- **11 / 12** (path missing / not a git repo) — the reader printed exactly one
+  `policy_source unavailable: <reason>` line; **relay that one line once**,
+  skip the pass, continue. Keep the reason for the `consulted:` line.
+- **4** (malformed block) — a stage-0 configuration error slipped through;
+  halt and report it like any CAP-5 finding.
+
+**The review run artifact ends with the `consulted:` line (Story 15.3)** —
+the same /ask-style audit grammar as the interview seam's, mapping checked
+policy lines to the findings they produced:
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py review-consulted \
+  --pin <product-lab@sha from the reader> --findings <policy-findings.json> \
+  --file GLOSSARY.md --file LESSONS.md [--file topics/<matched>.md]
+# skipped pass:  … review-consulted --policy-note ["policy_source unavailable: <reason>"]
+```
+
+Checked files with no finding close as `(no conflict)`; a skipped pass records
+`consulted: none (policy_source unset | unavailable: <reason>)` — every review
+run states its policy provenance. Surface the line in the completion summary's
+**informational notes**.
+
 ## Pass 5 — Cold read
 
 A read by **any cheap model given ONLY the draft** — **no repo access, no project
