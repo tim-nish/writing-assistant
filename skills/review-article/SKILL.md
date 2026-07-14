@@ -197,7 +197,12 @@ each, in this order:
    result that matters most and why)**; the audience anchor is the answer to
    **q5 (audience)**. Every framework's interview asks both. A question the
    journal records as *suppressed* was covered by the fact sheet — use the
-   covering entries it names as the anchor.
+   covering entries it names as the anchor. A question recorded as **capped**
+   (Story 15.4: displaced by policy-seeded questions under the interview's ≤5
+   budget) was **never asked** and has no covering entries — that anchor is
+   **absent**: report it as an informational note naming which anchor is
+   missing and why (`q5 capped by policy seeds`), run the comparison on the
+   anchors that do exist, and never fail or block on the absence.
 2. **Owner, once** — for a hand-written draft (no journal), ask the owner the
    two anchor questions at review start — "what is this article's one claim?"
    and "who exactly is it for?" — and use those answers.
@@ -403,7 +408,10 @@ for the audience; owner-stated for a journal-less draft):
   unexplained repo-internal context typically causes. In **degraded mode** (no
   journal and no owner-stated anchors) this comparison has nothing to compare
   against: report the cold reader's Q1/Q2 answers as informational instead —
-  never fabricate anchors, and never skip the cold read itself.
+  never fabricate anchors, and never skip the cold read itself. When exactly
+  **one** anchor is absent (a **capped** journal entry — Story 15.4), compare
+  the one that exists and report the other side as informational; a partial
+  anchor set is a note, never a pass failure.
 - **Q3 (confusion) and Q4 (assumed knowledge)** hits are **should-fixes**.
 - Q5/Q6 answers inform severity but are not themselves findings.
 
