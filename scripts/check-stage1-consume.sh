@@ -24,6 +24,20 @@ grep -q 'without re-reading any source' "$SKILL" && ok "skill states no source r
 grep -q 'verbatim' "$SKILL" && ok "skill requires verbatim source pointers" || err "verbatim rule not stated"
 grep -qi 'NEEDS-OWNER' "$SKILL" && ok "skill carries the NEEDS-OWNER list forward" || err "NEEDS-OWNER not threaded"
 
+# 1b. Validator convergence (Story 13.22, #206): stage 1 states the bounded
+#     repair behavior as its own contract, not just harvest's.
+grep -q -- '--emit-entry' "$SKILL" && ok "stage 1 names the emitter as the construction path" \
+  || err "emit-entry not referenced in stage 1"
+grep -q 'bounded at two validator passes' "$SKILL" && ok "stage 1 states the two-pass repair bound" \
+  || err "two-pass bound not stated in stage 1"
+grep -q 'budget-triage signal' "$SKILL" && ok "stage 1 reuses the per-stage budget-triage signal on breach" \
+  || err "budget-triage on breach not stated in stage 1"
+grep -qi 'never instructs.*free-hand\|free-hand entry writing' "$SKILL" \
+  && ok "stage 1 forbids free-hand entry writing + validate-loop repair" \
+  || err "free-hand validate-loop prohibition not stated"
+grep -q 'informational notes' "$SKILL" && ok "rerouted entries land in the completion summary" \
+  || err "completion-summary surfacing of rerouted entries not stated"
+
 # --- fixture: a harvest output document (fact sheet + NEEDS-OWNER) ----------
 work=$(mktemp -d); trap 'rm -rf "$work"' EXIT
 cat > "$work/harvest.md" <<'EOF'

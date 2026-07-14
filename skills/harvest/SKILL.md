@@ -82,27 +82,42 @@ and fabricated pointers reach the sheet (the `pin-source.py` step below fixes th
 - Every file pointer resolves inside a **declared** repo (Story 3.1 scope); a
   pointer into an undeclared repo is unsourceable.
 
-**Pin the `@sha` in one call — don't `git blame` per line.** You read a file at
-its current line numbers; to turn a `path:line` (or several) into the required
-`path:line@sha` form, hand them to the pin helper instead of resolving the sha by
-hand for each cited line:
+**Build file-pointer entries through the emitter — never re-type what a tool can
+emit (validator convergence, #206).** You read a file at its current line
+numbers; for every entry whose SOURCE is a file pointer, hand the `path:line`
+(or `path:l1-l2` for a wrapped quote) to the pin helper's `--emit-entry` mode
+and **copy its output line onto the sheet unchanged**:
 
 ```
 python3 ${CLAUDE_PLUGIN_ROOT}/scripts/pin-source.py --root <host-repo> \
-  README.md:88 bench/results.md:42
+  --emit-entry README.md:88 bench/results.md:42-43
+# non-quote KINDs: emit, then replace the placeholder CLAIM with your wording
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/pin-source.py --root <host-repo> \
+  --emit-entry --kind number bench/results.md:42
 # or pipe a column of pointers:
 printf 'README.md:88\nbench/results.md:42\n' | \
-  python3 ${CLAUDE_PLUGIN_ROOT}/scripts/pin-source.py --root <host-repo>
+  python3 ${CLAUDE_PLUGIN_ROOT}/scripts/pin-source.py --root <host-repo> --emit-entry
 ```
 
-It resolves each pointer with a **single `git blame -L` per file** (batched — the
-cost is bounded by file count, not line count), and prints the fully-pinned
-`path:line@sha` the validator already accepts (no new SOURCE grammar). Pass a
-quote's `path:l1-l2` the same way to pin a range. A line you have not committed
-yet cannot be pinned — the helper says so and skips it.
+Each emitted line is a complete `- CLAIM / SOURCE / KIND` entry: the SOURCE is
+commit-pinned (no new SOURCE grammar), and for a `quote` the CLAIM is the
+verbatim source text the validator matches — so the verbatim rule above is
+satisfied by copying, never by transcribing from memory. For non-`quote` KINDs
+the emitted CLAIM is a placeholder (the helper says so on stderr): replace it
+with your claim wording, keeping SOURCE and KIND as emitted. Resolution is
+batched — one cached `git show HEAD:<file>` per file, bounded by file count,
+not line count. A line you have not committed yet cannot be pinned — the helper
+says so and skips it. (The bare pointer mode without `--emit-entry` still
+exists when you only need the `path:line@sha` form.)
+
+This is the **only sanctioned construction path** for file-pointer entries:
+writing an entry free-hand and then repairing it against the validator is the
+reject → guess → re-run loop that exhausted whole turn budgets (#118, #142,
+#206) — the emitter exists so that loop never starts.
 
 A claim you cannot pin to a resolvable SOURCE does **not** go on the fact sheet —
-it routes to the **NEEDS-OWNER** list below. Validate the emitted sheet with:
+it routes to the **NEEDS-OWNER** list below. Then run the validator **once, as a
+confirmation pass** over the emitted sheet:
 
 ```
 python3 ${CLAUDE_PLUGIN_ROOT}/scripts/validate-fact-sheet.py <harvest-doc> --root <host-repo>
@@ -113,6 +128,16 @@ resolved host has no `writing-sources.yaml`, rather than mass-rejecting every
 pointer against an empty source list.)
 
 Every entry must pass; the rejects are exactly what the NEEDS-OWNER list captures.
+
+**Repair is bounded at two validator passes — never a third.** A REJECT on the
+confirmation pass is fixed by re-emitting the entry through `--emit-entry`
+(wrong line cited, placeholder CLAIM left in place, stale pin), then the
+validator runs once more. Entries still rejected after that second pass are
+**unsourceable by definition**: move each to the NEEDS-OWNER list with its
+REJECT reason as the REASON, surface the stage's **budget-triage signal**
+naming what was rerouted, and proceed — the run never spends a third pass
+converging on pointer syntax. List the rerouted entries in the completion
+summary so the owner sees what fell off the sheet and why.
 
 ## 4. Collect unsourceable candidates into NEEDS-OWNER
 
