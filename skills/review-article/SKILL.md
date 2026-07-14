@@ -442,6 +442,33 @@ the capped (≤10), severity-tagged findings **format** from *Findings contract*
 - The round is **top-down and single-pass**: the highest-leverage findings (which
   each pass placed first) are arbitrated before the nits.
 
+**Policy-consistency findings arbitrate with three choices (Story 15.2).** A
+`policy-contradiction` finding is contradiction detection, not a fix proposal,
+so its choices differ from accept/reject — each label stating its concrete
+effect:
+
+- **Fix article** → "edit the article to resolve the conflict" — the owner
+  edits (or gives one targeted edit instruction); never auto-applied;
+- **Position moved** → "the article stands; record the reversal for the recall
+  surface" — the run emits a **staging-candidate block** (the Story-14.5
+  emitter, `--findings` form) into the run workspace for the owner to
+  hand-copy into `q_a/staging/`; the draft text and its "publishable"
+  eligibility are unchanged;
+- **Dismiss** → "no effect" — recorded as dismissed.
+
+After the round, emit the position-moved blocks in one call:
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py staging-candidates \
+  --findings <arbitrated-findings.json> --source-repo <host repo name> \
+  --created <run date> [--tag <track>] > "$WS/staging-candidates.md"
+```
+
+An **unarbitrated or open policy finding never blocks "publishable"** —
+criterion `policy-contradiction` is never blocker alone (a flagged reversal
+may be correct); escalation is a per-finding owner call inside the round, and
+nothing under `policy_source.path` is ever created or modified.
+
 **Rubric-mapped findings are blocker-eligible (Story 12.2).** A structure or
 prose finding that **maps to a quality-rubric dimension** (Epic 11: narrative
 arc, paragraph flow, explanation calibration, readability mechanics — the same

@@ -949,11 +949,55 @@ def cmd_staging_candidates(args):
     such answer yields one block whose frontmatter mirrors product-lab's
     `q_a/staging/` schema. Skipped questions and generic answers yield nothing.
 
+    Review-side input (Story 15.2): `--findings` takes arbitrated
+    policy-consistency findings instead of interview answers — each entry
+    `{id, issue, article: {quote, pointer}, policy: {quote, pointer},
+    outcome, decision}`; only `outcome: position-moved` with a non-empty
+    owner `decision` emits a block (fix-article and dismiss propose nothing
+    back to the recall surface).
+
     The emitter writes to STDOUT only — the SKILL routes it into the run
     workspace. Nothing is ever written under `policy_source.path`: the owner
     copies accepted blocks into `q_a/staging/` by hand, and `/qa-batch` takes
     it from there. No candidates -> no output (never an empty block).
     """
+    if getattr(args, "findings", None):
+        findings = _load_json_state(args.findings, "arbitrated policy findings")
+        findings = findings if isinstance(findings, list) else [findings]
+        blocks = []
+        for f in findings:
+            if f.get("outcome") != "position-moved":
+                continue
+            decision = (f.get("decision") or "").strip()
+            if not decision:
+                continue
+            fid = f.get("id") or f"f{len(blocks) + 1}"
+            tags = ["policy-contradiction"] + (args.tag or [])
+            policy = f.get("policy") or {}
+            q_line = (f.get("issue") or "").strip() or (
+                f"the article ({(f.get('article') or {}).get('pointer', '?')}) conflicts "
+                f"with the recorded position at {policy.get('pointer', '?')}")
+            blocks.append("\n".join([
+                "<!-- staging-candidate -->",
+                "---",
+                f"slug: {args.created}-{args.source_repo}-reversal-{fid}",
+                f"created: {args.created}",
+                f"source_repo: {args.source_repo}",
+                "perishable: true",
+                f"tags: [{', '.join(tags)}]",
+                "---",
+                f"Q: {q_line} (recorded position: \"{policy.get('quote', '')}\" — {policy.get('pointer', '')})",
+                f"Decision: {decision}",
+            ]))
+        if not blocks:
+            return 0
+        print("\n\n".join(blocks))
+        return 0
+
+    if not args.interview or not args.answers:
+        sys.stderr.write("error: pass --interview and --answers (interview form) "
+                         "or --findings (review form)\n")
+        return 2
     interview = _load_json_state(args.interview, "interview output")
     answers = _load_json_state(args.answers, "answers batch")
     answers = answers if isinstance(answers, list) else [answers]
@@ -1305,8 +1349,9 @@ def main(argv=None):
     sp.add_argument("--policy-note", help="why the run was not policy-seeded, for the consulted: line "
                                           "(e.g. 'policy_source unavailable: <reason>'; default: unset)")
     sp = sub.add_parser("staging-candidates")
-    sp.add_argument("--interview", required=True, help="the `interview` output JSON, or - for stdin")
-    sp.add_argument("--answers", required=True, help="recorded answer records (JSON list)")
+    sp.add_argument("--interview", help="the `interview` output JSON, or - for stdin (interview form)")
+    sp.add_argument("--answers", help="recorded answer records (JSON list; interview form)")
+    sp.add_argument("--findings", help="arbitrated policy-consistency findings JSON (review form, Story 15.2)")
     sp.add_argument("--source-repo", required=True, help="the host repo's name, for the block frontmatter")
     sp.add_argument("--created", required=True, help="the run date (YYYY-MM-DD)")
     sp.add_argument("--tag", action="append", help="extra frontmatter tag (repeatable; e.g. the track)")
