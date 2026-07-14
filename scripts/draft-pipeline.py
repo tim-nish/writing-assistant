@@ -319,6 +319,24 @@ def _read_text(path):
     return sys.stdin.read() if path == "-" else open(path, encoding="utf-8").read()
 
 
+def _load_json_state(path, label):
+    """Read `path` (`-` == stdin) and parse it as JSON, raising SystemExit with a
+    named, actionable message instead of an opaque traceback when the input is
+    empty or malformed. An empty capture is the common case — a prior stage that
+    produced no output piped into the next — so it gets its own clear diagnostic
+    rather than a bare JSONDecodeError."""
+    text = _read_text(path)
+    if not text.strip():
+        raise SystemExit(
+            f"error: {label} produced no output (empty input from "
+            f"{'stdin' if path == '-' else path}) — the prior stage wrote nothing"
+        )
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError as e:
+        raise SystemExit(f"error: {label} is not valid JSON: {e}")
+
+
 def cmd_verify_markers(args):
     """Stage 3/4: validate the `[VERIFY: reason]` markers in a draft. Every
     VERIFY-shaped bracket must match the canonical form exactly; anything else
@@ -609,8 +627,7 @@ def cmd_interview(args):
     if framework not in FRAMEWORK_PRIORITY:
         sys.stderr.write(f"error: invalid framework {args.framework!r}. Valid: F1, F2, F3, F4.\n")
         return 2
-    text = sys.stdin.read() if args.state == "-" else open(args.state, encoding="utf-8").read()
-    state = json.loads(text)
+    state = _load_json_state(args.state, "stage-0 state capture")
     fact_sheet = state.get("fact_sheet", [])
     needs_owner = state.get("needs_owner", [])
     gap_topics = {n.get("topic") for n in needs_owner}
@@ -811,8 +828,7 @@ def cmd_journal(args):
     it. It fails closed if an asked question has no recorded disposition — an
     unattributable interview is a contract violation, not a silent gap.
     """
-    itext = sys.stdin.read() if args.interview == "-" else open(args.interview, encoding="utf-8").read()
-    interview = json.loads(itext)
+    interview = _load_json_state(args.interview, "interview journal")
     triage = interview.get("triage")
     if triage is None:
         sys.stderr.write("error: interview JSON has no `triage` array (run `interview` first)\n")
@@ -820,8 +836,7 @@ def cmd_journal(args):
 
     answers = {}
     if args.answers:
-        atext = sys.stdin.read() if args.answers == "-" else open(args.answers, encoding="utf-8").read()
-        parsed = json.loads(atext)
+        parsed = _load_json_state(args.answers, "answers batch")
         for a in (parsed if isinstance(parsed, list) else [parsed]):
             answers[a.get("id")] = a.get("disposition")
 
