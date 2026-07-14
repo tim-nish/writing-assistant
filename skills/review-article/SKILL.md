@@ -111,6 +111,47 @@ structural finding later deletes wastes the pass. Each LLM pass runs **exactly
 once per draft version**; a pass is not re-run within a cycle. A second full
 cycle happens only when a blocker survives arbitration (see *Arbitration*).
 
+## Pass execution — who runs each pass, and what gates what
+
+The skill orchestrates all four passes in the fixed order automatically once
+review is invoked; **no pass is skipped at the agent's discretion**. The only
+manual step is the owner's single arbitration round at the end.
+
+**Runner per pass** (who actually performs it):
+
+| Pass | Runner | Grounding |
+|---|---|---|
+| Lint | a **script** the invoking agent runs (`lint-article`) — zero tokens | — |
+| Structure | the **invoking agent itself**, acting as the reviewer | repo access |
+| Prose | the **invoking agent itself** | repo access |
+| Cold read | a **separate, context-free model invocation** — a subagent or fresh session given **only the draft** | **none, by design** |
+
+**Cold-read isolation is a mechanism, not a wish.** The cold read must run in a
+context that has never seen the sources, the interview journal, or the prior
+passes' findings — spawn it as a **separate invocation** (its own subagent /
+fresh session) whose entire input is the draft text and the reader rubric. If
+the agent that just ran structure and prose "also answers the cold-read
+questions" in the same context, the isolation is gone and the pass is void.
+
+**What gates what (halt semantics).** A lint failure does **not** uniformly halt
+the review — its findings split into two kinds:
+
+- **Review-precondition failures — these halt.** The unit of review is a
+  *framework-complete* draft, so if lint reports residual `[VERIFY]` markers,
+  unfilled GATE slots, un-stripped framework-template residue, or no frontmatter
+  block at all, the draft is not a well-formed review unit: **stop and report the
+  precondition failure** — there is nothing complete to review yet.
+- **Frontmatter schema defects on an otherwise-complete draft — these do NOT
+  halt.** Missing/extra schema fields, title length, or platform-native
+  frontmatter on a content-complete draft are **publish blockers**, not a stop:
+  the **structure, prose, and cold-read passes still run** so the owner gets
+  content feedback *and* the blocker list in one review round. These blockers
+  route to the completion summary's publish-blockers bucket, exactly like a
+  configuration defect (they never enter the capped structure/prose findings).
+
+Blocking all content review on a frontmatter defect alone wastes the review of a
+content-complete draft; the split above is deliberate.
+
 ## Findings contract
 
 Every LLM pass emits **findings only**, in this exact format, one per line:
@@ -200,8 +241,14 @@ claim verb, pointer-block presence, heading density, dead links, residual
 placeholders, `*(prompt)*` guidance, `[SKIP: …]` / `(~N words)` annotations, and
 the renderer's `NOT PUBLISHABLE` marker (an unfilled GATE slot is mechanically
 detected here, never left to reviewer discipline) — reporting each with
-`path:line` and consuming **no LLM tokens**. Fix every lint defect before spending a model pass; a draft with
-`[VERIFY]` markers is not review-ready.
+`path:line` and consuming **no LLM tokens**. Route its output per the halt
+semantics in *Pass execution* above: a **review-precondition failure** (residual
+`[VERIFY]` markers, unfilled GATE slots, template residue, or an absent
+frontmatter block) means the draft is not framework-complete — **stop and report
+it**, do not spend a model pass. A **frontmatter schema defect on an otherwise
+content-complete draft** is a publish blocker that does **not** halt: fix it
+before publishing, but run the content passes now so the owner gets their
+feedback in the same round.
 
 **Required frontmatter (know it before you lint).** The required fields come from
 the config `frontmatter.schema` — by default `slug`, `title`, `date`, `mode`,

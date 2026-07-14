@@ -21,6 +21,11 @@ draft article <framework> from <sources>
 - **sources** — any mix of paths, globs (`src/**/*.py`), and commit ranges
   (`HEAD~20..HEAD`).
 
+Every `draft-pipeline.py` subcommand and its flags are tabled in
+[Pipeline command reference](#pipeline-command-reference-draft-pipelinepy) at the
+end of this skill — consult it instead of running `--help` or reading the script
+source mid-run.
+
 ## Owner-facing proposals
 
 Every point in this pipeline where the owner approves, modifies, or declines
@@ -601,3 +606,28 @@ completion summary reports the **last completed stage and the resume path** unde
 informational notes — read from `draft-pipeline.py resume --ws "$WS"` — per the
 shared completion-summary contract; a partial run is recoverable, never a silent
 loss.
+
+## Pipeline command reference (`draft-pipeline.py`)
+
+Every subcommand of `${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py`, in
+pipeline order. This is the authoritative flag list — consult it instead of
+`--help` or the script source. Positional args are shown in `<angle brackets>`;
+`-` means "read from stdin".
+
+| Subcommand | Stage | Purpose | Args / flags |
+|---|---|---|---|
+| `stage0` | 0 | Config validation (CAP-5) + framework check + workspace autostart in one call (Story 13.13) | `<framework> <sources…>` `--root` |
+| `start` | 0 | Framework check + run-state only, no workspace (granular alternative to `stage0`) | `<framework> <sources…>` `--root` |
+| `autostart` | 0 | Resume the newest in-progress run, else mint a fresh workspace (Story 13.12) | `--root` |
+| `checkpoint` | durability | Persist a completed stage's state to `<ws>/checkpoint.json` (Story 13.5) | `--ws` (req) `<state\|->` |
+| `resume` | durability | Report where to resume a run from its workspace checkpoint | `--ws` (req) |
+| `consume` | 1 | Ingest the harvest fact-sheet document into pipeline state | `<harvest-doc\|->` |
+| `interview` | 2 | Build the bounded gap-interview question set for the framework | `--framework` (req) `<state\|->` |
+| `answer` | 2 | Record one owner answer (single form), or validate a batch | `--id` `--disposition` `--text` `--pointer` (repeatable) `--batch` |
+| `journal` | 2 | Write the interview journal (triage record, Story 10.4) | `--interview` (req) `--answers` |
+| `provenance` | 3 | Parse + structurally validate the sidecar provenance map | `--map` `--count` |
+| `quality-gate` | 3→4 | The mandatory quality gate; non-zero exit blocks Stage 4 (Story 11.4) | `--draft` `--map` `--judge` |
+| `verify-markers` | 3/4 | Validate `[VERIFY: reason]` markers; `--count` prints the count (drive to 0) | `<draft\|->` `--count` |
+| `verify` | 4 | Build the owner verification worklist, one entry per marker | `<draft\|->` |
+| `reroute` | 4 | Reroute an over-budget section into a new bounded interview question (Story 4.5) | `--rewrites` (req) `--section` |
+| `variants` | 5 | Emit platform-ready variants keyed by the draft's `language` | `<draft>` `--config-json` `--root` `--global-config` `--repo-config` `--out` `--dry-run` |
