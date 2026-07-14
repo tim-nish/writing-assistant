@@ -59,6 +59,21 @@ location is contract, not agent default.
 
 ## Interview question bank (stage 2)
 
+**Policy-seeded candidates (amended 2026-07-14, SPEC-policy-source-seam / #188).**
+When the host repo declares an optional `policy_source`, stage 2 first probes
+the owner's policy repo through the bounded, pinned, read-only reader
+(`GLOSSARY.md`, `LESSONS.md`, ≤2 track-matched `topics/*.md`; whitelist in
+code, `q_a/` unreadable) and authors **tension items** — schema-enforced
+questions typed `contradiction | ambiguity | missing-rationale |
+reversal-candidate`, each carrying a `seed {quote, pointer: file:line@commit}`
+— validated **before** triage (`validate-interview-items.py`, rejection
+classes R1–R5). Policy content seeds candidate **questions only**: triage and
+recommendation generation below remain a view over harvest output, and a
+policy seed can never supply or pre-fill an answer. Validated items join the
+asked set as `open`/`policy-seed` questions; an absent `policy_source` is
+silent, an unusable one logs one line and the interview proceeds generically
+(the seam's own contract lives in SPEC-policy-source-seam).
+
 Every candidate question is triaged against the harvest output — the fact
 sheet and NEEDS-OWNER list, reading nothing else (`docs/interview-architecture.md` D1):
 
@@ -71,8 +86,11 @@ sheet and NEEDS-OWNER list, reading nothing else (`docs/interview-architecture.m
 - **open** when neither — genuinely owner-only knowledge, answered as a
   bullet.
 
-Pick ≤5 survivors, prioritized top-down; tailor wording to the framework's
-GATE slots:
+Pick ≤5 survivors — confirmed NEEDS-OWNER gaps first, then policy-seeded
+tension questions, then generic open (amended 2026-07-14: seeded items share
+the same ≤5 cap, so seeds *displace* the lowest-priority generic questions
+rather than adding to them) — prioritized top-down; tailor wording to the
+framework's GATE slots:
 
 1. What surprised you most while building this? (feeds F2 slot 3 / F1 slot 4)
 2. Which single result or number matters most, and why that one? (feeds evidence GATE slots)
@@ -96,9 +114,19 @@ Q6: suppressed                   covered-by=fs-08,fs-12
 ```
 
 - Every **asked** question records its survival rationale (`topic-absent` |
-  `needs-owner-reraise` | `owner-judgment`), the recommendation's grounding
-  pointers (when recommended), and the owner's disposition.
+  `needs-owner-reraise` | `owner-judgment` | `policy-seed`), the
+  recommendation's grounding pointers (when recommended), the **seed
+  pointer(s)** (when policy-seeded — the `seed<-` field, parallel to `rec<-`;
+  amended 2026-07-14, SPEC-policy-source-seam), and the owner's disposition.
 - Every **suppressed** question records its covering entries.
+- A candidate that survived triage but fell to the ≤5 budget is journaled as
+  **capped** — recorded without a disposition, since the owner never saw it
+  (added 2026-07-14: policy seeds make >5 survivors possible for the first
+  time).
+- The journal **ends with the `consulted:` line** (SPEC-policy-source-seam
+  CAP-5): the pin plus a seed → question map for a seeded run, or
+  `consulted: none (policy_source unset | unavailable: <reason>)` — every
+  interview run states its policy provenance.
 - Answers carry their disposition into stage 3's provenance: an **approved**
   answer keeps its source pointers and grounds sourced claims like a
   fact-sheet entry; **modified**/**replaced** answers are interview-sourced
