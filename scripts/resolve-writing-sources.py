@@ -174,6 +174,20 @@ def _find_output_block(lines):
     return None
 
 
+def resolve_drafts_dir(value, root):
+    """Resolve a declared output.drafts value to an absolute directory (#213).
+
+    `~` and environment variables expand; an absolute result is taken as-is (an
+    external articles repo is the recommended home for drafts — articles are
+    private assets and a host repo may be public); a relative value keeps its
+    legacy meaning, resolving against the HOST ROOT (never the process cwd).
+    """
+    expanded = os.path.expandvars(os.path.expanduser(value))
+    if os.path.isabs(expanded):
+        return os.path.normpath(expanded)
+    return os.path.normpath(os.path.join(root, expanded))
+
+
 def get_output_drafts(lines):
     """Return the declared output.drafts value (str) or None."""
     out = _find_output_block(lines)
@@ -405,11 +419,13 @@ def cmd_draft_location(args):
     if val is None:
         sys.stderr.write(
             f"no output.drafts declared in {sources_path(root)[0]}; "
-            f"ask the owner for a location, then run:\n"
+            f"ask the owner once — recommended: a directory in a PRIVATE articles "
+            f"repo OUTSIDE the host repo (articles are private assets; a host repo "
+            f"may be public, #213) — then run:\n"
             f"  resolve-writing-sources.py set-draft-location <path> --root {root}\n"
         )
         return NEEDS_PROMPT
-    print(val)
+    print(resolve_drafts_dir(val, root))
     return 0
 
 
@@ -417,7 +433,19 @@ def cmd_set_draft_location(args):
     root = host_root(args.root)
     lines = read_lines(root)
     new_lines, changed = set_output_drafts(lines, args.path)
-    if changed:
+    path, kind = sources_path(root)
+    if kind == "legacy":
+        # The key must land machine-global, never in the host repo (#211/#213) —
+        # but a bare global file holding only `output:` would WIN resolution and
+        # shadow the legacy sources. So migrate the whole (updated) content.
+        gpath = os.path.join(rp.repo_config_dir(root), SOURCES_FILE)
+        os.makedirs(os.path.dirname(gpath), exist_ok=True)
+        with open(gpath, "w", encoding="utf-8") as fh:
+            fh.write("\n".join(new_lines))
+        sys.stderr.write(
+            f"migrated: {path} copied to {gpath} (with output.drafts set) — the "
+            f"machine-global file now wins; delete the in-repo copy (#211)\n")
+    elif changed or kind == "none":
         write_lines(root, new_lines)
     print(get_output_drafts(new_lines))
     return 0

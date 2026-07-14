@@ -1,7 +1,11 @@
 # writing-sources.example.yaml — per-host-repo source & output declaration (CAP-2).
 #
-# Copy to <host-repo>/writing-sources.yaml (this file lives in the repo you are
-# writing ABOUT, not in the plugin repo). Two things are declared here:
+# Copy to ~/.config/writing-assistant/repos/<repo-key>/writing-sources.yaml —
+# machine-global per-repo config, NEVER inside the host repo (#211: a host repo
+# may be public, and this file can carry private pointers). Print the exact
+# destination with:
+#   python3 scripts/resolve-paths.py sources-file --root <host-repo>
+# Two things are declared here:
 #
 #   sources: the ONLY paths the harvest step may read. A repo not listed is
 #            never traversed, even if it sits next to this one on disk. Paths
@@ -21,8 +25,13 @@ sources:
     include: ["notes/**", "specs/**"]    # optional: narrow to these globs. Omit = whole path in scope.
 
 output:
-  # Draft + platform-variant output directory, relative to the host-repo root.
-  drafts: articles/drafts/
+  # Draft + platform-variant output directory. Recommended: a directory in a
+  # dedicated PRIVATE articles repository OUTSIDE the host repo — articles are
+  # private assets, and a maybe-public host repo should never carry them (#213).
+  # `~` and absolute paths are supported.
+  drafts: ~/work/articles/drafts/
+  # In-host alternative (resolves relative to the host-repo root, NOT the cwd):
+  # drafts: articles/drafts/
 
 # Optional: point the Stage-2 interview at your policy repo (product-lab) so it
 # can seed tension questions from your recorded positions. Absent = the

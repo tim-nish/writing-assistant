@@ -43,8 +43,12 @@ has 'drafts:'    "$EX" 'output.drafts key'
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 mkdir -p "$work/host/sub" "$work/research-notes/notes" "$work/other-repo"
+# Hermetic config home: set-draft-location migration (13.24, #213) writes to the
+# machine-global config — keep it out of the developer's real ~/.config.
+XDG_CONFIG_HOME="$work/xdg"; export XDG_CONFIG_HOME
 
-# 2. draft-location returns the declared value.
+# 2. draft-location resolves the declared value (absolute, host-root-relative
+#    for a legacy relative value — Story 13.24, #213).
 cat > "$work/host/writing-sources.yaml" <<'YAML'
 # my sources
 sources:
@@ -55,16 +59,40 @@ output:
   # where drafts go
   drafts: articles/drafts/
 YAML
-got=$($PY --root "$work/host" draft-location)
-[ "$got" = "articles/drafts/" ] && ok "draft-location returns declared value" \
-  || err "draft-location returned '$got', expected 'articles/drafts/'"
+hostreal=$(realpath "$work/host")
+got=$($PY --root "$work/host" draft-location 2>/dev/null)
+[ "$got" = "$hostreal/articles/drafts" ] && ok "draft-location resolves a relative value against the host root" \
+  || err "draft-location returned '$got', expected '$hostreal/articles/drafts'"
+
+# 2a. ~ and absolute values resolve as-is (external articles repo, #213).
+cat > "$work/host/writing-sources.yaml" <<'YAML'
+sources:
+  - path: .
+output:
+  drafts: ~/articles-repo/drafts/
+YAML
+got=$($PY --root "$work/host" draft-location 2>/dev/null)
+[ "$got" = "$HOME/articles-repo/drafts" ] && ok "draft-location expands ~ (external destination)" \
+  || err "draft-location tilde expansion returned '$got', expected '$HOME/articles-repo/drafts'"
+# restore the original fixture verbatim (later sections rely on its comments
+# and the declared sibling source)
+cat > "$work/host/writing-sources.yaml" <<'YAML'
+# my sources
+sources:
+  - path: .
+  - path: ../research-notes
+    include: ["notes/**"]
+output:
+  # where drafts go
+  drafts: articles/drafts/
+YAML
 
 # 2b. --root works AFTER the subcommand too (the form the SKILLs document, #138):
 #     `resolve-writing-sources.py <cmd> --root <host>` must not error.
 # stdout only: the fixture uses legacy in-repo placement, which (correctly)
 # emits the O1 deprecation notice on stderr (Story 13.23, #211).
 after=$($PY draft-location --root "$work/host" 2>/dev/null)
-[ "$after" = "articles/drafts/" ] \
+[ "$after" = "$hostreal/articles/drafts" ] \
   && ok "--root accepted AFTER the subcommand (matches the documented invocation, #138)" \
   || err "--root after the subcommand failed: '$after'"
 # every subcommand accepts --root in that position (no 'unrecognized arguments').
@@ -85,25 +113,36 @@ set +e; $PY --root "$work/host2" draft-location >/dev/null 2>&1; rc=$?; set -e
 [ "$rc" -eq 3 ] && ok "undeclared output.drafts exits 3 (asks, no default)" \
   || err "expected exit 3 for missing output.drafts, got $rc"
 
-# 4. Write-back: preserves comments, is consent-gated (only on set), idempotent.
-$PY --root "$work/host2" set-draft-location "out/drafts/" >/dev/null
-grep -q '^sources:' "$work/host2/writing-sources.yaml" && ok "write-back preserved existing content/comments" \
-  || err "write-back clobbered the file"
-got=$($PY --root "$work/host2" draft-location)
-[ "$got" = "out/drafts/" ] && ok "second resolution reads written key silently" \
+# 4. Write-back: lands machine-global (never in the host repo, #211/#213) — a
+#    legacy in-repo file is migrated whole so the winning global copy keeps its
+#    sources — preserves comments, and is idempotent.
+host2real=$(realpath "$work/host2")
+gfile="$work/xdg/writing-assistant/repos/$(python3 "$root/scripts/resolve-paths.py" repo-key --root "$work/host2")/writing-sources.yaml"
+legacy_before=$(cat "$work/host2/writing-sources.yaml")
+$PY --root "$work/host2" set-draft-location "out/drafts/" >/dev/null 2>&1
+[ -f "$gfile" ] && grep -q '^sources:' "$gfile" \
+  && ok "set-draft-location migrated the legacy file whole to the machine-global config" \
+  || err "machine-global file missing or lost the sources block after migration"
+[ "$legacy_before" = "$(cat "$work/host2/writing-sources.yaml")" ] \
+  && ok "the in-repo file was not modified (nothing new written into the host repo)" \
+  || err "set-draft-location wrote into the host repo"
+got=$($PY --root "$work/host2" draft-location 2>/dev/null)
+[ "$got" = "$host2real/out/drafts" ] && ok "second resolution reads the written key (global wins)" \
   || err "post-write draft-location returned '$got'"
-before=$(cat "$work/host2/writing-sources.yaml")
-$PY --root "$work/host2" set-draft-location "out/drafts/" >/dev/null
-after=$(cat "$work/host2/writing-sources.yaml")
+before=$(cat "$gfile")
+$PY --root "$work/host2" set-draft-location "out/drafts/" >/dev/null 2>&1
+after=$(cat "$gfile")
 [ "$before" = "$after" ] && ok "re-writing the same value is a no-op (idempotent)" \
   || err "set-draft-location was not idempotent"
 
-# 5. Update in place preserves the value's own comment line above it.
-$PY --root "$work/host" set-draft-location "new/loc/" >/dev/null
-grep -q '# where drafts go' "$work/host/writing-sources.yaml" && ok "inline comment above the key preserved on update" \
+# 5. Update in place preserves the value's own comment line above it (the
+#    update lands in the migrated machine-global copy, #211/#213).
+$PY --root "$work/host" set-draft-location "new/loc/" >/dev/null 2>&1
+gfile_host="$work/xdg/writing-assistant/repos/$(python3 "$root/scripts/resolve-paths.py" repo-key --root "$work/host")/writing-sources.yaml"
+grep -q '# where drafts go' "$gfile_host" && ok "inline comment above the key preserved on update" \
   || err "update dropped the key's comment"
-got=$($PY --root "$work/host" draft-location)
-[ "$got" = "new/loc/" ] && ok "update replaced the value" || err "update left value '$got'"
+got=$($PY --root "$work/host" draft-location 2>/dev/null)
+[ "$got" = "$hostreal/new/loc" ] && ok "update replaced the value" || err "update left value '$got'"
 
 # 6. CAP-2 boundary + host-root path resolution.
 $PY --root "$work/host" is-declared "sub/file.md"  && ok "declared: file under host root (path: .)" \
