@@ -122,6 +122,16 @@ project specs live only under `specs/`. Release stripping is therefore a
 mechanical removal of those three paths. `scripts/check-skeleton.sh` verifies
 these invariants.
 
+**Canonical-spec promotion (#188).** A BMAD-generated spec starts in
+`_bmad-output/specs/` (git-ignored, next to its `.memlog.md`). When the epic
+implementing it merges, the spec is **promoted**: copied into `specs/` with an
+"Adopted — this copy is now the canonical version" header (the same adoption
+pattern as the vendored article specs), relative links fixed, and the
+`_bmad-output` copy marked superseded. The memlog stays with the BMAD
+workspace — it is process state, not contract. Rationale: the canonical
+contract for shipped code must be version-controlled; a spec that exists only
+in an ignored directory dies with one machine.
+
 ## Development mode (run skills before packaging)
 
 The plugin's skills run as plain local skills **before any `plugin.json` /
