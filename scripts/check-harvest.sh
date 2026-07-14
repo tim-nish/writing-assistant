@@ -88,6 +88,25 @@ python3 -c "import py_compile; py_compile.compile('$root/scripts/pin-source.py',
 #    caller's OWN line numbers, verified committed-at-HEAD, and the emitted pointer
 #    validates against the fact-sheet contract.
 has "pin-source.py" "documents the @sha pin helper in the skill"
+
+# 7b. Validator convergence (Story 13.22, #206): the emitter is the only
+#     sanctioned construction path, validation is a confirmation pass, and
+#     repair is bounded at two passes with NEEDS-OWNER routing — the skill
+#     never instructs an unbounded validate-loop.
+has "--emit-entry" "skill routes entry construction through the emitter"
+has "only sanctioned construction path" "emitter is stated as the only sanctioned path"
+has "confirmation pass" "validator run is framed as a confirmation pass"
+has "bounded at two validator passes" "repair loop is bounded at two passes"
+grep -q "never a third" "$SKILL" && ok "third repair pass is explicitly forbidden" \
+  || err "no explicit never-a-third-pass rule"
+grep -q "REJECT reason as the REASON" "$SKILL" \
+  && ok "post-bound rejects route to NEEDS-OWNER with their REJECT reason" \
+  || err "NEEDS-OWNER routing for post-bound rejects not stated"
+grep -q "budget-triage signal" "$SKILL" && ok "breach surfaces the budget-triage signal" \
+  || err "budget-triage signal on breach not stated"
+grep -q "completion" "$SKILL" && ok "rerouted entries surface in the completion summary" \
+  || err "completion-summary surfacing not stated"
+
 PIN="$root/scripts/pin-source.py"
 VFS="$root/scripts/validate-fact-sheet.py"
 pin=$(mktemp -d); trap 'rm -rf "$work" "$pin"' EXIT

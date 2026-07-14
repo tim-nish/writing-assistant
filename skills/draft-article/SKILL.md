@@ -143,6 +143,20 @@ writing-sources-declared files (`resolve-writing-sources.py files`) and
 only narrow what is read — never add an undeclared repo. Reconciliation against
 `writing-sources.yaml` happens there.
 
+**Fact-sheet entries are emitted, never guessed (validator convergence, #206).**
+Harvest builds every file-pointer entry through
+`pin-source.py --emit-entry` (its §3) — copied from tool output — and runs
+`validate-fact-sheet.py` as a **single confirmation pass**. Repair after a
+REJECT is **bounded at two validator passes**: entries still rejected after the
+second pass move to the NEEDS-OWNER list with their REJECT reason and the stage
+surfaces its **budget-triage signal** (Story 13.7 — the existing per-stage
+signal, not a new channel) instead of looping again. This stage never instructs
+free-hand entry writing followed by validate-loop repair — that
+reject → guess → re-run cycle is what exhausted the turn budget across all
+three frameworks (#206). Entries rerouted by the bound are listed in the
+completion summary's **informational notes** (they reach the owner as interview
+material, not as a silent loss).
+
 Then consume that output into pipeline state:
 
 ```
