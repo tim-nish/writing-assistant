@@ -33,7 +33,10 @@ printf '%s' "$state" | python3 "$PIPE" interview --framework F1 \
   --items "$FIX/valid.json" - > "$work/interview.json"
 
 # Answers: t1 answered (owner text), t2 skipped, q1 (generic) answered.
-cat > "$work/answers.json" <<'JSON'
+# Piped through `answer --batch` so the emitter is tested against the REAL
+# record shape (owner text lands in `answer`, not `text`) — the 2026-07-14
+# seam dogfood found the emitter reading `text` only and emitting zero blocks.
+cat > "$work/answers-spec.json" <<'JSON'
 [
   {"id": "t1", "disposition": "replaced",
    "text": "The position moved: mechanism-over-prompt still holds; the draft is wrong and will be fixed."},
@@ -45,6 +48,8 @@ cat > "$work/answers.json" <<'JSON'
   {"id": "q5", "disposition": "skipped"}
 ]
 JSON
+python3 "$PIPE" answer --batch "$work/answers-spec.json" > "$work/answers.json" \
+  || { err "answer --batch rejected the fixture specs"; printf '\nFAILED.\n' >&2; exit 1; }
 
 # --- 1. One answered tension question -> one schema-valid block ----------------
 python3 "$PIPE" staging-candidates --interview "$work/interview.json" \
