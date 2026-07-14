@@ -1,0 +1,5 @@
+[
+  {"id": "t1", "gap_type": "missing-rationale",
+   "seed": {"quote": "the evidence gate must be agent-fed", "pointer": "LESSONS.md:17@8f3c2d1e4a5b6c7d8e9f0a1b2c3d4e5f60718293"},
+   "question": "Do you agree the evidence gate must be agent-fed?", "owner_answer": ""}
+]

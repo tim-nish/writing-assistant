@@ -1,0 +1,5 @@
+[
+  {"id": "q5", "gap_type": "audience",
+   "seed": {"quote": "articles target working engineers", "pointer": "GLOSSARY.md:9@8f3c2d1e4a5b6c7d8e9f0a1b2c3d4e5f60718293"},
+   "question": "Who exactly is this article for?", "owner_answer": ""}
+]

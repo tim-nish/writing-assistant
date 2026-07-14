@@ -1,0 +1,8 @@
+[
+  {"id": "t1", "gap_type": "contradiction",
+   "seed": {"quote": "one hub is preserved", "pointer": "q_a/INDEX.md:3@8f3c2d1e4a5b6c7d8e9f0a1b2c3d4e5f60718293"},
+   "question": "Does the staging emitter break the one-hub rule you recorded?", "owner_answer": ""},
+  {"id": "t2", "gap_type": "contradiction",
+   "seed": {"quote": "one hub is preserved", "pointer": "LESSONS.md:41"},
+   "question": "Does the staging emitter break the one-hub rule you recorded, and if so which side should move?", "owner_answer": ""}
+]
