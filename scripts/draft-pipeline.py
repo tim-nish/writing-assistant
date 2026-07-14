@@ -937,6 +937,59 @@ def cmd_journal(args):
     return 0
 
 
+def cmd_staging_candidates(args):
+    """Stage 2 epilogue: emit staging-candidate blocks — proposal-only
+    contribute-back (Story 14.5, SPEC-policy-source-seam CAP-4;
+    seam-formats.md §3).
+
+    Detection rule (mechanical, stated): a POLICY-SEEDED tension question whose
+    answer carries owner text (disposition answered/modified/replaced) records
+    a durable position — the owner just answered a contradiction, ambiguity,
+    missing-rationale, or reversal probe against their own policy repo. Each
+    such answer yields one block whose frontmatter mirrors product-lab's
+    `q_a/staging/` schema. Skipped questions and generic answers yield nothing.
+
+    The emitter writes to STDOUT only — the SKILL routes it into the run
+    workspace. Nothing is ever written under `policy_source.path`: the owner
+    copies accepted blocks into `q_a/staging/` by hand, and `/qa-batch` takes
+    it from there. No candidates -> no output (never an empty block).
+    """
+    interview = _load_json_state(args.interview, "interview output")
+    answers = _load_json_state(args.answers, "answers batch")
+    answers = answers if isinstance(answers, list) else [answers]
+    by_id = {a.get("id"): a for a in answers}
+
+    questions = {q["id"]: q for q in interview.get("questions", [])}
+    blocks = []
+    for qid, q in questions.items():
+        if q.get("rationale") != "policy-seed":
+            continue
+        a = by_id.get(qid)
+        if not a or a.get("disposition") not in ("answered", "modified", "replaced"):
+            continue
+        text = (a.get("text") or "").strip()
+        if not text:
+            continue
+        gist = re.sub(r"[^a-z0-9]+", "-", q["topic"].lower()).strip("-")
+        tags = [q["topic"]] + (args.tag or [])
+        blocks.append("\n".join([
+            "<!-- staging-candidate -->",
+            "---",
+            f"slug: {args.created}-{args.source_repo}-{gist}-{qid}",
+            f"created: {args.created}",
+            f"source_repo: {args.source_repo}",
+            "perishable: true",
+            f"tags: [{', '.join(tags)}]",
+            "---",
+            f"Q: {q['text']}",
+            f"Decision: {text}",
+        ]))
+    if not blocks:
+        return 0
+    print("\n\n".join(blocks))
+    return 0
+
+
 def cmd_consume(args):
     """Stage 1: consume harvest's output document (fact sheet + NEEDS-OWNER) into
     pipeline state — WITHOUT re-reading any source. Source pointers are carried
@@ -1248,6 +1301,12 @@ def main(argv=None):
     sp.add_argument("--answers", help="recorded answer records (JSON list), or - for stdin")
     sp.add_argument("--policy-note", help="why the run was not policy-seeded, for the consulted: line "
                                           "(e.g. 'policy_source unavailable: <reason>'; default: unset)")
+    sp = sub.add_parser("staging-candidates")
+    sp.add_argument("--interview", required=True, help="the `interview` output JSON, or - for stdin")
+    sp.add_argument("--answers", required=True, help="recorded answer records (JSON list)")
+    sp.add_argument("--source-repo", required=True, help="the host repo's name, for the block frontmatter")
+    sp.add_argument("--created", required=True, help="the run date (YYYY-MM-DD)")
+    sp.add_argument("--tag", action="append", help="extra frontmatter tag (repeatable; e.g. the track)")
     sp = sub.add_parser("provenance")
     sp.add_argument("--map", default="-", help="the sidecar provenance map, or - for stdin")
     sp.add_argument("--count", action="store_true", help="print per-class tallies as JSON")
@@ -1278,6 +1337,7 @@ def main(argv=None):
         "checkpoint": cmd_checkpoint, "resume": cmd_resume, "autostart": cmd_autostart,
         "stage0": cmd_stage0,
         "answer": cmd_answer, "journal": cmd_journal, "provenance": cmd_provenance,
+        "staging-candidates": cmd_staging_candidates,
         "quality-gate": cmd_quality_gate,
         "verify-markers": cmd_verify_markers, "verify": cmd_verify, "reroute": cmd_reroute,
         "variants": cmd_variants,
