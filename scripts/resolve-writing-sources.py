@@ -45,6 +45,31 @@ git repo the script errors rather than silently resolving against cwd):
                             USABLE (exists, readable, a git repo) is
                             deliberately not checked here: an unusable path is
                             a read-time degradation, never a config error.
+
+  set-policy-source PATH [--track T] [--topics NAME ...]
+                            Write the `policy_source` block back into
+                            writing-sources.yaml (SPEC-repo-onboarding CAP-2),
+                            with the same contract as set-draft-location:
+                            comment-preserving line surgery, idempotent,
+                            machine-global destination, legacy-file migration.
+                            Keys not passed are left as they are. The result
+                            is validated BEFORE writing — a write that would
+                            produce a malformed block (>2 topics, non-basename
+                            entries) exits 4 and touches nothing. Usability of
+                            PATH is deliberately not checked (read-time
+                            degradation, never a config error). Prints the new
+                            block as JSON (the policy-source format).
+
+  set-sources               Declaratively REPLACE the `sources:` block from a
+                            JSON array on stdin (SPEC-repo-onboarding CAP-2):
+                            [{"path": ".", "include": ["docs/**"]}, ...].
+                            Emits the inline include form (#221). Comments
+                            inside the old sources block do not survive the
+                            replace (declarative semantics); comments outside
+                            it do. An empty list, a missing path, or an
+                            include pattern containing `..` exits 5 and
+                            touches nothing — the writer is fail-closed like
+                            the reader. Prints the resolved source paths.
 """
 
 import argparse
@@ -250,6 +275,143 @@ def set_output_drafts(lines, value):
     return lines + tail, True
 
 
+def _block_span(lines, header_re):
+    """(start, end) of a top-level block: `start` is the header line index,
+    `end` the first index after it holding a top-level non-blank line (the
+    line AFTER the block). (None, None) when the header is absent. Matches
+    the block-walking rule the readers use: any indent-0 non-blank line —
+    comment included — ends the block."""
+    start = None
+    for i, ln in enumerate(lines):
+        if re.match(header_re, ln):
+            start = i
+            break
+    if start is None:
+        return None, None
+    end = start + 1
+    while end < len(lines):
+        ln = lines[end]
+        if ln.strip() and _indent(ln) == 0:
+            break
+        end += 1
+    return start, end
+
+
+def set_policy_source(lines, path, track=None, topics=None):
+    """Return (new_lines, changed). Per-key line surgery like
+    set_output_drafts: keys passed are set, keys not passed keep their
+    existing lines (comments and ordering survive); an absent block is
+    appended whole. Callers validate the RESULT via get_policy_source before
+    writing — this function only edits lines."""
+    start, end = _block_span(lines, r"^policy_source:\s*(#.*)?$")
+    if start is None:
+        tail = []
+        if lines and lines[-1].strip() != "":
+            tail.append("")
+        tail.append("policy_source:")
+        tail.append(f"  path: {path}")
+        if track:
+            tail.append(f"  track: {track}")
+        if topics:
+            tail.append("  topics: [{}]".format(", ".join(topics)))
+        return lines + tail, True
+
+    new = list(lines)
+    changed = False
+
+    def _set_key(key, value_line):
+        """Replace the block's `key:` line, or insert one after the last
+        present key (path < track < topics keeps the documented order)."""
+        nonlocal new, changed, end
+        for j in range(start + 1, end):
+            m = re.match(rf"^(\s+){key}:\s*.*$", new[j])
+            if m:
+                candidate = f"{m.group(1)}{key}: {value_line}"
+                if new[j] != candidate:
+                    new[j] = candidate
+                    changed = True
+                return
+        # key absent: insert at the end of the block, before trailing blanks
+        k = end
+        while k > start + 1 and new[k - 1].strip() == "":
+            k -= 1
+        new.insert(k, f"  {key}: {value_line}")
+        end += 1
+        changed = True
+
+    _set_key("path", path)
+    if track is not None:
+        _set_key("track", track)
+    if topics is not None:
+        _set_key("topics", "[{}]".format(", ".join(topics)))
+    return new, changed
+
+
+def render_sources_block(specs):
+    """The canonical `sources:` block for [{'path': str, 'include': [str]}]
+    — always the inline include form (#221)."""
+    out = ["sources:"]
+    for s in specs:
+        out.append(f"  - path: {s['path']}")
+        if s.get("include"):
+            quoted = ", ".join(f'"{g}"' for g in s["include"])
+            out.append(f"    include: [{quoted}]")
+    return out
+
+
+def validate_source_specs(specs):
+    """Fail-closed write-time validation for set-sources input. Returns a
+    list of error strings; empty means writable."""
+    errors = []
+    if not isinstance(specs, list) or not specs:
+        return ["sources must be a non-empty JSON array of "
+                '{"path": str, "include": [str, ...]?} objects']
+    for i, s in enumerate(specs):
+        if not isinstance(s, dict) or not isinstance(s.get("path"), str) \
+                or not s["path"].strip():
+            errors.append(f"sources[{i}]: a non-empty string `path` is required")
+            continue
+        inc = s.get("include", [])
+        if not isinstance(inc, list) or any(not isinstance(g, str) or not g.strip()
+                                            for g in inc):
+            errors.append(f"sources[{i}].include: must be a list of non-empty strings")
+            continue
+        for g in inc:
+            if ".." in g.split("/"):
+                errors.append(
+                    f"sources[{i}].include: pattern {g!r} contains a `..` "
+                    "segment — path-escaping patterns are refused at write "
+                    "time (the reader would silently drop them)")
+    return errors
+
+
+def set_sources(lines, specs):
+    """Return (new_lines, changed). Declarative replace of the whole
+    `sources:` block (comments inside it are NOT preserved — this is the
+    documented tradeoff of declarative semantics; comments elsewhere
+    survive). An absent block is inserted after the leading comment header,
+    so the conventional order (sources, output, policy_source) holds for
+    files this tool creates from scratch."""
+    block = render_sources_block(specs)
+    start, end = _block_span(lines, r"^sources:\s*(#.*)?$")
+    if start is not None:
+        # keep trailing blank separation as-is: replace header..last content
+        last = end
+        while last > start + 1 and lines[last - 1].strip() == "":
+            last -= 1
+        new = lines[:start] + block + lines[last:]
+        return new, new != lines
+    # absent: insert after the leading run of comment/blank lines
+    k = 0
+    while k < len(lines) and (lines[k].strip() == "" or lines[k].lstrip().startswith("#")):
+        k += 1
+    lead = lines[:k]
+    rest = lines[k:]
+    sep_before = [""] if lead and lead[-1].strip() != "" else []
+    sep_after = [""] if rest and rest[0].strip() != "" else []
+    return lead + sep_before + block + sep_after + rest, True
+
+
 def get_sources(lines, root):
     """Parse the sources list into [{'path': abs, 'include': [...]}].
 
@@ -449,25 +611,73 @@ def cmd_draft_location(args):
     return 0
 
 
-def cmd_set_draft_location(args):
-    root = host_root(args.root)
-    lines = read_lines(root)
-    new_lines, changed = set_output_drafts(lines, args.path)
+def _write_back(root, new_lines, changed, what):
+    """The one write-back path every setter shares (SPEC-repo-onboarding
+    CAP-2): a legacy in-repo file migrates whole to the machine-global
+    location (#211 — a bare global file holding only the new key would WIN
+    resolution and shadow the legacy content), otherwise write when changed
+    or when no file existed yet."""
     path, kind = sources_path(root)
     if kind == "legacy":
-        # The key must land machine-global, never in the host repo (#211/#213) —
-        # but a bare global file holding only `output:` would WIN resolution and
-        # shadow the legacy sources. So migrate the whole (updated) content.
         gpath = os.path.join(rp.repo_config_dir(root), SOURCES_FILE)
         os.makedirs(os.path.dirname(gpath), exist_ok=True)
         with open(gpath, "w", encoding="utf-8") as fh:
             fh.write("\n".join(new_lines))
         sys.stderr.write(
-            f"migrated: {path} copied to {gpath} (with output.drafts set) — the "
+            f"migrated: {path} copied to {gpath} (with {what} set) — the "
             f"machine-global file now wins; delete the in-repo copy (#211)\n")
     elif changed or kind == "none":
         write_lines(root, new_lines)
+
+
+def cmd_set_draft_location(args):
+    root = host_root(args.root)
+    lines = read_lines(root)
+    new_lines, changed = set_output_drafts(lines, args.path)
+    _write_back(root, new_lines, changed, "output.drafts")
     print(get_output_drafts(new_lines))
+    return 0
+
+
+def cmd_set_policy_source(args):
+    import json
+    root = host_root(args.root)
+    lines = read_lines(root)
+    new_lines, changed = set_policy_source(
+        lines, args.path, track=args.track, topics=args.topics)
+    # Validate the RESULT before any write — a malformed block never lands.
+    block, errors = get_policy_source(new_lines, root)
+    if block is None or errors:
+        for key, msg in errors or [("policy_source", "block failed to parse after surgery")]:
+            sys.stderr.write(f"[{SOURCES_FILE}] {key}: {msg}\n")
+        sys.stderr.write("refused: nothing was written\n")
+        return POLICY_MALFORMED
+    _write_back(root, new_lines, changed, "policy_source")
+    print(json.dumps({"declared": True, "path": block["path"],
+                      "track": block["track"], "topics": block["topics"]}))
+    return 0
+
+
+def cmd_set_sources(args):
+    import json
+    root = host_root(args.root)
+    try:
+        specs = json.loads(sys.stdin.read())
+    except json.JSONDecodeError as e:
+        sys.stderr.write(f"set-sources: stdin is not valid JSON: {e}\n"
+                         "refused: nothing was written\n")
+        return SOURCES_MALFORMED
+    errors = validate_source_specs(specs)
+    if errors:
+        for msg in errors:
+            sys.stderr.write(f"[{SOURCES_FILE}] {msg}\n")
+        sys.stderr.write("refused: nothing was written\n")
+        return SOURCES_MALFORMED
+    lines = read_lines(root)
+    new_lines, changed = set_sources(lines, specs)
+    _write_back(root, new_lines, changed, "sources")
+    for s in get_sources(new_lines, root):
+        print(s["path"])
     return 0
 
 
@@ -545,6 +755,11 @@ def main(argv=None):
     sp.add_argument("path")
     sub.add_parser("files", parents=[root_parent])
     sub.add_parser("policy-source", parents=[root_parent])
+    sp = sub.add_parser("set-policy-source", parents=[root_parent])
+    sp.add_argument("path")
+    sp.add_argument("--track")
+    sp.add_argument("--topics", nargs="+")
+    sub.add_parser("set-sources", parents=[root_parent])
     args = p.parse_args(argv)
     if not hasattr(args, "root"):
         args.root = None
@@ -561,6 +776,8 @@ def main(argv=None):
             "is-declared": cmd_is_declared,
             "files": cmd_files,
             "policy-source": cmd_policy_source,
+            "set-policy-source": cmd_set_policy_source,
+            "set-sources": cmd_set_sources,
         }[args.cmd](args)
     except MalformedSources as e:
         # #221: never widen scope on a malformed narrowing directive — name the
