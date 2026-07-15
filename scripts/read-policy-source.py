@@ -8,10 +8,10 @@ is a code-level allowlist — the read function takes the whitelist and refuses
 everything else, so no prompt can widen the seam:
 
   * `GLOSSARY.md` and `LESSONS.md`, always;
-  * at most 2 `topics/*.md` files — the explicit `policy_source.topics` list
-    when declared, else `topics/<track>*.md` matched by filename stem from
-    `policy_source.track` (sorted, first 2). No track and no topics list means
-    GLOSSARY + LESSONS only — still a valid seeded run.
+  * at most 2 `topics/*.md` files — the per-run `read --topics` selection the
+    owner approved in draft-article Stage 2 (Story 13.35). No selection means
+    GLOSSARY + LESSONS only — still a valid seeded run. (The per-repo
+    `track`/`topics` config keys were removed — Story 13.36.)
   * `q_a/` and every other path are structurally unreadable; a symlink or `..`
     escaping the policy root is refused, not followed.
 
@@ -38,10 +38,9 @@ Subcommands (each takes --root, the HOST repo root; default: git top-level):
                    the whitelist is refused with exit 5 — that refusal is the
                    enforcement test, not a convention. --topics (Story 13.35,
                    SPEC-policy-topic-at-draft CAP-2) BUILDS the whitelist from
-                   the given <=2 basenames under topics/ instead of the config
-                   track/topics — distinct from --only, which filters within
-                   an already-built whitelist; >2 names or a non-basename is
-                   refused (exit 5).
+                   the given <=2 basenames under topics/ — distinct from
+                   --only, which filters within an already-built whitelist;
+                   >2 names or a non-basename is refused (exit 5).
 
 Exit codes — the caller keys graceful degradation (CAP-6) off these:
 
@@ -74,7 +73,7 @@ UNAVAIL_UNSET = 10
 UNAVAIL_PATH = 11
 UNAVAIL_GIT = 12
 
-MAX_TOPICS = 2  # CAP-2: at most 2 track-matched topic files
+MAX_TOPICS = 2  # CAP-2: at most 2 topic files per read
 BASE_FILES = ("GLOSSARY.md", "LESSONS.md")
 
 
@@ -131,8 +130,7 @@ def build_whitelist(policy_root, block, override_topics=None):
 
     GLOSSARY + LESSONS always; then <=2 topics — the per-run `--topics`
     selection when given (Story 13.35, SPEC-policy-topic-at-draft CAP-2),
-    else the explicit config list when declared, else `topics/<track>*.md`
-    by filename stem. A candidate whose realpath escapes the policy root
+    else none. A candidate whose realpath escapes the policy root
     (symlink/.. tricks) is dropped here, so it never becomes readable.
     """
     entries = []
@@ -143,14 +141,10 @@ def build_whitelist(policy_root, block, override_topics=None):
     if override_topics is not None:
         for t in override_topics[:MAX_TOPICS]:
             topics.append(os.path.join(policy_root, "topics", t))
-    elif block["topics"]:
-        for t in block["topics"][:MAX_TOPICS]:
-            if "/" in t or ".." in t or t.startswith("."):
-                continue  # defense in depth; the resolver already rejects these
-            topics.append(os.path.join(policy_root, "topics", t))
-    elif block["track"]:
-        pattern = os.path.join(policy_root, "topics", glob.escape(block["track"]) + "*.md")
-        topics = sorted(glob.glob(pattern))[:MAX_TOPICS]
+    # No per-run selection -> GLOSSARY + LESSONS only. The config
+    # `track`/`topics` keys were removed (Story 13.36, SPEC-policy-topic-at-
+    # draft CAP-3): which topics an article reads is chosen per-article in
+    # Stage 2 and arrives here as --topics; there is no per-repo topic config.
     for full in topics:
         rel = os.path.relpath(full, policy_root)
         entries.append((rel, full, os.path.isfile(full) and _inside(policy_root, full)))

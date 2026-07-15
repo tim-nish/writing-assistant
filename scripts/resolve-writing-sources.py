@@ -37,25 +37,26 @@ git repo the script errors rather than silently resolving against cwd):
   policy-source             Print the optional `policy_source` block as JSON:
                             {"declared": false} when absent (exit 0 — absence
                             is not an error), else {"declared": true, "path":
-                            <abs>, "track": <str|null>, "topics": [<basename>…]}.
-                            A malformed block (missing/empty path, more than 2
-                            topics, a topics entry that is not a plain basename)
-                            exits 4 with per-key errors naming the fix — the
-                            stage-0 validator relays them. Whether the path is
+                            <abs>}. A malformed block (missing/empty path, or a
+                            leftover `track:`/`topics:` key — removed by Story
+                            13.36, SPEC-policy-topic-at-draft CAP-3: topics are
+                            chosen per-article at draft time) exits 4 with
+                            per-key errors naming the fix — the stage-0
+                            validator relays them. Whether the path is
                             USABLE (exists, readable, a git repo) is
                             deliberately not checked here: an unusable path is
                             a read-time degradation, never a config error.
 
-  set-policy-source PATH [--track T] [--topics NAME ...]
-                            Write the `policy_source` block back into
+  set-policy-source PATH    Write the `policy_source` block back into
                             writing-sources.yaml (SPEC-repo-onboarding CAP-2),
                             with the same contract as set-draft-location:
                             comment-preserving line surgery, idempotent,
                             machine-global destination, legacy-file migration.
-                            Keys not passed are left as they are. The result
+                            Path-only (Story 13.36): the `--track`/`--topics`
+                            flags were removed with the config keys. The result
                             is validated BEFORE writing — a write that would
-                            produce a malformed block (>2 topics, non-basename
-                            entries) exits 4 and touches nothing. Usability of
+                            leave a malformed block (e.g. a leftover removed
+                            key) exits 4 and touches nothing. Usability of
                             PATH is deliberately not checked (read-time
                             degradation, never a config error). Prints the new
                             block as JSON (the policy-source format).
@@ -132,7 +133,6 @@ def sources_path(root, notice=False):
 NEEDS_PROMPT = 3      # draft-location: no output.drafts declared
 POLICY_MALFORMED = 4  # policy-source: block present but malformed
 SOURCES_MALFORMED = 5 # sources: include: line not the inline-list form (#221)
-POLICY_MAX_TOPICS = 2 # SPEC-policy-source-seam CAP-2: at most 2 topic files
 
 
 class MalformedSources(ValueError):
@@ -297,12 +297,15 @@ def _block_span(lines, header_re):
     return start, end
 
 
-def set_policy_source(lines, path, track=None, topics=None):
+def set_policy_source(lines, path):
     """Return (new_lines, changed). Per-key line surgery like
-    set_output_drafts: keys passed are set, keys not passed keep their
-    existing lines (comments and ordering survive); an absent block is
-    appended whole. Callers validate the RESULT via get_policy_source before
-    writing — this function only edits lines."""
+    set_output_drafts: `path` is set, other lines keep their existing form
+    (comments and ordering survive); an absent block is appended whole —
+    path-only since Story 13.36 (topic selection moved to draft time; the
+    `--track`/`--topics` flags were removed with the config keys). Callers
+    validate the RESULT via get_policy_source before writing — a leftover
+    `track:`/`topics:` line therefore refuses the write with the removed-key
+    error until the owner deletes it."""
     start, end = _block_span(lines, r"^policy_source:\s*(#.*)?$")
     if start is None:
         tail = []
@@ -310,18 +313,13 @@ def set_policy_source(lines, path, track=None, topics=None):
             tail.append("")
         tail.append("policy_source:")
         tail.append(f"  path: {path}")
-        if track:
-            tail.append(f"  track: {track}")
-        if topics:
-            tail.append("  topics: [{}]".format(", ".join(topics)))
         return lines + tail, True
 
     new = list(lines)
     changed = False
 
     def _set_key(key, value_line):
-        """Replace the block's `key:` line, or insert one after the last
-        present key (path < track < topics keeps the documented order)."""
+        """Replace the block's `key:` line, or insert one at the block end."""
         nonlocal new, changed, end
         for j in range(start + 1, end):
             m = re.match(rf"^(\s+){key}:\s*.*$", new[j])
@@ -340,10 +338,6 @@ def set_policy_source(lines, path, track=None, topics=None):
         changed = True
 
     _set_key("path", path)
-    if track is not None:
-        _set_key("track", track)
-    if topics is not None:
-        _set_key("topics", "[{}]".format(", ".join(topics)))
     return new, changed
 
 
@@ -455,7 +449,7 @@ def get_policy_source(lines, root):
     """Parse the optional `policy_source` block.
 
     Returns (None, []) when the block is absent, else (block, errors) where
-    block = {"path": abs-or-None, "track": str-or-None, "topics": [str]} and
+    block = {"path": abs-or-None} and
     errors is a list of (key, message) pairs for a malformed block. Usability
     of the path (exists / readable / git repo) is not checked here.
     """
@@ -470,7 +464,7 @@ def get_policy_source(lines, root):
     def _val(raw):
         return re.sub(r"\s+#.*$", "", raw).strip().strip('"').strip("'")
 
-    block = {"path": None, "track": None, "topics": []}
+    block = {"path": None}
     errors = []
     j = start + 1
     while j < len(lines):
@@ -485,31 +479,23 @@ def get_policy_source(lines, root):
             raw = _val(m.group(1))
             block["path"] = os.path.realpath(os.path.join(root, raw)) if raw else None
             continue
-        m = re.match(r"^\s+track:\s*(.*)$", ln)
+        # `track:` / `topics:` were REMOVED (Story 13.36, SPEC-policy-topic-at-
+        # draft CAP-3): topic context is a per-article decision made in
+        # draft-article Stage 2, never per-repo config. A leftover key is an
+        # explicit, actionable error — never a silent ignore.
+        m = re.match(r"^\s+(track|topics):", ln)
         if m:
-            block["track"] = _val(m.group(1)) or None
-            continue
-        m = re.match(r"^\s+topics:\s*\[(.*)\]\s*(#.*)?$", ln)
-        if m:
-            items = [x.strip().strip('"').strip("'") for x in m.group(1).split(",")]
-            block["topics"] = [x for x in items if x]
+            errors.append((f"policy_source.{m.group(1)}",
+                           "removed (SPEC-policy-topic-at-draft CAP-3): which "
+                           "policy topics an article reads is chosen per-article "
+                           "in draft-article Stage 2. Fix: delete this line from "
+                           "writing-sources.yaml."))
             continue
 
     if block["path"] is None:
         errors.append(("policy_source.path",
                        "required when policy_source is declared. Fix: set it to "
                        "the local product-lab checkout (a plain path; no URL)."))
-    if len(block["topics"]) > POLICY_MAX_TOPICS:
-        errors.append(("policy_source.topics",
-                       f"{len(block['topics'])} entries exceed the cap of "
-                       f"{POLICY_MAX_TOPICS}. Fix: keep at most {POLICY_MAX_TOPICS} "
-                       "topic files (the bounded-read invariant)."))
-    for t in block["topics"]:
-        if "/" in t or ".." in t or t.startswith("."):
-            errors.append(("policy_source.topics",
-                           f"entry {t!r} is not a plain basename. Fix: name files "
-                           "directly under the policy repo's topics/ directory "
-                           "(e.g. eval-engineering.md)."))
     return block, errors
 
 
@@ -643,8 +629,7 @@ def cmd_set_policy_source(args):
     import json
     root = host_root(args.root)
     lines = read_lines(root)
-    new_lines, changed = set_policy_source(
-        lines, args.path, track=args.track, topics=args.topics)
+    new_lines, changed = set_policy_source(lines, args.path)
     # Validate the RESULT before any write — a malformed block never lands.
     block, errors = get_policy_source(new_lines, root)
     if block is None or errors:
@@ -653,8 +638,7 @@ def cmd_set_policy_source(args):
         sys.stderr.write("refused: nothing was written\n")
         return POLICY_MALFORMED
     _write_back(root, new_lines, changed, "policy_source")
-    print(json.dumps({"declared": True, "path": block["path"],
-                      "track": block["track"], "topics": block["topics"]}))
+    print(json.dumps({"declared": True, "path": block["path"]}))
     return 0
 
 
@@ -731,8 +715,7 @@ def cmd_policy_source(args):
         for key, msg in errors:
             sys.stderr.write(f"[{SOURCES_FILE}] {key}: {msg}\n")
         return POLICY_MALFORMED
-    print(json.dumps({"declared": True, "path": block["path"],
-                      "track": block["track"], "topics": block["topics"]}))
+    print(json.dumps({"declared": True, "path": block["path"]}))
     return 0
 
 
@@ -757,8 +740,6 @@ def main(argv=None):
     sub.add_parser("policy-source", parents=[root_parent])
     sp = sub.add_parser("set-policy-source", parents=[root_parent])
     sp.add_argument("path")
-    sp.add_argument("--track")
-    sp.add_argument("--topics", nargs="+")
     sub.add_parser("set-sources", parents=[root_parent])
     args = p.parse_args(argv)
     if not hasattr(args, "root"):
