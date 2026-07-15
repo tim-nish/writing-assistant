@@ -8,6 +8,14 @@ policy narrative). Policy-guard reviewed against the recall surface at
 `product-lab@173588733677` — conforms; advisory tensions recorded in the run
 transcript and folded into Constraints below.
 
+> **Amended 2026-07-15 (triage, #230)** per SPEC-policy-topic-at-draft: the
+> policy-source offer (CAP-1 step 2; skill Stage B item 3) proposes and writes
+> **`policy_source.path` only** — setup no longer asks for or writes
+> `track`/`topics` (a per-article decision made at draft time). CAP-2's
+> `set-policy-source` drops its `--track`/`--topics` flags on the same
+> schedule as the config keys (SPEC-policy-topic-at-draft CAP-3). The
+> declining-consequence statement is unchanged.
+
 ## Problem
 
 Preparing a repository for the article pipeline today requires manual YAML

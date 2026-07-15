@@ -10,6 +10,7 @@ sources:
 
 > **Adopted 2026-07-14.** Promoted from `_bmad-output/specs/spec-policy-source-seam/` (BMAD-generated, owner-approved 2026-07-14, implemented as Epic 14, issues #178–#182) per the canonical-spec promotion convention (#188); **this copy is now the canonical version**. The BMAD memlog stays with the generating workspace — it is process state, not contract.
 > **Amended 2026-07-14 (dogfood)** per the papers-repo seeded run: `answer --batch` records carry owner text as `answer` (emitter fix #191/#192); no contract change — record shape is implementation detail.
+> **Amended 2026-07-15 (triage, #230)** per SPEC-policy-topic-at-draft: the first assumption below ("one host repo maps to one backlog track…") is **superseded** — dogfood round 2 falsified it (different articles from one repo need different topic slices). Topic selection moves to draft time under the proposal contract; `track`/`topics` config keys are demoted to per-run default recommendations and then removed. The seam's read-time contracts (≤2 cap, code-enforced whitelist, CAP-6 degradation, GLOSSARY+LESSONS-only fallback) are unchanged.
 
 > **Canonical contract.** This SPEC and the files in `companions:` are the complete, preservation-validated contract for what to build, test, and validate. Source documents listed in frontmatter are for traceability only — consult them only if you need narrative rationale or prose color this contract intentionally omits.
 
