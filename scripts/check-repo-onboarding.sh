@@ -131,4 +131,17 @@ grep -q 'escape hatch' README.md && ok "README keeps manual edit as escape hatch
 grep -q 'setup, draft-article' .claude-plugin/plugin.json \
   && ok "plugin manifest lists setup" || err "manifest missing setup"
 
+# Setup offers/writes policy_source.path ONLY (Story 13.34,
+# SPEC-policy-topic-at-draft CAP-1): topic context is a draft-time decision.
+SK="skills/setup/SKILL.md"
+grep -q 'path only' "$SK" && ok "setup offer is path-only" || err "setup still offers track"
+grep -q 'per-article decision' "$SK" && ok "setup names topics a per-article decision" \
+  || err "draft-time rationale missing"
+grep -q 'set-policy-source <path> --track' "$SK" \
+  && err "setup Stage C still passes --track to the writer" \
+  || ok "setup Stage C writes path without --track"
+grep -qE 'a .track. matched|track proposal' "$SK" \
+  && err "setup Stage B still proposes a track" \
+  || ok "setup Stage B proposes no track"
+
 [ "$fail" -eq 0 ] && printf '\nPASSED.\n' || { printf '\nFAILED.\n' >&2; exit 1; }

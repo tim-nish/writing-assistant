@@ -69,8 +69,11 @@ from nothing (evidence-gate-must-be-agent-fed).
    when it exists.
 3. **Policy source (optional — explicit offer, stated consequence).** Offer
    the `policy_source` block with a proposed `path` (the owner's policy repo
-   checkout, if one is known) and a `track` matched to the repo's likely
-   article angle. State the consequence of declining in one line: *"without
+   checkout, if one is known) — **path only** (SPEC-policy-topic-at-draft
+   CAP-1, Story 13.34): which policy topics an article reads is a
+   **per-article decision made at draft time** (draft-article Stage 2), so
+   setup asks no `track`/`topics` question and writes neither key. State the
+   consequence of declining in one line: *"without
    it, the Stage-2 interview runs generic — no policy-seeded tension
    questions, `consulted: none`."* Declining is a valid, recorded choice —
    the run-time degrade stays silent by design (SPEC-policy-source-seam
@@ -83,8 +86,8 @@ from nothing (evidence-gate-must-be-agent-fed).
 printf '%s' '<approved sources JSON>' | \
   python3 ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-writing-sources.py set-sources --root <host-repo>
 python3 ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-writing-sources.py set-draft-location <dir> --root <host-repo>
-# only when the owner accepted the policy_source offer:
-python3 ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-writing-sources.py set-policy-source <path> --track <track> --root <host-repo>
+# only when the owner accepted the policy_source offer (path only — Story 13.34):
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-writing-sources.py set-policy-source <path> --root <host-repo>
 ```
 
 The writers are fail-closed (a malformed result refuses and writes nothing)
