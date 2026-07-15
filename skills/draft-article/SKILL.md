@@ -454,6 +454,13 @@ probe degraded, `consulted: none (policy_source unavailable: <reason>)` via
 the generic ones. Surface the line in the completion summary's informational
 notes when it names a pin.
 
+**On request — the policy-influence report.** When the owner asks what the
+policy changed in a run, produce the
+[policy-influence report](../policy-influence-report.md)
+(`${CLAUDE_PLUGIN_ROOT}/skills/policy-influence-report.md`): a view over the
+journal + presented payloads + `consulted:` lines — never a second draft or
+A/B run, and never emitted unasked (Story 13.40).
+
 ### Staging candidates — proposal-only contribute-back (Story 14.5)
 
 After the journal, emit staging-candidate blocks for the policy-seeded tension
