@@ -39,12 +39,28 @@ Before a stage hard-fails at the ceiling, **surface a budget-triage signal** (a
 warning that the turn budget is nearly spent) rather than dying silently at
 `error_max_turns`, so the run can be checkpointed and resumed rather than lost.
 
-## Explicit next step
+## Explicit next step — an in-conversation choice, never a file to open
 
-After the three buckets, state **one concrete next step** — e.g. "run
-review-article on the draft"; for a standalone harvest, "review the fact sheet, or
-run draft-article to turn it into a draft". For a **partially-completed run**, the
-next step is the resume command above.
+After the three buckets, present **one concrete next step as an in-conversation
+choice** (a selection UI — AskUserQuestion — where available; plain offered
+options otherwise). The owner decides by selecting, never by opening a file:
+
+- **draft run** → "run review-article on the draft / stop here".
+- **standalone harvest** → "continue into draft-article / stop here", drafted
+  from what the run just produced (fact-sheet entry count, NEEDS-OWNER count) so
+  the choice is informed without opening anything.
+- **review run** → "apply the accepted findings, then re-run review" or "the
+  draft is publishable".
+- **partially-completed run** → the resume command above is the next step.
+
+**Interaction contract (CAP-6, #226):** every human decision point — the next
+step included — lives **in the conversation**. Local artifact paths (fact sheet,
+run workspace, logs, checkpoints) MAY be displayed informationally — a
+copy-pasteable path is still required output where the convention says so — but
+**opening or navigating a local artifact is never a prerequisite** for
+continuing the workflow, and never phrased as one ("review the file at <path>,
+then …" is the defect; "here's the path for reference — continue or stop?" is
+the contract).
 
 ## Reading-time estimate (article body only)
 

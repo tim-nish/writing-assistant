@@ -232,8 +232,13 @@ appears in both.
 End every harvest run with the shared
 [**completion summary**](../completion-summary.md)
 (`${CLAUDE_PLUGIN_ROOT}/skills/completion-summary.md`): the three labelled buckets
-— **informational notes** (e.g. fact-sheet and NEEDS-OWNER counts), **publish
-blockers**, **optional cleanup** — then an explicit **next step** ("review the
-fact sheet, or run draft-article to turn it into a draft"). A **standalone harvest
+— **informational notes** (e.g. fact-sheet and NEEDS-OWNER counts, and the
+resolved fact-sheet path from above), **publish blockers**, **optional
+cleanup** — then the explicit **next step as an in-conversation choice**
+(interaction contract, CAP-6/#226): offer "**continue into draft-article** /
+**stop here**", drafted from what this run produced (fact-sheet entry count,
+NEEDS-OWNER count) so the owner decides by selecting, not by opening the fact
+sheet. The path stays printed for reference — display is fine; requiring the
+owner to navigate to it before continuing is the defect. A **standalone harvest
 omits the reading-time estimate**: it produces a fact sheet, not an article body,
 so there is nothing to measure.

@@ -533,8 +533,10 @@ End every review run with the shared
 [**completion summary**](../completion-summary.md)
 (`${CLAUDE_PLUGIN_ROOT}/skills/completion-summary.md`): the three labelled buckets
 — **informational notes**, **publish blockers**, **optional cleanup** — then an
-explicit **next step** (e.g. "apply the accepted findings, then re-run review" or
-"the draft is publishable"). A surviving blocker-severity finding — including a
+explicit **next step presented as an in-conversation choice** (e.g. "apply the
+accepted findings, then re-run review" or "the draft is publishable" —
+interaction contract, CAP-6/#226: no step may require the owner to open a
+machine-state artifact to proceed). A surviving blocker-severity finding — including a
 **rubric-mapped structure/prose blocker** (Story 12.2) — an unresolved
 `[VERIFY]` marker, an unrendered figure, or a **configuration defect**
 (placeholder, malformed URL, config-caused frontmatter invalidity) goes under
