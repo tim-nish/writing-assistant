@@ -20,6 +20,14 @@ That makes the `harvest`, `draft-article`, and `review-article` skills available
 in the host repo as `/writing-assistant:<skill>`. To develop against the plugin
 without installing it, see [Development mode](#development-mode-run-skills-before-packaging).
 
+**Updating.** Installation copies the plugin into Claude Code's cache
+(`~/.claude/plugins/cache/writing-assistant/writing-assistant/<version>/`);
+sessions run from that copy, **not** from this repo. After pulling or merging
+plugin changes, run `/reload-plugins` (or update via `/plugin`) — otherwise the
+old cached skills and scripts keep running with no warning. If the plugin ever
+behaves like a change you just merged isn't there, a stale cache is the first
+thing to check: diff a script in the cache path above against this repo.
+
 ## Configure
 
 Two config files drive the plugin; **your identity lives in config, never in the
