@@ -30,6 +30,15 @@ thing to check: diff a script in the cache path above against this repo.
 
 ## Configure
 
+**The supported first-run path is the `setup` skill** (SPEC-repo-onboarding):
+ask for *"set up this repo for the writing assistant"* in a Claude Code session
+and approve its proposals — it inspects the repo, drafts the source allowlist,
+draft location, and the optional `policy_source`, writes the machine-global
+config through sanctioned writer subcommands, and verifies the result. You
+never open a config file; after a clean finish, `draft article` runs
+immediately. Everything below documents what `setup` configures — read it to
+understand the two files, or to hand-edit them as the escape hatch.
+
 Two config files drive the plugin; **your identity lives in config, never in the
 skills**, so the engine is generic (a different user's config produces a different
 author with zero skill edits). The split, at a glance:
@@ -70,8 +79,11 @@ Resolution order: `~/.config/writing-assistant/user-config.yaml` first, then an
 optional repo-local `config/user-config.yaml` as a per-key override.
 
 **2. Sources & draft location — per host repo, stored machine-globally.**
-Create `writing-sources.yaml` in the **machine-global per-repo config — not in
-the repo you're writing about** (a host repo may be public or become public
+`setup` writes this file for you (via the `set-sources`, `set-draft-location`,
+and `set-policy-source` writer subcommands — comment-preserving and
+fail-closed); the format below is the contract, and hand-editing it is the
+escape hatch. It lives in the **machine-global per-repo config — not in the
+repo you're writing about** (a host repo may be public or become public
 later, and this file can carry private pointers; see
 [`config/writing-sources.example.yaml`](config/writing-sources.example.yaml)).
 Print the exact destination for a repo with:
@@ -105,6 +117,7 @@ and offers to write your choice back into `writing-sources.yaml`.
 ## Usage
 
 ```
+setup                                    # once per repo: guided onboarding, no manual YAML
 harvest                                  # standalone source-pointed fact sheet
 draft article <F1-F4> from <sources>     # harvest → interview → fill → variants
 review article <draft>                   # lint → structure → prose → cold read
@@ -121,6 +134,7 @@ review article <draft>                   # lint → structure → prose → cold
 ```
 .claude-plugin/    plugin.json + marketplace.json (repo-as-marketplace packaging)
 skills/
+  setup/           once-per-repo guided onboarding: sources, drafts, policy_source
   draft-article/   harvest → interview → framework fill → variants; frameworks/ assets
   review-article/  lint → structure → prose → cold read
   harvest/         source-pointed fact sheet (used by draft-article, invocable alone)
