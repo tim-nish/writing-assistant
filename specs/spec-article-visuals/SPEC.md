@@ -5,8 +5,8 @@ amends:
   - ../spec-article-draft-pipeline/SPEC.md   # narrows its non-goal "No image/figure generation"
   - ../spec-article-frameworks/SPEC.md       # adds visual slots to framework conventions
 sources:
-  - ../../q_a/q1.md      # dogfooding Q&A round 1, traceability only
-  - ../../q_a/a1.md      # dogfooding Q&A round 1, traceability only
+  - ../../q_a/q1.md      # dogfooding Q&A round 1, traceability only (file removed 2026-07-16)
+  - ../../q_a/a1.md      # dogfooding Q&A round 1, traceability only (file removed 2026-07-16)
 ---
 
 > **Canonical contract.** This SPEC is the complete contract for what to build, test, and validate. Source documents listed in frontmatter are for traceability only — consult them only if you need narrative rationale or prose color this contract intentionally omits.

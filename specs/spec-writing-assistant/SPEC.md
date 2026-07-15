@@ -8,8 +8,8 @@ companions:
   - ../spec-article-visuals/SPEC.md      # accepted 2026-07-10 (q_a/a1.md)
 sources:
   - ../../../website/q_a/3/question.md  # external: website repo (sibling checkout), traceability only
-  - ../../q_a/q1.md                     # dogfooding Q&A round 1, traceability only
-  - ../../q_a/a1.md                     # dogfooding Q&A round 1, traceability only
+  - ../../q_a/q1.md                     # dogfooding Q&A round 1, traceability only (file removed 2026-07-16)
+  - ../../q_a/a1.md                     # dogfooding Q&A round 1, traceability only (file removed 2026-07-16)
   - ../../docs/dogfood-findings.md      # dogfood evidence behind the 2026-07-10 amendments
   - ../../docs/harness-architecture.md  # 2026-07-11 article-quality harness decision behind the 2026-07-11 amendments
   - ../../docs/storage-architecture.md  # 2026-07-11 storage & footprint decision behind the footprint invariant

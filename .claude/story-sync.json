@@ -1,8 +1,0 @@
-{
-  "project": 4,
-  "project_statuses": {
-    "todo": "Todo",
-    "in_review": "In Review",
-    "done": "Done"
-  }
-}

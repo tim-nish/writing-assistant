@@ -28,8 +28,13 @@ __pycache__/
 # Local crash / scratch artifacts (e.g. Cygwin/WSL stack dumps).
 *.stackdump
 
-# Nightwatch: only the transient per-run out/ dir is disposable. The rest of
-# .nightwatch/ (ledger.jsonl, briefs/, STATE.md, config.yaml, RELEASE.md) is
-# the system's memory and MUST be committed — a previous `.nightwatch/*` line
-# here silently discarded it (dogfooding finding 0024).
-.nightwatch/out/
+# Nightwatch is an independent tool under extraction (2026-07-16) — its state
+# lives here locally but is no longer part of this repository's public
+# content. Untracked whole; history before 2026-07-16 still contains it.
+.nightwatch/
+
+# Owner-personal workflow config (story-sync, triage-gh — used by the owner's
+# private command tooling, not by the writing-assistant plugin). Kept local,
+# never published; only .claude/skills/bmad-* has its own rule above.
+.claude/story-sync.json
+.claude/triage-gh.json
