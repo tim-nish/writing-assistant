@@ -13,9 +13,9 @@
 #  - AC1 (contract): all three run-producing skills (harvest, draft-article,
 #    review-article) declare the footprint invariant and route intermediates
 #    through the resolver workspace, never the host tree.
-#  - AC3: the writing-sources.yaml in-repo contract is left unchanged (O1 out
-#    of scope) — still host-root, still resolved from the host root, no
-#    state-root migration.
+#  - AC3 (as amended by #211/13.23): writing-sources.yaml is machine-global —
+#    resolve-paths.py owns its placement, no script composes the per-repo
+#    config path itself, and no doc points owners at the host root.
 
 set -eu
 
@@ -112,6 +112,20 @@ if [ -z "$offenders" ]; then
 else
   err "per-repo config path composed outside the resolver:"
   printf '%s\n' "$offenders" >&2
+fi
+#    5e. Issue #218: README never claims writing-sources.yaml lives in the host
+#        repo. The 13.25 text sweep caught the skills but missed README's
+#        at-a-glance config table ("Lives at | host repo root"), which led a
+#        reader to commit the config into a host repo the same day. Guard the
+#        stale claim pattern; the legacy-migration note ("A legacy in-repo
+#        writing-sources.yaml is still read…") is allowed — it names the old
+#        location as deprecated, not as the place to put the file.
+stale=$(grep -n 'host repo root\|host-repo root' README.md || true)
+if [ -z "$stale" ]; then
+  ok "README makes no host-repo-root placement claim for writing-sources.yaml (#218)"
+else
+  err "README still claims a host-repo-root location (#218):"
+  printf '%s\n' "$stale" >&2
 fi
 
 if [ "$fail" -eq 0 ]; then
