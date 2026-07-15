@@ -972,10 +972,13 @@ def cmd_journal(args):
         return 1
 
     answers = {}
+    answer_text = {}
     if args.answers:
         parsed = _load_json_state(args.answers, "answers batch")
         for a in (parsed if isinstance(parsed, list) else [parsed]):
             answers[a.get("id")] = a.get("disposition")
+            if a.get("text"):
+                answer_text[a.get("id")] = a["text"]
 
     # The asked set is the ≤5 survivors the owner actually saw; a candidate
     # that survived triage but fell to the question budget was never asked, so
@@ -1040,6 +1043,23 @@ def cmd_journal(args):
     # run is attributable from the journal alone.
     if interview.get("presentation_order"):
         out["presentation_order"] = interview["presentation_order"]
+
+    # Editorial anchor (Story 13.38, SPEC-policy-editorial-direction CAP-2):
+    # the claim/angle answer — the first presented question that received
+    # owner text — is the run's editorial anchor, carried into review as the
+    # claim intent anchor. It shapes argument and emphasis; it NEVER grounds
+    # a factual claim (no-facts invariant — its provenance stays whatever the
+    # disposition rules assigned).
+    owner_text = {"approved", "modified", "replaced", "answered"}
+    rationale_by_id = {t["id"]: t.get("rationale") for t in triage}
+    for qid in interview.get("presentation_order") or []:
+        if answers.get(qid) in owner_text:
+            out["editorial_anchor"] = {
+                "id": qid,
+                "text": answer_text.get(qid, ""),
+                "policy_seeded": rationale_by_id.get(qid) == "policy-seed",
+            }
+            break
     print(json.dumps(out, indent=2))
     return 0
 

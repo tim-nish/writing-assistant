@@ -432,6 +432,18 @@ triage error — without owner intervention. The command **fails closed** if an
 asked question has no recorded disposition, so an unattributable interview
 never ships.
 
+**Editorial anchor (SPEC-policy-editorial-direction CAP-2, Story 13.38).** The
+journal also records the run's **editorial anchor** — the claim/angle answer:
+the first *presented* question whose disposition carries owner text, with
+`policy_seeded: true` when a policy tension seeded it (this is what the QSB
+run's p1 did by accident, made first-class). The anchor is carried into review
+as the **claim intent anchor** (SPEC-review-ux / SPEC-policy-editorial-direction
+CAP-3 consume it from the journal). It shapes the article's argument and what
+reviewers weight — it **never grounds a factual claim** (no-facts invariant):
+its provenance stays exactly what the disposition rules assigned, and it adds
+no source pointer. A run whose slot-1 question was skipped simply has no
+anchor — nothing is invented.
+
 **The journal ends with the `consulted:` line (Story 14.4, CAP-5).** Its last
 key maps every seed to the question it seeded, under the run's pin —
 `consulted: product-lab@<commit> — LESSONS.md:41 → t1; …` — the /ask-style
