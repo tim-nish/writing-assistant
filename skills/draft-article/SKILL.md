@@ -209,11 +209,35 @@ Story 3.1 scope boundary. It:
 
 Before selecting questions, probe the host repo's optional `policy_source`
 (SPEC-policy-source-seam) — the owner's policy repo, read-only and bounded
-**in code** to GLOSSARY.md, LESSONS.md, and ≤2 track-matched `topics/*.md`:
+**in code** to GLOSSARY.md, LESSONS.md, and ≤2 `topics/*.md`. Which two topic
+files is a **per-article decision made now, not a per-repo config**
+(SPEC-policy-topic-at-draft CAP-2, Story 13.35), in two steps:
 
-```
-python3 ${CLAUDE_PLUGIN_ROOT}/scripts/read-policy-source.py --root "$HOST" read > "$WS/policy-surface.txt"
-```
+1. **List** the available topics — names only, no content read:
+
+   ```
+   python3 ${CLAUDE_PLUGIN_ROOT}/scripts/read-policy-source.py --root "$HOST" list-topics
+   ```
+
+2. **Propose ≤2 topics for THIS article** under the proposal contract: draft
+   the recommendation from the chosen article intent and the host repo (e.g.
+   an evaluation-methodology article from a benchmark repo → the
+   benchmark-engineering topic), the owner approves or overrides. Declining
+   is valid: the read proceeds with GLOSSARY + LESSONS only — still
+   policy-seeded, recorded as track-less. Then read with the approved
+   selection:
+
+   ```
+   python3 ${CLAUDE_PLUGIN_ROOT}/scripts/read-policy-source.py --root "$HOST" read --topics <a.md> [<b.md>] > "$WS/policy-surface.txt"
+   ```
+
+   (No approved topics → plain `read`, which falls back to the config
+   `track`/`topics` while those keys still exist, else GLOSSARY + LESSONS.
+   The ≤2 cap and the code-enforced whitelist are unchanged; `--topics`
+   builds the whitelist, unlike `--only`, which filters within it.)
+
+When `policy_source` is unset this whole step is skipped silently — zero new
+interaction in generic mode (seam CAP-6).
 
 Branch on its exit code — **the policy source is an enhancer, never a
 dependency; no exit code here may abort the run**:

@@ -28,12 +28,20 @@ Subcommands (each takes --root, the HOST repo root; default: git top-level):
                    the policy root). Absent whitelisted files are listed with an
                    `absent: ` prefix — a missing GLOSSARY is a note, not a failure.
   pin              Print `product-lab@<commit>`.
-  read [--only NAME ...]
+  list-topics      Print the available topics/*.md basenames, one per line —
+                   names only, never content (Story 13.35 step 1: the listing
+                   the per-run selection question is built from).
+  read [--only NAME ...] [--topics NAME.md ...]
                    Print the pin, then each whitelisted file's content with
                    line numbers. --only restricts to the named whitelist
                    entries (relative path or basename); naming ANY path outside
                    the whitelist is refused with exit 5 — that refusal is the
-                   enforcement test, not a convention.
+                   enforcement test, not a convention. --topics (Story 13.35,
+                   SPEC-policy-topic-at-draft CAP-2) BUILDS the whitelist from
+                   the given <=2 basenames under topics/ instead of the config
+                   track/topics — distinct from --only, which filters within
+                   an already-built whitelist; >2 names or a non-basename is
+                   refused (exit 5).
 
 Exit codes — the caller keys graceful degradation (CAP-6) off these:
 
@@ -118,20 +126,24 @@ def _inside(parent, child):
     return child == parent or child.startswith(parent + os.sep)
 
 
-def build_whitelist(policy_root, block):
+def build_whitelist(policy_root, block, override_topics=None):
     """The code-enforced allowlist: [(rel, full, exists)].
 
-    GLOSSARY + LESSONS always; then <=2 topics — the explicit list when
-    declared, else `topics/<track>*.md` by filename stem. A candidate whose
-    realpath escapes the policy root (symlink/.. tricks) is dropped here, so
-    it never becomes readable.
+    GLOSSARY + LESSONS always; then <=2 topics — the per-run `--topics`
+    selection when given (Story 13.35, SPEC-policy-topic-at-draft CAP-2),
+    else the explicit config list when declared, else `topics/<track>*.md`
+    by filename stem. A candidate whose realpath escapes the policy root
+    (symlink/.. tricks) is dropped here, so it never becomes readable.
     """
     entries = []
     for rel in BASE_FILES:
         full = os.path.join(policy_root, rel)
         entries.append((rel, full, os.path.isfile(full) and _inside(policy_root, full)))
     topics = []
-    if block["topics"]:
+    if override_topics is not None:
+        for t in override_topics[:MAX_TOPICS]:
+            topics.append(os.path.join(policy_root, "topics", t))
+    elif block["topics"]:
         for t in block["topics"][:MAX_TOPICS]:
             if "/" in t or ".." in t or t.startswith("."):
                 continue  # defense in depth; the resolver already rejects these
@@ -143,6 +155,21 @@ def build_whitelist(policy_root, block):
         rel = os.path.relpath(full, policy_root)
         entries.append((rel, full, os.path.isfile(full) and _inside(policy_root, full)))
     return entries
+
+
+def validate_run_topics(names):
+    """Validate a per-run --topics selection BEFORE it can build a whitelist
+    (Story 13.35): basenames only, at most MAX_TOPICS. Returns an error string
+    or None. Widening 'which two files' is the feature; widening 'how many' or
+    'what else is readable' is refused in code."""
+    if len(names) > MAX_TOPICS:
+        return (f"refused: --topics takes at most {MAX_TOPICS} files "
+                f"(got {len(names)}) — the ≤{MAX_TOPICS} cap is code-enforced")
+    for t in names:
+        if "/" in t or os.sep in t or ".." in t or t.startswith("."):
+            return (f"refused: --topics entries are basenames under topics/ "
+                    f"({t!r} is not) — no other path is readable")
+    return None
 
 
 def read_whitelisted(policy_root, rel, whitelist):
@@ -199,6 +226,24 @@ def cmd_pin(args):
     return 0
 
 
+def cmd_list_topics(args):
+    """Names only — a whitelist listing, never a content read (Story 13.35
+    step 1): the owner picks from these; nothing is opened here."""
+    root = RWS.host_root(args.root)
+    block, err = resolve_policy_source(root)
+    if err:
+        return _unavailable(err)
+    policy_root, _pin, err = policy_repo(block)
+    if err:
+        return _unavailable(err)
+    tdir = os.path.join(policy_root, "topics")
+    names = sorted(os.path.basename(p) for p in glob.glob(os.path.join(glob.escape(tdir), "*.md"))
+                   if _inside(policy_root, p))
+    for n in names:
+        print(n)
+    return 0
+
+
 def cmd_read(args):
     root = RWS.host_root(args.root)
     block, err = resolve_policy_source(root)
@@ -207,7 +252,13 @@ def cmd_read(args):
     policy_root, pin, err = policy_repo(block)
     if err:
         return _unavailable(err)
-    whitelist = build_whitelist(policy_root, block)
+    override = getattr(args, "topics", None)
+    if override is not None:
+        bad = validate_run_topics(override)
+        if bad:
+            sys.stderr.write(bad + "\n")
+            return REFUSED
+    whitelist = build_whitelist(policy_root, block, override_topics=override)
     targets = args.only or [e[0] for e in whitelist]
     print(f"pin: product-lab@{pin}")
     for name in targets:
@@ -234,13 +285,21 @@ def main(argv=None):
     sub = p.add_subparsers(dest="cmd", required=True)
     sub.add_parser("whitelist", parents=[root_parent])
     sub.add_parser("pin", parents=[root_parent])
+    sub.add_parser("list-topics", parents=[root_parent])
     sp = sub.add_parser("read", parents=[root_parent])
     sp.add_argument("--only", nargs="+",
                     help="restrict to these whitelist entries; anything else is refused (exit 5)")
+    sp.add_argument("--topics", nargs="+", metavar="NAME.md",
+                    help="per-run topic selection (Story 13.35): BUILD the "
+                    "whitelist from these <=2 basenames under topics/ instead "
+                    "of the config track/topics (distinct from --only, which "
+                    "filters within an already-built whitelist); >2 or a "
+                    "non-basename is refused (exit 5)")
     args = p.parse_args(argv)
     if not hasattr(args, "root"):
         args.root = None
-    return {"whitelist": cmd_whitelist, "pin": cmd_pin, "read": cmd_read}[args.cmd](args)
+    return {"whitelist": cmd_whitelist, "pin": cmd_pin,
+            "list-topics": cmd_list_topics, "read": cmd_read}[args.cmd](args)
 
 
 if __name__ == "__main__":
