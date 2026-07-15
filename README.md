@@ -30,7 +30,7 @@ author with zero skill edits). The split, at a glance:
 |---|---|---|
 | Answers | **who is writing**, and where it publishes | **what this repo's articles draw from**, and where drafts land |
 | Scope | machine-global (per person, not per repo) | per host repo |
-| Lives at | `~/.config/writing-assistant/` | host repo root |
+| Lives at | `~/.config/writing-assistant/` | `~/.config/writing-assistant/repos/<repo-key>/` |
 | Set up | once per machine | once per repo you write about |
 
 **1. Owner identity — machine-global (per person, not per repo).** Copy the
