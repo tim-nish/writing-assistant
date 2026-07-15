@@ -2,10 +2,12 @@
 name: draft-article
 description: >
   Draft a technical article from a repository's own material. Invoke as
-  "draft article <F1-F4> from <sources>" to run the pipeline: harvest → gap
-  interview → framework fill → verification → platform variants. Frameworks are
-  F1 (project intro), F2 (engineering lessons), F3 (evaluation methodology),
-  F4 (research survey); sources are paths, globs, or commit ranges.
+  "draft article <article-type> from <sources>" to run the pipeline: harvest →
+  gap interview → framework fill → verification → platform variants. Article
+  types are intent labels — "introduce the project", "share engineering
+  lessons", "explain the evaluation methodology", "survey a research area"
+  (F1-F4 remain the internal/expert alias); sources are paths, globs, or
+  commit ranges.
 ---
 
 # Draft article
@@ -13,13 +15,32 @@ description: >
 One invocation kicks off the whole harvest-to-variant flow:
 
 ```
-draft article <framework> from <sources>
+draft article <article-type> from <sources>
 ```
 
-- **framework** — one of `F1`, `F2`, `F3`, `F4` (see
-  `${CLAUDE_PLUGIN_ROOT}/skills/draft-article/frameworks/`).
+- **article-type** — an **intent label**: "introduce the project", "share
+  engineering lessons", "explain the evaluation methodology", or "survey a
+  research area". The framework ids `F1`–`F4` keep working as the
+  internal/expert alias (see
+  `${CLAUDE_PLUGIN_ROOT}/skills/draft-article/frameworks/`); both forms
+  resolve through `resolve_framework` in the pipeline helper — a closed
+  mapping, never fuzzy-matched.
 - **sources** — any mix of paths, globs (`src/**/*.py`), and commit ranges
   (`HEAD~20..HEAD`).
+
+**No article type given?** Ask by intent, in-conversation (proposal contract):
+offer the four intent labels with a **repo-grounded recommendation** — e.g. a
+tagged release exists → "introduce the project" is viable; no release → its
+own entry precondition already redirects to "share engineering lessons", so
+recommend that. Draft the recommendation from repo state you can check
+(tags, docs, eval assets), never from guesswork.
+
+**Vocabulary boundary (SPEC-draft-article-ux CAP-1, Story 13.27):** framework
+ids (`F1`–`F4`), GATE slot markers, and stage names are internal contract
+vocabulary. They stay in specs, filenames, run state, and the journal — they
+**never appear in an owner-facing question, proposal, or summary**. When
+talking to the owner, always use the intent label ("introduce the project"),
+never the id.
 
 Every `draft-pipeline.py` subcommand and its flags are tabled in
 [Pipeline command reference](#pipeline-command-reference-draft-pipelinepy) at the
@@ -74,8 +95,10 @@ config or framework:
     on consent create it from the example and show the owner the **path and
     contents** before re-running Stage 0; without consent, stop.
     Never scaffold silently, and never create the file inside the host repo.
-- **Framework check** against the **closed set {F1, F2, F3, F4}** — an invalid
-  name exits non-zero and **nothing starts** (no workspace minted). Relay and stop.
+- **Article-type check** against the **closed set** of intent labels and their
+  `F1`–`F4` aliases (`resolve_framework`) — an invalid name exits non-zero and
+  **nothing starts** (no workspace minted). Relay and stop; the error names the
+  valid intent labels.
 - **Workspace autostart** — resumption is **automatic, not opt-in**. It resumes
   the **newest in-progress run** (a workspace whose checkpoint records a
   `next_stage` other than `done`) when one exists, returning `"resumed": true`
