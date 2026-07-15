@@ -35,6 +35,23 @@ own entry precondition already redirects to "share engineering lessons", so
 recommend that. Draft the recommendation from repo state you can check
 (tags, docs, eval assets), never from guesswork.
 
+**Policy-informed recommendation (SPEC-policy-editorial-direction CAP-1,
+Story 13.37).** When the host repo declares a `policy_source`, the
+recommendation may additionally draw on the owner's recorded positions — read
+the base surface (`read-policy-source.py read --only GLOSSARY.md LESSONS.md`;
+topics are not selected yet at this point) and let a recorded stance on what
+the owner's channel should emit shape which type is recommended. The three
+invariants are hard lines: the policy **proposes** (a recommendation the owner
+ratifies or overrides — never a silent decision); it supplies **no facts**
+(the seed shapes the recommendation, never grounds a claim); and the influence
+is **audited** — quote the seed verbatim with its `file:line@commit` pointer
+in the question's **Why**, and record it in the journal's `consulted:` line
+via `journal --seed-extra '<pointer>=article-type'`. An owner override is a
+**recorded decline** (the presented-payload log keeps the recommendation and
+the selection; declines are the recall surface's raw material — proposal-only,
+staging-candidate path unchanged). Without a `policy_source`, the
+recommendation is repo-grounded only, with zero policy interaction.
+
 **Vocabulary boundary (SPEC-draft-article-ux CAP-1, Story 13.27):** framework
 ids (`F1`–`F4`), GATE slot markers, and stage names are internal contract
 vocabulary. They stay in specs, filenames, run state, and the journal — they

@@ -83,6 +83,27 @@ python3 "$DP" journal --interview "$work/iv.json" --answers /dev/null >/dev/null
 grep -q 'draft-pipeline.py journal' "$SKILL" && grep -q '\$WS/interview-journal.json' "$SKILL" \
   && ok "SKILL writes the journal to the run workspace" || err "SKILL does not write the journal to \$WS"
 
+# --- Decision-level consulted influence (Story 13.37) -------------------------
+# --seed-extra records a policy-shaped DECISION (article-type recommendation)
+# in the same consulted: grammar; a malformed pair fails closed.
+st='{"fact_sheet":[],"needs_owner":[]}'
+ivout=$(printf '%s' "$st" | python3 "$DP" interview --framework F2 -)
+ans=$(printf '%s' "$ivout" | python3 -c "import json,sys; d=json.load(sys.stdin); print(json.dumps([{'id': q['id'], 'disposition': 'skipped'} for q in d['questions']]))")
+printf '%s' "$ivout" > "$work/iv.json"; printf '%s' "$ans" > "$work/ans.json"
+jout=$(python3 "$DP" journal --interview "$work/iv.json" --answers "$work/ans.json" \
+       --seed-extra 'LESSONS.md:12@abc1234=article-type')
+printf '%s' "$jout" | python3 -c "
+import json, sys
+c = json.load(sys.stdin)['consulted']
+assert c.startswith('consulted: product-lab@abc1234'), c
+assert 'LESSONS.md:12 → article-type' in c, c
+" && ok "journal --seed-extra records a decision-level policy influence" \
+  || err "seed-extra influence missing from consulted:"
+python3 "$DP" journal --interview "$work/iv.json" --answers "$work/ans.json" \
+        --seed-extra 'not-a-pointer' >/dev/null 2>&1 \
+  && err "malformed --seed-extra accepted" \
+  || ok "malformed --seed-extra fails closed"
+
 if [ "$fail" -eq 0 ]; then
   printf '\nAll interview-journal checks passed.\n'; exit 0
 else
