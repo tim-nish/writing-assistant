@@ -104,6 +104,43 @@ python3 "$DP" journal --interview "$work/iv.json" --answers "$work/ans.json" \
   && err "malformed --seed-extra accepted" \
   || ok "malformed --seed-extra fails closed"
 
+# --- Editorial anchor (Story 13.38, SPEC-policy-editorial-direction CAP-2) ----
+# The first PRESENTED question with an owner-text answer becomes the anchor.
+st='{"fact_sheet":[],"needs_owner":[]}'
+ivout=$(printf '%s' "$st" | python3 "$DP" interview --framework F4 -)
+printf '%s' "$ivout" > "$work/iv38.json"
+# F4 presents q6 (opinion/claim) first; answer it with owner text.
+printf '%s' "$ivout" | python3 -c "
+import json, sys
+d = json.load(sys.stdin)
+ans = [{'id': q['id'], 'disposition': 'skipped'} for q in d['questions']]
+ans[0] = {'id': d['presentation_order'][0], 'disposition': 'answered',
+          'text': 'reproducibility is the feature'}
+print(json.dumps(ans))
+" > "$work/ans38.json"
+python3 "$DP" journal --interview "$work/iv38.json" --answers "$work/ans38.json" \
+  | python3 -c "
+import json, sys
+d = json.load(sys.stdin)
+a = d['editorial_anchor']
+assert a['id'] == d['presentation_order'][0], a
+assert a['text'] == 'reproducibility is the feature', a
+assert a['policy_seeded'] is False, a
+" && ok "editorial anchor: first presented owner-text answer, text carried" \
+  || err "editorial anchor missing or wrong"
+# All-skipped run -> no anchor invented.
+printf '%s' "$ivout" | python3 -c "
+import json, sys
+d = json.load(sys.stdin)
+print(json.dumps([{'id': q['id'], 'disposition': 'skipped'} for q in d['questions']]))
+" > "$work/ans38b.json"
+python3 "$DP" journal --interview "$work/iv38.json" --answers "$work/ans38b.json" \
+  | python3 -c "
+import json, sys
+assert 'editorial_anchor' not in json.load(sys.stdin)
+" && ok "no owner text -> no editorial anchor invented" \
+  || err "anchor invented on an all-skipped run"
+
 if [ "$fail" -eq 0 ]; then
   printf '\nAll interview-journal checks passed.\n'; exit 0
 else
