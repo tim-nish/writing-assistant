@@ -42,6 +42,20 @@ has 'zero-token script\|lint.*script'               "lint is the zero-token scri
 has 'Sonnet-class model with repo access\|Sonnet-class' "structure/prose Sonnet-class + repo access"
 has 'context-free'                                  "cold read context-free"
 
+# Pinned consolidated presentation + reject-only arbitration (Story 13.32,
+# SPEC-review-ux CAP-2+3).
+has 'de-duplicated across passes'        "consolidated list is de-duplicated across passes"
+has 'votes'                              "cross-pass agreement noted as votes"
+has 'numbered'                           "findings are numbered"
+has 'blockers → should\|blockers -> should' "ranked blockers/should/nit"
+has 'default to ACCEPTED'                "ordinary findings default to accepted"
+has 'deselect any to reject'             "one reject-only ask"
+has 'empty selection'                    "empty selection = apply all"
+has 'never defaulted'                    "exceptions are never defaulted"
+has 'auto-align'                         "policy default-fix rejected (would auto-align article to policy)"
+has 'NFR12'                              "owner-approved-content fixes asked explicitly (NFR12)"
+has 'accepted-by-default is journaled\|journaled as .accepted' "default-accepts get explicit recorded dispositions"
+
 if [ "$fail" -eq 0 ]; then
   printf '\nAll arbitration checks passed.\n'; exit 0
 else

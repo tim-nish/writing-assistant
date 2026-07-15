@@ -483,24 +483,52 @@ first, no rewrites. This is the final pass; its findings feed arbitration.
 After lint, structure, prose, policy consistency, and cold read have run,
 collect their findings into one list and hand it to the owner. The **owner is the sole arbiter**.
 
-**Present each finding under the
-[owner-facing proposal contract](../owner-facing-proposal-contract.md):** show
+**Pinned presentation (SPEC-review-ux CAP-2, Story 13.32) — the round opens
+with the consolidated findings list.** This presentation is contract, not
+discretion: findings **de-duplicated across passes** (two passes raising the
+same defect become one finding **with cross-pass agreement noted as votes**),
+each finding **numbered**, **severity-tagged**, **location-anchored**, and
+carrying its **one-sentence issue and its fix** — ranked **blockers → should →
+nit, highest-leverage first**. The findings **format** itself (capped ≤10 per
+pass, severity-tagged, no rewrites — *Findings contract*) is unchanged; this
+pins how the consolidated list is shown.
+
+**Reject-only arbitration (SPEC-review-ux CAP-3, Story 13.32).** Acceptance is
+the overwhelming default, so the interaction costs attention only for
+exceptions. **Ordinary findings** — lint, structure, prose, cold-read, every
+severity — **default to ACCEPTED**: ask the owner **once**, "these N findings
+will be applied — deselect any to reject" (a multi-select; an empty selection
+= apply all). Presentation still follows the
+[owner-facing proposal contract](../owner-facing-proposal-contract.md) —
 **where** it sits in the article (the finding's `{location}`), **why** it is
-raised (its one-sentence issue), and accept/reject choices whose labels state
-their **concrete effect on the article** — *accept* → "apply the fix to the
-article", *reject* → "leave the article unchanged" — never a bare accept/reject
-the owner must decode. This is a presentation wrapper only: it **does not change**
-the capped (≤10), severity-tagged findings **format** from *Findings contract*.
+raised, and choices whose labels state their **concrete effect on the article**:
+keeping a finding selected means "apply the fix to the article", deselecting
+means "leave the article unchanged" — never a bare accept/reject the owner
+must decode. This is a presentation wrapper only: it **does not change** the
+capped (≤10), severity-tagged findings **format** from *Findings contract*.
+Two exceptions stay explicit, never defaulted:
 
-**The single arbitration round.** Walk the findings **top-down, once**:
+- **policy-contradiction findings** keep their three-way choice (below) — no
+  safe default exists: defaulting to "fix article" would auto-align the
+  article to policy (SPEC-policy-consistency-pass forbids it), defaulting to
+  "dismiss" would bury the tension the seam exists to surface;
+- **a finding whose fix would alter owner-approved content** (an approved
+  interview answer used as a sourced claim, an approved visual — NFR12) is
+  asked explicitly.
 
-- **Accept or reject each finding** — no finding is skipped and none is
-  **auto-applied**. Apply an accepted fix yourself, or via **one targeted edit
-  instruction per finding**; never open-ended rewriting.
+Every finding still receives an **explicit recorded disposition** —
+accepted-by-default is journaled as *accepted*; the journal and summary stay
+complete.
+
+**The single arbitration round.** One pass over the consolidated list:
+
+- **No finding is skipped and none is auto-applied.** Apply an accepted fix
+  yourself, or via **one targeted edit instruction per finding**; never
+  open-ended rewriting.
 - **A rejected finding is rejected.** Do **not** re-litigate it in a later pass or
   a second cycle — the decision stands.
-- The round is **top-down and single-pass**: the highest-leverage findings (which
-  each pass placed first) are arbitrated before the nits.
+- The round is **top-down and single-pass** over the ranked list: the
+  highest-leverage findings are resolved before the nits.
 
 **Policy-consistency findings arbitrate with three choices (Story 15.2).** A
 `policy-contradiction` finding is contradiction detection, not a fix proposal,
