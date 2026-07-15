@@ -173,6 +173,30 @@ changed=$(find "$plab" -newer "$stamp" -type f | wc -l)
 [ "$changed" -eq 0 ] && ok "read-only: no file under the policy path created or modified" \
   || err "reader touched $changed file(s) under the policy path"
 
+# --- Per-run topic selection (Story 13.35, SPEC-policy-topic-at-draft CAP-2) --
+# list-topics: names only, never content.
+lt=$($PY --root "$host" list-topics)
+printf '%s\n' "$lt" | grep -qx 'unrelated.md' && printf '%s\n' "$lt" | grep -qx 'eval-gamma.md' \
+  && ok "list-topics lists every topics/*.md basename" || err "list-topics incomplete: $lt"
+printf '%s' "$lt" | grep -q '#' && err "list-topics leaked file content" \
+  || ok "list-topics prints names only (no content)"
+
+# read --topics BUILDS the whitelist (overrides config track), still capped.
+rt=$($PY --root "$host" read --topics unrelated.md)
+printf '%s' "$rt" | grep -q '=== topics/unrelated.md' \
+  && ok "read --topics reads the per-run selection (config track overridden)" \
+  || err "read --topics did not read the selected topic"
+printf '%s' "$rt" | grep -q 'eval-alpha' && err "config-track topic leaked into a --topics read" \
+  || ok "read --topics excludes the config-track topics"
+printf '%s' "$rt" | grep -q '=== GLOSSARY.md' && ok "GLOSSARY + LESSONS still always read" \
+  || err "base files missing from --topics read"
+
+# Cap and basename rules enforced in code (exit 5).
+set +e; $PY --root "$host" read --topics eval-alpha.md eval-beta.md eval-gamma.md >/dev/null 2>&1; rc=$?; set -e
+[ "$rc" -eq 5 ] && ok "read --topics refuses >2 files (exit 5, cap code-enforced)" || err "cap not enforced: rc=$rc"
+set +e; $PY --root "$host" read --topics ../q_a/secret.md >/dev/null 2>&1; rc=$?; set -e
+[ "$rc" -eq 5 ] && ok "read --topics refuses a non-basename (exit 5)" || err "non-basename accepted: rc=$rc"
+
 if [ "$fail" -eq 0 ]; then
   printf '\nAll policy-reader checks passed.\n'; exit 0
 else
