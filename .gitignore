@@ -28,13 +28,3 @@ __pycache__/
 # Local crash / scratch artifacts (e.g. Cygwin/WSL stack dumps).
 *.stackdump
 
-# Nightwatch is an independent tool under extraction (2026-07-16) — its state
-# lives here locally but is no longer part of this repository's public
-# content. Untracked whole; history before 2026-07-16 still contains it.
-.nightwatch/
-
-# Owner-personal workflow config (story-sync, triage-gh — used by the owner's
-# private command tooling, not by the writing-assistant plugin). Kept local,
-# never published; only .claude/skills/bmad-* has its own rule above.
-.claude/story-sync.json
-.claude/triage-gh.json
