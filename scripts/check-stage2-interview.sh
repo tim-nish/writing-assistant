@@ -31,8 +31,10 @@ grep -q 'verbatim' "$SKILL" && ok "skill captures answers verbatim" || err "verb
 # 2. At most 5 questions, prioritized/framework-tailored, gaps first.
 out=$(iv '{"fact_sheet":[{"claim":"Throughput rose 2x"}],"needs_owner":[{"topic":"surprise"},{"topic":"significance"}]}' F1)
 [ "$(printf '%s' "$out" | jget 'd["asked"]')" -le 5 ] && ok "asks <= 5 questions" || err "exceeded 5 questions"
-printf '%s' "$out" | jget 'all(q["from_gap"] for q in d["questions"][:2])' | grep -q True \
-  && ok "confirmed NEEDS-OWNER gaps are asked first" || err "gaps not prioritized first"
+# Selection priority: every confirmed NEEDS-OWNER gap survives into the asked
+# set (display order is the separate pinned presentation contract, Story 13.30).
+printf '%s' "$out" | jget 'all(any(q["id"]==g and q["from_gap"] for q in d["questions"]) for g in ["q1","q2"])' | grep -q True \
+  && ok "confirmed NEEDS-OWNER gaps are selected into the asked set" || err "gaps not prioritized in selection"
 
 # 3. Hard cap even when NEEDS-OWNER exceeds five gaps.
 big='{"fact_sheet":[],"needs_owner":[{"topic":"surprise"},{"topic":"significance"},{"topic":"warning"},{"topic":"opinion"},{"topic":"other"},{"topic":"surprise"}]}'
@@ -48,8 +50,9 @@ rr='{"fact_sheet":[{"claim":"a known caveat: do not use on TPUs"}],"needs_owner"
 iv "$rr" F3 | jget 'any(q["id"]=="q3" for q in d["questions"])' | grep -q True \
   && ok "a NEEDS-OWNER gap re-raises an otherwise-suppressed question" || err "gap did not re-raise"
 
-# 5. Empty-gap: fact sheet covers everything + no gaps -> zero questions (no padding).
-full='{"fact_sheet":[{"claim":"the key result that matters most; a surprising unexpected finding; a caveat/limitation; we gave up speed as a tradeoff; written for SREs; we argue our opinion"}],"needs_owner":[]}'
+# 5. Empty-gap: fact sheet covers everything (and carries a result, so the
+#    evidence fallback q8 has no condition) + no gaps -> zero questions.
+full='{"fact_sheet":[{"claim":"the key result that matters most; a surprising unexpected finding; a caveat/limitation; we gave up speed as a tradeoff; written for SREs; we argue our opinion","kind":"result"}],"needs_owner":[]}'
 [ "$(iv "$full" F1 | jget 'd["asked"]')" -eq 0 ] && ok "asks zero when harvest covers everything (no padding)" || err "padded instead of asking zero"
 
 # 6. Deterministic: same input twice -> identical selection.
@@ -66,6 +69,34 @@ f4=$(iv "$s" F4 | jget 'd["questions"][0]["id"]')
 # 8. Every asked question carries a stable id (so bullet answers key to it).
 iv "$s" F1 | jget 'all(q.get("id") and q.get("text") for q in d["questions"])' | grep -q True \
   && ok "questions carry stable ids + text (answers key by id)" || err "question ids/text missing"
+
+# 9. Pinned presentation order (Story 13.30, SPEC-draft-article-ux CAP-4):
+#    claim/angle -> audience -> significance -> color; echoed as
+#    presentation_order and matching the questions array.
+[ "$(iv "$s" F1 | jget '",".join(d["presentation_order"])')" = "q5,q2,q4,q3,q1" ] \
+  && ok "F1 presentation: audience, significance, then color (pinned)" || err "F1 presentation order wrong"
+[ "$(iv "$s" F4 | jget 'd["presentation_order"][0]')" = "q6" ] \
+  && ok "F4: the claim/angle (opinion) question presents first" || err "claim slot not first for F4"
+iv "$s" F1 | jget 'd["presentation_order"] == [q["id"] for q in d["questions"]]' | grep -q True \
+  && ok "presentation_order matches the questions array" || err "order field out of sync"
+
+# 10. Evidence fallback (Story 13.30, CAP-5): q8 joins only when harvest has
+#     no number/result entry.
+cov='{"fact_sheet":[{"claim":"a surprising unexpected finding; we gave up speed as a tradeoff; a caveat limitation; written for SREs","kind":"decision"}],"needs_owner":[]}'
+iv "$cov" F2 | jget 'any(q["id"]=="q8" for q in d["questions"])' | grep -q True \
+  && ok "no number/result fact -> evidence fallback q8 is asked" || err "q8 missing without evidence"
+covr='{"fact_sheet":[{"claim":"a surprising unexpected finding; we gave up speed as a tradeoff; a caveat limitation; written for SREs","kind":"decision"},{"claim":"p99 latency 180ms","kind":"number"}],"needs_owner":[]}'
+iv "$covr" F2 | jget 'any(q["id"]=="q8" for q in d["questions"])' | grep -q False \
+  && ok "a number/result fact present -> q8 not asked (condition-gated)" || err "q8 asked despite evidence"
+
+# 11. Journal echoes the presentation order (attributable mis-ordering).
+ivout=$(iv "$s" F4)
+ans=$(printf '%s' "$ivout" | jget 'json.dumps([{"id": q["id"], "disposition": "skipped"} for q in d["questions"]])')
+printf '%s' "$ivout" > /tmp/iv-$$.json; printf '%s' "$ans" > /tmp/ans-$$.json
+python3 "$DP" journal --interview /tmp/iv-$$.json --answers /tmp/ans-$$.json \
+  | jget 'd.get("presentation_order",[])[0]' | grep -q q6 \
+  && ok "journal echoes presentation_order" || err "journal does not echo the order"
+rm -f /tmp/iv-$$.json /tmp/ans-$$.json
 
 if [ "$fail" -eq 0 ]; then
   printf '\nAll stage-2 interview checks passed.\n'; exit 0
