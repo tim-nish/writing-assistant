@@ -23,6 +23,10 @@ sources:
     # include: ["specs/**", "docs/**", "README.md"]
   - path: ../research-notes              # a sibling checkout on local disk
     include: ["notes/**", "specs/**"]    # optional: narrow to these globs. Omit = whole path in scope.
+    # `include:` must use this INLINE form. A block-style YAML list
+    # (`include:` followed by `- "glob"` lines) is a hard error (#221) — the
+    # resolver refuses to run rather than silently ignore the allowlist and
+    # widen scope to the whole tree.
 
 output:
   # Draft + platform-variant output directory. Recommended: a directory in a

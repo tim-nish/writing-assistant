@@ -155,6 +155,35 @@ set -e
 $PY --root "$work/host" is-declared "../research-notes/notes/a.md" && ok "declared: listed sibling checkout" \
   || err "listed sibling should be declared"
 
+# 6b. #221: a block-style include: list is a hard error, never a silent
+#     fall-through to whole-tree scope. The resolver must exit 5, name the
+#     offending line, and emit no files.
+mkdir -p "$work/host3"
+cat > "$work/host3/writing-sources.yaml" <<'YAML'
+sources:
+  - path: .
+    include:
+      - "docs/**"
+      - "README.md"
+output:
+  drafts: out/
+YAML
+mkdir -p "$work/host3/docs"; : > "$work/host3/docs/a.md"; : > "$work/host3/stray.txt"
+set +e
+out=$($PY --root "$work/host3" files 2>"$work/host3.err"); rc=$?
+set -e
+[ "$rc" -eq 5 ] && ok "block-style include exits 5 (SOURCES_MALFORMED, #221)" \
+  || err "block-style include: expected exit 5, got $rc"
+[ -z "$out" ] && ok "block-style include reads nothing (no silent whole-tree scope)" \
+  || err "block-style include still emitted files: $(printf '%s' "$out" | head -2 | tr '\n' ' ')"
+grep -q 'line 3' "$work/host3.err" && grep -q 'inline form' "$work/host3.err" \
+  && ok "error names the offending line and the supported form" \
+  || err "error message missing line pointer or supported-form hint: $(cat "$work/host3.err" | tr '\n' ' ')"
+# the valid inline form still parses (regression guard around the new branch)
+got=$($PY --root "$work/host" sources 2>/dev/null | head -1)
+[ -n "$got" ] && ok "inline include form still parses after #221 guard" \
+  || err "inline include form broke"
+
 # 7. Negative invariant: the resolver has no hardcoded 'drafts/' default path.
 if grep -F 'drafts/' "$RES" >/dev/null 2>&1; then
   err "resolver contains a literal 'drafts/' path (possible hardcoded default): $(grep -nF 'drafts/' "$RES" | head -2 | tr '\n' ' ')"

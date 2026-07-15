@@ -223,7 +223,14 @@ def main(argv=None):
               f"{ws_path} (see config/writing-sources.example.yaml), or check --root",
               file=sys.stderr)
         return 2
-    sources = rws.get_sources(rws.read_lines(host), host)
+    try:
+        sources = rws.get_sources(rws.read_lines(host), host)
+    except rws.MalformedSources as e:
+        # #221: a malformed include: must fail loudly here too — validating
+        # pointers against a silently-widened scope would accept entries the
+        # owner never declared readable.
+        print(f"error: {ws_path}: {e}", file=sys.stderr)
+        return 2
     text = sys.stdin.read() if args.factsheet == "-" else open(args.factsheet, encoding="utf-8").read()
 
     # Only the fact-sheet section: stop at the NEEDS-OWNER list (Story 3.3),
