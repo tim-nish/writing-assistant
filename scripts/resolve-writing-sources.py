@@ -688,6 +688,11 @@ def cmd_files(args):
     files = enumerate_files(sources)
     for f in files:
         print(f)
+    # Emit the whole-tree noise warning only after the file list is fully
+    # flushed. stdout is block-buffered under a pipe while stderr is unbuffered,
+    # so without this flush the advisory lands *before* the buffered enumeration
+    # in a merged capture — interleaved mid-list and easy to miss (#F63).
+    sys.stdout.flush()
     report = noise_report(sources, files)
     if report:
         total = sum(report.values())
