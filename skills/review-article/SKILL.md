@@ -2,7 +2,8 @@
 name: review-article
 description: >
   Review a framework-complete draft article for publication. Invoke as
-  "review article <draft>" to run the fixed pass order: lint → structure →
+  "review article" (a draft picker enumerates the repo's candidate drafts;
+  a direct draft path is the expert bypass) to run the fixed pass order: lint → structure →
   prose → policy consistency → cold read, each LLM pass once per draft version, emitting capped
   severity-tagged findings (blocker/should/nit) with no rewrites. The owner is
   the sole arbiter of every finding.
@@ -14,11 +15,39 @@ Take a framework-complete draft from "review requested" to "publishable" with a
 fixed, small number of passes:
 
 ```
-review article <draft>
+review article [<host-repo> | <draft>]
 ```
 
-- **draft** — a path to a framework-complete draft (the unit of review is a
-  filled draft, never an outline or idea).
+- **no argument, or a host repo** — the normal form (SPEC-review-ux CAP-1,
+  Story 13.31): the owner never types a resolver-internal workspace path.
+  Enumerate the candidates through the resolver and present a **picker**:
+
+  ```
+  python3 ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-paths.py list-drafts --root <host-repo>
+  ```
+
+  plus any emitted variants at the resolved `output.drafts` location
+  (`resolve-writing-sources.py draft-location`). Show each candidate with its
+  metadata — title, article type (**the intent label, never the internal
+  id**), created/updated time, and pipeline status (in-progress / complete /
+  reviewed). The listing is read-only: it never mutates run state or advances
+  a checkpoint. **Exactly one candidate → confirm it and proceed** (confirm,
+  never auto-pick). **Zero candidates → report where the pipeline would have
+  put one** (the resolver's runs location and the resolved `output.drafts`)
+  **and point at draft-article** — never present an empty picker.
+- **draft** — a direct path to a framework-complete draft: the expert bypass,
+  unchanged (the unit of review is a filled draft, never an outline or idea).
+
+After arbitration completes, checkpoint the review so the picker's status
+column can say "reviewed" on later runs:
+
+```
+printf '%s' '{"next_stage": "done", "reviewed": true, "stage": "review"}' | \
+  python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py checkpoint --ws "$WS" -
+```
+
+(Only when the draft came from a run workspace; a direct-path review of an
+external draft has no workspace to mark.)
 
 ## Starting from a blank repo — the starter template
 

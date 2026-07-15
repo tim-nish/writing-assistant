@@ -130,6 +130,50 @@ else
   printf '%s\n' "$offenders" >&2
 fi
 
+# --- list-drafts: the review draft picker's enumeration (Story 13.31) ---------
+work=$(mktemp -d); trap 'rm -rf "$work"' EXIT
+host="$work/host"; mkdir -p "$host"; git -C "$host" init -q
+export XDG_STATE_HOME="$work/state"
+
+# Empty repo -> empty JSON list (data, not an error).
+[ "$($PY list-drafts --root "$host")" = "[]" ] \
+  && ok "list-drafts: no runs -> empty list, exit 0" || err "empty enumeration failed"
+
+# One run with a draft + done checkpoint, one without a draft, one reviewed.
+ws1=$($PY new-run --root "$host" --run-id r1)
+printf -- '---\ntitle: "Alpha article"\n---\nbody\n' > "$ws1/draft.md"
+printf '{"next_stage": "done", "framework": "F2"}' > "$ws1/checkpoint.json"
+ws2=$($PY new-run --root "$host" --run-id r2)   # no draft.md — never listed
+ws3=$($PY new-run --root "$host" --run-id r3)
+printf -- '---\ntitle: "Gamma article"\n---\nbody\n' > "$ws3/draft.md"
+printf '{"next_stage": "done", "framework": "F3", "reviewed": true}' > "$ws3/checkpoint.json"
+
+$PY list-drafts --root "$host" | python3 -c "
+import json, sys
+ds = json.load(sys.stdin)
+assert [d['run_id'] for d in ds] == ['r1', 'r3'], ds
+a, g = ds
+assert a['title'] == 'Alpha article' and a['status'] == 'complete', a
+assert a['article_type'] == 'share engineering lessons', a
+assert 'F2' not in json.dumps(a), 'internal id leaked into picker metadata'
+assert g['status'] == 'reviewed', g
+assert all(d['updated'] > 0 and d['draft'].endswith('draft.md') for d in ds)
+" && ok "list-drafts: metadata (title, intent label, status), draft-less runs skipped, no F-id leak" \
+  || err "list-drafts metadata wrong"
+
+# Intent-label map stays in sync with the canonical one in draft-pipeline.py.
+python3 - "$root" <<'PYEOF' && ok "picker intent labels match draft-pipeline INTENT_LABELS" || err "intent-label maps diverged"
+import importlib.util, os, sys
+def load(p, n):
+    s = importlib.util.spec_from_file_location(n, p)
+    m = importlib.util.module_from_spec(s); s.loader.exec_module(m); return m
+root = sys.argv[1]
+rp = load(os.path.join(root, "scripts", "resolve-paths.py"), "rp")
+dp = load(os.path.join(root, "scripts", "draft-pipeline.py"), "dp")
+assert rp._INTENT_LABELS == {k.upper(): v for k, v in dp.INTENT_LABELS.items()}, \
+    (rp._INTENT_LABELS, dp.INTENT_LABELS)
+PYEOF
+
 if [ "$fail" -eq 0 ]; then
   printf '\nAll path-resolver checks passed.\n'; exit 0
 else

@@ -48,6 +48,7 @@ Subcommands:
 
 import argparse
 import datetime
+import json
 import os
 import re
 import subprocess
@@ -265,6 +266,69 @@ def cmd_run_workspace(args):
     return 0
 
 
+# Owner-facing article-type labels (canonical map: draft-pipeline.py
+# INTENT_LABELS — check-path-resolver.sh asserts the two stay in sync).
+# The picker shows these, never the internal F-ids (SPEC-review-ux CAP-1).
+_INTENT_LABELS = {
+    "F1": "introduce the project",
+    "F2": "share engineering lessons",
+    "F3": "explain the evaluation methodology",
+    "F4": "survey a research area",
+}
+
+
+def _draft_title(path):
+    """The frontmatter `title:` of a draft, best-effort (metadata display only)."""
+    try:
+        with open(path, encoding="utf-8") as f:
+            head = f.read(4000)
+    except OSError:
+        return None
+    m = re.search(r'^title:\s*"?(.*?)"?\s*$', head, re.MULTILINE)
+    return m.group(1) if m else None
+
+
+def cmd_list_drafts(args):
+    """Enumerate candidate drafts for review (Story 13.31, SPEC-review-ux
+    CAP-1): run workspaces holding a draft.md, with picker metadata — title,
+    owner-facing article type, updated time, and pipeline status from the
+    checkpoint (in-progress / complete / reviewed). Layout knowledge stays
+    here: callers never compose runs/ paths themselves. JSON list on stdout;
+    an empty list is data, not an error (the caller reports where a draft
+    would have been and points at draft-article)."""
+    root = host_root(args.root)
+    base = runs_dir(root)
+    out = []
+    for rid in (sorted(os.listdir(base)) if os.path.isdir(base) else []):
+        ws = os.path.join(base, rid)
+        draft = os.path.join(ws, "draft.md")
+        if not os.path.isfile(draft):
+            continue
+        status, framework = "in-progress", None
+        cp = os.path.join(ws, "checkpoint.json")
+        try:
+            with open(cp, encoding="utf-8") as f:
+                state = json.load(f)
+            framework = state.get("framework")
+            if state.get("reviewed"):
+                status = "reviewed"
+            elif state.get("next_stage") == "done":
+                status = "complete"
+        except (OSError, json.JSONDecodeError):
+            pass
+        out.append({
+            "run_id": rid,
+            "ws": ws,
+            "draft": draft,
+            "title": _draft_title(draft),
+            "article_type": _INTENT_LABELS.get(framework),
+            "updated": int(os.path.getmtime(draft)),
+            "status": status,
+        })
+    print(json.dumps(out, indent=2))
+    return 0
+
+
 def main(argv=None):
     p = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
@@ -294,6 +358,10 @@ def main(argv=None):
     sp.add_argument("--root", help="host-repo root (default: git top-level of cwd; errors outside a git repo)")
     sp.add_argument("--run-id", required=True, help="the run id whose workspace to print")
 
+    sp = sub.add_parser("list-drafts", help="enumerate run workspaces holding a draft.md, "
+                        "with picker metadata (Story 13.31)")
+    sp.add_argument("--root", help="host-repo root (default: git top-level of cwd; errors outside a git repo)")
+
     args = p.parse_args(argv)
     return {
         "state-root": cmd_state_root,
@@ -304,6 +372,7 @@ def main(argv=None):
         "sources-file": cmd_sources_file,
         "new-run": cmd_new_run,
         "run-workspace": cmd_run_workspace,
+        "list-drafts": cmd_list_drafts,
     }[args.cmd](args)
 
 
