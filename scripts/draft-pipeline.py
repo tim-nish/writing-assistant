@@ -1018,6 +1018,16 @@ def cmd_journal(args):
     # explicit `none` naming why (unset vs unavailable, from --policy-note).
     seeds = [(t["seed"]["pointer"], t["id"]) for t in triage
              if t.get("seed") and t["id"] in asked_ids]
+    # Decision-level influences (Story 13.37): '<pointer>=<label>' pairs — e.g.
+    # the policy-informed article-type recommendation — join the same audited
+    # mapping; the grammar is unchanged (pointer → what it shaped, at the pin).
+    for extra in getattr(args, "seed_extra", []) or []:
+        ptr, _, label = extra.partition("=")
+        if not label or "@" not in ptr:
+            sys.stderr.write(f"error: --seed-extra {extra!r} is not "
+                             "'file:line@commit=label'\n")
+            return 1
+        seeds.append((ptr, label))
     if seeds:
         pin = seeds[0][0].rsplit("@", 1)[1]
         mapping = "; ".join(f"{ptr.rsplit('@', 1)[0]} → {qid}" for ptr, qid in seeds)
@@ -1489,6 +1499,11 @@ def main(argv=None):
     sp.add_argument("--answers", help="recorded answer records (JSON list), or - for stdin")
     sp.add_argument("--policy-note", help="why the run was not policy-seeded, for the consulted: line "
                                           "(e.g. 'policy_source unavailable: <reason>'; default: unset)")
+    sp.add_argument("--seed-extra", action="append", default=[], metavar="PTR=LABEL",
+                    help="additional policy influence for the consulted: line — "
+                    "'file:line@commit=article-type' records a decision (not a "
+                    "question) the policy surface shaped (Story 13.37, "
+                    "SPEC-policy-editorial-direction CAP-1)")
     sp = sub.add_parser("staging-candidates")
     sp.add_argument("--interview", help="the `interview` output JSON, or - for stdin (interview form)")
     sp.add_argument("--answers", help="recorded answer records (JSON list; interview form)")
