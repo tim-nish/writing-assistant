@@ -224,8 +224,11 @@ each, in this order:
 
 1. **Interview journal** — when the draft came out of the draft-article
    pipeline, its run workspace holds an interview journal keyed by question id
-   (Story 10.4). The claim anchor is the answer to **q2 (significance — the
-   result that matters most and why)**; the audience anchor is the answer to
+   (Story 10.4). **The journal's `editorial_anchor` (Story 13.38) is the claim
+   anchor when present** — the run's claim/angle answer, possibly
+   policy-seeded (`policy_seeded: true`); fall back to the answer to **q2
+   (significance — the result that matters most and why)** when the journal
+   predates it or records no anchor. The audience anchor is the answer to
    **q5 (audience)**. Every framework's interview asks both. A question the
    journal records as *suppressed* was covered by the fact sheet — use the
    covering entries it names as the anchor. A question recorded as **capped**
@@ -251,12 +254,28 @@ Both repo-grounded LLM passes open with this framing, filled from the draft:
 > You are a senior engineer skimming {dev.to | Zenn}. You give an article 60
 > seconds to earn a full read; your time is scarce and your standards are high.
 > The intended reader: {the audience intent anchor}.
+> The article's claim: {the claim intent anchor}. Weigh findings against how
+> well the article lands THAT claim for THAT reader — the author's recorded
+> standards, not generic taste.
 > You have repo access — when the draft states a fact about the project, check it
 > against the sources before flagging or passing it.
 >
 > Output findings only. Never rewrite passages. Never praise. Never summarize the
 > article back. Cap at 10 findings, ordered by severity, and state the single
 > highest-leverage change FIRST.
+
+**Policy-calibrated emphasis (SPEC-policy-editorial-direction CAP-3, Story
+13.39).** The anchors above are the run's **policy-derived editorial anchors**
+when the journal says so (a `policy_seeded` claim anchor) — passing them into
+the structure and prose prompts changes only **what those reviewers weight**,
+never the rules: the severity criteria table (`review-prompts.md`) and the
+findings format are fixed, and the policy consistency pass is untouched. The
+anchors flow to **these two passes only — NEVER to the cold read** (resolved
+question 2: the cold read is the control arm; its value is context-free
+isolation, and informing it destroys it — the existing isolation contract
+already forbids it). When the run's anchors were policy-derived, record the
+influence in the review's `consulted:` line (`review-consulted --file` names
+the anchor's seed file; the pointer → what-it-shaped grammar is unchanged).
 
 ## Model routing
 
