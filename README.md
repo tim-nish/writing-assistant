@@ -22,11 +22,36 @@ without installing it, see [Development mode](#development-mode-run-skills-befor
 
 **Updating.** Installation copies the plugin into Claude Code's cache
 (`~/.claude/plugins/cache/writing-assistant/writing-assistant/<version>/`);
-sessions run from that copy, **not** from this repo. After pulling or merging
-plugin changes, run `/reload-plugins` (or update via `/plugin`) — otherwise the
-old cached skills and scripts keep running with no warning. If the plugin ever
-behaves like a change you just merged isn't there, a stale cache is the first
-thing to check: diff a script in the cache path above against this repo.
+sessions run from that copy, **not** from this repo. **`/reload-plugins` does
+not fetch or rebuild plugin files** — it reloads the existing on-disk snapshot
+only. Which refresh you need depends on how the plugin is loaded:
+
+- **Local development (`claude --plugin-dir <checkout>`)** — sessions run the
+  checkout directly. Code changes are picked up by **restarting Claude Code**
+  against the checkout (see
+  [Development mode](#development-mode-run-skills-before-packaging));
+  `/reload-plugins` does not refresh them.
+- **Installed plugin (the cache above)** — sessions run a frozen copy. After
+  pulling or merging plugin changes, **update or reinstall first** so the
+  cache is re-copied — `/plugin marketplace update writing-assistant`, then
+  update/reinstall via `/plugin` — and *then* run `/reload-plugins` to load
+  the refreshed snapshot. Reloading without updating faithfully re-reads the
+  old copy, with no warning.
+
+**Diagnosing stale behavior** — check which snapshot the session is actually
+running before debugging anything else. This one-liner prints each loaded
+copy's path and content fingerprint, so you can tell a checkout from the
+cache and confirm whether it matches this repo:
+
+```sh
+for d in ~/.claude/plugins/cache/writing-assistant/writing-assistant/*/ /path/to/writing-assistant; do
+  [ -d "$d" ] && printf '%s  %s\n' "$(cat "$d"/scripts/*.py "$d"/skills/*/SKILL.md 2>/dev/null | md5sum | cut -c1-12)" "$d"
+done
+```
+
+Matching fingerprints = the cache is current; a mismatch means the session is
+running a pre-update snapshot (for a checkout, `git -C <path> rev-parse
+--short HEAD` names the commit).
 
 ## Configure
 
