@@ -41,8 +41,21 @@ printf 'sources:\n  - path: .\n' > "$host/writing-sources.yaml"
 # 2. Bad framework -> exit 2, nothing started, still no workspace.
 if out=$(python3 "$DP" stage0 F9 specs/ --root "$host" 2>"$work/err"); then rc=0; else rc=$?; fi
 [ "$rc" -eq 2 ] && ok "stage0 rejects an invalid framework (exit 2)" || err "stage0 did not reject bad framework"
-grep -q 'invalid framework' "$work/err" && ok "stage0 names the invalid framework" || err "framework error not reported"
+grep -q 'invalid article type' "$work/err" && ok "stage0 names the invalid article type" || err "article-type error not reported"
+grep -q 'introduce the project' "$work/err" && ok "invalid-type error lists intent labels" || err "error does not list intent labels"
 [ "$(ws_count)" -eq 0 ] && ok "no workspace minted on a bad framework" || err "workspace minted despite bad framework"
+
+# 2b. Intent label resolves to the same framework as its F-id alias
+#     (SPEC-draft-article-ux CAP-1, Story 13.27) — closed mapping, no fuzz.
+out=$(python3 "$DP" stage0 "share engineering lessons" specs/ --root "$host")
+echo "$out" | jget 'd["run_state"]["framework"]' | grep -q F2 \
+  && ok "intent label 'share engineering lessons' resolves to F2" \
+  || err "intent label did not resolve to F2"
+if python3 "$DP" stage0 "share lessons" specs/ --root "$host" >/dev/null 2>&1; then
+  err "fuzzy intent label accepted — mapping must be closed"
+else
+  ok "near-miss intent label rejected (closed mapping)"
+fi
 
 # 3. Clean config + framework -> one JSON with config_ok, run_state, and a workspace.
 out=$(python3 "$DP" stage0 F2 specs/ --root "$host")

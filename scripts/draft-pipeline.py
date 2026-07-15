@@ -37,6 +37,36 @@ FRAMEWORKS = {
     "f3": "F3-evaluation-methodology.md",
     "f4": "F4-research-survey.md",
 }
+
+# Owner-facing intent labels (SPEC-draft-article-ux CAP-1, Story 13.27). The
+# invocation accepts these; F1-F4 stay valid as the internal/expert alias and
+# never appear in owner-facing text. Closed mapping — no fuzzy matching: an
+# unknown label is rejected, never guessed.
+INTENT_LABELS = {
+    "f1": "introduce the project",
+    "f2": "share engineering lessons",
+    "f3": "explain the evaluation methodology",
+    "f4": "survey a research area",
+}
+INTENT_ALIASES = {
+    "introduce-the-project": "f1",
+    "project-introduction": "f1",
+    "share-engineering-lessons": "f2",
+    "engineering-lessons": "f2",
+    "explain-the-evaluation-methodology": "f3",
+    "evaluation-methodology": "f3",
+    "survey-a-research-area": "f4",
+    "research-survey": "f4",
+}
+
+
+def resolve_framework(name):
+    """Resolve an invocation's article-type argument — an intent label or an
+    F1-F4 id — to the canonical framework key, or None if it matches neither."""
+    key = re.sub(r"[^a-z0-9]+", "-", name.strip().lower()).strip("-")
+    if key in FRAMEWORKS:
+        return key
+    return INTENT_ALIASES.get(key)
 GLOB_RE = re.compile(r"[*?\[\]{}]")
 RANGE_RE = re.compile(r"^[A-Za-z0-9_.\-~^@]+\.\.\.?[A-Za-z0-9_.\-~^@/]+$")
 
@@ -1306,24 +1336,26 @@ def _entry_gate_ok(key, framework_file, root):
             has_tag = False
         if not has_tag:
             return False, (
-                "framework F1 (project introduction) has an entry GATE: the "
-                "project must have a tagged release (or an equivalent shipped "
-                "artifact), and this repository has no git tags — F1's "
-                "precondition is unmet before any drafting begins.\n"
-                "Choose a framework without a release precondition: "
-                "F2 (engineering lessons), F3 (evaluation methodology), or "
-                "F4 (research survey).")
+                'the "introduce the project" article type has an entry '
+                "precondition: the project must have a tagged release (or an "
+                "equivalent shipped artifact), and this repository has no git "
+                "tags — the precondition is unmet before any drafting begins.\n"
+                "Choose an article type without a release precondition: "
+                '"share engineering lessons", "explain the evaluation '
+                'methodology", or "survey a research area".')
     return True, ""
 
 
 def _run_state(framework, sources, root=None):
     """Build the stage-0 run-state (framework + classified sources), or return
     (None, exit_code) on a framework error — shared by `start` and `stage0`."""
-    key = framework.lower()
-    if key not in FRAMEWORKS:
+    key = resolve_framework(framework)
+    if key is None:
+        labels = "; ".join(
+            f'"{INTENT_LABELS[k]}" ({k.upper()})' for k in sorted(FRAMEWORKS))
         sys.stderr.write(
-            f"error: invalid framework {framework!r}. "
-            f"Valid frameworks: F1, F2, F3, F4. Nothing started.\n")
+            f"error: invalid article type {framework!r}. "
+            f"Valid: {labels}. Nothing started.\n")
         return None, 2
     framework_file = os.path.join("skills", "draft-article", "frameworks", FRAMEWORKS[key])
     if not os.path.isfile(os.path.join(plugin_root(), framework_file)):
