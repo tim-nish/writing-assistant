@@ -248,10 +248,12 @@ files is a **per-article decision made now, not a per-repo config**
    python3 ${CLAUDE_PLUGIN_ROOT}/scripts/read-policy-source.py --root "$HOST" read --topics <a.md> [<b.md>] > "$WS/policy-surface.txt"
    ```
 
-   (No approved topics → plain `read`, which falls back to the config
-   `track`/`topics` while those keys still exist, else GLOSSARY + LESSONS.
-   The ≤2 cap and the code-enforced whitelist are unchanged; `--topics`
-   builds the whitelist, unlike `--only`, which filters within it.)
+   (No approved topics → plain `read`: GLOSSARY + LESSONS only. The per-repo
+   `track`/`topics` config keys were **removed** — Story 13.36,
+   SPEC-policy-topic-at-draft CAP-3; a leftover key is a named stage-0
+   configuration error, never silently applied. The ≤2 cap and the
+   code-enforced whitelist are unchanged; `--topics` builds the whitelist,
+   unlike `--only`, which filters within it.)
 
 When `policy_source` is unset this whole step is skipped silently — zero new
 interaction in generic mode (seam CAP-6).

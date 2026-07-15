@@ -4,11 +4,11 @@
 #
 # Covers: absent block resolves {"declared": false} with byte-identical
 # pipeline behavior (exit 0, no warning); a well-formed block resolves path
-# (against the host root) + track + topics; a malformed block (missing path,
-# >2 topics, non-basename topic entries) exits 4 with per-key errors that
-# stage-0 validation relays as configuration findings; a well-formed block
-# whose path does not exist is NOT a config error (usability is read-time
-# degradation, CAP-6).
+# (against the host root); a malformed block (missing path, or a leftover
+# track/topics key — removed by Story 13.36, topic selection happens at draft
+# time) exits 4 with per-key errors that stage-0 validation relays as
+# configuration findings; a well-formed block whose path does not exist is
+# NOT a config error (usability is read-time degradation, CAP-6).
 
 set -eu
 
@@ -34,8 +34,10 @@ work=$(mktemp -d); trap 'rm -rf "$work"' EXIT
 EX="config/writing-sources.example.yaml"
 grep -q 'policy_source:' "$EX" && ok "example documents policy_source" \
   || err "example missing policy_source block"
-grep -q 'track:' "$EX" && ok "example documents track" || err "example missing track"
-grep -q 'topics:' "$EX" && ok "example documents topics" || err "example missing topics"
+grep -q 'track:' "$EX" && err "example still documents the removed track key" \
+  || ok "example no longer documents track (removed, Story 13.36)"
+grep -qi 'per article at draft time' "$EX" && ok "example points at draft-time topic selection" \
+  || err "example missing the draft-time selection note"
 
 # --- 2. Absent block: declared=false, exit 0, no stderr ----------------------
 mkdir -p "$work/plain"
@@ -53,7 +55,7 @@ if grep -v '^deprecated:' "$work/e1" | grep -q .; then policy_noise=1; else poli
   && ok "absent block: {\"declared\": false}, exit 0, silent" \
   || err "absent block: got rc=$rc out='$out'"
 
-# --- 3. Well-formed block resolves path/track/topics --------------------------
+# --- 3. Well-formed block resolves path (path-only since Story 13.36) ---------
 mkdir -p "$work/host" "$work/product-lab"
 cat > "$work/host/writing-sources.yaml" <<'YAML'
 sources:
@@ -62,8 +64,6 @@ output:
   drafts: articles/drafts/
 policy_source:
   path: ../product-lab        # local checkout
-  track: eval-engineering
-  topics: ["eval-engineering.md", "articles.md"]
 YAML
 out=$($PY --root "$work/host" policy-source)
 python3 - "$out" "$work/product-lab" <<'PYEOF'
@@ -71,10 +71,9 @@ import json, os, sys
 d = json.loads(sys.argv[1])
 assert d["declared"] is True, d
 assert d["path"] == os.path.realpath(sys.argv[2]), d["path"]
-assert d["track"] == "eval-engineering", d["track"]
-assert d["topics"] == ["eval-engineering.md", "articles.md"], d["topics"]
+assert "track" not in d and "topics" not in d, d
 PYEOF
-[ $? -eq 0 ] && ok "well-formed block: path resolved against host root, track+topics parsed" \
+[ $? -eq 0 ] && ok "well-formed block: path resolved against host root (path-only)" \
   || err "well-formed block did not resolve as expected: $out"
 
 # --- 4. Malformed: missing path ------------------------------------------------
@@ -83,40 +82,42 @@ cat > "$work/nopath/writing-sources.yaml" <<'YAML'
 sources:
   - path: .
 policy_source:
-  track: eval-engineering
+  path:
 YAML
 set +e; msg=$($PY --root "$work/nopath" policy-source 2>&1 >/dev/null); rc=$?; set -e
 [ "$rc" -eq 4 ] && printf '%s' "$msg" | grep -q 'policy_source.path' \
   && ok "missing path: exit 4, error names policy_source.path" \
   || err "missing path: rc=$rc msg='$msg'"
 
-# --- 5. Malformed: >2 topics ----------------------------------------------------
+# --- 5. Removed keys: leftover track/topics are named errors, never ignored ----
 mkdir -p "$work/many"
 cat > "$work/many/writing-sources.yaml" <<'YAML'
 sources:
   - path: .
 policy_source:
   path: ../product-lab
-  topics: [a.md, b.md, c.md]
+  topics: [a.md, b.md]
 YAML
 set +e; msg=$($PY --root "$work/many" policy-source 2>&1 >/dev/null); rc=$?; set -e
 [ "$rc" -eq 4 ] && printf '%s' "$msg" | grep -q 'policy_source.topics' \
-  && ok ">2 topics: exit 4, error names policy_source.topics" \
-  || err ">2 topics: rc=$rc msg='$msg'"
+  && printf '%s' "$msg" | grep -qi 'removed' && printf '%s' "$msg" | grep -qi 'delete this line' \
+  && ok "leftover topics key: exit 4, named as removed with the fix" \
+  || err "leftover topics key: rc=$rc msg='$msg'"
 
-# --- 6. Malformed: non-basename topic entry -------------------------------------
+# --- 6. Removed keys: leftover track ---------------------------------------------
 mkdir -p "$work/esc"
 cat > "$work/esc/writing-sources.yaml" <<'YAML'
 sources:
   - path: .
 policy_source:
   path: ../product-lab
-  topics: ["../q_a/INDEX.md"]
+  track: eval-engineering
 YAML
 set +e; msg=$($PY --root "$work/esc" policy-source 2>&1 >/dev/null); rc=$?; set -e
-[ "$rc" -eq 4 ] && printf '%s' "$msg" | grep -q 'not a plain basename' \
-  && ok "path-escaping topic entry: exit 4, basename rule named" \
-  || err "escaping topic entry: rc=$rc msg='$msg'"
+[ "$rc" -eq 4 ] && printf '%s' "$msg" | grep -q 'policy_source.track' \
+  && printf '%s' "$msg" | grep -qi 'draft-article Stage 2' \
+  && ok "leftover track key: exit 4, fix points at draft-time selection" \
+  || err "leftover track key: rc=$rc msg='$msg'"
 
 # --- 7. Stage-0 validation relays malformed block as a finding -------------------
 cat > "$work/clean-user.yaml" <<'YAML'

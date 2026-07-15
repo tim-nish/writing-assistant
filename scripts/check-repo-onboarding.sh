@@ -43,11 +43,17 @@ printf '[{"path": ".", "include": ["docs/**", "README.md"]}, {"path": "../plab"}
   && ok "set-sources creates the file from scratch" \
   || err "set-sources failed on a missing config"
 $PY set-draft-location "~/drafts/" --root "$work/host" >/dev/null 2>&1
-out=$($PY set-policy-source ../plab --track eval-engineering --root "$work/host" 2>/dev/null); rc=$?
+out=$($PY set-policy-source ../plab --root "$work/host" 2>/dev/null); rc=$?
 [ "$rc" -eq 0 ] && printf '%s' "$out" | grep -q '"declared": true' \
-  && printf '%s' "$out" | grep -q '"track": "eval-engineering"' \
-  && ok "set-policy-source declares the block (JSON echo)" \
+  && ok "set-policy-source declares the block (JSON echo, path-only)" \
   || err "set-policy-source: rc=$rc out='$out'"
+# The removed flags are gone from the CLI (Story 13.36) — passing one is a
+# usage error, not a silent write.
+if $PY set-policy-source ../plab --track eval --root "$work/host" >/dev/null 2>&1; then
+  err "--track still accepted (flag should be removed)"
+else
+  ok "--track flag removed with the config keys"
+fi
 f=$(gfile)
 [ -n "$f" ] || { err "no machine-global file created"; printf '\nFAILED.\n' >&2; exit 1; }
 case "$f" in "$work/host"/*) err "config landed IN the host repo (#211)";; *) ok "config is machine-global, not in-host (#211)";; esac
@@ -63,21 +69,26 @@ grep -q 'include: \["docs/\*\*", "README.md"\]' "$f" \
 printf '# HEADER kept\n%s' "$(cat "$f")" > "$f"
 $PY set-policy-source ../plab2 --root "$work/host" >/dev/null 2>&1
 head -1 "$f" | grep -q '# HEADER kept' && ok "surgery keeps comments" || err "comment lost"
-grep -q 'path: ../plab2' "$f" && grep -q 'track: eval-engineering' "$f" \
-  && ok "path replaced, unpassed track kept" || err "per-key surgery wrong"
+grep -q 'path: ../plab2' "$f" \
+  && ok "path replaced by per-key surgery" || err "per-key surgery wrong"
 
 # --- 3. Idempotency: unchanged input writes nothing ---------------------------
 m1=$(stat -c %Y "$f" 2>/dev/null || stat -f %m "$f")
 sleep 1
-$PY set-policy-source ../plab2 --track eval-engineering --root "$work/host" >/dev/null 2>&1
+$PY set-policy-source ../plab2 --root "$work/host" >/dev/null 2>&1
 m2=$(stat -c %Y "$f" 2>/dev/null || stat -f %m "$f")
 [ "$m1" = "$m2" ] && ok "set-policy-source idempotent" || err "rewrote an unchanged file"
 
 # --- 4. Fail-closed refusals write NOTHING ------------------------------------
+sed -i.bak '/^policy_source:/a\
+  track: leftover' "$f" && rm -f "$f.bak"
 before=$(cat "$f")
-rc=0; $PY set-policy-source ../plab --topics a.md b.md c.md --root "$work/host" >/dev/null 2>&1 || rc=$?
+rc=0; $PY set-policy-source ../plab3 --root "$work/host" >/dev/null 2>&1 || rc=$?
 [ "$rc" -eq 4 ] && [ "$(cat "$f")" = "$before" ] \
-  && ok ">2 topics: exit 4, file untouched" || err ">2 topics: rc=$rc or file changed"
+  && ok "leftover removed key: exit 4, file untouched (fail-closed)" \
+  || err "removed-key refusal: rc=$rc or file changed"
+grep -v '^  track: leftover$' "$f" > "$f.tmp" && mv "$f.tmp" "$f"
+before=$(cat "$f")
 rc=0; printf '[{"path": ".", "include": ["../evil/**"]}]' | $PY set-sources --root "$work/host" >/dev/null 2>&1 || rc=$?
 [ "$rc" -eq 5 ] && [ "$(cat "$f")" = "$before" ] \
   && ok ".. include pattern: exit 5, file untouched" || err ".. pattern: rc=$rc or file changed"

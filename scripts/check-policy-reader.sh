@@ -52,20 +52,17 @@ output:
   drafts: articles/drafts/
 policy_source:
   path: ../product-lab
-  track: eval
 YAML
 
-# --- 1. Whitelist: base files + track-matched topics, capped at 2 -------------
+# --- 1. Whitelist: base files only (topics arrive per-run via --topics; the
+#        per-repo track/topics config keys were removed, Story 13.36) ---------
 wl=$($PY --root "$host" whitelist)
 echo "$wl" | grep -qx 'GLOSSARY.md' && echo "$wl" | grep -qx 'LESSONS.md' \
   && ok "whitelist includes GLOSSARY.md and LESSONS.md" \
   || err "whitelist missing base files: $wl"
-n_topics=$(echo "$wl" | grep -c '^topics/' || true)
-[ "$n_topics" -eq 2 ] && ok "3 matching topics capped at 2" \
-  || err "expected 2 topic entries, got $n_topics: $wl"
-echo "$wl" | grep -qx 'topics/eval-alpha.md' && echo "$wl" | grep -qx 'topics/eval-beta.md' \
-  && ok "cap keeps sorted-first matches (eval-alpha, eval-beta)" \
-  || err "unexpected topic selection: $wl"
+[ "$(echo "$wl" | grep -c '^topics/' || true)" -eq 0 ] \
+  && ok "no per-run selection: no topic entries (config keys removed)" \
+  || err "unexpected topic entries without --topics: $wl"
 echo "$wl" | grep -q 'q_a' && err "whitelist leaked a q_a path" || ok "no q_a path in whitelist"
 
 # --- 2. Pin ---------------------------------------------------------------------
@@ -98,34 +95,25 @@ set +e; $PY --root "$host" read --only topics/unrelated.md >/dev/null 2>&1; rc=$
 # --- 5. Symlink escape never becomes readable --------------------------------------
 mkdir -p "$work/outside"; printf 'OUTSIDE\n' > "$work/outside/leak.md"
 ln -s "$work/outside/leak.md" "$plab/topics/evil.md"
-cat > "$host/writing-sources.yaml" <<'YAML'
-sources:
-  - path: .
-output:
-  drafts: articles/drafts/
-policy_source:
-  path: ../product-lab
-  topics: [evil.md]
-YAML
-out=$($PY --root "$host" read)
+out=$($PY --root "$host" read --topics evil.md)
 echo "$out" | grep -q 'OUTSIDE' && err "symlink escape leaked content" \
   || ok "symlink escaping the policy root is not readable"
 echo "$out" | grep -q '^absent: topics/evil.md' && ok "escape reported as absent, not followed" \
   || err "escape not reported"
 rm "$plab/topics/evil.md"
 
-# --- 6. Explicit topics override beats track; no track/topics = base only -----------
+# --- 6. Leftover config keys are refused, not silently applied (Story 13.36) --
 cat > "$host/writing-sources.yaml" <<'YAML'
 sources:
   - path: .
 policy_source:
   path: ../product-lab
   track: eval
-  topics: [unrelated.md]
 YAML
-wl=$($PY --root "$host" whitelist)
-echo "$wl" | grep -qx 'topics/unrelated.md' && [ "$(echo "$wl" | grep -c '^topics/')" -eq 1 ] \
-  && ok "explicit topics: overrides track matching" || err "override failed: $wl"
+set +e; msg=$($PY --root "$host" read 2>&1 >/dev/null); rc=$?; set -e
+[ "$rc" -eq 4 ] && printf '%s' "$msg" | grep -q 'policy_source.track' \
+  && ok "leftover track key: reader refuses (exit 4), never silently applies it" \
+  || err "leftover track: rc=$rc msg='$msg'"
 cat > "$host/writing-sources.yaml" <<'YAML'
 sources:
   - path: .
@@ -134,7 +122,7 @@ policy_source:
 YAML
 wl=$($PY --root "$host" whitelist)
 [ "$(echo "$wl" | grep -c '^topics/')" -eq 0 ] \
-  && ok "no track/topics: GLOSSARY + LESSONS only (still a valid run)" \
+  && ok "path-only block: GLOSSARY + LESSONS only (still a valid run)" \
   || err "expected no topics: $wl"
 
 # --- 7. Distinct unavailable statuses, one stderr line each -------------------------
@@ -163,7 +151,6 @@ sources:
   - path: .
 policy_source:
   path: ../product-lab
-  track: eval
 YAML
 sleep 1  # ensure mtime granularity
 stamp="$work/stamp"; touch "$stamp"
