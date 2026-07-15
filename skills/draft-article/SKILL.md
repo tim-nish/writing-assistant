@@ -298,7 +298,12 @@ is asked, and **choices whose labels state their concrete effect** — never a
 shorthand the owner must decode. A first-time owner answers from **repository
 knowledge alone**. Assemble the prompt payload and **validate it before showing
 it** (contract (e)): `validate-proposal-payload.py` blocks a missing Effect line
-or a truncated field.
+or a truncated field. Pass `--ws "$WS" --surface <name>` on that same call so
+the presentable payload is **captured verbatim** to
+`$WS/presented-payloads.jsonl` at ask time, and record the owner's selection +
+free text against the returned `ask_id` with `--answer` (contract (f), Story
+13.28) — every owner-facing ask in this pipeline (interview, visual proposals,
+Stage-4 verification) captures this way.
 
 ### Recommended answers with dispositions (Story 10.3)
 

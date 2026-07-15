@@ -62,3 +62,29 @@ A non-zero exit means the payload is not presentable — fix the named field and
 re-validate. This gate is **engine-wide**: the gap interview, review arbitration,
 Stage-4 verification, and visual proposals all inherit it by referencing this
 convention, with no restated wording.
+
+## (f) Presented payloads are captured verbatim (Story 13.28)
+
+Every ask that passes gate (e) inside a run is **persisted exactly as shown**,
+at ask time, by the same invocation — pass the run workspace to the validator:
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/validate-proposal-payload.py --ws "$WS" --surface <interview|visual-proposal|verification|arbitration> <payload.json>
+```
+
+On a presentable payload this appends the full payload verbatim — question set,
+option labels, descriptions, previews, recommended answers — to
+`$WS/presented-payloads.jsonl` (append-only; one record per ask; no
+normalization or summarization; never the host tree) and prints the ask's
+`ask_id`. A blocked payload is never captured. When the owner answers, record
+the selection and any free text against the same ask:
+
+```
+printf '%s' '<answer JSON>' | python3 ${CLAUDE_PLUGIN_ROOT}/scripts/validate-proposal-payload.py --ws "$WS" --answer <ask_id>
+```
+
+This log is the meta-analysis substrate (SPEC-draft-article-ux CAP-2): a later
+"review the interview itself" pass reads payloads + journal + answers and needs
+nothing from the drafting context. The capture is the deliverable — no analysis
+tooling exists; the analysis is a prompt over run state. Resumed runs keep
+appending; nothing is overwritten or de-duplicated.

@@ -37,6 +37,7 @@ Exit 0 = presentable; non-zero = blocked, with a per-field report.
 
 import argparse
 import json
+import os
 import sys
 
 # Display budgets (characters). Illustrative caps tied to the presentation
@@ -91,12 +92,42 @@ def validate(payload):
                 yield (f"{tag}.choices[{j}].effect", reason)
 
 
+CAPTURE_FILE = "presented-payloads.jsonl"
+
+
+def _capture_append(ws, record):
+    """Append one record to the run's presented-payload log (append-only,
+    verbatim — SPEC-draft-article-ux CAP-2, Story 13.28) and return its
+    1-based ask_id (the line number). The log lives in the run workspace,
+    never the host tree."""
+    path = os.path.join(ws, CAPTURE_FILE)
+    try:
+        with open(path, encoding="utf-8") as f:
+            n = sum(1 for _ in f)
+    except OSError:
+        n = 0
+    record = dict(record, ask_id=record.get("ask_id", n + 1))
+    with open(path, "a", encoding="utf-8") as f:
+        f.write(json.dumps(record, ensure_ascii=False) + "\n")
+    return record["ask_id"]
+
+
 def main(argv=None):
     p = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
     p.add_argument("payload", nargs="?", default="-",
                    help="proposal payload JSON file, or - for stdin")
+    p.add_argument("--ws", help="run workspace: on a presentable payload, append "
+                   "it verbatim to <ws>/presented-payloads.jsonl and print its "
+                   "ask_id (Story 13.28); a blocked payload is never captured")
+    p.add_argument("--surface", default="unspecified",
+                   help="which owner-facing surface is asking (interview, "
+                   "visual-proposal, verification, arbitration)")
+    p.add_argument("--answer", type=int, metavar="ASK_ID",
+                   help="record-answer mode: append the owner's selection + free "
+                   "text (JSON on stdin or in PAYLOAD) for the given ask_id; "
+                   "requires --ws, skips payload validation")
     args = p.parse_args(argv)
 
     raw = sys.stdin.read() if args.payload == "-" else open(args.payload, encoding="utf-8").read()
@@ -106,9 +137,24 @@ def main(argv=None):
         sys.stderr.write(f"error: payload is not valid JSON: {e}\n")
         return 2
 
+    if args.answer is not None:
+        if not args.ws:
+            sys.stderr.write("error: --answer requires --ws\n")
+            return 2
+        _capture_append(args.ws, {"kind": "answer", "ask_id": args.answer,
+                                  "answer": payload})
+        print(json.dumps({"ok": True, "kind": "answer", "ask_id": args.answer}))
+        return 0
+
     defects = list(validate(payload))
     if not defects:
-        print("payload OK: presentable (where/why/effect present, non-empty, within budget)")
+        if args.ws:
+            ask_id = _capture_append(args.ws, {"kind": "ask",
+                                               "surface": args.surface,
+                                               "payload": payload})
+            print(json.dumps({"ok": True, "kind": "ask", "ask_id": ask_id}))
+        else:
+            print("payload OK: presentable (where/why/effect present, non-empty, within budget)")
         return 0
     sys.stderr.write("payload BLOCKED — not presentable:\n")
     for path, reason in defects:
