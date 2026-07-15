@@ -593,7 +593,19 @@ End every review run with the shared
 explicit **next step presented as an in-conversation choice** (e.g. "apply the
 accepted findings, then re-run review" or "the draft is publishable" —
 interaction contract, CAP-6/#226: no step may require the owner to open a
-machine-state artifact to proceed). A surviving blocker-severity finding — including a
+machine-state artifact to proceed).
+
+**The informational bucket leads with the editor's assessment (SPEC-review-ux
+CAP-4, Story 13.33)** — a concise editorial verdict, **~3–5 sentences**, on
+what the review did to the article's **argument and reader experience**: which
+defect class most threatened the **stated audience's trust**, what the
+**highest-leverage change bought**, and what the article **now does that it
+did not before**. It **cites finding numbers** (from the consolidated
+arbitration list), never rewritten prose; **no praise padding** — it is a
+verdict, not a compliment. The assessment is composed from the run's own
+arbitration record — **no new pass and no new model spend** beyond the summary
+the run already writes. The **change list** (what was edited, per accepted
+finding) is **demoted to reference below it**, complete but secondary. A surviving blocker-severity finding — including a
 **rubric-mapped structure/prose blocker** (Story 12.2) — an unresolved
 `[VERIFY]` marker, an unrendered figure, or a **configuration defect**
 (placeholder, malformed URL, config-caused frontmatter invalidity) goes under

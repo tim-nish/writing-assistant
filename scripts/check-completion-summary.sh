@@ -99,6 +99,18 @@ grep -qi 'budget-triage signal before hard failure' "$DRAFT" \
   && ok "draft SKILL surfaces budget-triage + partial-progress reporting" \
   || err "draft SKILL missing budget-triage/partial-progress wiring"
 
+# 6. Editor's assessment leads the review summary (Story 13.33, SPEC-review-ux CAP-4).
+grep -qi "editor's assessment" "$REVIEW" && ok "review summary leads with the editor's assessment" \
+  || err "editor's assessment missing from review SKILL"
+grep -qi 'cites finding numbers' "$REVIEW" && ok "assessment cites finding numbers, not prose" \
+  || err "finding-number citation rule missing"
+grep -qi 'no praise padding' "$REVIEW" && ok "assessment is a verdict, not a compliment" \
+  || err "praise-padding guard missing"
+grep -qi 'no new pass and no new model spend' "$REVIEW" && ok "assessment adds no pass / no model spend" \
+  || err "no-new-spend constraint missing"
+grep -qi 'demoted to reference' "$REVIEW" && ok "change list demoted below the assessment" \
+  || err "change-list demotion missing"
+
 if [ "$fail" -eq 0 ]; then
   printf '\nAll completion-summary checks passed.\n'; exit 0
 else
