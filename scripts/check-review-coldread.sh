@@ -76,6 +76,25 @@ q5status=$(python3 scripts/draft-pipeline.py journal --interview "$work/iv.json"
   && ok "real interview+journal run yields q5 status=capped (the case the cold read must tolerate)" \
   || err "expected q5 capped from the real pipeline, got '$q5status'"
 
+# Policy-calibrated emphasis (Story 13.39, SPEC-policy-editorial-direction
+# CAP-3): anchors flow to structure/prose prompts only, never the cold read;
+# criteria stay fixed; influence recorded in consulted:.
+SKILL="skills/review-article/SKILL.md"
+grep -q 'Policy-calibrated emphasis' "$SKILL" \
+  && ok "policy-calibrated emphasis contract present" || err "CAP-3 contract missing"
+grep -q 'NEVER to the cold read' "$SKILL" \
+  && ok "anchors never flow to the cold read (control arm)" || err "cold-read exclusion missing"
+grep -qi 'changes only .*what those reviewers weight' "$SKILL" \
+  && ok "criteria fixed — only weighting changes" || err "fixed-criteria clause missing"
+grep -qi "editorial_anchor.*is the claim.*anchor when present\|editorial_anchor. (Story 13.38) is the claim" "$SKILL" \
+  && ok "claim anchor consumes the journal's editorial_anchor (13.38 handoff)" \
+  || err "editorial_anchor consumption missing"
+grep -qi 'influence in the review' "$SKILL" \
+  && ok "policy-derived anchors recorded in the review consulted: line" \
+  || err "consulted recording missing"
+grep -q 'the claim intent anchor' "$SKILL" \
+  && ok "shared preamble carries the claim anchor" || err "claim anchor missing from preamble"
+
 if [ "$fail" -eq 0 ]; then
   printf '\nAll cold-read checks passed.\n'; exit 0
 else
