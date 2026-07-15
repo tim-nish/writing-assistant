@@ -45,11 +45,15 @@ for q in seeded:
     assert q["outcome"] == "open", q
     assert "seed" in q and q["seed"]["pointer"], q
     assert "grounding" not in q, "NFR15: a seeded question must not carry a recommendation"
-# ordering: recommended first, then policy-seed, then generic open
-kinds = ["rec" if q["outcome"] == "recommended" else
-         "seed" if q["rationale"] == "policy-seed" else "open" for q in qs]
-order = {"rec": 0, "seed": 1, "open": 2}
-assert kinds == sorted(kinds, key=order.get), kinds
+# SELECTION priority (rec > seed > open under the cap) is unchanged: every
+# recommended question survives alongside the seeds. PRESENTATION (Story
+# 13.30, SPEC-draft-article-ux CAP-4) now leads with the policy-seeded
+# tension question — the claim/angle slot — so the array is display-ordered.
+assert any(q["outcome"] == "recommended" for q in qs), \
+    "recommended question lost under the cap"
+assert qs[0].get("rationale") == "policy-seed", \
+    "presentation must lead with the policy-seeded claim/angle question"
+assert d["presentation_order"] == [q["id"] for q in qs], d.get("presentation_order")
 assert len(qs) <= 5, len(qs)
 PYEOF
 [ $? -eq 0 ] && ok "seeded items: asked, open, seed carried, no recommendation, rec>seed>open order, cap holds" \

@@ -290,6 +290,21 @@ other: its **Why** context is the seed — the verbatim quote plus its
 the question probes. Its primary input is bullet free-text, like any open
 question.
 
+**Presentation order is contract, not discretion (SPEC-draft-article-ux CAP-4,
+Story 13.30).** Ask the surviving questions in the pinned order the `interview`
+command already emits (`presentation_order`): **claim/angle first** (the
+policy-seeded tension question when one exists — it reframes every later
+answer; else the opinion/claim question), **audience second**, then
+**headline/significance**, then **color** (surprise, tradeoff, warning,
+retrospective). Batching within that order is free — grouping several
+questions into one ask is fine — but never reorder across it. The journal
+echoes the order, so a mis-ordered run is attributable. Selection priority
+(the bullets above) is unchanged; this governs presentation only. When harvest
+yields **no `number`/`result` fact**, the bank's conditional evidence-fallback
+question ("what result or worked example would convince a skeptical reader?")
+joins the candidates automatically (CAP-5) — the evidence GATE's interview
+fallback, surfacing the gap here instead of failing late at Stage 3.
+
 Present each surviving question under the
 [owner-facing proposal contract](../owner-facing-proposal-contract.md): show
 **where** the section it concerns sits in the article outline and a **short

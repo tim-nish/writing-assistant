@@ -115,7 +115,33 @@ QUESTION_BANK = {
            "covers": ["our opinion", "we argue", "we believe", "hot take", "controversial", "we contend"]},
     "q7": {"text": "What would you do differently if starting over?", "topic": "retrospective",
            "covers": ["in hindsight", "would do differently", "if starting over", "lessons for next time"]},
+    # Conditional evidence fallback (SPEC-draft-article-ux CAP-5, Story 13.30):
+    # joins the candidate set ONLY when harvest yielded no `number`/`result`
+    # fact-sheet entry — the evidence GATE's interview fallback, so the gap
+    # surfaces in Stage 2 instead of failing late at Stage 3. Not in any
+    # FRAMEWORK_PRIORITY list; cmd_interview inserts it on its condition.
+    "q8": {"text": "What result or worked example would convince a skeptical reader?",
+           "topic": "significance",
+           "covers": ["convincing result", "worked example", "demonstration", "proof point"]},
 }
+
+# Owner-facing presentation order (SPEC-draft-article-ux CAP-4, Story 13.30).
+# Selection priority (NEEDS-OWNER first, policy seeds, generic; GATE-slot
+# tie-break; ≤5 cap) is UNCHANGED — this orders only how the survivors are
+# PRESENTED: claim/angle first (the policy-seeded tension question when one
+# exists — it reframes every later answer; else the opinion/claim question),
+# audience second, then headline/significance, then color (surprise, tradeoff,
+# warning, retrospective). The order is contract, not discretion; it is echoed
+# in the journal so a mis-ordered run is attributable. Batching within the
+# order is free; ordering is not.
+_PRESENTATION_SLOTS = {"opinion": 0, "audience": 1, "significance": 2}
+
+
+def presentation_slot(rec):
+    """0 = claim/angle, 1 = audience, 2 = headline/significance, 3 = color."""
+    if rec.get("rationale") == "policy-seed":
+        return 0
+    return _PRESENTATION_SLOTS.get(rec.get("topic"), 3)
 
 # Per-framework question priority, ORDERED by that framework's GATE slots (not
 # question-bank order) — so the same fact sheet yields a stable, framework-
@@ -755,6 +781,14 @@ def cmd_interview(args):
             rec.update(outcome="open", rationale="topic-absent")
         triage.append(rec)
 
+    # Evidence fallback (Story 13.30, CAP-5): only when harvest produced no
+    # `number`/`result` entry does q8 join the candidates — the evidence GATE
+    # has no material and the owner is the only remaining source.
+    if not any(e.get("kind") in ("number", "result") for e in fact_sheet):
+        q8 = QUESTION_BANK["q8"]
+        triage.append({"id": "q8", "text": q8["text"], "topic": q8["topic"],
+                       "outcome": "open", "rationale": "evidence-fallback"})
+
     # Survivors = the non-suppressed questions. Confirmed gaps first, then
     # policy-seeded tension questions, then generic open (stable → framework
     # order preserved within each group), and the ≤5 hard cap holds even with
@@ -764,18 +798,24 @@ def cmd_interview(args):
                    else 1 if r["rationale"] == "policy-seed" else 2)
     survivors = survivors[:QUESTION_BUDGET]
 
+    # Presentation reorder (Story 13.30, CAP-4): selection above is untouched;
+    # the asked set is SHOWN claim/angle → audience → significance → color.
+    # Python's sort is stable, so ties keep the selection order within a slot.
+    presented = sorted(survivors, key=presentation_slot)
+
     questions = [{"id": r["id"], "text": r["text"], "topic": r["topic"],
                   "from_gap": r["outcome"] == "recommended", "outcome": r["outcome"],
                   "rationale": r["rationale"],
                   **({"grounding": r["grounding"]} if "grounding" in r else {}),
                   **({"seed": r["seed"]} if "seed" in r else {})}
-                 for r in survivors]
+                 for r in presented]
     out = {
         "stage": "interview",
         "next_stage": "fill",
         "framework": framework,
         "budget": QUESTION_BUDGET,
         "asked": len(questions),
+        "presentation_order": [q["id"] for q in questions],
         "questions": questions,
         "triage": triage,
     }
@@ -985,8 +1025,12 @@ def cmd_journal(args):
     else:
         consulted = f"consulted: none ({args.policy_note or 'policy_source unset'})"
 
-    print(json.dumps({"stage": "interview", "journal": entries,
-                      "consulted": consulted}, indent=2))
+    out = {"stage": "interview", "journal": entries, "consulted": consulted}
+    # Echo the pinned presentation order (Story 13.30, CAP-4) so a mis-ordered
+    # run is attributable from the journal alone.
+    if interview.get("presentation_order"):
+        out["presentation_order"] = interview["presentation_order"]
+    print(json.dumps(out, indent=2))
     return 0
 
 
