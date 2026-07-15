@@ -36,6 +36,23 @@ hasc 'here and nowhere else\|nowhere else' "a blocker appears in exactly one buc
 hasc '200 wpm'              "reading time: ~200 wpm EN"
 hasc '500 cpm'             "reading time: ~500 cpm JA"
 
+# 1a. Interaction contract (Story 13.26, CAP-6/#226): the next step is an
+# in-conversation choice; artifact paths are display-only, never a gate.
+hasc 'in-conversation choice' "next step is an in-conversation choice"
+hasc 'never a prerequisite'   "opening a local artifact is never a prerequisite"
+grep -qi 'review the fact sheet, or' "$CONV" \
+  && err "convention still phrases harvest next step as artifact navigation" \
+  || ok "convention: no navigation-as-gate harvest wording"
+grep -qi 'continue into draft-article' "$HARVEST" \
+  && ok "harvest offers in-conversation continuation" \
+  || err "harvest missing the in-conversation continuation choice"
+grep -qi 'review the fact sheet, or run draft-article' "$HARVEST" \
+  && err "harvest still instructs the owner to review the fact sheet to continue" \
+  || ok "harvest: no navigation-as-gate wording"
+grep -qi 'in-conversation choice' "$DRAFT" && grep -qi 'in-conversation choice' "$REVIEW" \
+  && ok "draft + review present the next step as an in-conversation choice" \
+  || err "draft/review next step not phrased as an in-conversation choice"
+
 # 1b. Partial-progress reporting + budget-triage signal (Story 13.7, CAP-6).
 hasc 'last completed stage' "partial run reports the last completed stage"
 hasc 'resume --ws'          "partial run gives the resume path (pairs with Story 13.5)"

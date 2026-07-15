@@ -701,7 +701,9 @@ End every run with the shared
 [**completion summary**](../completion-summary.md)
 (`${CLAUDE_PLUGIN_ROOT}/skills/completion-summary.md`): the three labelled buckets
 — **informational notes**, **publish blockers**, **optional cleanup** — followed
-by an explicit **next step** (here: "run review-article on the draft"). Because
+by an explicit **next step presented as an in-conversation choice** (here: "run
+review-article on the draft / stop here" — interaction contract, CAP-6/#226:
+paths are reference information, never a required navigation step). Because
 this run produces an **article body**, the informational bucket includes a
 **reading-time estimate**:
 
