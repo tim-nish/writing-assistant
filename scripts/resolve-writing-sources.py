@@ -106,7 +106,17 @@ def sources_path(root, notice=False):
 
 NEEDS_PROMPT = 3      # draft-location: no output.drafts declared
 POLICY_MALFORMED = 4  # policy-source: block present but malformed
+SOURCES_MALFORMED = 5 # sources: include: line not the inline-list form (#221)
 POLICY_MAX_TOPICS = 2 # SPEC-policy-source-seam CAP-2: at most 2 topic files
+
+
+class MalformedSources(ValueError):
+    """A sources `include:` line the parser cannot read (#221).
+
+    A malformed *narrowing* directive must never fall through to whole-tree
+    scope — that silently inverts the fail-closed read boundary. Raised by
+    get_sources(); CLI entry points catch it and exit SOURCES_MALFORMED.
+    """
 
 
 def host_root(arg_root):
@@ -243,12 +253,15 @@ def set_output_drafts(lines, value):
 def get_sources(lines, root):
     """Parse the sources list into [{'path': abs, 'include': [...]}].
 
-    Absent `include` means the whole path is in scope.
+    Absent `include` means the whole path is in scope. An `include:` line
+    that is present but not the supported inline form raises
+    MalformedSources (#221): degrading it to "no include" would silently
+    widen scope to the whole tree — the opposite of fail-closed.
     """
     result = []
     in_sources = False
     current = None
-    for ln in lines:
+    for lineno, ln in enumerate(lines, 1):
         if re.match(r"^sources:\s*(#.*)?$", ln):
             in_sources = True
             continue
@@ -262,10 +275,17 @@ def get_sources(lines, root):
             current = {"path": os.path.realpath(os.path.join(root, raw)), "include": []}
             result.append(current)
             continue
-        m = re.match(r"^\s+include:\s*\[(.*)\]\s*$", ln)
+        m = re.match(r"^\s+include:\s*\[(.*)\]\s*(#.*)?$", ln)
         if m and current is not None:
             items = [x.strip().strip('"').strip("'") for x in m.group(1).split(",")]
             current["include"] = [x for x in items if x]
+            continue
+        if re.match(r"^\s+include\s*:", ln):
+            raise MalformedSources(
+                f"line {lineno}: unparseable include: {ln.strip()!r} — only the "
+                f'inline form is supported (include: ["docs/**", "README.md"]); '
+                f"a block-style YAML list is not read, and falling through would "
+                f"silently widen scope to the whole tree (#221)")
     return result
 
 
@@ -533,14 +553,21 @@ def main(argv=None):
     # them — see sources_path(). host_root() here exits identically to the
     # handler's own call, so this adds no new failure mode.
     sources_path(host_root(args.root), notice=True)
-    return {
-        "draft-location": cmd_draft_location,
-        "set-draft-location": cmd_set_draft_location,
-        "sources": cmd_sources,
-        "is-declared": cmd_is_declared,
-        "files": cmd_files,
-        "policy-source": cmd_policy_source,
-    }[args.cmd](args)
+    try:
+        return {
+            "draft-location": cmd_draft_location,
+            "set-draft-location": cmd_set_draft_location,
+            "sources": cmd_sources,
+            "is-declared": cmd_is_declared,
+            "files": cmd_files,
+            "policy-source": cmd_policy_source,
+        }[args.cmd](args)
+    except MalformedSources as e:
+        # #221: never widen scope on a malformed narrowing directive — name the
+        # offending line and read nothing.
+        path, _ = sources_path(host_root(args.root))
+        print(f"error: {path}: {e}", file=sys.stderr)
+        return SOURCES_MALFORMED
 
 
 if __name__ == "__main__":
