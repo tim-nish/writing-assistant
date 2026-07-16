@@ -78,10 +78,13 @@ def render(cfg, lang):
         base = variants.get("devto", {}).get("canonical_url_base", "{site_url}/articles")
         out += ["syndication:", "  devto:", f"    canonical_url: {base}/{{slug}}"]
     elif mode == "external":
-        zenn = variants.get("zenn", {})
-        maxln = zenn.get("external_record_max_lines", 20)
+        # Site-record constants live in the owner's `site_record` block (#282);
+        # a legacy `syndication.variants.zenn` block is still honoured during
+        # migration (stage 0 relays its deprecation pointer).
+        site_rec = cfg.get("site_record") or variants.get("zenn", {}) or {}
+        maxln = site_rec.get("external_record_max_lines", 20)
         out.append(f"# mode: external — site record <= {maxln} lines, body forbidden "
-                   "(Zenn is canonical via repo-sync)")
+                   "(the external platform is canonical via repo-sync)")
     out.append("---")
     return "\n".join(out) + "\n"
 

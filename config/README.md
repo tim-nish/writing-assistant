@@ -9,6 +9,19 @@ Skills never hard-code identity — they read it from here (CAP-6).
 | `writing-sources.yaml` | **what this repo's articles draw from**: declared sources + draft output location | per host repo | machine-global: `resolve-paths.py sources-file` prints it (#211 — never in the host repo) | `scripts/resolve-writing-sources.py` |
 | `platform-profiles/<platform>.yaml` | **how a platform packages a variant**: `platform`, `audience`, `language`, `packaging`, `distribution_hook` (one file per platform) | per host repo, machine-global | `platform-profiles/` under `resolve-paths.py repo-config-dir` (never in the host repo) | `scripts/resolve-platform-profiles.py` |
 
+## The `site_record` block (owner-site external-record schema)
+
+For a language whose `syndication.policy` mode is `external`, the owner's site
+holds a short **index-facing record** instead of the article body. The record's
+schema constants — `external_record_max_lines` (default 20) and `body_forbidden`
+(default true) — live in the top-level `site_record` block of
+`user-config.yaml`: they are facts about the **owner's site**, not platform
+packaging, which is why they sit outside `syndication.variants` (the former
+`syndication.variants.zenn.*` home is deprecated; readers fall back to it during
+migration and stage 0 relays a one-line deprecation pointer). Consumed by
+`draft-pipeline.py site-record` (the post-publish proposal) and
+`render-frontmatter.py` (the `mode: external` skeleton note).
+
 ## Platform profiles vs. syndication policy (who owns what)
 
 A **platform profile** declares facts about a *platform* and must stay reusable
