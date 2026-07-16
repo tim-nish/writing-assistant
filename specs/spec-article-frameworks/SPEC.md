@@ -56,4 +56,19 @@ The owner produces a publishable draft by filling one framework end-to-end and t
 
 ## Open Questions
 
+- **Owner proposal (2026-07-16, owner decision record: content architecture) — a
+  fifth, lightweight "working-note" framework.** The owner's newsletter issues
+  (4 fixed blocks: one lesson / one number / published-links / what-I'm-building)
+  would be produced by this pipeline as their own small canonical draft, with the
+  variant stage emitting email + web-archive renderings via packaging profiles.
+  Proposed shape: a working-note framework (the 4 blocks as slots) paired with a
+  **slim pipeline profile** — no 5-question interview, a lighter quality gate —
+  because the issue's contract is "assembly <1hr", and the full article
+  pipeline's attention budget is mis-sized for it. Sources: the active repos'
+  recent activity plus the owner's policy recall surface (read via the existing
+  policy-source seam mechanics, read-only and pinned); published text carries
+  public repository links only. Proposal-only: adopting it means adding the
+  framework here and the profile contract to SPEC-platform-variants; declining
+  leaves newsletter assembly manual.
+
 - ~~Where should the templates be installed for day-to-day authoring: `docs/article-frameworks/` in this repo, or as assets of the drafting skill from SPEC-article-draft-pipeline?~~ **Resolved 2026-07-16 (owner decision record, template placement):** the F1–F4 templates live **only** as assets of the drafting skill (`skills/draft-article/frameworks/`) — implementation assets consumed by the skill, single canonical source bundled with the plugin. `docs/article-frameworks/` holds lightweight **pointers only**: framework name, one-line description, canonical asset path — never template content (the templates are already human-readable Markdown; the problem is discoverability, not readability). No generated documentation views and no regeneration machinery unless a future need arises that opening the canonical asset cannot satisfy (e.g. synthesized cross-framework comparison tables).
