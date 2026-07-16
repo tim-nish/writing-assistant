@@ -769,14 +769,32 @@ config (`syndication.policy` / `syndication.variants`) keyed by the draft's
 (frontmatter fields, tag cap, `canonical_url` format, diagram-`visuals`
 treatment) comes entirely from that platform's **profile** (a machine-global
 declaration, SPEC-platform-variants CAP-2), so there is no per-platform code path
-and adding a platform is one profile file:
+and adding a platform is one profile file.
+
+**Emission is the owner's explicit publish decision (CAP-6/#226) — the pipeline
+never auto-emits every configured platform.** First read the choices, then
+present them **in-conversation** as a selection (never a path to open):
 
 ```
-python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py variants <draft>
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py variants <draft> --list-platforms
 ```
+
+Offer the owner: *emit each `available` platform / both / stop here.* Then emit
+exactly their choice (a comma-separated subset, or `all`):
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py variants <draft> --platforms <chosen>
+```
+
+The **completion summary records the choice and its outcome** — which platforms
+were offered, which the owner emitted, and where each file landed (an owner who
+picks only one platform leaves no file for the others, anywhere).
 
 - **Precondition:** the draft carries **zero `[VERIFY]` markers** — Stage 4 must
   be complete. Any unresolved marker aborts the stage.
+- **Emission metadata:** each emitted variant carries the canonical draft's
+  content hash (a trailing `canonical-sha256` comment) so a later run can flag a
+  variant whose source draft has since changed (Story 16.7).
 - **Projection, not rewrite:** the body carries over unchanged (claims, evidence,
   provenance, section structure); only frontmatter/packaging and the profile's
   declared visual treatment differ from the canonical draft.
