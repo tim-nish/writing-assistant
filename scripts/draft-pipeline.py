@@ -810,6 +810,77 @@ def cmd_variants(args):
     return 0
 
 
+_CANONICAL_SHA = re.compile(r"canonical-sha256=([0-9a-f]{64})")
+
+
+def cmd_variant_staleness(args):
+    """Detect stale variants (Story 16.7, SPEC-platform-variants constraint
+    "variants are views"). Each variant carries the canonical draft's content
+    hash at emission (Story 16.4); this compares that recorded hash against the
+    CURRENT canonical draft. A variant whose source draft has changed since
+    emission is a **publish blocker** (CAP-6 bucket) — never a silent
+    inconsistency. A wanted change routes to the canonical draft first, then the
+    variant is re-emitted: re-emission records the new hash and clears the
+    blocker. A variant with no recorded hash cannot be verified fresh and is a
+    blocker too (re-emit to record one).
+    """
+    text = sys.stdin.read() if args.draft == "-" else open(args.draft, encoding="utf-8").read()
+    canonical_sha = hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+    if args.variants:
+        paths = list(args.variants)
+    else:
+        out_dir = args.out if args.out else _resolve_drafts_dir(args.root)
+        slug = None
+        try:
+            fields, _ = _read_frontmatter(text)
+            slug = fields.get("slug")
+        except SystemExit:
+            slug = None
+        pattern = f"{slug}." if slug else ""
+        paths = [os.path.join(out_dir, f) for f in sorted(os.listdir(out_dir))
+                 if f.startswith(pattern) and f.endswith(".md")] if os.path.isdir(out_dir) else []
+
+    variants, publish_blockers = [], []
+    for path in paths:
+        platform = os.path.basename(path).split(".")[-2] if path.endswith(".md") \
+            and len(os.path.basename(path).split(".")) >= 3 else None
+        try:
+            content = open(path, encoding="utf-8").read()
+        except OSError:
+            continue
+        m = _CANONICAL_SHA.search(content)
+        recorded = m.group(1) if m else None
+        if recorded is None:
+            status = "unrecorded"
+        elif recorded == canonical_sha:
+            status = "fresh"
+        else:
+            status = "stale"
+        entry = {"path": path, "platform": platform, "status": status,
+                 "recorded_sha256": recorded}
+        variants.append(entry)
+        if status != "fresh":
+            publish_blockers.append({
+                "platform": platform, "path": path,
+                "blocker": "stale-variant" if status == "stale" else "unrecorded-canonical-hash",
+                "detail": ("the canonical draft changed since this variant was emitted; "
+                           "route the change to the draft and re-emit"
+                           if status == "stale"
+                           else "no recorded canonical hash; re-emit to record one"),
+            })
+
+    out = {
+        "stage": "variant-staleness",
+        "canonical_sha256": canonical_sha,
+        "variants": variants,
+    }
+    if publish_blockers:
+        out["publish_blockers"] = publish_blockers
+    print(json.dumps(out, indent=2))
+    return 0
+
+
 def cmd_interview(args):
     """Stage 2: triage every candidate question against the harvest output
     (fact sheet + NEEDS-OWNER) into exactly one of three outcomes, then present
@@ -1703,6 +1774,13 @@ def main(argv=None):
     sp.add_argument("--list-platforms", action="store_true",
                     help="report the configured platforms for this draft and emit "
                          "nothing (feeds the in-conversation emission choice)")
+
+    st = sub.add_parser("variant-staleness")
+    st.add_argument("draft", nargs="?", default="-", help="canonical draft, or - for stdin")
+    st.add_argument("--variants", nargs="*", help="variant files to check "
+                    "(default: scan output.drafts for this draft's slug)")
+    st.add_argument("--out", help="output dir holding the variants (default: resolved output.drafts)")
+    st.add_argument("--root", help="host-repo root (default: git top-level of cwd)")
     args = p.parse_args(argv)
     return {
         "start": cmd_start, "consume": cmd_consume, "interview": cmd_interview,
@@ -1714,6 +1792,7 @@ def main(argv=None):
         "quality-gate": cmd_quality_gate,
         "verify-markers": cmd_verify_markers, "verify": cmd_verify, "reroute": cmd_reroute,
         "variants": cmd_variants,
+        "variant-staleness": cmd_variant_staleness,
     }[args.cmd](args)
 
 
