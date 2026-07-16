@@ -1,15 +1,15 @@
 ---
 id: SPEC-article-visuals
-status: accepted            # accepted 2026-07-10 from q_a/a1.md; promoted per dogfood evidence
+status: accepted            # accepted 2026-07-10; promoted per dogfood evidence
 amends:
   - ../spec-article-draft-pipeline/SPEC.md   # narrows its non-goal "No image/figure generation"
   - ../spec-article-frameworks/SPEC.md       # adds visual slots to framework conventions
 sources:
-  - ../../q_a/q1.md      # dogfooding Q&A round 1, traceability only (file removed 2026-07-16)
-  - ../../q_a/a1.md      # dogfooding Q&A round 1, traceability only (file removed 2026-07-16)
+  # Prior dogfooding review round (private; records removed 2026-07-16), traceability only.
 ---
 
 > **Canonical contract.** This SPEC is the complete contract for what to build, test, and validate. Source documents listed in frontmatter are for traceability only — consult them only if you need narrative rationale or prose color this contract intentionally omits.
+> **Amended 2026-07-16 (platform profiles)** per SPEC-platform-variants: CAP-5's per-platform rendering divergence (Mermaid embedded vs. HTML-comment + render blocker) is **declared in each platform profile's `packaging`**, not fixed per platform in stage code or in this spec — the dev.to/Zenn behaviors CAP-5 names are the contents of those two profiles. The rendering *outcomes* CAP-5 requires are unchanged; a third platform gets its visual handling from its own profile with zero stage-code changes.
 
 # Article Visuals
 

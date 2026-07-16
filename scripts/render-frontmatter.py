@@ -66,6 +66,11 @@ def render(cfg, lang):
     out = ["---"]
     for name in schema:
         out.append(f"{name}: {field_value(name)}")
+        if name == "language":
+            # Pipeline-internal field (lede-retarget trigger, 2026-07-16):
+            # required on the draft, stripped by variant packaging, never part
+            # of the site schema in user config.
+            out.append("audience: {audience}   # pipeline-internal — stripped at packaging")
 
     variants = cfg.get("syndication", {}).get("variants", {})
     if mode == "canonical":

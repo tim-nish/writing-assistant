@@ -4,17 +4,16 @@ companions:
   - pipeline-stages.md
   - ../spec-article-frameworks/article-frameworks.md
 sources:
-  - ../../../website/q_a/2/question.md  # external: website repo (sibling checkout), traceability only
-  - ../../../website/q_a/2/answer.md    # external: website repo (sibling checkout), traceability only
-  - ../../q_a/a1.md                     # dogfooding Q&A round 1, traceability only (file removed 2026-07-16)
+  # Originating private site repo, decision round (traceability only).
+  # Prior dogfooding review round (private; records removed 2026-07-16), traceability only.
   - ../../docs/dogfood-findings.md      # dogfood evidence behind the 2026-07-10 amendments
   - ../../docs/harness-architecture.md  # 2026-07-11 article-quality harness decision (D1–D5) behind the 2026-07-11 amendments
   - ../../docs/storage-architecture.md  # 2026-07-11 storage & footprint decision behind the intermediates-location constraint
   - ../../docs/interview-architecture.md # 2026-07-11 Stage-2 interview decision (D1–D4) behind the CAP-2 rework
 ---
 
-> **Vendored copy.** Adopted verbatim from the website repo (`website/_bmad-output/specs/spec-article-draft-pipeline/`, 2026-07-09) per SPEC-writing-assistant; this copy is now the canonical version for this project. Repo-internal references (`q_a/…`, AP/AC numbers) refer to the website repo.
-> **Amended 2026-07-10** per accepted dogfood findings (`docs/dogfood-findings.md`, `q_a/a1.md`): CAP-5 (up-front config validation) and CAP-6 (completion-summary contract) added; interview/verification constraints now reference SPEC-writing-assistant's owner-facing proposal contract.
+> **Vendored copy.** Adopted verbatim from the originating private site repo (2026-07-09) per SPEC-writing-assistant; this copy is now the canonical version for this project. Bare AP/AC numbers and archive references refer to that originating repo.
+> **Amended 2026-07-10** per accepted dogfood findings (`docs/dogfood-findings.md`, prior dogfooding round): CAP-5 (up-front config validation) and CAP-6 (completion-summary contract) added; interview/verification constraints now reference SPEC-writing-assistant's owner-facing proposal contract.
 > **Amended 2026-07-11** per the article-quality harness decision (`docs/harness-architecture.md`, D1–D5): CAP-3 reworked to three provenance classes with a sidecar provenance map; CAP-7 (mandatory stage 3→4 quality gate) added; the no-invented-evidence and rewrite constraints updated accordingly.
 > **Amended 2026-07-11 (storage)** per the storage & footprint decision (`docs/storage-architecture.md`, D1–D2): all intermediates live in the per-run workspace resolved by the path resolver, never in the host working tree.
 > **Amended 2026-07-11 (interview)** per the Stage-2 interview decision (`docs/interview-architecture.md`, D1–D4): CAP-2 reworked to three-outcome triage with recommended answers, dispositions, and the interview journal; skip effects are framework-slot contracts.
@@ -25,7 +24,7 @@ sources:
 > **Amended 2026-07-14 (policy seam, #188)** per SPEC-policy-source-seam (Epic 14): stage 2 may additionally seed **tension questions** from an optional, bounded, pinned read of the owner's policy repo — questions only, never answers; triage and recommendation generation still read nothing beyond harvest output. Journal gains `policy-seed` rationale, `seed<-` pointers, `capped` status, and the closing `consulted:` line (`pipeline-stages.md`); the seam's own contract lives in `../spec-policy-source-seam/SPEC.md`.
 > **Amended 2026-07-15 (triage, #226)** per /triage-gh on the Tanuki F44 finding: an **interaction contract** added to CAP-6 — every human decision point is presented in-conversation (a selection UI); local artifact paths may be displayed informationally but are never a required navigation step or decision gate. The standalone-harvest next step becomes an in-UI continuation choice instead of "review the fact sheet at the path above".
 
-> **Amended 2026-07-16 (platform variants)** per the owner's platform-variant architecture decision (product-lab `q_a/2026-07-16-micro-platform-variant-architecture`): CAP-4's variant promise is elaborated by **SPEC-platform-variants** (`../spec-platform-variants/SPEC.md`), which owns the variant stage's contract — platform profiles as declared config, emission per publish decision, variants as projections of the canonical draft with a single lede-re-targeting touchpoint, lint-sized per-variant checks. Where they disagree on the variant stage, that spec wins.
+> **Amended 2026-07-16 (platform variants)** per the owner's platform-variant architecture decision (owner decision record 2026-07-16, platform-variant architecture): CAP-4's variant promise is elaborated by **SPEC-platform-variants** (`../spec-platform-variants/SPEC.md`), which owns the variant stage's contract — platform profiles as declared config, emission per publish decision, variants as projections of the canonical draft with a single lede-re-targeting touchpoint, lint-sized per-variant checks. Where they disagree on the variant stage, that spec wins.
 
 > **Canonical contract.** This SPEC and the files in `companions:` are the complete, preservation-validated contract for what to build, test, and validate. Source documents listed in frontmatter are for traceability only — consult them only if you need narrative rationale or prose color this contract intentionally omits.
 
@@ -33,7 +32,7 @@ sources:
 
 ## Why
 
-A pain to solve plus an opportunity to capture: the owner wants a publishable technical-article draft in ~10 minutes of personal attention, from raw material already in git (dev logs, specs, READMEs, commit history, BMAD memlogs). The owner's initial workflow idea — human extracts key points, AI reconstructs narrative — spends scarce human minutes on the step AI does better (extraction) and delegates the step that most needs human control (claims and voice). This pipeline inverts that: AI harvests with source pointers, the human contributes judgment through a bounded interview and a verification pass. Distribution, not artifact quality, is the current bottleneck (q_a/1); this pipeline is the throughput fix.
+A pain to solve plus an opportunity to capture: the owner wants a publishable technical-article draft in ~10 minutes of personal attention, from raw material already in git (dev logs, specs, READMEs, commit history, BMAD memlogs). The owner's initial workflow idea — human extracts key points, AI reconstructs narrative — spends scarce human minutes on the step AI does better (extraction) and delegates the step that most needs human control (claims and voice). This pipeline inverts that: AI harvests with source pointers, the human contributes judgment through a bounded interview and a verification pass. Distribution, not artifact quality, is the current bottleneck (ratified owner finding); this pipeline is the throughput fix.
 
 ## Capabilities
 
@@ -87,8 +86,8 @@ The owner takes a real project (e.g. a QuantScenarioBench release) from "invoke 
 
 ## Assumptions
 
-- Drafting runs on the strongest model available to the owner (q_a/2 answer §4.1: draft quality determines the number of downstream review cycles).
+- Drafting runs on the strongest model available to the owner (ratified owner decision: draft quality determines the number of downstream review cycles).
 
 ## Open Questions
 
-- Should the pipeline also create the site's `mode: external` article record for JA/Zenn pieces, or does that stay a manual follow-up?
+- ~~Should the pipeline also create the site's `mode: external` article record for JA/Zenn pieces, or does that stay a manual follow-up?~~ **Resolved 2026-07-16 (owner decision record, site external record):** neither a manual follow-up nor a platform variant — a **post-publish proposal**. The record is not a variant: it fails the profile type on every field (no audience, no language register, nothing to lede-re-target, and it carries no claims — it is index-facing metadata: title, canonical URL, date), so modeling it as a "site profile" would be a degenerate profile instance and would breach the ratified site-independence boundary (the site is owner identity, never a pipeline emission target; its schema stays in user config). Structurally, its substrate completes only at the publish event — the load-bearing field is the *final* published URL plus the real publication date, which exist after the owner's manual publish act — so a variant-stage emission would be stale at birth. Contract: after the owner confirms the published URL (a CAP-6 in-conversation next step), the pipeline **proposes** a ready-to-paste record block conforming to the user-config site frontmatter schema (≤20 lines, body forbidden), under the owner-facing proposal contract; applying it to the site tree is the owner's (or a site-side command's) act — the pipeline never writes the site's tree.

@@ -10,9 +10,15 @@
 | 3 | Fill: populate the framework's slots from fact sheet + answers; frontmatter from the article schema; every sentence classed in the provenance map (sourced / derived / narration); inferred claims marked `[VERIFY]` | AI | 0 | Draft + provenance map (CAP-3) |
 | 3→4 | Quality gate: four-dimension rubric + `verify-provenance`; fail → revise against named dimensions and re-run both, ≤2 cycles, then publish blocker (CAP-6) | AI | 0 | Gate-passing draft (CAP-7) |
 | 4 | Verification pass: resolve `[VERIFY]` markers, veto off-voice text; >1 rewrite needed → new interview question, not editing | Owner | ~4 min | Draft ready for review |
-| 5 | Variants: dev.to copy (`canonical_url` placeholder) and/or Zenn repo-sync copy per language policy | AI | 0 | Platform files (CAP-4) |
+| 5 | Variants: owner picks which platform variants to emit (in-conversation choice, never auto-emit); each variant is a projection of the canonical draft driven by its platform profile, with one lede-re-targeting proposal when the profile's audience/language differ | AI emits; owner chooses platforms + arbitrates the lede proposal | ~1 min (within the ≤10 budget) | Platform files per emission choice (CAP-4 → SPEC-platform-variants) |
 
 Draft then exits this pipeline into SPEC-article-review.
+
+**Stage 5 contract moved (2026-07-16).** The variant stage's full contract —
+platform profiles as declared config, emission per publish decision, projection
+with a single lede touchpoint, lint-sized per-variant checks — lives in
+SPEC-platform-variants (`../spec-platform-variants/SPEC.md`), which wins where
+this table and that spec disagree. The row above is the pipeline-level summary.
 
 **Durability across the stage boundaries (added 2026-07-12).** Each stage
 persists its completion state to the run workspace (`$WS`) alongside its
@@ -63,7 +69,7 @@ location is contract, not agent default.
 When the host repo declares an optional `policy_source`, stage 2 first probes
 the owner's policy repo through the bounded, pinned, read-only reader
 (`GLOSSARY.md`, `LESSONS.md`, ≤2 track-matched `topics/*.md`; whitelist in
-code, `q_a/` unreadable) and authors **tension items** — schema-enforced
+code, the hub's history archive unreadable) and authors **tension items** — schema-enforced
 questions typed `contradiction | ambiguity | missing-rationale |
 reversal-candidate`, each carrying a `seed {quote, pointer: file:line@commit}`
 — validated **before** triage (`validate-interview-items.py`, rejection

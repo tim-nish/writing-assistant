@@ -5,6 +5,7 @@ Four fill-in templates, one per sanctioned category. Conventions used by all fou
 - `{slot}` = fill-in; *(prompt)* = what the slot must answer; lengths are targets, not limits.
 - **GATE** marks a mandatory editorial-gate slot (CAP-3). A draft with an unfilled GATE slot is not publishable.
 - Frontmatter follows the `article` schema in `docs/content-guide.md`. EN canonical pieces use `mode: canonical` (+ `syndication:` for dev.to); JA pieces published on Zenn use `mode: external` on the site and this template's body ships to Zenn via repo-sync.
+- Additionally (2026-07-16, lede-retarget trigger): every draft's frontmatter carries a required **pipeline-internal `audience` field** — the one named reader, populated from the backlog item at draft time (a backlog-less draft declares it at draft start), validated for presence at stage 0/the quality gate. It is **stripped by variant packaging**: published frontmatter and the user-config site schema never carry it, so it is deliberately absent from `docs/content-guide.md`'s article schema.
 - Every framework ends with the same **pointer block** (spec §3 invariant), template at the bottom of this file.
 - Title rule (all categories): the title states the article's one specific claim, not its topic.
 
@@ -22,6 +23,7 @@ title: "{Claim-shaped title: what the project makes possible, not its name alone
 date: {YYYY-MM-DD}
 mode: canonical            # or external if JA-on-Zenn
 language: {en|ja}
+audience: {the one named reader}   # pipeline-internal — stripped by variant packaging
 summary: >
   {≤240 chars: problem + what the project does about it}
 topics: [{kebab-case}]
@@ -72,6 +74,7 @@ title: "{The lesson as a claim, e.g. 'Structured discovery halved our token bill
 date: {YYYY-MM-DD}
 mode: canonical
 language: {en|ja}
+audience: {the one named reader}   # pipeline-internal — stripped by variant packaging
 summary: >
   {≤240 chars: the lesson + the evidence type behind it}
 topics: [{kebab-case}]
@@ -117,6 +120,7 @@ title: "{The measurement question or its answer, e.g. 'How do you know your agen
 date: {YYYY-MM-DD}
 mode: canonical
 language: {en|ja}
+audience: {the one named reader}   # pipeline-internal — stripped by variant packaging
 summary: >
   {≤240 chars: the measurement problem + your method}
 topics: [{kebab-case}]
@@ -160,6 +164,7 @@ title: "{Field + angle, e.g. 'Signature methods for market data: a field guide'}
 date: {YYYY-MM-DD}
 mode: canonical
 language: {en|ja}
+audience: {the one named reader}   # pipeline-internal — stripped by variant packaging
 summary: >
   {≤240 chars: scope + who it's for}
 topics: [{kebab-case}]
@@ -200,7 +205,12 @@ slot that keeps a survey within AP-10. Link your preprint/repo.)}
 {JA counterpart exists → "日本語版は Zenn にあります: {url}" / EN counterpart exists → link it.}
 ```
 
-Syndication notes:
+Syndication notes (2026-07-16: platform packaging is declared by platform
+profiles per SPEC-platform-variants — the dev.to note and the Zenn repo-sync
+clause below describe the intended *contents* of those two profiles, not
+per-platform rules frameworks or stage code carry; the site's `mode: external`
+record is **not** profile content — it is the owner-site's post-publish
+proposal contract, resolved 2026-07-16 in SPEC-article-draft-pipeline):
 
 - dev.to copy: full text, frontmatter `canonical_url:` pointing to the site page (add/repoint after the site can host canonical articles).
-- Zenn: JA canonical via repo-sync; the site gets a 20-line `mode: external` record (body forbidden, AC-4).
+- Zenn: JA canonical via repo-sync (Zenn profile content). Separately, owner-site side: the site gets a 20-line `mode: external` record (body forbidden, AC-4) — proposed post-publish, schema owned by user config, never emitted by the variant stage.

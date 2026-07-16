@@ -70,6 +70,11 @@ pointer_block:
 # that guide, without changing skills.
 # ---------------------------------------------------------------------------
 frontmatter:
+  # NOTE (2026-07-16, lede-retarget trigger): the canonical DRAFT additionally
+  # carries a required pipeline-internal `audience` field (the one named
+  # reader; from the backlog item at draft time, or declared at draft start).
+  # It is stripped by variant packaging and is deliberately NOT part of this
+  # site schema — do not add it here.
   # Fields emitted on every article, in order.
   schema:
     - slug            # kebab-case
@@ -93,6 +98,16 @@ frontmatter:
 # Canonical vs. syndication policy (AP-6). Structured (not prose) so a skill
 # picks `mode` and platform variants deterministically from config alone.
 # Ported verbatim from article-frameworks.md "Syndication notes".
+#
+# MIGRATION (2026-07-16, syndication-key split — SPEC-platform-variants):
+# `syndication.policy` stays here permanently (owner publishing intent; the
+# per-language canonical/external decision sources frontmatter `mode`).
+# Zero `syndication.variants.*` keys move to platform profiles — none are
+# platform-shaped: `devto.canonical_url_base` is an owner value (re-homes in
+# the owner block) and `zenn.external_record_max_lines`/`body_forbidden` are
+# the owner-site record's schema (re-home in a site-record schema block).
+# Each legacy key deprecates as its re-routing lands (#211 treatment);
+# platform profiles' fields are new declarations, migrated from nothing.
 # ---------------------------------------------------------------------------
 syndication:
   # Per-language canonical mode + where the article body actually publishes.
