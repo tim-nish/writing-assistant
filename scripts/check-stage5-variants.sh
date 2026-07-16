@@ -85,7 +85,7 @@ assert d["mode"]=="canonical" and d["language"]=="en", d
 assert [e["platform"] for e in d["emitted"]]==["devto"], d
 assert d["chosen"]==["devto"], d
 assert d["next_stage"]=="review", d
-assert "render_blockers" not in d, d  # dev.to embeds mermaid, no blocker
+assert d.get("render_blockers")==[{"platform":"devto","blocker":"unrendered-mermaid"}], d
 ' && ok "EN emits exactly a dev.to variant (config-selected, profile-projected)" \
   || err "EN variant selection/shape wrong"
 
@@ -95,8 +95,8 @@ grep -q '^canonical_url: https://example.com/articles/retry-storms$' "$DEVTO" \
   && ok "dev.to canonical_url composed from owner value + profile format" || err "canonical_url wrong"
 grep -q 'The retry storm doubled token spend' "$DEVTO" \
   && ok "projection carries the article body unchanged" || err "dev.to body missing"
-grep -q '```mermaid' "$DEVTO" \
-  && ok "dev.to visuals=mermaid-embedded leaves the diagram inline" || err "dev.to mermaid handling wrong"
+grep -q '<!-- render blocker' "$DEVTO" \
+  && ok "dev.to visuals=html-comment-blocked wraps the diagram (dev.to has no Mermaid)" || err "dev.to visual treatment wrong"
 
 # 2b. NFR17 — the profile-resolution log is an intermediate in $WS, not a product.
 [ -f "$work/platform-profiles.resolution.json" ] \
@@ -135,15 +135,15 @@ import json,sys
 d=json.load(sys.stdin)
 assert d["mode"]=="external", d
 assert [e["platform"] for e in d["emitted"]]==["zenn"], d
-assert d.get("render_blockers")==[{"platform":"zenn","blocker":"unrendered-mermaid"}], d
-' && ok "JA emits a Zenn variant with a profile-declared render blocker" || err "JA variant/blocker wrong"
+assert "render_blockers" not in d, d  # Zenn renders Mermaid natively — no blocker
+' && ok "JA emits a Zenn variant, Mermaid embedded (no blocker)" || err "JA variant/blocker wrong"
 
 ZENN="$work/o/retry-arashi.zenn.md"
 grep -q '^type: "tech"$' "$ZENN" && grep -q '^emoji:' "$ZENN" && grep -q '^published: false$' "$ZENN" \
   && ok "Zenn frontmatter (emoji/type/published) from the profile" || err "Zenn frontmatter wrong"
 grep -q '本文。' "$ZENN" && ok "Zenn projection carries the full body" || err "Zenn body missing"
-grep -q '<!-- render blocker' "$ZENN" \
-  && ok "Zenn visuals=html-comment-blocked wraps the diagram" || err "Zenn visual treatment wrong"
+grep -q '```mermaid' "$ZENN" \
+  && ok "Zenn visuals=mermaid-embedded leaves the diagram inline (native render)" || err "Zenn visual treatment wrong"
 
 # 4. A configured platform with no profile is a clear, actionable error.
 cat > "$work/cfg-noprofile.json" <<'EOF'

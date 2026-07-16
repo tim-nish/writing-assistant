@@ -31,9 +31,10 @@ packaging:
   canonical_url:
     policy: point-to-site
     format: "{base}/{slug}"
-  # Diagram-rendering treatment (SPEC-article-visuals CAP-5): dev.to renders
-  # fenced ```mermaid blocks inline.
-  visuals: mermaid-embedded
+  # Diagram-rendering treatment (SPEC-article-visuals CAP-5): dev.to does NOT
+  # render Mermaid, so a diagram is HTML-commented and a render publish blocker
+  # is raised (pre-render to an image before publishing).
+  visuals: html-comment-blocked
 
 # Where this audience's end-pointer points (the distribution call-to-action).
 distribution_hook: newsletter-follow

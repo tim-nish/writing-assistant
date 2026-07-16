@@ -69,7 +69,7 @@ got=$($PY get zenn --root "$work" --profiles-dir "$work/pp" \
 eq "AC2 zenn packaging.layout.dir present" "$got" "articles/"
 got=$($PY get zenn --root "$work" --profiles-dir "$work/pp" \
   | python3 -c "import json,sys; print(json.load(sys.stdin)['packaging']['visuals'])")
-eq "AC2/CAP-5 zenn packaging.visuals present" "$got" "html-comment-blocked"
+eq "AC2/CAP-5 zenn packaging.visuals present" "$got" "mermaid-embedded"
 
 # 5. AC1 resolver location goes through the path resolver — no literal
 #    ~/.config path is composed in the resolver's own body.
