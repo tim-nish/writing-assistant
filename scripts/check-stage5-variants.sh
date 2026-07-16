@@ -76,12 +76,13 @@ graph TD; A-->B
 ```
 EOF
 out=$(python3 "$DP" variants "$work/en.md" --config-json "$work/cfg.json" \
-        --root "$work/host" --out "$work/o" --ws "$work")
+        --root "$work/host" --out "$work/o" --ws "$work" --platforms devto)
 printf '%s' "$out" | python3 -c '
 import json,sys
 d=json.load(sys.stdin)
 assert d["mode"]=="canonical" and d["language"]=="en", d
 assert [e["platform"] for e in d["emitted"]]==["devto"], d
+assert d["chosen"]==["devto"], d
 assert d["next_stage"]=="review", d
 assert "render_blockers" not in d, d  # dev.to embeds mermaid, no blocker
 ' && ok "EN emits exactly a dev.to variant (config-selected, profile-projected)" \
@@ -126,7 +127,7 @@ graph TD; A-->B
 ```
 EOF
 out=$(python3 "$DP" variants "$work/ja.md" --config-json "$work/cfg.json" \
-        --root "$work/host" --out "$work/o")
+        --root "$work/host" --out "$work/o" --platforms zenn)
 printf '%s' "$out" | python3 -c '
 import json,sys
 d=json.load(sys.stdin)
@@ -147,7 +148,7 @@ cat > "$work/cfg-noprofile.json" <<'EOF'
 {"syndication":{"policy":{"en":{"mode":"canonical","variants":["hashnode"]}}}}
 EOF
 if python3 "$DP" variants "$work/en.md" --config-json "$work/cfg-noprofile.json" \
-     --root "$work/host" --out "$work/o" >/dev/null 2>"$work/e_np"; then
+     --root "$work/host" --out "$work/o" --platforms hashnode >/dev/null 2>"$work/e_np"; then
   err "a configured platform with no profile was not rejected"
 else
   grep -q 'no platform profile' "$work/e_np" \
@@ -165,7 +166,7 @@ topics: [a]
 Body [VERIFY: still unresolved].
 EOF
 python3 "$DP" variants "$work/bad.md" --config-json "$work/cfg.json" \
-  --root "$work/host" --out "$work/o" >/dev/null 2>&1 \
+  --root "$work/host" --out "$work/o" --platforms devto >/dev/null 2>&1 \
   && err "emitted variants for an unverified draft" || ok "unresolved [VERIFY] aborts Stage 5"
 
 # 6. External output.drafts guard (#213): a config-resolved destination OUTSIDE
@@ -177,7 +178,7 @@ output:
   drafts: $work/external-drafts/
 YAML
 if python3 "$DP" variants "$work/en.md" --config-json "$work/cfg.json" \
-     --root "$work/host" >/dev/null 2>"$work/e_ext"; then
+     --root "$work/host" --platforms devto >/dev/null 2>"$work/e_ext"; then
   err "external missing output dir was not refused"
 else
   grep -q 'outside the host repo' "$work/e_ext" \
@@ -186,7 +187,7 @@ else
 fi
 [ ! -d "$work/external-drafts" ] && ok "refusal created nothing" || err "refusal created the directory"
 python3 "$DP" variants "$work/en.md" --config-json "$work/cfg.json" \
-  --root "$work/host" --create-out >/dev/null 2>/dev/null \
+  --root "$work/host" --create-out --platforms devto >/dev/null 2>/dev/null \
   && [ -f "$work/external-drafts/retry-storms.devto.md" ] \
   && ok "--create-out consents to creating the external destination" \
   || err "--create-out did not create/write the external destination"
@@ -195,9 +196,55 @@ rm -f "$work/host/writing-sources.yaml"
 # 7. --dry-run reports without writing.
 rm -rf "$work/dry"
 python3 "$DP" variants "$work/en.md" --config-json "$work/cfg.json" \
-  --root "$work/host" --out "$work/dry" --dry-run | python3 -c '
+  --root "$work/host" --out "$work/dry" --dry-run --platforms devto | python3 -c '
 import json,sys; d=json.load(sys.stdin); assert d["written"] is False, d'
 [ ! -d "$work/dry" ] && ok "--dry-run writes nothing" || err "--dry-run wrote files"
+
+# 8. Story 16.4 — emission is the owner's explicit choice; never auto-emit all.
+#    Config where EN offers BOTH platforms, to prove selection.
+cat > "$work/cfg-both.json" <<'EOF'
+{"syndication":{"policy":{"en":{"mode":"canonical","variants":["devto","zenn"]}},
+"variants":{"devto":{"canonical_url_base":"https://example.com/articles"}}}}
+EOF
+rm -rf "$work/e8"
+# 8a. No choice → reports the options and emits NOTHING (never auto-emit all).
+out=$(python3 "$DP" variants "$work/en.md" --config-json "$work/cfg-both.json" \
+        --root "$work/host" --out "$work/e8")
+printf '%s' "$out" | python3 -c '
+import json,sys; d=json.load(sys.stdin)
+assert d["available"]==["devto","zenn"] and d["emitted"]==[], d' \
+  && ok "no explicit choice reports options and emits nothing (never auto-emit all)" \
+  || err "auto-emit guard wrong"
+[ ! -d "$work/e8" ] && ok "no files written without an explicit choice" || err "files written without a choice"
+
+# 8b. --list-platforms reports the choices for the in-conversation selection.
+python3 "$DP" variants "$work/en.md" --config-json "$work/cfg-both.json" \
+  --root "$work/host" --list-platforms | python3 -c '
+import json,sys; d=json.load(sys.stdin)
+assert d["available"]==["devto","zenn"] and d["emitted"]==[], d' \
+  && ok "--list-platforms reports the emission choices" || err "--list-platforms wrong"
+
+# 8c. Owner picks only dev.to → no Zenn file exists anywhere; choice recorded.
+out=$(python3 "$DP" variants "$work/en.md" --config-json "$work/cfg-both.json" \
+        --root "$work/host" --out "$work/e8" --platforms devto)
+printf '%s' "$out" | python3 -c '
+import json,sys; d=json.load(sys.stdin)
+assert d["chosen"]==["devto"] and [e["platform"] for e in d["emitted"]]==["devto"], d' \
+  && ok "owner picks dev.to only; choice recorded in the summary" || err "single-choice emission wrong"
+[ -f "$work/e8/retry-storms.devto.md" ] && [ ! -f "$work/e8/retry-storms.zenn.md" ] \
+  && ok "picking dev.to leaves no Zenn file anywhere (FR57)" || err "unwanted variant file present"
+
+# 8d. Emission metadata: the canonical draft's content hash rides with the variant.
+grep -q 'canonical-sha256=[0-9a-f]\{64\}' "$work/e8/retry-storms.devto.md" \
+  && ok "emitted variant carries the canonical content hash (for 16.7 stale detection)" \
+  || err "canonical-sha256 metadata missing from the variant"
+
+# 8e. A platform not in the configured set is rejected.
+python3 "$DP" variants "$work/en.md" --config-json "$work/cfg-both.json" \
+  --root "$work/host" --out "$work/e8" --platforms medium >/dev/null 2>"$work/e_bad" \
+  && err "an unconfigured platform choice was accepted" \
+  || { grep -q 'not configured' "$work/e_bad" && ok "unconfigured platform choice rejected" \
+       || err "unconfigured-choice message wrong"; }
 
 if [ "$fail" -eq 0 ]; then
   printf '\nAll stage-5 variant checks passed.\n'; exit 0

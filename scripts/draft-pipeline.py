@@ -25,6 +25,7 @@ an undeclared path passed here cannot expand what gets read.
 """
 
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -669,8 +670,13 @@ def cmd_variants(args):
     of the canonical draft through declared platform profiles (Story 16.3). Which
     platforms come from the config canonical policy; HOW each is packaged comes
     entirely from that platform's profile (Story 16.1) — there is no hardcoded
-    per-platform code path. Each variant is written to the resolved output.drafts
-    location (or --out); the profile-resolution log lands in the run workspace.
+    per-platform code path. WHICH configured platforms are actually emitted is
+    the owner's explicit publish decision (Story 16.4): `--list-platforms` (or no
+    choice) reports the options and emits nothing; `--platforms <ids|all>` emits
+    exactly that subset — the stage never auto-emits every configured platform.
+    Each variant is written to the resolved output.drafts location (or --out),
+    carrying the canonical draft's content hash; the profile-resolution log lands
+    in the run workspace.
     """
     text = sys.stdin.read() if args.draft == "-" else open(args.draft, encoding="utf-8").read()
 
@@ -697,6 +703,33 @@ def cmd_variants(args):
         sys.stderr.write(f"error: no syndication.policy for language {lang!r} in config\n")
         return 1
     owner_variants = cfg.get("syndication", {}).get("variants", {})
+    available = list(policy.get("variants", []))
+
+    # Emission is per explicit publish decision (Story 16.4, CAP-3): the pipeline
+    # NEVER auto-emits all configured platforms. The owner's choice arrives as
+    # --platforms (a subset of `available`); `--list-platforms` (or no choice at
+    # all) reports the choices for the in-conversation selection and emits
+    # nothing. `--platforms all` is an explicit opt-in to every configured one.
+    if getattr(args, "list_platforms", False) or not getattr(args, "platforms", None):
+        print(json.dumps({"stage": "variants", "language": lang,
+                          "mode": policy.get("mode"), "available": available,
+                          "emitted": [], "written": False,
+                          "note": "choose platforms to emit with --platforms "
+                                  "<ids|all>; nothing is auto-emitted"}, indent=2))
+        return 0
+    requested = [p.strip() for p in args.platforms.split(",") if p.strip()]
+    chosen = available if requested == ["all"] else requested
+    unknown = [p for p in chosen if p not in available]
+    if unknown:
+        sys.stderr.write(
+            f"error: {', '.join(unknown)} not configured for language {lang!r} "
+            f"(available: {', '.join(available) or 'none'})\n")
+        return 1
+
+    # The canonical draft's content hash is recorded with every emitted variant
+    # (embedded + reported) so stale-variant detection (Story 16.7) can tell when
+    # a variant's source draft has moved since emission.
+    canonical_sha = hashlib.sha256(text.encode("utf-8")).hexdigest()
 
     # Resolve platform profiles — the single declaration source (no builder table).
     pp = _load("resolve-platform-profiles.py")
@@ -736,7 +769,7 @@ def cmd_variants(args):
 
     emitted = []
     blockers = []
-    for name in policy.get("variants", []):
+    for name in chosen:
         profile = profiles.get(name)
         if not profile:
             sys.stderr.write(
@@ -746,12 +779,18 @@ def cmd_variants(args):
             return 1
         content, blocked = _project_variant(fields, body, profile,
                                             owner_variants.get(name, {}))
+        # Emission metadata: the canonical draft's hash rides with the variant
+        # (an unobtrusive trailing comment both platforms ignore) so Story 16.7
+        # can detect a variant whose source draft has since changed.
+        content = content.rstrip("\n") + \
+            f"\n\n<!-- writing-assistant: canonical-sha256={canonical_sha} -->\n"
         path = os.path.join(out_dir, f"{slug}.{name}.md")
         if not args.dry_run:
             os.makedirs(out_dir, exist_ok=True)
             with open(path, "w", encoding="utf-8") as fh:
                 fh.write(content)
-        emitted.append({"platform": name, "path": path})
+        emitted.append({"platform": name, "path": path,
+                        "canonical_sha256": canonical_sha})
         if blocked:
             blockers.append({"platform": name, "blocker": "unrendered-mermaid"})
 
@@ -760,6 +799,8 @@ def cmd_variants(args):
         "next_stage": "review",           # draft exits into SPEC-article-review
         "language": lang,
         "mode": policy.get("mode"),
+        "available": available,
+        "chosen": chosen,                 # the owner's explicit publish decision
         "emitted": emitted,
         "written": not args.dry_run,
     }
@@ -1656,6 +1697,12 @@ def main(argv=None):
                          "the host repo (inside the host it is created automatically)")
     sp.add_argument("--dry-run", action="store_true", help="do not write files; just report")
     sp.add_argument("--ws", help="run workspace for intermediates (profile-resolution log)")
+    sp.add_argument("--platforms",
+                    help="comma-separated platform ids to emit (the owner's publish "
+                         "decision), or `all`; a subset of the configured platforms")
+    sp.add_argument("--list-platforms", action="store_true",
+                    help="report the configured platforms for this draft and emit "
+                         "nothing (feeds the in-conversation emission choice)")
     args = p.parse_args(argv)
     return {
         "start": cmd_start, "consume": cmd_consume, "interview": cmd_interview,
