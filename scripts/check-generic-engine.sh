@@ -48,6 +48,13 @@ grep_absent() {
 # A. Static proxy sweep (the AC's literal).
 grep_absent "tim-nish.dev" "static proxy"
 
+# A2. Publication boundary (#291, repo-onboarding C8): the shipped surface
+# describes the policy-seam mechanism generically — the owner hub's name and
+# its internal layout never appear; the real pointer lives only in generated
+# machine-global config.
+grep_absent "product-lab" "owner hub name"
+grep_absent "q_a/" "hub-layout detail (history/staging paths)"
+
 # B. Config-derived sweep.
 if python3 scripts/resolve-user-config.py resolved > "$work/cfg.json" 2>/dev/null; then
   python3 - "$work/cfg.json" > "$work/vals" <<'PY'

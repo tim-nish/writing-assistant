@@ -270,7 +270,7 @@ interaction in generic mode (seam CAP-6).
 Branch on its exit code — **the policy source is an enhancer, never a
 dependency; no exit code here may abort the run**:
 
-- **0** — the output leads with the run's pin (`pin: product-lab@<commit>`)
+- **0** — the output leads with the run's pin (`pin: <policy-source>@<commit>`)
   and each file's content line-numbered. Author **tension items** from it:
   questions whose `gap_type` is `contradiction`, `ambiguity`,
   `missing-rationale`, or `reversal-candidate`, each carrying its seed
@@ -457,7 +457,7 @@ anchor — nothing is invented.
 
 **The journal ends with the `consulted:` line (Story 14.4, CAP-5).** Its last
 key maps every seed to the question it seeded, under the run's pin —
-`consulted: product-lab@<commit> — LESSONS.md:41 → t1; …` — the /ask-style
+`consulted: <policy-source>@<commit> — LESSONS.md:41 → t1; …` — the /ask-style
 audit trail of which policy lines drove which questions. A run that was not
 policy-seeded records `consulted: none (policy_source unset)`, or, when the
 probe degraded, `consulted: none (policy_source unavailable: <reason>)` via
@@ -485,11 +485,11 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py staging-candidates \
   [--tag <track>] > "$WS/staging-candidates.md"
 ```
 
-Each block mirrors product-lab's `q_a/staging/` frontmatter (`slug, created,
+Each block mirrors the policy hub's staging-area frontmatter (`slug, created,
 source_repo, perishable, tags`) followed by the question and the owner's
 decision in full sentences (seam-formats.md §3). **This is where the tool
 stops**: the blocks land in the run workspace only — the owner copies accepted
-ones into `q_a/staging/` by hand, and nothing is ever written under
+ones into the hub's staging area by hand, and nothing is ever written under
 `policy_source.path`. A run with no answered tension questions emits nothing —
 never an empty block. When candidates were emitted, the completion summary's
 **informational notes** must name the file (`$WS/staging-candidates.md`) and
