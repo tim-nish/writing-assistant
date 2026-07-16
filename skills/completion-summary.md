@@ -10,10 +10,21 @@ Partition everything the run surfaced into exactly three labelled buckets:
 
 1. **Informational notes** — things worth knowing that need no action (counts,
    what was harvested, and — for an article body — the reading-time estimate).
+   For a run that reached Stage 5, this bucket also records the **emission
+   choice and its outcome** (the platforms offered vs. the owner's `chosen`
+   subset, and where each variant file landed — FR57) and, when one fired, the
+   **lede re-targeting touchpoint** (which variant carried a `lede_proposals`
+   entry and how the owner arbitrated it).
 2. **Publish blockers** — things that **must** be fixed before publishing: an
-   unresolved `[VERIFY]` marker, an unrendered figure, an open configuration
-   defect (CAP-5). A blocker appears **here and nowhere else** — never also under
-   informational notes or optional cleanup.
+   unresolved `[VERIFY]` marker, an unrendered figure (a `render_blockers`
+   entry from a profile whose platform cannot render the diagram), an open
+   configuration defect (CAP-5), a **platform-lint defect** on an emitted
+   variant (`lint-platform-variant`, CAP-5 of SPEC-platform-variants), or a
+   **stale variant** — a `publish_blockers` entry from `variant-staleness`
+   (`stale-variant` / `unrecorded-canonical-hash`, FR60): the canonical draft
+   moved since emission, so route the change to the draft and re-emit. A
+   blocker appears **here and nowhere else** — never also under informational
+   notes or optional cleanup.
 3. **Optional cleanup** — nice-to-have polish the owner may skip.
 
 ## Partial progress — never a silent loss (Story 13.7, CAP-6)
