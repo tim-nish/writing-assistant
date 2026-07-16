@@ -86,15 +86,15 @@ sed 's#^canonical_url:.*#canonical_url: not-a-url#' "$work/o/retry-storms.devto.
 python3 "$LINT" "$work/badcu.devto.md" --root "$work/host" 2>&1 \
   | grep -q "not a well-formed" && ok "malformed canonical_url reported" || err "canonical_url check wrong"
 
-# 5. Visual treatment: a Zenn variant with a RAW (un-commented) Mermaid fence
-#    fails; the packaging step's HTML-commented output passes.
-cat > "$work/raw.zenn.md" <<'EOF'
+# 5. Visual treatment: a dev.to variant (html-comment-blocked — dev.to does not
+#    render Mermaid) with a RAW (un-commented) Mermaid fence fails.
+cat > "$work/raw.devto.md" <<'EOF'
 ---
 title: "x"
-emoji: "📝"
-type: "tech"
-topics: ["a"]
 published: false
+description: d
+tags: a
+canonical_url: https://example.com/articles/x
 ---
 
 body
@@ -103,7 +103,7 @@ body
 graph TD; A-->B
 ```
 EOF
-python3 "$LINT" "$work/raw.zenn.md" --root "$work/host" 2>&1 \
+python3 "$LINT" "$work/raw.devto.md" --root "$work/host" 2>&1 \
   | grep -q 'not HTML-commented' && ok "raw Mermaid in a html-comment-blocked profile is a defect" \
   || err "visuals check wrong"
 

@@ -24,9 +24,9 @@ packaging:
   # Zenn is canonical via repo-sync, so a variant carries no canonical_url.
   canonical_url:
     policy: none
-  # Zenn does not render inline Mermaid, so a diagram is HTML-commented and a
-  # render publish blocker is raised (SPEC-article-visuals CAP-5).
-  visuals: html-comment-blocked
+  # Zenn renders fenced ```mermaid blocks natively, so a diagram is embedded
+  # directly with zero manual work (SPEC-article-visuals CAP-5).
+  visuals: mermaid-embedded
   # The Zenn-synced repo's TARGET DIRECTORY layout. This is a CONFORMANCE
   # RECORD of the platform's sync contract, never an authority: the
   # output.drafts destination repo's actual directory structure is
