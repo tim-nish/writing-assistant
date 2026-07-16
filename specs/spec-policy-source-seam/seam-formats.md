@@ -6,18 +6,22 @@ staging blocks) and illustrative for the human-facing `consulted:` line.
 
 ## 1. `policy_source` config block (`writing-sources.yaml`)
 
+*(Amended per SPEC-policy-topic-at-draft CAP-3, executed as Story 13.36 — the
+former `track:` / `topics:` config keys are **removed**; which `topics/*.md`
+files an article reads is chosen **per article at draft time** under the
+proposal contract, ≤2, owner-approved — SPEC-policy-topic-at-draft CAP-2. The
+pointer is the whole block.)*
+
 ```yaml
 policy_source:                     # optional — absent = generic interview, silently
   path: ../policy-hub              # local checkout of the owner's policy repo, resolved against host-repo root
-  track: eval-engineering          # optional — backlog track; matches topics/<stem>*.md
-  topics: [eval-engineering.md]    # optional — explicit override, basenames under topics/, max 2
 ```
 
-Validation (stage 0, `validate-config` path): `path` must be a string;
-`topics` entries must be plain basenames (no `/`, no `..`); `topics` length
-≤ 2. A malformed block is a configuration error naming key and fix. A
-well-formed block whose path is unusable at run time is NOT a config error —
-that is CAP-6 degradation.
+Validation (stage 0, `validate-config` path): `path` must be a string; a
+leftover legacy `track:` or `topics:` key is reported as a **named
+configuration error**. A malformed block is a configuration error naming key
+and fix. A well-formed block whose path is unusable at run time is NOT a
+config error — that is CAP-6 degradation.
 
 ## 2. Interview item
 
@@ -68,7 +72,7 @@ slug: 2026-07-14-<kebab-gist>
 created: <run date>
 source_repo: <host repo name>
 perishable: true|false
-tags: [<track>, ...]
+tags: [<question topic | policy-contradiction>, ...]   # + any --tag extras; never a config track (keys removed, Story 13.36)
 ---
 Q: <the interview question, full sentence>
 Decision: <the owner's answer as a durable statement, full sentences>
