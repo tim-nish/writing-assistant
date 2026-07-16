@@ -1,8 +1,10 @@
 #!/usr/bin/env sh
-# check-stage5-variants.sh — verify Stage 5 platform-ready variants (Story 4.6):
-# config-driven dev.to (EN/canonical) and Zenn (JA/external) emission, the
-# verified-draft precondition, and output to the resolved drafts location.
-# POSIX shell + stdlib Python.
+# check-stage5-variants.sh — verify Stage 5 as a PROFILE-DRIVEN projection
+# (Story 16.3, SPEC-platform-variants CAP-4): variants are projections of the
+# canonical draft through declared platform profiles; no hardcoded dev.to/Zenn
+# builder remains in stage code; frontmatter and visual treatment come from the
+# profile's packaging; the profile-resolution log lands in $WS and only variant
+# files land at output.drafts. POSIX shell + stdlib Python.
 
 set -eu
 
@@ -20,23 +22,38 @@ ok()  { printf 'ok:   %s\n' "$1"; }
 python3 -c "import py_compile; py_compile.compile('$DP', doraise=True)" 2>/dev/null \
   && ok "pipeline helper compiles" || { err "helper syntax error"; printf '\nFAILED.\n' >&2; exit 1; }
 
-# 1. Skill documents the Stage-5 contract.
+# 1. AC1 — no hardcoded platform builders / identifiers survive in stage code.
+if grep -nE '_devto_variant|_zenn_variant|VARIANT_BUILDERS' scripts/draft-pipeline.py >/dev/null 2>&1; then
+  err "hardcoded variant builders still present in stage code"
+else ok "hardcoded variant builders removed"; fi
+if grep -niE '\bdevto\b|\bzenn\b' scripts/draft-pipeline.py >/dev/null 2>&1; then
+  err "platform identifiers (devto/zenn) still appear in stage code"
+else ok "no platform identifiers in stage code (config + profiles carry them)"; fi
+
+# Skill still documents the Stage-5 contract.
 grep -q 'Stage 5 — platform-ready variants' "$SKILL" && ok "documents Stage 5" || err "Stage 5 not documented"
 grep -qi 'never a hardcoded' "$SKILL" && ok "states the config-driven (not hardcoded) mapping" || err "config-driven claim missing"
-grep -qi 'canonical_url' "$SKILL" && ok "documents the dev.to canonical_url placeholder" || err "canonical_url not documented"
-grep -qi 'Zenn' "$SKILL" && ok "documents the Zenn repo-sync variant" || err "Zenn variant not documented"
 grep -q 'output.drafts' "$SKILL" && ok "writes to the resolved output.drafts location" || err "output.drafts wiring missing"
 
+# Fixture: a controlled config home with resolvable platform profiles, and a
+# host root the resolver keys profiles to.
 work=$(mktemp -d); trap 'rm -rf "$work"' EXIT
+export XDG_CONFIG_HOME="$work/xdg"
+mkdir -p "$work/host"
+repo_key=$(python3 scripts/resolve-paths.py repo-key --root "$work/host")
+ppdir="$work/xdg/writing-assistant/repos/$repo_key/platform-profiles"
+mkdir -p "$ppdir"
+cp config/platform-profiles/devto.example.yaml "$ppdir/devto.yaml"
+cp config/platform-profiles/zenn.example.yaml "$ppdir/zenn.yaml"
 
 cat > "$work/cfg.json" <<'EOF'
 {"syndication":{"policy":{"en":{"mode":"canonical","variants":["devto"]},
 "ja":{"mode":"external","variants":["zenn"]}},
-"variants":{"devto":{"canonical_url_base":"https://example.com/articles"},
-"zenn":{"external_record_max_lines":20}}}}
+"variants":{"devto":{"canonical_url_base":"https://example.com/articles"}}}}
 EOF
 
-# 2. EN/canonical -> dev.to copy: full text + canonical_url placeholder.
+# 2. EN/canonical → dev.to projection: profile frontmatter + composed canonical_url,
+#    body carried over unchanged (mermaid embedded per the profile's visuals).
 cat > "$work/en.md" <<'EOF'
 ---
 slug: retry-storms
@@ -53,24 +70,41 @@ related: { projects: [], publications: [], products: [] }
 ## Hook
 
 The retry storm doubled token spend, and we caught it late.
+
+```mermaid
+graph TD; A-->B
+```
 EOF
-out=$(python3 "$DP" variants "$work/en.md" --config-json "$work/cfg.json" --out "$work/o")
+out=$(python3 "$DP" variants "$work/en.md" --config-json "$work/cfg.json" \
+        --root "$work/host" --out "$work/o" --ws "$work")
 printf '%s' "$out" | python3 -c '
 import json,sys
 d=json.load(sys.stdin)
 assert d["mode"]=="canonical" and d["language"]=="en", d
 assert [e["platform"] for e in d["emitted"]]==["devto"], d
 assert d["next_stage"]=="review", d
-' && ok "EN emits exactly a dev.to variant (config-driven)" || err "EN variant selection wrong"
+assert "render_blockers" not in d, d  # dev.to embeds mermaid, no blocker
+' && ok "EN emits exactly a dev.to variant (config-selected, profile-projected)" \
+  || err "EN variant selection/shape wrong"
 
 DEVTO="$work/o/retry-storms.devto.md"
 [ -f "$DEVTO" ] && ok "dev.to file written to the output location" || err "dev.to file not written"
 grep -q '^canonical_url: https://example.com/articles/retry-storms$' "$DEVTO" \
-  && ok "dev.to canonical_url placeholder built from config + slug" || err "canonical_url wrong"
+  && ok "dev.to canonical_url composed from owner value + profile format" || err "canonical_url wrong"
 grep -q 'The retry storm doubled token spend' "$DEVTO" \
-  && ok "dev.to copy carries the full article body" || err "dev.to body missing"
+  && ok "projection carries the article body unchanged" || err "dev.to body missing"
+grep -q '```mermaid' "$DEVTO" \
+  && ok "dev.to visuals=mermaid-embedded leaves the diagram inline" || err "dev.to mermaid handling wrong"
 
-# 3. JA/external -> Zenn repo-sync copy with Zenn frontmatter.
+# 2b. NFR17 — the profile-resolution log is an intermediate in $WS, not a product.
+[ -f "$work/platform-profiles.resolution.json" ] \
+  && ok "profile-resolution log lands in \$WS" || err "no profile-resolution log in \$WS"
+python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); assert sorted(d["resolved"])==["devto","zenn"], d' \
+  "$work/platform-profiles.resolution.json" \
+  && ok "resolution log records the resolved profiles" || err "resolution log content wrong"
+
+# 3. JA/external → Zenn projection + profile-declared visual treatment (mermaid
+#    HTML-commented, a render publish blocker raised).
 cat > "$work/ja.md" <<'EOF'
 ---
 slug: retry-arashi
@@ -86,20 +120,42 @@ related: { projects: [], publications: [], products: [] }
 ## フック
 
 本文。
+
+```mermaid
+graph TD; A-->B
+```
 EOF
-python3 "$DP" variants "$work/ja.md" --config-json "$work/cfg.json" --out "$work/o" | python3 -c '
+out=$(python3 "$DP" variants "$work/ja.md" --config-json "$work/cfg.json" \
+        --root "$work/host" --out "$work/o")
+printf '%s' "$out" | python3 -c '
 import json,sys
 d=json.load(sys.stdin)
 assert d["mode"]=="external", d
 assert [e["platform"] for e in d["emitted"]]==["zenn"], d
-' && ok "JA emits exactly a Zenn variant (config-driven)" || err "JA variant selection wrong"
+assert d.get("render_blockers")==[{"platform":"zenn","blocker":"unrendered-mermaid"}], d
+' && ok "JA emits a Zenn variant with a profile-declared render blocker" || err "JA variant/blocker wrong"
 
 ZENN="$work/o/retry-arashi.zenn.md"
 grep -q '^type: "tech"$' "$ZENN" && grep -q '^emoji:' "$ZENN" && grep -q '^published: false$' "$ZENN" \
-  && ok "Zenn frontmatter (emoji/type/published) emitted" || err "Zenn frontmatter wrong"
-grep -q '本文。' "$ZENN" && ok "Zenn copy carries the full body (repo-sync canonical)" || err "Zenn body missing"
+  && ok "Zenn frontmatter (emoji/type/published) from the profile" || err "Zenn frontmatter wrong"
+grep -q '本文。' "$ZENN" && ok "Zenn projection carries the full body" || err "Zenn body missing"
+grep -q '<!-- render blocker' "$ZENN" \
+  && ok "Zenn visuals=html-comment-blocked wraps the diagram" || err "Zenn visual treatment wrong"
 
-# 4. Verified-draft precondition: an unresolved [VERIFY] marker aborts Stage 5.
+# 4. A configured platform with no profile is a clear, actionable error.
+cat > "$work/cfg-noprofile.json" <<'EOF'
+{"syndication":{"policy":{"en":{"mode":"canonical","variants":["hashnode"]}}}}
+EOF
+if python3 "$DP" variants "$work/en.md" --config-json "$work/cfg-noprofile.json" \
+     --root "$work/host" --out "$work/o" >/dev/null 2>"$work/e_np"; then
+  err "a configured platform with no profile was not rejected"
+else
+  grep -q 'no platform profile' "$work/e_np" \
+    && ok "a configured platform with no profile is rejected, names the fix" \
+    || err "missing-profile message wrong: $(cat "$work/e_np")"
+fi
+
+# 5. Verified-draft precondition: an unresolved [VERIFY] marker aborts Stage 5.
 cat > "$work/bad.md" <<'EOF'
 ---
 slug: x
@@ -108,50 +164,38 @@ topics: [a]
 ---
 Body [VERIFY: still unresolved].
 EOF
-python3 "$DP" variants "$work/bad.md" --config-json "$work/cfg.json" --out "$work/o" >/dev/null 2>&1 \
+python3 "$DP" variants "$work/bad.md" --config-json "$work/cfg.json" \
+  --root "$work/host" --out "$work/o" >/dev/null 2>&1 \
   && err "emitted variants for an unverified draft" || ok "unresolved [VERIFY] aborts Stage 5"
 
-# 4b. External output.drafts guard (Story 13.24, #213): a config-resolved
-#     destination OUTSIDE the host repo that does not exist is refused without
-#     --create-out (nothing created); --create-out creates it. An in-host
-#     relative value keeps auto-creating. Hermetic config home.
-XDG_CONFIG_HOME="$work/xdg"; export XDG_CONFIG_HOME
-mkdir -p "$work/exthost"
-cat > "$work/exthost/writing-sources.yaml" <<YAML
+# 6. External output.drafts guard (#213): a config-resolved destination OUTSIDE
+#    the host repo that does not exist is refused without --create-out.
+cat > "$work/host/writing-sources.yaml" <<YAML
 sources:
   - path: .
 output:
   drafts: $work/external-drafts/
 YAML
 if python3 "$DP" variants "$work/en.md" --config-json "$work/cfg.json" \
-     --root "$work/exthost" >/dev/null 2>"$work/e_ext"; then
+     --root "$work/host" >/dev/null 2>"$work/e_ext"; then
   err "external missing output dir was not refused"
 else
   grep -q 'outside the host repo' "$work/e_ext" \
     && ok "external missing output dir refused, names the boundary" \
     || err "external refusal message wrong: $(cat "$work/e_ext")"
 fi
-[ ! -d "$work/external-drafts" ] && ok "refusal created nothing" || err "refusal still created the directory"
+[ ! -d "$work/external-drafts" ] && ok "refusal created nothing" || err "refusal created the directory"
 python3 "$DP" variants "$work/en.md" --config-json "$work/cfg.json" \
-  --root "$work/exthost" --create-out >/dev/null 2>/dev/null \
+  --root "$work/host" --create-out >/dev/null 2>/dev/null \
   && [ -f "$work/external-drafts/retry-storms.devto.md" ] \
   && ok "--create-out consents to creating the external destination" \
   || err "--create-out did not create/write the external destination"
-cat > "$work/exthost/writing-sources.yaml" <<'YAML'
-sources:
-  - path: .
-output:
-  drafts: articles/drafts/
-YAML
-python3 "$DP" variants "$work/en.md" --config-json "$work/cfg.json" \
-  --root "$work/exthost" >/dev/null 2>/dev/null \
-  && [ -f "$work/exthost/articles/drafts/retry-storms.devto.md" ] \
-  && ok "in-host relative output.drafts still auto-creates under the host root" \
-  || err "in-host relative output.drafts failed"
+rm -f "$work/host/writing-sources.yaml"
 
-# 5. --dry-run reports without writing.
+# 7. --dry-run reports without writing.
 rm -rf "$work/dry"
-python3 "$DP" variants "$work/en.md" --config-json "$work/cfg.json" --out "$work/dry" --dry-run | python3 -c '
+python3 "$DP" variants "$work/en.md" --config-json "$work/cfg.json" \
+  --root "$work/host" --out "$work/dry" --dry-run | python3 -c '
 import json,sys; d=json.load(sys.stdin); assert d["written"] is False, d'
 [ ! -d "$work/dry" ] && ok "--dry-run writes nothing" || err "--dry-run wrote files"
 
