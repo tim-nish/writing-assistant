@@ -364,6 +364,23 @@ def cmd_quality_gate(args):
     d4 = _dimension4(draft, prov_entries)
     results["dim4"] = ("pass", "") if not d4 else ("fail", "; ".join(d4))
 
+    # Audience presence — a stage-progression precondition (Story 13.41,
+    # SPEC-platform-variants CAP-4). `audience` is born at stage-3 fill, so this
+    # gate is where presence is enforceable on a fresh run; the variant stage's
+    # hard stop remains as backstop. Mechanical: frontmatter parse only.
+    try:
+        fields, _ = _read_frontmatter(draft)
+    except SystemExit:
+        fields = {}
+    aud = fields.get("audience")
+    if not aud or aud == "{audience}":
+        results["audience"] = ("fail",
+                               "frontmatter `audience` missing or unfilled — set the named "
+                               "reader at stage-3 fill (from the interview's audience answer, "
+                               "the backlog item, or the draft-start declaration)")
+    else:
+        results["audience"] = ("pass", "")
+
     failing = [d for d, (v, _) in results.items() if v == "fail"]
     out = {"gate": "quality", "pass": not failing,
            "dimensions": {d: {"verdict": v, "locations": loc} for d, (v, loc) in results.items()},

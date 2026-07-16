@@ -29,8 +29,15 @@ python3 -c "import py_compile; py_compile.compile('$DP', doraise=True)" 2>/dev/n
 
 work=$(mktemp -d); trap 'rm -rf "$work"' EXIT
 
-# A clean, well-mixed draft + map + all-pass judge verdicts.
+# A clean, well-mixed draft + map + all-pass judge verdicts. Carries the
+# pipeline-internal `audience` field (a gate precondition since Story 13.41).
 cat > "$work/good.md" <<'MD'
+---
+slug: t
+title: The one claim
+language: en
+audience: en-practitioner
+---
 # The one claim
 
 Structured discovery halved our token bill. We measured it across the suite.
@@ -75,9 +82,19 @@ python3 "$DP" quality-gate --draft "$work/good.md" --map "$work/stitch-map.txt" 
   && err "stitched fact sheet reached stage 4" || ok "stitched fact sheet does not reach stage 4 unrevised"
 
 # A wall-of-text paragraph fails dim4 mechanically (no judge needed).
-python3 -c "print('# t\n\n' + ' '.join('word%d'%i for i in range(200)) + '.')" > "$work/wall.md"
+python3 -c "print('---\nslug: w\naudience: en-practitioner\n---\n# t\n\n' + ' '.join('word%d'%i for i in range(200)) + '.')" > "$work/wall.md"
 python3 "$DP" quality-gate --draft "$work/wall.md" | jget 'd["dimensions"]["dim4"]["verdict"]' | grep -q fail \
   && ok "a wall-of-text paragraph fails dim4 (mechanical)" || err "wall of text passed dim4"
+
+# Story 13.41 — audience presence is a stage-progression precondition: a draft
+# with an unfilled (or absent) `audience` fails the gate mechanically.
+sed 's/^audience:.*/audience: {audience}/' "$work/good.md" > "$work/noaud.md"
+python3 "$DP" quality-gate --draft "$work/noaud.md" --map "$work/good-map.txt" --judge "$work/judge-pass.txt" >/dev/null 2>&1 \
+  && err "an unfilled audience passed the gate" \
+  || ok "an unfilled audience fails the gate (stage-progression precondition)"
+python3 "$DP" quality-gate --draft "$work/noaud.md" --map "$work/good-map.txt" --judge "$work/judge-pass.txt" \
+  | jget '"audience" in d["failing_dimensions"]' | grep -q True \
+  && ok "the audience precondition is named in failing_dimensions" || err "audience failure not named"
 
 # SKILL contract: precondition wording, mechanical dim4 + judged dims1-3,
 # bounded ≤2 cycles re-running both gates, publish blocker, NFR12.

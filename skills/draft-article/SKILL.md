@@ -176,6 +176,15 @@ printf '{"stage":"variants","next_stage":"done"}' | \
 Checkpoint state lives under `$WS` with the other intermediates
 (`docs/storage-architecture.md` D2), never in the host tree.
 
+**Resumed-run audience recheck (Story 13.41 — stage 0's half of the presence
+rule).** When `stage0`/`autostart` resumes a run (`"resumed": true`) whose
+`next_stage` is `verify` or `variants` — i.e. a filled draft already exists among
+the intermediates — confirm that draft carries a **resolved `audience`** before
+continuing (a run checkpointed before the audience precondition existed may lack
+it). If it is missing or still `{audience}`, fill it per the Stage-3 rule and
+re-run the quality gate; the variant stage's hard stop remains the mechanical
+backstop either way.
+
 ## Stage 1 — harvest and consume its output
 
 Hand the run to the `harvest` skill to produce its output document at
@@ -512,6 +521,16 @@ so a schema change propagates without editing the fill:
 python3 ${CLAUDE_PLUGIN_ROOT}/scripts/render-frontmatter.py --language <en|ja>
 ```
 
+**Fill `audience` here (Story 13.41 — this is where the field is born).** The
+skeleton carries a pipeline-internal `audience: {audience}` slot: replace it with
+the **one named reader** — from the interview's audience answer (q5) when one was
+given, from the backlog item's declared audience when drafting from the backlog,
+or from the owner's draft-start declaration otherwise. Never leave the `{audience}`
+placeholder: the stage 3→4 quality gate fails on it (a stage-progression
+precondition), and the variant stage hard-stops as backstop. The field is
+pipeline-internal — variant packaging strips it, and it never enters the site
+schema.
+
 **Provenance — every sentence is one of three classes (Story 11.1;
 `docs/harness-architecture.md` D1).** Synthesis is legal without abandoning the
 zero-unmarked-claims guarantee, because provenance attaches at the **claim**
@@ -684,6 +703,9 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py quality-gate \
   tokens): sentence/paragraph-length distributions, heading density, and — from
   the provenance map — the **stitched-fact-sheet** signature (wall-to-wall
   `sourced` claims, no `derived`/`narration` tissue).
+- **Audience presence is checked mechanically here too (Story 13.41):** an
+  absent or unfilled `audience` fails the gate — the named reader must be set at
+  stage-3 fill before the draft can progress.
 - **Dimensions 1–3** are judged by **one single-pass cheap-tier rubric judge**
   emitting **pass/fail per dimension + failing locations, no rewritten text**;
   its verdicts feed `--judge`. Like `verify-provenance` (NFR13), this judge runs
@@ -855,6 +877,55 @@ Each variant is publishable on its platform with **no manual reformatting beyond
 filling the canonical URL**. The draft then exits this pipeline into
 SPEC-article-review (`next_stage: review`).
 
+### Platform lint — every emitted variant gets it (Story 13.41, CAP-5)
+
+Immediately after emitting each variant, run the **profile-parameterized
+mechanical lint** on it (zero LLM tokens; each defect reported `path:line`):
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/lint-platform-variant <variant-file> \
+  --root <host-repo> --ws "$WS" [--dest-repo <output.drafts repo root>]
+```
+
+Pass `--dest-repo` when the profile declares a target directory layout so the
+existence check runs against the **`output.drafts` destination repo**. A lint
+defect is a **publish blocker** for that variant (CAP-6 bucket) — relay each
+finding; never re-run a structure/prose/cold-read pass on a variant.
+
+### Stale-variant check — before any publish handoff (Story 13.41, FR60)
+
+On a **resumed run** that already emitted variants, and always **before handing
+variants to the owner for publishing**, verify no variant's canonical draft has
+moved since emission:
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py variant-staleness <draft> --root <host-repo>
+```
+
+Any `publish_blockers` entry (`stale-variant` / `unrecorded-canonical-hash`)
+goes to the completion summary's blocker bucket. The remedy is structural: route
+the change to the canonical draft, **re-emit** the variant (which records the
+new hash), never edit the variant in place.
+
+### Post-publish next step — the site's external record (Story 13.41, FR62)
+
+For a variant whose language maps to `mode: external` in `syndication.policy`
+(the site holds a record, not the body), the completion summary's next-step
+choice includes — **after the owner publishes** — "confirm the published URL →
+generate the site record". This runs **outside** the per-article attention
+budget (post-publish), and the offer is **re-presentable on any later
+invocation** until the owner confirms; it is never silently dropped:
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py site-record <draft> \
+  --url <final published URL> [--date <real publication date>] --ws "$WS"
+```
+
+The output is a **ready-to-paste proposal** (≤ line budget, body forbidden)
+written to `$WS` only — applying it to the site tree is the owner's act; the
+pipeline never writes the site tree. Without `--url` it reports the offer as
+pending — re-offer it next invocation.
+
 ## Completion summary
 
 End every run with the shared
@@ -907,4 +978,6 @@ pipeline order. This is the authoritative flag list — consult it instead of
 | `verify-markers` | 3/4 | Validate `[VERIFY: reason]` markers; `--count` prints the count (drive to 0) | `<draft\|->` `--count` |
 | `verify` | 4 | Build the owner verification worklist, one entry per marker | `<draft\|->` |
 | `reroute` | 4 | Reroute an over-budget section into a new bounded interview question (Story 4.5) | `--rewrites` (req) `--section` |
-| `variants` | 5 | Emit platform-ready variants keyed by the draft's `language` | `<draft>` `--config-json` `--root` `--global-config` `--repo-config` `--out` `--dry-run` |
+| `variants` | 5 | Emit platform-ready variants as profile-driven projections; emission is the owner's explicit choice — no `--platforms` reports options and emits nothing | `<draft>` `--platforms <ids\|all>` `--list-platforms` `--config-json` `--root` `--global-config` `--repo-config` `--out` `--create-out` `--ws` `--dry-run` |
+| `variant-staleness` | 5/post | Compare each variant's recorded canonical hash against the current draft; mismatches are publish blockers (Story 16.7) | `<draft\|->` `--variants <files…>` `--out` `--root` |
+| `site-record` | post-publish | Propose the site's `mode: external` record after the owner confirms the published URL (Story 16.9); proposal lands in `$WS` only | `<draft\|->` `--url` `--date` `--config-json` `--root` `--global-config` `--repo-config` `--ws` |
