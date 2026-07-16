@@ -1,0 +1,216 @@
+#!/usr/bin/env python3
+"""Profile-parameterized mechanical lint for an emitted platform variant
+(Story 16.6 / SPEC-platform-variants CAP-5).
+
+An emitted variant gets THIS lint instead of a second review: the full article
+review (SPEC-article-review) and the quality gate run on the canonical draft
+only. Every check here is a deterministic string/parse/filesystem operation
+parameterized entirely by the variant's platform PROFILE (Story 16.1) — it
+spends no LLM tokens and re-runs no structure/prose/cold-read pass. Each defect
+is reported `path:line`.
+
+Checks (all driven by `profile.packaging`, never a hardcoded platform rule):
+
+  1. frontmatter schema — every field in `packaging.frontmatter` is present.
+  2. tag cap           — the tags/topics field carries <= `packaging.tag_cap`.
+  3. TL;DR placement   — when `packaging.tldr_placement` is not `none`, a TL;DR
+                         marker is present.
+  4. canonical-URL     — when present, it is a well-formed http(s) URL.
+  5. です/ます (ja)     — a `language: ja` variant does not mix polite (です/ます)
+                         and plain (だ/である) sentence forms (heuristic).
+  6. visuals treatment — `packaging.visuals` was applied: `html-comment-blocked`
+                         leaves no raw ```mermaid fence outside an HTML comment.
+  7. layout existence  — every `packaging.layout` target directory EXISTS in the
+                         output.drafts destination repo (the repo's actual
+                         structure is authoritative; a missing dir means the
+                         profile — a conformance record — is the defect, ratified
+                         2026-07-16).
+
+Validator convergence (#206, NFR18): each rejectable form has a sanctioned
+emitting path — the packaging step (draft-pipeline `variants`) reads the SAME
+`packaging` values this lint checks — so a variant the pipeline emits passes its
+own lint.
+
+The platform is taken from the file name `<slug>.<platform>.md` (or --platform).
+Lint output also lands in the run workspace when --ws is given. Exit 0 when the
+variant is clean, 1 on any defect, 2 on a usage error. Stdlib-only.
+"""
+
+import argparse
+import importlib.util
+import json
+import os
+import re
+import sys
+
+HERE = os.path.dirname(os.path.realpath(__file__))
+
+
+def _load(mod_filename):
+    name = mod_filename.replace(".py", "").replace("-", "_")
+    spec = importlib.util.spec_from_file_location(name, os.path.join(HERE, mod_filename))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+pp = _load("resolve-platform-profiles.py")
+
+
+def infer_platform(path, override):
+    if override:
+        return override
+    base = os.path.basename(path)
+    parts = base.split(".")
+    # <slug>.<platform>.md  ->  parts[-2]
+    if len(parts) >= 3 and parts[-1] == "md":
+        return parts[-2]
+    sys.stderr.write(f"error: cannot infer platform from {base!r}; pass --platform\n")
+    raise SystemExit(2)
+
+
+def parse_frontmatter(lines):
+    """Return (fields, fm_end_index) where fields maps key -> (raw_value, line_no,
+    parsed_list_or_none). Line numbers are 1-based. fm_end_index is the 0-based
+    index of the closing `---` (or None if there is no frontmatter)."""
+    if not lines or lines[0].strip() != "---":
+        return {}, None
+    end = None
+    for i in range(1, len(lines)):
+        if lines[i].strip() == "---":
+            end = i
+            break
+    if end is None:
+        return {}, None
+    fields = {}
+    for i in range(1, end):
+        m = re.match(r"^([A-Za-z_][\w-]*):\s*(.*)$", lines[i])
+        if not m:
+            continue
+        key, val = m.group(1), m.group(2).strip()
+        lst = None
+        if val.startswith("[") and val.endswith("]"):
+            inner = val[1:-1].strip()
+            lst = [t.strip().strip('"\'') for t in inner.split(",") if t.strip()]
+        elif "," in val and key in ("tags", "topics"):
+            lst = [t.strip() for t in val.split(",") if t.strip()]
+        fields[key] = (val, i + 1, lst)
+    return fields, end
+
+
+POLITE = re.compile(r"(です|ます)[。！？]")
+PLAIN = re.compile(r"(である|[^ま]だ)[。！]")
+
+
+def lint(path, platform, profiles, dest_repo):
+    findings = []           # (line, message)
+    prof = profiles.get(platform)
+    if prof is None:
+        findings.append((0, f"no platform profile {platform!r} resolved; cannot lint"))
+        return findings
+    packaging = prof.get("packaging", {}) or {}
+
+    with open(path, encoding="utf-8") as fh:
+        text = fh.read()
+    lines = text.splitlines()
+    fields, fm_end = parse_frontmatter(lines)
+    body = "\n".join(lines[fm_end + 1:]) if fm_end is not None else text
+    body_offset = (fm_end + 1) if fm_end is not None else 0
+
+    # 1. Frontmatter schema — every profile-declared field present.
+    for field in packaging.get("frontmatter", []) or []:
+        if field not in fields:
+            findings.append((1, f"frontmatter missing profile-declared field {field!r}"))
+
+    # 2. Tag cap.
+    cap = packaging.get("tag_cap")
+    if cap is not None:
+        for tagkey in ("tags", "topics"):
+            if tagkey in fields:
+                raw, ln, lst = fields[tagkey]
+                count = len(lst) if lst is not None else (1 if raw else 0)
+                if count > cap:
+                    findings.append((ln, f"{tagkey} has {count} entries; profile caps at {cap}"))
+
+    # 3. TL;DR placement (only when the profile asks for one).
+    tldr = packaging.get("tldr_placement")
+    if tldr not in (None, "", "none") and not re.search(r"TL;?DR", body, re.IGNORECASE):
+        findings.append((1, f"packaging.tldr_placement={tldr!r} but no TL;DR marker in the body"))
+
+    # 4. canonical_url well-formedness.
+    if "canonical_url" in fields:
+        raw, ln, _ = fields["canonical_url"]
+        if not re.match(r"^https?://\S+$", raw):
+            findings.append((ln, f"canonical_url {raw!r} is not a well-formed http(s) URL"))
+        else:
+            after = re.sub(r"^https?://", "", raw)
+            if "//" in (after[after.find("/"):] if "/" in after else ""):
+                findings.append((ln, f"canonical_url {raw!r} has a double slash in its path"))
+
+    # 5. です/ます consistency for ja.
+    if prof.get("language") == "ja" and POLITE.search(body) and PLAIN.search(body):
+        m = PLAIN.search(body)
+        ln = body_offset + body[:m.start()].count("\n") + 1
+        findings.append((ln, "mixes polite (です/ます) and plain (だ/である) forms; "
+                             "keep です/ます consistency for ja"))
+
+    # 6. Visual treatment applied.
+    if packaging.get("visuals") == "html-comment-blocked":
+        for m in re.finditer(r"^```mermaid", body, re.MULTILINE):
+            ln = body_offset + body[:m.start()].count("\n") + 1
+            preceding = body[:m.start()]
+            # inside an HTML comment if the last `<!--` is unclosed before here
+            if preceding.rfind("<!--") <= preceding.rfind("-->"):
+                findings.append((ln, "Mermaid block is not HTML-commented "
+                                     "(packaging.visuals=html-comment-blocked not applied)"))
+
+    # 7. Layout target directories exist in the destination repo.
+    layout = packaging.get("layout") or {}
+    target = layout.get("dir")
+    if target and dest_repo:
+        if not os.path.isdir(os.path.join(dest_repo, target)):
+            findings.append((0, f"profile declares target directory {target!r} absent from the "
+                               f"destination repo {dest_repo!r}; the repo's actual structure is "
+                               "authoritative — the profile (a conformance record) is the defect"))
+
+    return findings
+
+
+def main(argv=None):
+    p = argparse.ArgumentParser(description=__doc__,
+                                formatter_class=argparse.RawDescriptionHelpFormatter)
+    p.add_argument("variant", help="the emitted variant file (<slug>.<platform>.md)")
+    p.add_argument("--platform", help="platform id (default: inferred from the file name)")
+    p.add_argument("--root", help="host-repo root (default: git toplevel of cwd)")
+    p.add_argument("--profiles-dir", help="override the profiles directory")
+    p.add_argument("--dest-repo", help="the output.drafts destination repo root "
+                                       "(for the layout-existence check)")
+    p.add_argument("--ws", help="run workspace for the lint output (intermediate)")
+    args = p.parse_args(argv)
+
+    if not os.path.isfile(args.variant):
+        sys.stderr.write(f"error: no such variant file: {args.variant}\n")
+        return 2
+    platform = infer_platform(args.variant, args.platform)
+    pdir = pp.profiles_dir(pp.host_root(args.root), args.profiles_dir)
+    profiles, _ = pp.load_profiles(pdir)
+
+    findings = lint(args.variant, platform, profiles, args.dest_repo)
+
+    if args.ws:
+        try:
+            with open(os.path.join(args.ws, f"platform-lint.{platform}.json"),
+                      "w", encoding="utf-8") as fh:
+                json.dump({"variant": args.variant, "platform": platform,
+                           "findings": [{"line": ln, "message": msg} for ln, msg in findings]},
+                          fh, indent=2)
+        except OSError as exc:  # pragma: no cover - defensive
+            sys.stderr.write(f"warning: could not write lint output: {exc}\n")
+
+    for ln, msg in findings:
+        sys.stderr.write(f"{args.variant}:{ln}: {msg}\n")
+    return 1 if findings else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
