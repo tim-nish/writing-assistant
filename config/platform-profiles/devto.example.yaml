@@ -1,0 +1,39 @@
+# platform-profiles/devto.example.yaml — dev.to publication profile (Story 16.1).
+#
+# Copy to the machine-global per-repo profiles directory (NEVER the host repo):
+#   dir=$(python3 scripts/resolve-paths.py repo-config-dir --root <host-repo>)
+#   cp config/platform-profiles/devto.example.yaml "$dir/platform-profiles/devto.yaml"
+#
+# A profile declares platform PACKAGING only. Publishing INTENT — the
+# canonical/external decision — lives in user config's `syndication.policy`,
+# never here; a profile that declares `mode`/`canonical`/`syndication` is
+# rejected at stage 0 (Story 16.2). Adding a third platform is one more file
+# like this one and zero stage-code changes.
+
+platform: devto
+
+# The one named reader this variant is framed for. When a profile's
+# audience/language equals the canonical draft's, emission is pure packaging
+# with no lede re-targeting proposal (Story 16.5).
+audience: en-practitioner
+language: en
+
+packaging:
+  # Field set emitted in the platform's frontmatter (Forem schema).
+  frontmatter: [title, published, description, tags, canonical_url]
+  # Forem caps tags at 4; each is lowercased-alphanumeric.
+  tag_cap: 4
+  # dev.to surfaces the `description` frontmatter; no in-body TL;DR.
+  tldr_placement: none
+  cover: optional
+  # canonical_url is WHERE/FORMAT only — the base VALUE is an owner value in
+  # user config (owner.site_url / syndication.variants), never duplicated here.
+  canonical_url:
+    policy: point-to-site
+    format: "{base}/{slug}"
+  # Diagram-rendering treatment (SPEC-article-visuals CAP-5): dev.to renders
+  # fenced ```mermaid blocks inline.
+  visuals: mermaid-embedded
+
+# Where this audience's end-pointer points (the distribution call-to-action).
+distribution_hook: newsletter-follow
