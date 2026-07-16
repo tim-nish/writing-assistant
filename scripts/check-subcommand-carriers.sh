@@ -50,10 +50,14 @@ for sub in $subs; do
 done
 
 # 3. Standalone shipped scripts that skills must carry too (same failure class):
-#    the platform lint (Story 16.6) is invoked by the draft-article Stage-5 flow.
+#    the platform lint (Story 16.6) is invoked by the draft-article Stage-5 flow;
+#    the arbitration-event emitter (Story 13.42) by review-article's arbitration.
 grep -rq "lint-platform-variant" skills/ \
   && ok "lint-platform-variant: invocation site present in skills/" \
   || err "lint-platform-variant: ORPHAN — no skill invokes it"
+grep -rq "emit-arbitration-events.py" skills/ \
+  && ok "emit-arbitration-events.py: invocation site present in skills/" \
+  || err "emit-arbitration-events.py: ORPHAN — no skill invokes it"
 
 if [ "$fail" -eq 0 ]; then
   printf '\nAll subcommand-carrier checks passed.\n'; exit 0
