@@ -5,11 +5,10 @@ companions:
   - ../spec-article-frameworks/SPEC.md
   - ../spec-article-draft-pipeline/SPEC.md
   - ../spec-article-review/SPEC.md
-  - ../spec-article-visuals/SPEC.md      # accepted 2026-07-10 (q_a/a1.md)
+  - ../spec-article-visuals/SPEC.md      # accepted 2026-07-10 (prior dogfooding round)
 sources:
-  - ../../../website/q_a/3/question.md  # external: website repo (sibling checkout), traceability only
-  - ../../q_a/q1.md                     # dogfooding Q&A round 1, traceability only (file removed 2026-07-16)
-  - ../../q_a/a1.md                     # dogfooding Q&A round 1, traceability only (file removed 2026-07-16)
+  # Originating private site repo, decision round (traceability only).
+  # Prior dogfooding review round (private; records removed 2026-07-16), traceability only.
   - ../../docs/dogfood-findings.md      # dogfood evidence behind the 2026-07-10 amendments
   - ../../docs/harness-architecture.md  # 2026-07-11 article-quality harness decision behind the 2026-07-11 amendments
   - ../../docs/storage-architecture.md  # 2026-07-11 storage & footprint decision behind the footprint invariant
@@ -78,7 +77,7 @@ An opportunity to capture plus a vision to realize: the article specs already pr
 
 ## Deferred specs (trigger-gated, not part of the current build)
 
-Written 2026-07-10 (`q_a/a1.md`) so the build decisions are pre-made; each fires mechanically when its frontmatter `build-trigger` is met, with `docs/dogfood-findings.md` as the tripwire. They are deliberately **not** companions: companions are the current build contract.
+Written 2026-07-10 (prior dogfooding round) so the build decisions are pre-made; each fires mechanically when its frontmatter `build-trigger` is met, with `docs/dogfood-findings.md` as the tripwire. They are deliberately **not** companions: companions are the current build contract.
 
 - [`../spec-article-restructure/SPEC.md`](../spec-article-restructure/SPEC.md) — intent-changing re-outline + fact-preserving re-fill. Trigger: ≥3 logged runs with whole-section post-review manual edits.
 - [`../spec-article-index/SPEC.md`](../spec-article-index/SPEC.md) — machine-global metadata index (pointers + one-line claims, never bodies). Trigger: 5 published pipeline articles, or first observed self-repetition.

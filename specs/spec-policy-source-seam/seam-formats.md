@@ -8,7 +8,7 @@ staging blocks) and illustrative for the human-facing `consulted:` line.
 
 ```yaml
 policy_source:                     # optional — absent = generic interview, silently
-  path: ../product-lab             # local checkout, resolved against host-repo root
+  path: ../policy-hub              # local checkout of the owner's policy repo, resolved against host-repo root
   track: eval-engineering          # optional — backlog track; matches topics/<stem>*.md
   topics: [eval-engineering.md]    # optional — explicit override, basenames under topics/, max 2
 ```
@@ -58,7 +58,7 @@ Validator rejection classes (each a seeded test fixture):
 ## 3. Staging-candidate block (run output, proposal-only)
 
 Emitted when an interview answer contains a durable decision or reversal;
-schema mirrors product-lab `q_a/staging/` frontmatter. The owner copies
+schema mirrors the policy hub's staging-area frontmatter. The owner copies
 accepted blocks by hand.
 
 ```markdown
@@ -77,7 +77,7 @@ Decision: <the owner's answer as a durable statement, full sentences>
 ## 4. `consulted:` line (end of interview run artifact)
 
 ```
-consulted: product-lab@8f3c2d1 — GLOSSARY.md#writing-assistant → q2;
+consulted: policy-hub@8f3c2d1 — GLOSSARY.md#writing-assistant → q2;
 LESSONS.md:41 (report-trust-is-structural) → q3; topics/eval-engineering.md:12-14 → q5
 ```
 

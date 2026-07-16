@@ -34,7 +34,7 @@ Same grammar as the interview seam's (seam `seam-formats.md` §4), mapping
 checked policy lines to findings instead of questions:
 
 ```
-consulted: product-lab@6357d9f… — LESSONS.md:39 → finding 1; GLOSSARY.md:123 → (no conflict)
+consulted: policy-hub@6357d9f… — LESSONS.md:39 → finding 1; GLOSSARY.md:123 → (no conflict)
 ```
 
 Skipped-pass runs emit `consulted: none (policy_source unset)` or

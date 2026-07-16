@@ -7,8 +7,7 @@ build-trigger: >
 relates:
   - ../spec-writing-assistant/SPEC.md   # extends the identity/engine split: index location is user config
 sources:
-  - ../../q_a/q1.md      # dogfooding Q&A round 1, traceability only (file removed 2026-07-16)
-  - ../../q_a/a1.md      # dogfooding Q&A round 1, traceability only (file removed 2026-07-16)
+  # Prior dogfooding review round (private; records removed 2026-07-16), traceability only.
 ---
 
 > **Deferred contract.** This spec exists so the build decision is pre-made and fires mechanically on evidence: the dogfood findings log and the published-article count are the tripwires. Until the `build-trigger` in frontmatter is met, this spec generates no epics, stories, or code.

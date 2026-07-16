@@ -3,15 +3,14 @@ id: SPEC-article-review
 companions:
   - review-prompts.md
 sources:
-  - ../../../website/q_a/2/question.md  # external: website repo (sibling checkout), traceability only
-  - ../../../website/q_a/2/answer.md    # external: website repo (sibling checkout), traceability only
-  - ../../q_a/a1.md                     # dogfooding Q&A round 1, traceability only (file removed 2026-07-16)
+  # Originating private site repo, decision round (traceability only).
+  # Prior dogfooding review round (private; records removed 2026-07-16), traceability only.
   - ../../docs/dogfood-findings.md      # dogfood evidence behind the 2026-07-10 amendments
   - ../../docs/harness-architecture.md  # 2026-07-11 article-quality harness decision behind the 2026-07-11 amendments
 ---
 
-> **Vendored copy.** Adopted verbatim from the website repo (`website/_bmad-output/specs/spec-article-review/`, 2026-07-09) per SPEC-writing-assistant; this copy is now the canonical version for this project. Repo-internal references (`q_a/…`) refer to the website repo.
-> **Amended 2026-07-10** per accepted dogfood findings (`docs/dogfood-findings.md`, `q_a/a1.md`): arbitration prompts follow SPEC-writing-assistant's owner-facing proposal contract; configuration defects are separated from article-quality findings and gate the "publishable" verdict.
+> **Vendored copy.** Adopted verbatim from the originating private site repo (2026-07-09) per SPEC-writing-assistant; this copy is now the canonical version for this project. Bare archive references refer to that originating repo.
+> **Amended 2026-07-10** per accepted dogfood findings (`docs/dogfood-findings.md`, prior dogfooding round): arbitration prompts follow SPEC-writing-assistant's owner-facing proposal contract; configuration defects are separated from article-quality findings and gate the "publishable" verdict.
 > **Amended 2026-07-11** per the article-quality harness decision (`docs/harness-architecture.md`, D3): severity is criterion-anchored — findings carry a rationale field naming the criterion that sets their severity; quality-rubric violations are blocker-eligible and block "publishable".
 
 > **Canonical contract.** This SPEC and the files in `companions:` are the complete, preservation-validated contract for what to build, test, and validate. Source documents listed in frontmatter are for traceability only — consult them only if you need narrative rationale or prose color this contract intentionally omits.
@@ -20,7 +19,7 @@ sources:
 
 ## Why
 
-A pain to solve: the owner wants article review that maximizes ROI while keeping token costs low, and initially framed editing as "process tokens" to minimize. Reframed (q_a/2 answer §0.3): a published article is a permanent public artifact; the true process cost is unbounded iterative churn. The design goal is therefore maximum defect yield per pass with a fixed, small number of passes — mechanical checks cost zero tokens, LLM passes run once each on cheap models, and the owner arbitrates findings in a single round.
+A pain to solve: the owner wants article review that maximizes ROI while keeping token costs low, and initially framed editing as "process tokens" to minimize. Reframed (ratified owner decision §0.3): a published article is a permanent public artifact; the true process cost is unbounded iterative churn. The design goal is therefore maximum defect yield per pass with a fixed, small number of passes — mechanical checks cost zero tokens, LLM passes run once each on cheap models, and the owner arbitrates findings in a single round.
 
 ## Capabilities
 

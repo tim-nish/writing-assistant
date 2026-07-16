@@ -52,7 +52,7 @@ sources:
   - path: ../research-notes        # sibling checkout
     include: ["notes/**", "specs/**"]
 output:
-  drafts: ~/work/articles/drafts/  # where drafts + platform variants land — an
+  drafts: ~/articles/drafts/       # where drafts + platform variants land — an
                                    # external (private) articles repo by default,
                                    # never required to be inside the host repo
 ```

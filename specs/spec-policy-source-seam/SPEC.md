@@ -5,7 +5,8 @@ companions:
   - ../spec-article-draft-pipeline/SPEC.md            # adopted: CAP-2 triage contract this seam feeds
   - ../spec-article-draft-pipeline/pipeline-stages.md # adopted: Stage-2 question bank + interview journal
 sources:
-  - ../../../product-lab/q_a/2026-07-14-writing-assistant-seam/answer.md  # authoritative external contract (read-only)
+  # Authoritative external contract — owner decision record 2026-07-14 (writing-assistant seam),
+  # held in the owner's private policy hub, retrievable by date + title (read-only).
 ---
 
 > **Adopted 2026-07-14.** Promoted from `_bmad-output/specs/spec-policy-source-seam/` (BMAD-generated, owner-approved 2026-07-14, implemented as Epic 14, issues #178–#182) per the canonical-spec promotion convention (#188); **this copy is now the canonical version**. The BMAD memlog stays with the generating workspace — it is process state, not contract.
@@ -18,21 +19,21 @@ sources:
 
 ## Why
 
-An opportunity to capture, ratified 2026-07-14: product-lab is the owner's authoritative policy repository (glossary, lessons, topic positions), and the Stage-2 gap interview currently asks generic questions blind to those positions. The hardest interview input is the *right question*; reading the recall surface lets the tool generate questions specific to the owner's recorded positions — surfacing tension (contradictions, reversals, missing rationale), never confirmation. The seam is a local read-only pointer: writing-assistant reads a bounded slice of product-lab, the owner decides everything, and contribution back is proposal-only. Build order is ratified: this input side ships first; the review-side consistency pass (A2) later reuses the same plumbing.
+An opportunity to capture, ratified 2026-07-14: the owner keeps an authoritative policy hub (glossary, lessons, topic positions) in a separate private repository, and the Stage-2 gap interview currently asks generic questions blind to those positions. The hardest interview input is the *right question*; reading the recall surface lets the tool generate questions specific to the owner's recorded positions — surfacing tension (contradictions, reversals, missing rationale), never confirmation. The seam is a local read-only pointer: writing-assistant reads a bounded slice of that policy hub, the owner decides everything, and contribution back is proposal-only. Build order is ratified: this input side ships first; the review-side consistency pass (A2) later reuses the same plumbing.
 
 ## Capabilities
 
 - **CAP-1** — `policy_source` config key
-  - **intent:** A host repo may declare an optional `policy_source` block in `writing-sources.yaml`: a local filesystem `path` to the product-lab checkout, an optional `track` (the article-backlog track naming which topic files match), and an optional explicit `topics:` list overriding track matching. No URL scheme, no sync protocol — the pointer is the integration.
+  - **intent:** A host repo may declare an optional `policy_source` block in `writing-sources.yaml`: a local filesystem `path` to the policy-hub checkout, an optional `track` (the article-backlog track naming which topic files match), and an optional explicit `topics:` list overriding track matching. No URL scheme, no sync protocol — the pointer is the integration.
   - **success:** A repo with the block gets policy-seeded interviews; a repo without it behaves exactly as today; `validate-config` reports a malformed block (non-string path, >2 topics, non-basename topic entries) as a stage-0 configuration error naming the key and fix.
 - **CAP-2** — bounded, pinned, read-only policy reader
-  - **intent:** A reader script resolves and reads **only** `GLOSSARY.md`, `LESSONS.md`, and ≤2 `topics/*.md` files matched from the track (or the explicit `topics:` list, same cap) under `policy_source.path`, and records the pin `product-lab@<commit>` (`git rev-parse HEAD` at that path). The whitelist is enforced in code — the function takes the allowlist; `q_a/` and every other path are structurally unreadable; the reader never writes outside the host run workspace.
-  - **success:** Asking the reader for any path outside the whitelist (including any `q_a/` path) is refused by code regardless of prompt; every emitted policy quote carries `file:line@commit` (harvest pointer convention); the run artifact records the pin; no file under `policy_source.path` is ever created or modified.
+  - **intent:** A reader script resolves and reads **only** `GLOSSARY.md`, `LESSONS.md`, and ≤2 `topics/*.md` files matched from the track (or the explicit `topics:` list, same cap) under `policy_source.path`, and records the pin `<policy-source>@<commit>` (the resolved path's basename + `git rev-parse HEAD` at that path). The whitelist is enforced in code — the function takes the allowlist; the hub's history archive and every other path are structurally unreadable; the reader never writes outside the host run workspace.
+  - **success:** Asking the reader for any path outside the whitelist (including any history-archive path) is refused by code regardless of prompt; every emitted policy quote carries `file:line@commit` (harvest pointer convention); the run artifact records the pin; no file under `policy_source.path` is ever created or modified.
 - **CAP-3** — schema-enforced, question-shaped interview items
   - **intent:** Every Stage-2 candidate question is emitted as an interview item `{id, gap_type, seed: {quote, pointer} | null, question, owner_answer: ""}` (companion `seam-formats.md`). `gap_type` extends the NEEDS-OWNER taxonomy with four tension types — `contradiction`, `ambiguity`, `missing-rationale`, `reversal-candidate` — the only types a policy seed may generate. A validator rejects: a pre-filled `owner_answer`, a tension-typed item without a seed, a seed without a pinned pointer, and a seeded question that merely restates its seed (confirmation is not a gap type).
   - **success:** Each rejection class has a seeded test fixture that the validator fails; a valid item set passes; validation runs before triage so a bad item can never reach the owner.
 - **CAP-4** — staging-candidate emitter (proposal-only contribute-back)
-  - **intent:** When an interview answer contains a durable decision or reversal, the run output appends a staging-candidate block whose schema mirrors `q_a/staging/` frontmatter (`slug, created, source_repo, perishable, tags` + question/decision in full sentences; companion). The tool stops there — the owner copies accepted blocks into product-lab by hand.
+  - **intent:** When an interview answer contains a durable decision or reversal, the run output appends a staging-candidate block whose schema mirrors the policy hub's staging-area frontmatter (`slug, created, source_repo, perishable, tags` + question/decision in full sentences; companion). The tool stops there — the owner copies accepted blocks into the policy hub by hand.
   - **success:** A run whose answers contain a reversal emits a schema-valid block in its run output; no run ever writes a file under `policy_source.path`.
 - **CAP-5** — `consulted:` auditability line
   - **intent:** The interview run artifact ends with an `/ask`-style `consulted:` line naming which glossary entries, lessons, and topic lines seeded which questions (companion format).
@@ -48,22 +49,22 @@ An opportunity to capture, ratified 2026-07-14: product-lab is the owner's autho
 - The whitelist, the ≤2-topics cap, and read-only-ness are code-enforced (reader takes an allowlist), never prompt-enforced.
 - Reader and validator are stdlib-only Python in `scripts/` (repo convention: no PyYAML, no JS/TS); each ships with a `check-*.sh` harness like every other script.
 - Seed pointers use the existing `file:line@commit` harvest convention — no new pointer format.
-- The product-lab checkout is never modified, and nothing from `q_a/` (including `q_a/staging/`) is ever read.
+- The policy-hub checkout is never modified, and nothing from its history archive (including its staging area) is ever read.
 
 ## Non-goals
 
 - A2 — the review-article policy-consistency pass (ships later as this plumbing's second consumer).
-- Automated contribute-back: no writes into product-lab, no PR automation; the manual copy is the design until it proves to be real friction.
+- Automated contribute-back: no writes into the policy hub, no PR automation; the manual copy is the design until it proves to be real friction.
 - Sync/export pipelines, URL/remote policy sources, embeddings or semantic search over policy or history, cross-repo `/ask` or any invocation mechanism.
 - Redesigning Stage-2 triage, recommendations, or the interview journal beyond the additive fields named here.
 
 ## Success signal
 
-A draft-article run in a host repo pointing at product-lab asks at least one tension-typed question quoting a pinned policy line the owner recognizes as their own position — and the same run with `policy_source` removed completes identically minus the seeded questions.
+A draft-article run in a host repo pointing at the policy hub asks at least one tension-typed question quoting a pinned policy line the owner recognizes as their own position — and the same run with `policy_source` removed completes identically minus the seeded questions.
 
 ## Assumptions
 
 - One host repo maps to one backlog track, so `policy_source.track` is a per-repo config value rather than a per-invocation argument (explicit `topics:` covers exceptions).
-- Track→topic matching is by filename stem under `topics/` (e.g. track `eval-engineering` matches `topics/eval-engineering*.md`), capped at 2; no mapping table is imported from product-lab.
+- Track→topic matching is by filename stem under `topics/` (e.g. track `eval-engineering` matches `topics/eval-engineering*.md`), capped at 2; no mapping table is imported from the policy hub.
 - Absent `track` and `topics:`, the reader reads GLOSSARY + LESSONS only — still a valid seeded run.
 

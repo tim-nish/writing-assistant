@@ -4,8 +4,8 @@
 Origin: owner UX proposal during the 2026-07-15 QSB dogfood run, after the
 first-run gap surfaced twice (a host repo with no machine-global config fails
 closed with no guided path; a config without `policy_source` silently loses the
-policy narrative). Policy-guard reviewed against the recall surface at
-`product-lab@173588733677` — conforms; advisory tensions recorded in the run
+policy narrative). Policy-guard reviewed against the owner's pinned recall
+surface — conforms; advisory tensions recorded in the run
 transcript and folded into Constraints below.
 
 > **Amended 2026-07-15 (triage, #230)** per SPEC-policy-topic-at-draft: the
@@ -103,7 +103,7 @@ degraded interview when `policy_source` was never considered.
 
 - Changing interview/run-time behavior in any way (degrade stays silent).
 - Remote/URL policy sources, sync, or multi-machine config distribution.
-- Editing product-lab or any policy repo (proposal-only contribute-back
+- Editing the policy hub or any policy repo (proposal-only contribute-back
   stands).
 - A second config store or a migration away from `writing-sources.yaml` —
   the file format is unchanged; this spec only adds sanctioned writers and a

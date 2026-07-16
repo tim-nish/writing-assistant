@@ -6,7 +6,8 @@ companions:
   - ../spec-article-review/SPEC.md            # adopted: the review pipeline this pass joins (pass order, findings format, arbitration)
   - ../spec-article-review/review-prompts.md  # adopted: severity criteria table carries the policy-contradiction row
 sources:
-  - ../../../product-lab/q_a/2026-07-14-writing-assistant-seam/answer.md  # authoritative external contract §3 (read-only)
+  # Authoritative external contract §3 — owner decision record 2026-07-14 (writing-assistant seam),
+  # held in the owner's private policy hub, retrievable by date + title (read-only).
 ---
 
 > **Adopted 2026-07-14.** Promoted from `_bmad-output/specs/spec-policy-consistency-pass/` (BMAD-generated, owner-approved 2026-07-14, implemented as Epic 15, issues #197–#200, PRs #201–#204) per the canonical-spec promotion convention (README "BMAD / hand-written separation", #188); **this copy is now the canonical version**. The BMAD memlog stays with the generating workspace — process state, not contract.
@@ -17,7 +18,7 @@ sources:
 
 ## Why
 
-The ratified 2026-07-14 seam decision ordered two consumers of one read/pin/consulted plumbing: the interview seam (A1, shipped as Epic 14 and dogfooded) first, then this output-side check as the second — proportionality to the first use case rather than a cross-repo framework. The gap it closes: a draft can now *assert* something that contradicts a position recorded in product-lab, and nothing catches it before publication. The pass is contradiction detection for the owner's judgment — never a conformity filter: a flagged conflict may mean the article is wrong, or that the position moved, and only the owner decides which; a correct reversal routes back to the recall surface as a staging-candidate block while the article stands.
+The ratified 2026-07-14 seam decision ordered two consumers of one read/pin/consulted plumbing: the interview seam (A1, shipped as Epic 14 and dogfooded) first, then this output-side check as the second — proportionality to the first use case rather than a cross-repo framework. The gap it closes: a draft can now *assert* something that contradicts a position recorded in the owner's policy hub, and nothing catches it before publication. The pass is contradiction detection for the owner's judgment — never a conformity filter: a flagged conflict may mean the article is wrong, or that the position moved, and only the owner decides which; a correct reversal routes back to the recall surface as a staging-candidate block while the article stands.
 
 ## Capabilities
 
@@ -41,14 +42,14 @@ The ratified 2026-07-14 seam decision ordered two consumers of one read/pin/cons
 
 - **Contradiction only, never conformity:** the pass flags conflicts; it never suggests aligning the article to policy, never proposes diffs, and never auto-conforms — the owner's arbitration is the only path to any change.
 - Pass mechanics inherit SPEC-article-review verbatim: once per draft version, cheap tier, ≤10 findings, no rewritten text, owner is sole arbiter, proposal-contract presentation.
-- The policy surface read is the seam's bounded read — nothing beyond GLOSSARY.md, LESSONS.md, and the ≤2 matched topics; never `q_a/`; never a write under `policy_source.path`; staging-candidate blocks land in the run workspace only, hand-copied by the owner.
+- The policy surface read is the seam's bounded read — nothing beyond GLOSSARY.md, LESSONS.md, and the ≤2 matched topics; never the hub's history archive; never a write under `policy_source.path`; staging-candidate blocks land in the run workspace only, hand-copied by the owner.
 - Cold-read robustness (seam side effect, this epic's cleanup): the cold-read comparison against the interview journal's q2/q5 entries must tolerate a **capped** q5 (policy seeds can displace it under the ≤5 budget) — it reports an absent anchor as a finding-free note, never fails the pass.
 - Scripts stay stdlib-only Python / POSIX shell with `check-*.sh` harnesses (repo convention).
 
 ## Non-goals
 
 - Auto-conforming rewrites, auto-applied fixes, or any diff proposal from this pass.
-- Automated writes into product-lab (staging emission stays proposal-only, workspace-only).
+- Automated writes into the policy hub (staging emission stays proposal-only, workspace-only).
 - Extending the cold read's context (it remains isolation-by-design; the policy surface is never shown to it).
 - Semantic search, embeddings, additional policy repos, or any read beyond the seam's whitelist.
 - A third consumer of the seam — nothing here generalizes the plumbing beyond its two ratified users.
