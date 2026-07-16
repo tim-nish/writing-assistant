@@ -917,6 +917,111 @@ def cmd_variant_staleness(args):
     return 0
 
 
+def cmd_site_record(args):
+    """Propose the site's `mode: external` record AFTER the owner publishes an
+    external-canonical variant (Story 16.9, FR62). The record is not a variant
+    and no platform profile is consulted — the site is owner identity, not a
+    platform. Its load-bearing field (the final published URL) exists only after
+    the publish event, so this is a post-publish, post-budget step: without a
+    confirmed `--url` it reports the offer as pending (re-runnable — the offer is
+    never dropped); with one it builds a ready-to-paste record conforming to the
+    user-config site frontmatter schema and writes the PROPOSAL to the run
+    workspace only — never the site tree (applying it is the owner's act).
+    """
+    text = sys.stdin.read() if args.draft == "-" else open(args.draft, encoding="utf-8").read()
+    fields, _ = _read_frontmatter(text)
+    lang = fields.get("language")
+    if not lang:
+        sys.stderr.write("error: draft frontmatter has no `language`\n")
+        return 1
+
+    rf = _load("render-frontmatter.py")
+    cfg_args = argparse.Namespace(config_json=args.config_json, root=args.root,
+                                  global_config=args.global_config, repo_config=args.repo_config)
+    cfg = rf.load_config(cfg_args)
+    mode = (cfg.get("syndication", {}).get("policy", {}).get(lang, {}) or {}).get("mode")
+    if mode != "external":
+        print(json.dumps({"stage": "site-record", "language": lang, "mode": mode,
+                          "applicable": False,
+                          "note": f"language {lang!r} is canonical on the site; "
+                                  "no external record is needed"}, indent=2))
+        return 0
+
+    # Site-record schema constants come from the owner's `site_record` block in
+    # user config (Story 16.1 routing: the external-record schema is owner-site
+    # identity, not platform packaging). Absent → the ratified defaults.
+    site_rec = cfg.get("site_record") or {}
+    max_lines = site_rec.get("external_record_max_lines", 20)
+    body_forbidden = site_rec.get("body_forbidden", True)
+
+    if not args.url:
+        print(json.dumps({"stage": "site-record", "language": lang, "mode": "external",
+                          "applicable": True, "url_confirmed": False,
+                          "note": "confirm the final published URL to generate the site "
+                                  "record — re-run with --url; the offer persists until then"},
+                         indent=2))
+        return 0
+
+    schema = (cfg.get("frontmatter", {}) or {}).get("schema", []) or []
+    slug = fields.get("slug") or "draft"
+    pub_date = args.date or fields.get("date") or "{date}"
+    related_keys = (cfg.get("frontmatter", {}) or {}).get("related_keys",
+                                                          ["projects", "publications", "products"])
+
+    def field_line(name):
+        if name == "mode":
+            return "mode: external"
+        if name == "slug":
+            return f"slug: {slug}"
+        if name == "title":
+            return f'title: "{fields.get("title", "{title}")}"'
+        if name == "date":
+            return f"date: {pub_date}"          # the REAL publication date
+        if name == "language":
+            return f"language: {lang}"
+        if name == "summary":
+            return f"summary: {fields.get('summary', '')}"
+        if name == "topics":
+            return "topics: [" + ", ".join(fields.get("topics", []) or []) + "]"
+        if name == "related":
+            return "related: { " + ", ".join(f"{k}: []" for k in related_keys) + " }"
+        # audience and any non-site field are never emitted into the record.
+        return None
+
+    lines = ["---"]
+    for name in schema:
+        line = field_line(name)
+        if line is not None:
+            lines.append(line)
+    lines.append(f"canonical_url: {args.url}")   # index-facing pointer to the published copy
+    lines.append("---")
+    record = "\n".join(lines) + "\n"             # body forbidden — no body follows
+
+    proposal_path = None
+    if args.ws:
+        proposal_path = os.path.join(args.ws, f"site-record.{slug}.md")
+        try:
+            with open(proposal_path, "w", encoding="utf-8") as fh:
+                fh.write(record)
+        except OSError as exc:  # pragma: no cover - defensive
+            sys.stderr.write(f"warning: could not write site-record proposal: {exc}\n")
+            proposal_path = None
+
+    out = {
+        "stage": "site-record",
+        "language": lang, "mode": "external",
+        "applicable": True, "url_confirmed": True, "url": args.url,
+        "lines": len(lines), "max_lines": max_lines, "body_forbidden": body_forbidden,
+        "over_line_budget": len(lines) > max_lines,
+        "proposal_path": proposal_path,
+        "record": record,
+        "note": "proposal only — apply it to the site yourself (or via a site-side "
+                "command); the pipeline never writes the site tree",
+    }
+    print(json.dumps(out, indent=2, ensure_ascii=False))
+    return 0
+
+
 def cmd_interview(args):
     """Stage 2: triage every candidate question against the harvest output
     (fact sheet + NEEDS-OWNER) into exactly one of three outcomes, then present
@@ -1817,6 +1922,17 @@ def main(argv=None):
                     "(default: scan output.drafts for this draft's slug)")
     st.add_argument("--out", help="output dir holding the variants (default: resolved output.drafts)")
     st.add_argument("--root", help="host-repo root (default: git top-level of cwd)")
+
+    sr = sub.add_parser("site-record")
+    sr.add_argument("draft", nargs="?", default="-", help="canonical draft, or - for stdin")
+    sr.add_argument("--url", help="the final published URL (the owner confirms it "
+                    "post-publish); without it the offer is reported as pending")
+    sr.add_argument("--date", help="the real publication date (default: the draft's date)")
+    sr.add_argument("--config-json")
+    sr.add_argument("--root", help="host-repo root (default: git top-level of cwd)")
+    sr.add_argument("--global-config")
+    sr.add_argument("--repo-config")
+    sr.add_argument("--ws", help="run workspace for the proposal (never the site tree)")
     args = p.parse_args(argv)
     return {
         "start": cmd_start, "consume": cmd_consume, "interview": cmd_interview,
@@ -1829,6 +1945,7 @@ def main(argv=None):
         "verify-markers": cmd_verify_markers, "verify": cmd_verify, "reroute": cmd_reroute,
         "variants": cmd_variants,
         "variant-staleness": cmd_variant_staleness,
+        "site-record": cmd_site_record,
     }[args.cmd](args)
 
 
