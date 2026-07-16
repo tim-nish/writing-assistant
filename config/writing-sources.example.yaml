@@ -37,10 +37,10 @@ output:
   # In-host alternative (resolves relative to the host-repo root, NOT the cwd):
   # drafts: articles/drafts/
 
-# Optional: point the Stage-2 interview at your policy repo (product-lab) so it
+# Optional: point the Stage-2 interview at your policy repo so it
 # can seed tension questions from your recorded positions. Absent = the
 # interview runs exactly as before. The read is bounded IN CODE to GLOSSARY.md,
-# LESSONS.md, and at most 2 topics/*.md files — never q_a/, never a write — and
+# LESSONS.md, and at most 2 topics/*.md files — never the hub's history archive, never a write — and
 # every run pins the repo's commit. An unusable path (missing, unreadable, not
 # a git repo) is not a config error: the interview logs one line and degrades
 # to generic questions.
@@ -49,4 +49,4 @@ output:
 # config. The former track / topics keys were removed (Story 13.36); a
 # leftover key is reported as a named configuration error.
 # policy_source:
-#   path: ../product-lab                 # local checkout; plain path, no URL/sync
+#   path: ../policy-hub                  # local checkout of your policy repo; plain path, no URL/sync

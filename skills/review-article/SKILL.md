@@ -408,7 +408,7 @@ path into the policy repo:
 python3 ${CLAUDE_PLUGIN_ROOT}/scripts/read-policy-source.py --root "$HOST" read
 ```
 
-The output leads with the run's pin (`pin: product-lab@<commit>`) and each
+The output leads with the run's pin (`pin: <policy-source>@<commit>`) and each
 whitelisted file's content line-numbered (GLOSSARY.md, LESSONS.md, ≤2
 track-matched topics — the whitelist is code-enforced). Then compare the
 draft's checkable claims against the surface and flag **conflicts only**:
@@ -453,7 +453,7 @@ policy lines to the findings they produced:
 
 ```
 python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py review-consulted \
-  --pin <product-lab@sha from the reader> --findings <policy-findings.json> \
+  --pin <policy-source@sha from the reader> --findings <policy-findings.json> \
   --file GLOSSARY.md --file LESSONS.md [--file topics/<matched>.md]
 # skipped pass:  … review-consulted --policy-note ["policy_source unavailable: <reason>"]
 ```
@@ -559,7 +559,7 @@ effect:
 - **Position moved** → "the article stands; record the reversal for the recall
   surface" — the run emits a **staging-candidate block** (the Story-14.5
   emitter, `--findings` form) into the run workspace for the owner to
-  hand-copy into `q_a/staging/`; the draft text and its "publishable"
+  hand-copy into the hub's staging area; the draft text and its "publishable"
   eligibility are unchanged;
 - **Dismiss** → "no effect" — recorded as dismissed.
 
