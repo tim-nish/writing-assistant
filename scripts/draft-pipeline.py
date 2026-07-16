@@ -726,6 +726,18 @@ def cmd_variants(args):
             f"(available: {', '.join(available) or 'none'})\n")
         return 1
 
+    # The canonical draft must declare its named reader (Story 16.5): the
+    # lede-retarget trigger is a deterministic comparison of the draft's declared
+    # `audience`/`language` against each profile's, so a missing/unfilled
+    # `audience` is a hard stop here (presence enforced before any variant).
+    draft_audience = fields.get("audience")
+    if not draft_audience or draft_audience == "{audience}":
+        sys.stderr.write(
+            "error: draft frontmatter has no resolved `audience`; the "
+            "pipeline-internal audience field (the named reader) must be filled "
+            "before variants — set it at draft time.\n")
+        return 1
+
     # The canonical draft's content hash is recorded with every emitted variant
     # (embedded + reported) so stale-variant detection (Story 16.7) can tell when
     # a variant's source draft has moved since emission.
@@ -769,6 +781,7 @@ def cmd_variants(args):
 
     emitted = []
     blockers = []
+    lede_proposals = []
     for name in chosen:
         profile = profiles.get(name)
         if not profile:
@@ -777,6 +790,15 @@ def cmd_variants(args):
                 f"Add `{name}.yaml` under {pdir} "
                 "(see config/platform-profiles/*.example.yaml).\n")
             return 1
+        # Lede-retarget trigger (Story 16.5): a DETERMINISTIC comparison of the
+        # declared `audience`/`language` — draft vs profile. Inequality on either
+        # calls for exactly one judgment step (re-targeting the lede/framing to
+        # the profile's named reader; です/ます for `ja`), presented to the owner
+        # as a proposal — the variant's only owner touchpoint. Equality means
+        # pure packaging, no proposal. The trigger is never agent judgment over
+        # content, and there is no `lede_retarget` profile override field.
+        retarget = (draft_audience != profile.get("audience")
+                    or lang != profile.get("language"))
         content, blocked = _project_variant(fields, body, profile,
                                             owner_variants.get(name, {}))
         # Emission metadata: the canonical draft's hash rides with the variant
@@ -789,10 +811,22 @@ def cmd_variants(args):
             os.makedirs(out_dir, exist_ok=True)
             with open(path, "w", encoding="utf-8") as fh:
                 fh.write(content)
-        emitted.append({"platform": name, "path": path,
-                        "canonical_sha256": canonical_sha})
+        entry = {"platform": name, "path": path, "canonical_sha256": canonical_sha,
+                 "lede_retarget": retarget}
+        emitted.append(entry)
         if blocked:
             blockers.append({"platform": name, "blocker": "unrendered-mermaid"})
+        if retarget:
+            # One proposal per cross-audience variant — the SKILL performs the
+            # actual re-targeting (a judgment step) and presents it under the
+            # owner-facing proposal contract. The script only fires the trigger.
+            lede_proposals.append({
+                "platform": name, "path": path,
+                "draft_audience": draft_audience, "draft_language": lang,
+                "profile_audience": profile.get("audience"),
+                "profile_language": profile.get("language"),
+                "register": "です/ます" if profile.get("language") == "ja" else None,
+            })
 
     out = {
         "stage": "variants",
@@ -806,6 +840,8 @@ def cmd_variants(args):
     }
     if blockers:
         out["render_blockers"] = blockers
+    if lede_proposals:
+        out["lede_proposals"] = lede_proposals   # SKILL presents one per variant
     print(json.dumps(out, indent=2))
     return 0
 

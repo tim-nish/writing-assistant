@@ -61,6 +61,7 @@ title: "Retry storms doubled our token spend"
 date: 2026-07-09
 mode: canonical
 language: en
+audience: en-practitioner
 summary: >
   How an innocuous retry policy tripled load and what we changed.
 topics: [llm-ops, reliability]
@@ -113,6 +114,7 @@ title: "リトライ嵐"
 date: 2026-07-09
 mode: external
 language: ja
+audience: ja-practitioner
 summary: 本文の要約。
 topics: [llm-ops]
 related: { projects: [], publications: [], products: [] }
@@ -245,6 +247,37 @@ python3 "$DP" variants "$work/en.md" --config-json "$work/cfg-both.json" \
   && err "an unconfigured platform choice was accepted" \
   || { grep -q 'not configured' "$work/e_bad" && ok "unconfigured platform choice rejected" \
        || err "unconfigured-choice message wrong"; }
+
+# 9. Story 16.5 — deterministic lede-retarget trigger (declared-field comparison).
+#    The EN draft (audience en-practitioner, language en) matches the dev.to
+#    profile → no proposal; it differs from the Zenn profile (ja-practitioner,
+#    ja) → exactly one lede proposal (です/ます register).
+rm -rf "$work/e9"
+out=$(python3 "$DP" variants "$work/en.md" --config-json "$work/cfg-both.json" \
+        --root "$work/host" --out "$work/e9" --platforms all)
+printf '%s' "$out" | python3 -c '
+import json,sys; d=json.load(sys.stdin)
+rt={e["platform"]:e["lede_retarget"] for e in d["emitted"]}
+assert rt=={"devto":False,"zenn":True}, d
+props=d.get("lede_proposals",[])
+assert len(props)==1 and props[0]["platform"]=="zenn", d
+assert props[0]["register"]=="です/ます", d' \
+  && ok "lede trigger: match=no proposal, audience/language mismatch=one proposal" \
+  || err "lede-retarget trigger wrong"
+
+# 9b. The pipeline-internal audience field is stripped from emitted variants.
+grep -q '^audience:' "$work/e9/retry-storms.devto.md" \
+  && err "audience field leaked into the emitted variant" \
+  || ok "audience is stripped from emitted variant frontmatter"
+
+# 9c. A draft with an unfilled audience is a hard stop before any variant.
+sed 's/^audience:.*/audience: {audience}/' "$work/en.md" > "$work/noaud.md"
+python3 "$DP" variants "$work/noaud.md" --config-json "$work/cfg.json" \
+  --root "$work/host" --out "$work/e9" --platforms devto >/dev/null 2>"$work/e_aud" \
+  && err "a draft with an unfilled audience was accepted" \
+  || { grep -q 'no resolved `audience`' "$work/e_aud" \
+       && ok "unfilled audience is a hard stop (presence enforced)" \
+       || err "audience-presence message wrong: $(cat "$work/e_aud")"; }
 
 if [ "$fail" -eq 0 ]; then
   printf '\nAll stage-5 variant checks passed.\n'; exit 0

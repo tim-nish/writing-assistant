@@ -791,7 +791,21 @@ were offered, which the owner emitted, and where each file landed (an owner who
 picks only one platform leaves no file for the others, anywhere).
 
 - **Precondition:** the draft carries **zero `[VERIFY]` markers** — Stage 4 must
-  be complete. Any unresolved marker aborts the stage.
+  be complete. Any unresolved marker aborts the stage. The draft must also
+  declare a resolved `audience` (the named reader) — an unfilled one is a hard
+  stop.
+- **Lede re-targeting proposal (Story 16.5), the variant's only owner
+  touchpoint.** For each emitted variant the pipeline fires a **deterministic
+  trigger** — it compares the draft's declared `audience`/`language` against the
+  profile's. When they **differ** (e.g. a Zenn/JA profile for an EN draft) the
+  variant carries `lede_retarget: true` and a `lede_proposals` entry. Perform
+  **exactly one** judgment step for it: re-target the lede and framing to the
+  profile's named reader (です/ます register for `ja`) **without introducing any
+  claim absent from the canonical draft**, and present it under the
+  [owner-facing proposal contract](../owner-facing-proposal-contract.md)
+  (approve / modify / replace). When audience and language **match**, emission is
+  pure packaging — **no proposal, no touchpoint**. The trigger is never your
+  judgment over content; there is no `lede_retarget` profile field.
 - **Emission metadata:** each emitted variant carries the canonical draft's
   content hash (a trailing `canonical-sha256` comment) so a later run can flag a
   variant whose source draft has since changed (Story 16.7).
