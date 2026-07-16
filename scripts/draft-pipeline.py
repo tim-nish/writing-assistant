@@ -533,46 +533,109 @@ def _read_frontmatter(text):
     return fields, body
 
 
-def _devto_variant(fields, body, variant_cfg):
-    """dev.to (Forem) copy: full text, `canonical_url` placeholder pointing back
-    at the site page. Tags are sanitized to Forem's alphanumeric rule (≤4)."""
-    slug = fields.get("slug", "{slug}")
-    base = variant_cfg.get("canonical_url_base", "{site_url}/articles")
-    tags = []
-    for t in fields.get("topics", []) or []:
-        clean = re.sub(r"[^a-z0-9]", "", t.lower())
-        if clean and clean not in tags:
-            tags.append(clean)
-    fm = [
-        "---",
-        f"title: {fields.get('title', '{title}')}",
-        "published: false",
-        f"description: {fields.get('summary', '')}",
-        f"tags: {', '.join(tags[:4])}",
-        f"canonical_url: {base}/{slug}",   # placeholder — owner confirms/repoints
-        "---",
-    ]
-    return "\n".join(fm) + "\n\n" + body.rstrip() + "\n"
+# --------------------------------------------------------------------------
+# Profile-driven variant projection (Story 16.3, SPEC-platform-variants CAP-4).
+#
+# A variant is a PROJECTION of the canonical draft: the body carries over
+# unchanged (claims, evidence, provenance, section structure), and the
+# frontmatter is rendered from the platform PROFILE's `packaging`, never from a
+# per-platform code path. There is no per-platform function and no builder table
+# — one field-renderer registry keyed by field NAME serves every platform, so
+# adding a platform is a profile file (Story 16.1) and zero stage-code change.
+# --------------------------------------------------------------------------
+
+# Fenced ```mermaid block, used by the profile-declared visual treatment.
+_MERMAID_FENCE = re.compile(r"^```mermaid[^\n]*\n.*?^```[^\n]*$", re.MULTILINE | re.DOTALL)
 
 
-def _zenn_variant(fields, body, variant_cfg):
-    """Zenn repo-sync copy: Zenn frontmatter, full body (Zenn is canonical via
-    repo-sync). `emoji` is a placeholder the owner may change."""
-    topics = [re.sub(r"[^a-z0-9]", "", t.lower()) for t in (fields.get("topics", []) or [])]
-    topics = [t for t in topics if t][:5]
-    fm = [
-        "---",
-        f'title: "{fields.get("title", "{title}")}"',
-        'emoji: "📝"',                     # placeholder — owner may change
-        'type: "tech"',
-        "topics: [" + ", ".join(f'"{t}"' for t in topics) + "]",
-        "published: false",
-        "---",
-    ]
-    return "\n".join(fm) + "\n\n" + body.rstrip() + "\n"
+def _sanitize_tags(topics, cap):
+    """Lowercase-alphanumeric, de-duplicated, capped at the profile's tag_cap."""
+    out = []
+    for t in topics or []:
+        clean = re.sub(r"[^a-z0-9]", "", str(t).lower())
+        if clean and clean not in out:
+            out.append(clean)
+    return out[:cap] if cap else out
 
 
-VARIANT_BUILDERS = {"devto": _devto_variant, "zenn": _zenn_variant}
+def _canonical_url(fields, packaging, owner_values):
+    """Compose canonical_url per packaging.canonical_url (WHERE/FORMAT); the base
+    VALUE is an owner value from user config (never duplicated in the profile).
+    Returns None when the profile declares `policy: none` (a repo-sync-canonical
+    platform, whose variant carries no canonical_url)."""
+    cu = packaging.get("canonical_url") or {}
+    if cu.get("policy") in (None, "none", "None"):
+        return None
+    base = owner_values.get("canonical_url_base") or "{site_url}/articles"
+    fmt = cu.get("format", "{base}/{slug}")
+    return fmt.replace("{base}", base).replace("{slug}", fields.get("slug", "{slug}"))
+
+
+def _render_field(field, fields, packaging, owner_values):
+    """Render one frontmatter line for a profile-declared field NAME (platform-
+    agnostic). Returns the line, or None to omit the field."""
+    cap = packaging.get("tag_cap")
+    if field == "slug":
+        return f"slug: {fields.get('slug', '{slug}')}"
+    if field == "title":
+        return f'title: "{fields.get("title", "{title}")}"'
+    if field == "date":
+        return f"date: {fields.get('date', '{date}')}"
+    if field == "language":
+        return f"language: {fields.get('language', '')}"
+    if field == "published":
+        return "published: false"           # a variant is always emitted unpublished
+    if field == "description":
+        return f"description: {fields.get('summary', '')}"
+    if field == "summary":
+        return f"summary: {fields.get('summary', '')}"
+    if field == "tags":
+        return f"tags: {', '.join(_sanitize_tags(fields.get('topics'), cap))}"
+    if field == "topics":
+        tags = _sanitize_tags(fields.get("topics"), cap)
+        return "topics: [" + ", ".join(f'"{t}"' for t in tags) + "]"
+    if field == "emoji":
+        return 'emoji: "📝"'                 # placeholder — owner may change
+    if field == "type":
+        return 'type: "tech"'
+    if field == "canonical_url":
+        cu = _canonical_url(fields, packaging, owner_values)
+        return f"canonical_url: {cu}" if cu else None
+    # Unknown field: pass the draft's value through if present, else omit.
+    val = fields.get(field)
+    return f"{field}: {val}" if val is not None else None
+
+
+def _apply_visuals(body, treatment):
+    """Apply the profile-declared diagram treatment (SPEC-article-visuals CAP-5),
+    driven by `packaging.visuals` — never a per-platform branch. Returns
+    (body, blocked): `blocked` is True when a render publish blocker was raised."""
+    if treatment in (None, "", "mermaid-embedded"):
+        return body, False               # platform renders Mermaid inline
+    if treatment == "html-comment-blocked":
+        if not _MERMAID_FENCE.search(body):
+            return body, False
+        def _wrap(m):
+            return ("<!-- render blocker: this platform does not render Mermaid; "
+                    "replace with a rendered image before publishing.\n"
+                    + m.group(0) + "\n-->")
+        return _MERMAID_FENCE.sub(_wrap, body), True
+    return body, False                   # unknown treatment: leave body, no claim
+
+
+def _project_variant(fields, body, profile, owner_values):
+    """Project the canonical draft through a platform profile → (content, blocked).
+    Frontmatter from packaging.frontmatter; body carried over unchanged but for
+    the declared visual treatment."""
+    packaging = profile.get("packaging", {}) or {}
+    fm = ["---"]
+    for field in packaging.get("frontmatter", []) or []:
+        line = _render_field(field, fields, packaging, owner_values)
+        if line is not None:
+            fm.append(line)
+    fm.append("---")
+    body_out, blocked = _apply_visuals(body, packaging.get("visuals"))
+    return "\n".join(fm) + "\n\n" + body_out.rstrip() + "\n", blocked
 
 
 def _git_toplevel():
@@ -602,11 +665,12 @@ def _resolve_drafts_dir(root):
 
 
 def cmd_variants(args):
-    """Stage 5: emit platform-ready variants of a VERIFIED draft, per the
-    article's language and the config canonical policy (never a hardcoded
-    mapping). EN/canonical → a dev.to copy (full text, canonical_url
-    placeholder); JA/external → a Zenn repo-sync copy (Zenn frontmatter). Each is
-    written to the resolved output.drafts location (or --out).
+    """Stage 5: emit platform-ready variants of a VERIFIED draft as PROJECTIONS
+    of the canonical draft through declared platform profiles (Story 16.3). Which
+    platforms come from the config canonical policy; HOW each is packaged comes
+    entirely from that platform's profile (Story 16.1) — there is no hardcoded
+    per-platform code path. Each variant is written to the resolved output.drafts
+    location (or --out); the profile-resolution log lands in the run workspace.
     """
     text = sys.stdin.read() if args.draft == "-" else open(args.draft, encoding="utf-8").read()
 
@@ -623,7 +687,7 @@ def cmd_variants(args):
         sys.stderr.write("error: draft frontmatter has no `language`; cannot pick a variant policy\n")
         return 1
 
-    # Config drives the mapping: which platforms, and their canonical policy.
+    # Config drives WHICH platforms + the canonical policy; profiles drive HOW.
     rf = _load("render-frontmatter.py")
     cfg_args = argparse.Namespace(config_json=args.config_json, root=args.root,
                                   global_config=args.global_config, repo_config=args.repo_config)
@@ -632,7 +696,25 @@ def cmd_variants(args):
     if not policy:
         sys.stderr.write(f"error: no syndication.policy for language {lang!r} in config\n")
         return 1
-    variant_params = cfg.get("syndication", {}).get("variants", {})
+    owner_variants = cfg.get("syndication", {}).get("variants", {})
+
+    # Resolve platform profiles — the single declaration source (no builder table).
+    pp = _load("resolve-platform-profiles.py")
+    prof_root = pp.host_root(args.root)
+    pdir = pp.profiles_dir(prof_root, None)
+    profiles, prof_findings = pp.load_profiles(pdir)
+
+    # Profile-resolution log is an intermediate → the run workspace, never a
+    # product (footprint invariant, NFR17). Only the variant files land at
+    # output.drafts below.
+    if getattr(args, "ws", None):
+        try:
+            with open(os.path.join(args.ws, "platform-profiles.resolution.json"),
+                      "w", encoding="utf-8") as fh:
+                json.dump({"profiles_dir": pdir, "resolved": sorted(profiles),
+                           "findings": prof_findings}, fh, indent=2)
+        except OSError as exc:  # pragma: no cover - defensive
+            sys.stderr.write(f"warning: could not write profile-resolution log: {exc}\n")
 
     slug = fields.get("slug") or "draft"
     out_dir = args.out if args.out else _resolve_drafts_dir(args.root)
@@ -653,18 +735,25 @@ def cmd_variants(args):
             return 1
 
     emitted = []
+    blockers = []
     for name in policy.get("variants", []):
-        builder = VARIANT_BUILDERS.get(name)
-        if not builder:
-            sys.stderr.write(f"error: no builder for configured variant {name!r}\n")
+        profile = profiles.get(name)
+        if not profile:
+            sys.stderr.write(
+                f"error: no platform profile for configured variant {name!r}. "
+                f"Add `{name}.yaml` under {pdir} "
+                "(see config/platform-profiles/*.example.yaml).\n")
             return 1
-        content = builder(fields, body, variant_params.get(name, {}))
+        content, blocked = _project_variant(fields, body, profile,
+                                            owner_variants.get(name, {}))
         path = os.path.join(out_dir, f"{slug}.{name}.md")
         if not args.dry_run:
             os.makedirs(out_dir, exist_ok=True)
             with open(path, "w", encoding="utf-8") as fh:
                 fh.write(content)
         emitted.append({"platform": name, "path": path})
+        if blocked:
+            blockers.append({"platform": name, "blocker": "unrendered-mermaid"})
 
     out = {
         "stage": "variants",
@@ -674,6 +763,8 @@ def cmd_variants(args):
         "emitted": emitted,
         "written": not args.dry_run,
     }
+    if blockers:
+        out["render_blockers"] = blockers
     print(json.dumps(out, indent=2))
     return 0
 
@@ -1564,6 +1655,7 @@ def main(argv=None):
                     help="consent to creating a missing output directory OUTSIDE "
                          "the host repo (inside the host it is created automatically)")
     sp.add_argument("--dry-run", action="store_true", help="do not write files; just report")
+    sp.add_argument("--ws", help="run workspace for intermediates (profile-resolution log)")
     args = p.parse_args(argv)
     return {
         "start": cmd_start, "consume": cmd_consume, "interview": cmd_interview,

@@ -762,10 +762,14 @@ is ready for platform variants.
 
 ## Stage 5 — platform-ready variants
 
-Emit platform-ready copies of the **verified** draft. Which platforms, and each
-one's canonical policy, come from user config (`syndication.policy` /
-`syndication.variants`) keyed by the draft's `language` — **never a hardcoded
-mapping**:
+Emit platform-ready copies of the **verified** draft as **projections** of the
+canonical draft. Which platforms, and each one's canonical policy, come from user
+config (`syndication.policy` / `syndication.variants`) keyed by the draft's
+`language` — **never a hardcoded mapping**; **how** each variant is packaged
+(frontmatter fields, tag cap, `canonical_url` format, diagram-`visuals`
+treatment) comes entirely from that platform's **profile** (a machine-global
+declaration, SPEC-platform-variants CAP-2), so there is no per-platform code path
+and adding a platform is one profile file:
 
 ```
 python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py variants <draft>
@@ -773,12 +777,17 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py variants <draft>
 
 - **Precondition:** the draft carries **zero `[VERIFY]` markers** — Stage 4 must
   be complete. Any unresolved marker aborts the stage.
-- **EN / `mode: canonical`** → a **dev.to** copy: the full article text with a
-  dev.to frontmatter whose `canonical_url` is a placeholder
-  (`{canonical_url_base}/{slug}`) pointing back at the site page.
-- **JA / `mode: external`** → a **Zenn** repo-sync copy: Zenn frontmatter
-  (`emoji`/`type`/`topics`, `published: false`) with the full body — Zenn is
-  canonical via repo-sync.
+- **Projection, not rewrite:** the body carries over unchanged (claims, evidence,
+  provenance, section structure); only frontmatter/packaging and the profile's
+  declared visual treatment differ from the canonical draft.
+- **EN / `mode: canonical`** (dev.to-style profile) → the full article text with
+  the profile's frontmatter, whose `canonical_url` is composed from the owner's
+  base value and the profile's format, pointing back at the site page.
+- **JA / `mode: external`** (Zenn-style profile) → a repo-sync copy with the
+  profile's frontmatter and the full body — the platform is canonical via
+  repo-sync, so its profile declares `canonical_url: {policy: none}`. A profile
+  whose `packaging.visuals` cannot render Mermaid HTML-comments each diagram and
+  raises a render publish blocker (reported as `render_blockers`).
 - Each variant is written to the **resolved `output.drafts`** location (Story
   1.3; `--out <dir>` overrides). Files are named `{slug}.{platform}.md`.
 - **`output.drafts` may live outside the host repo — and should (#213):** the
