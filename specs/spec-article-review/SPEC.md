@@ -35,6 +35,9 @@ A pain to solve: the owner wants article review that maximizes ROI while keeping
 - **CAP-4**
   - **intent:** A cold read by a model with no project context answers a reader rubric — what is the article's claim, who is it for, what was unclear — simulating the actual reader.
   - **success:** A draft relying on unexplained repo-internal context yields a cold-read answer that misstates the claim or flags the gap, demonstrating the pass catches missing-context defects.
+- **CAP-5** *(added 2026-07-16 per the ratified review-pipeline-complete decision; transcribed from Open Questions per SPEC-policy-realignment F1)*
+  - **intent:** Every arbitration outcome is persisted as a **dogfood event**: one emit per finding disposition into the dogfood ledger (source: `review-arbitration`; fields: pass, criterion, severity, disposition, one-line reason on reject) — **raw events only, no classification at emit time, no new subsystem, no new report**. A criterion whose findings are chronically rejected surfaces through the dogfood tool's existing recurrence bar as a "tune or demote this pass" proposal; demotion analysis never runs inside this workflow.
+  - **success:** After an arbitration round of N findings, exactly N `review-arbitration` events exist in the ledger, each carrying the five fields and nothing judged; the review run's output contains no new report section for them.
 
 ## Constraints
 
@@ -63,5 +66,5 @@ A framework-complete draft goes from "review requested" to "publishable" within 
 
 ## Open Questions
 
-- Should the cold read (CAP-4) run on a non-Claude provider for a stronger independent-reader simulation, or stay single-provider for workflow simplicity?
-- **Owner proposal (2026-07-16, owner decision record: review pipeline complete) — persist arbitration outcomes as dogfood events.** The arbitration round (owner accepts/rejects each finding) currently records nothing, so the reviewer can never be calibrated against its own acceptance history. Proposed: one emit per finding disposition into the dogfood ledger (source: `review-arbitration`; fields: pass, criterion, severity, disposition, one-line reason on reject) — raw events only, no classification at emit time; a criterion whose findings are chronically rejected then surfaces through the dogfood tool's existing recurrence bar as a "tune or demote this pass" proposal. No new subsystem, no new report. Proposal-only: adopting it means one emit call in the arbitration step; declining leaves reviewer calibration to memory.
+- ~~Should the cold read (CAP-4) run on a non-Claude provider for a stronger independent-reader simulation, or stay single-provider for workflow simplicity?~~ **Dispositioned 2026-07-16 (owner decision record, review pipeline complete):** multi-provider cold read, outcome binding, and pass tuning are **deferred behind demand triggers and the captured arbitration data (CAP-5)** — not undecided; a chronically-rejected pass surfacing through the dogfood recurrence bar is the trigger that reopens this.
+- ~~Persist arbitration outcomes as dogfood events (owner proposal 2026-07-16)~~ **Ratified 2026-07-16 and transcribed to CAP-5** (SPEC-policy-realignment F1) — no longer open.

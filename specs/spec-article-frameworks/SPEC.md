@@ -34,7 +34,7 @@ A pain to solve: the owner writes self-branding technical articles for dev.to (E
 
 - Templates are plain markdown files in the repo, usable by hand or by an agent; this spec introduces no runtime tooling (automation belongs to SPEC-article-draft-pipeline).
 - Language-neutral: the same skeleton serves EN articles (site-canonical, syndicated to dev.to) and JA articles (Zenn-canonical, indexed as `mode: external`) per AP-6/AP-11.
-- Category set is fixed to the four above; a category outside spec §9's sanctioned genres (e.g. generic tutorials) must not get a framework.
+- Category set is fixed to the four above **plus the ratified working-note category** (amended 2026-07-16 — see the working-note entry under Open Questions for its contract); a category outside spec §9's sanctioned genres (e.g. generic tutorials) must not get a framework.
 - **Length is an outcome, not a target** (added 2026-07-10, prior dogfooding round Q2): frameworks bound structure — every slot filled, no slot padded — and never define or optimize toward a word count. Platform hard limits, where they exist, are validation (publish blockers), not optimization targets.
 - **Visual slots** (added 2026-07-10): each framework's expected visuals — F1 one overview diagram, F2 optional before/after or timeline, F3 one comparison table (required), F4 one landscape table or concept map — are defined by SPEC-article-visuals CAP-1; a declined slot is omitted entirely, never left as a placeholder.
 - **Skip semantics per slot** (added 2026-07-11, `docs/interview-architecture.md` D2): each framework slot fed by an interview question declares the effect of a skipped input — omit the slot, defer the decision, accept the recommended answer later, fill with `[VERIFY]`-marked inference, or raise a publish blocker. The interview engine records only the skip disposition; the slot's declared contract determines the consequence, and the skip choice's label states it. Per-slot values are template content, authored with the templates.
@@ -56,19 +56,26 @@ The owner produces a publishable draft by filling one framework end-to-end and t
 
 ## Open Questions
 
-- **Owner proposal (2026-07-16, owner decision record: content architecture) — a
-  fifth, lightweight "working-note" framework.** The owner's newsletter issues
-  (4 fixed blocks: one lesson / one number / published-links / what-I'm-building)
-  would be produced by this pipeline as their own small canonical draft, with the
-  variant stage emitting email + web-archive renderings via packaging profiles.
-  Proposed shape: a working-note framework (the 4 blocks as slots) paired with a
-  **slim pipeline profile** — no 5-question interview, a lighter quality gate —
-  because the issue's contract is "assembly <1hr", and the full article
-  pipeline's attention budget is mis-sized for it. Sources: the active repos'
-  recent activity plus the owner's policy recall surface (read via the existing
-  policy-source seam mechanics, read-only and pinned); published text carries
-  public repository links only. Proposal-only: adopting it means adding the
-  framework here and the profile contract to SPEC-platform-variants; declining
-  leaves newsletter assembly manual.
+- ~~Owner proposal (2026-07-16) — a fifth, lightweight "working-note"
+  framework.~~ **RATIFIED 2026-07-16 (owner decision record: content
+  architecture; transcribed per SPEC-policy-realignment F2).** Working notes
+  **are** writing-assistant products: the owner's newsletter issues (4 fixed
+  blocks: one lesson / one number / published-links / what-I'm-building) are
+  produced by this pipeline as their own small canonical draft, with the
+  variant stage emitting email + web-archive renderings via packaging profiles
+  (slim-profile contract: SPEC-platform-variants, "Working-note slim profile").
+  Shape: a working-note framework (the 4 blocks as slots) paired with a **slim
+  pipeline profile** — no 5-question interview, a lighter quality gate —
+  because the issue's contract is "assembly <1hr" and the full pipeline's
+  attention budget is mis-sized for it. **Ratified constraints (verbatim,
+  binding on the implementation whenever it is ordered):**
+  (1) sources are the active repos' recent activity **plus the owner's policy
+  recall surface read via the existing policy-source seam mechanics —
+  read-only, pinned, lessons first**; (2) the policy hub's **Q&A history
+  archive is never a harvest source** — promotion to the recall surface is the
+  only path by which hub content becomes harvestable; (3) **published text
+  carries public repository links only**. Implementation timing stays free —
+  this ratification orders no build; adding the F5 template file is additive
+  and non-breaking (Assumptions).
 
 - ~~Where should the templates be installed for day-to-day authoring: `docs/article-frameworks/` in this repo, or as assets of the drafting skill from SPEC-article-draft-pipeline?~~ **Resolved 2026-07-16 (owner decision record, template placement):** the F1–F4 templates live **only** as assets of the drafting skill (`skills/draft-article/frameworks/`) — implementation assets consumed by the skill, single canonical source bundled with the plugin. `docs/article-frameworks/` holds lightweight **pointers only**: framework name, one-line description, canonical asset path — never template content (the templates are already human-readable Markdown; the problem is discoverability, not readability). No generated documentation views and no regeneration machinery unless a future need arises that opening the canonical asset cannot satisfy (e.g. synthesized cross-framework comparison tables).

@@ -55,7 +55,12 @@ per publish decision.**
   - **success:** Adding a third platform requires writing one profile file and zero
     stage-code changes; a profile with an unresolved placeholder is caught by the
     stage-0 config validation (CAP-5 of the pipeline spec), not discovered at emit
-    time.
+    time; and a profile declaring a publishing-intent key (`mode`, `canonical`,
+    `canonicality`, or a `syndication` block) is **rejected at stage 0** with a
+    configuration error naming the key and its user-config home — the
+    intent/packaging split is unrepresentable in a profile, not conventional
+    (ratified 2026-07-16, Epic 16 story review; transcribed per
+    SPEC-policy-realignment F5; implemented in Story 16.2).
 - **CAP-3 (emission is per publish decision)**
   - **intent:** Variants are emitted on an explicit owner choice, presented
     in-conversation per the CAP-6 interaction contract (#226) — e.g. after the
@@ -132,6 +137,27 @@ per publish decision.**
   convergence (#206) applies to the platform lint — the lint's rejectable forms
   each have a sanctioned emitting path (e.g. the profile itself states the tag
   cap the packaging step reads).
+
+## Working-note slim profile (ratified 2026-07-16; implementation unordered)
+
+Transcribed per SPEC-policy-realignment F2 from the owner's content-architecture
+decision: **working notes are writing-assistant products.** A working-note draft
+(SPEC-article-frameworks, working-note framework: 4 fixed blocks) is its own
+small canonical draft, and this variant stage emits its **email and web-archive
+renderings via packaging profiles** — the same declared-profile machinery as
+every platform, no new mechanism. The pairing is a **slim pipeline profile**: no
+5-question interview and a lighter quality gate, because the issue's contract is
+"assembly <1hr" and the full pipeline's attention budget is mis-sized for it.
+Ratified constraints binding the implementation whenever it is ordered:
+
+- Sources are the active repos' recent activity **plus the owner's policy recall
+  surface read via the existing policy-source seam mechanics — read-only,
+  pinned, lessons first**; the hub's **Q&A history archive is never a harvest
+  source** (promotion to the recall surface is the only path).
+- **Published text carries public repository links only.**
+
+This section orders no build — it records the contract so the later
+implementation order needs no policy attachments.
 
 ## Non-goals
 
