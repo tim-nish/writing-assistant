@@ -142,14 +142,16 @@ and offers to write your choice back into `writing-sources.yaml`.
 ## Usage
 
 ```
-setup                                    # once per repo: guided onboarding, no manual YAML
-harvest                                  # standalone source-pointed fact sheet
-draft article <F1-F4> from <sources>     # harvest → interview → fill → variants
-review article <draft>                   # lint → structure → prose → cold read
+setup                                          # once per repo: guided onboarding, no manual YAML
+harvest                                        # standalone source-pointed fact sheet
+draft article <article-type> from <sources>    # harvest → interview → fill → variants
+review article <draft>                         # lint → structure → prose → cold read
 ```
 
-- Frameworks: `F1` project intro, `F2` engineering lessons, `F3` evaluation
-  methodology, `F4` research survey.
+- Article types are **intent labels**: "introduce the project", "share
+  engineering lessons", "explain the evaluation methodology", "survey a
+  research area". (`F1`–`F4` keep working as the internal/expert alias for the
+  same four, in that order.)
 - The draft pipeline marks every inferred claim with `[VERIFY]` and resolves them
   in a bounded owner pass; the review workflow emits capped, severity-tagged
   findings and never auto-edits — you arbitrate.
