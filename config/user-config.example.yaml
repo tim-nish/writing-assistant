@@ -138,3 +138,14 @@ site_record:
   # publication date); the body is forbidden on the site for external pieces.
   external_record_max_lines: 20
   body_forbidden: true
+
+# ---------------------------------------------------------------------------
+# Optional: dogfood-event ingestion hook (SPEC-article-review CAP-5).
+# Review-arbitration outcomes are always persisted to the run workspace as raw
+# JSONL events; when this key is set, the emitter ALSO pipes the events file to
+# your dogfood ledger's ingest command (the file path is appended as the last
+# argument). Absent or failing, runs continue unchanged — the ledger is an
+# enhancer, never a dependency.
+# ---------------------------------------------------------------------------
+# dogfood:
+#   ingest_cmd: "<your-ledger-cli> --target <your-target> ingest"

@@ -549,6 +549,27 @@ complete.
 - The round is **top-down and single-pass** over the ranked list: the
   highest-leverage findings are resolved before the nits.
 
+**Arbitration events — one emit per disposition (SPEC-article-review CAP-5,
+Story 13.42).** When the round completes, persist every finding's disposition
+as a **raw dogfood event** — this is how the reviewer gets calibrated against
+its own acceptance history (a chronically-rejected criterion surfaces through
+the dogfood tool's recurrence bar as a "tune or demote this pass" proposal;
+that analysis never runs here). Build one JSON line per arbitrated finding —
+`{"pass", "criterion", "severity", "disposition", "reason"?}`, `reason`
+required on `rejected` — and emit:
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/emit-arbitration-events.py <dispositions.jsonl> \
+  --ws "$WS" --scenario <draft-slug>
+```
+
+Exactly N events for N findings, **nothing judged or classified at emit time,
+no new report**. The events always land in `$WS/arbitration-events.jsonl`;
+when the owner's user config declares an optional `dogfood.ingest_cmd`, the
+emitter also feeds them to the dogfood ledger — absent or failing, it logs
+one line and the run continues (enhancer, never a dependency; the workspace
+file remains for offline mining).
+
 **Policy-consistency findings arbitrate with three choices (Story 15.2).** A
 `policy-contradiction` finding is contradiction detection, not a fix proposal,
 so its choices differ from accept/reject — each label stating its concrete
