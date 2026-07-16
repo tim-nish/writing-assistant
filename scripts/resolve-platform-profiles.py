@@ -229,8 +229,10 @@ def cmd_deprecations(args):
     variants = ((cfg.get("syndication") or {}).get("variants") or {})
     homes = {
         "canonical_url_base": "user config owner block (owner value)",
-        "external_record_max_lines": "user config site-record schema block (owner-site record)",
-        "body_forbidden": "user config site-record schema block (owner-site record)",
+        "external_record_max_lines": "the top-level `site_record` block in user-config.yaml "
+                                     "(owner-site record schema; see config/README.md)",
+        "body_forbidden": "the top-level `site_record` block in user-config.yaml "
+                          "(owner-site record schema; see config/README.md)",
     }
     n = 0
     for platform, block in sorted(variants.items()):

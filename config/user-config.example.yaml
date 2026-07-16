@@ -104,10 +104,12 @@ frontmatter:
 # per-language canonical/external decision sources frontmatter `mode`).
 # Zero `syndication.variants.*` keys move to platform profiles — none are
 # platform-shaped: `devto.canonical_url_base` is an owner value (re-homes in
-# the owner block) and `zenn.external_record_max_lines`/`body_forbidden` are
-# the owner-site record's schema (re-home in a site-record schema block).
-# Each legacy key deprecates as its re-routing lands (#211 treatment);
-# platform profiles' fields are new declarations, migrated from nothing.
+# the owner block); the former `zenn.external_record_max_lines`/`body_forbidden`
+# were the owner-site record's schema and now live in the `site_record` block
+# below (re-homing executed, #282). A legacy `syndication.variants.zenn` block
+# in a live config still resolves (readers fall back to it) and produces a
+# one-line deprecation pointer at stage 0; platform profiles' fields are new
+# declarations, migrated from nothing.
 # ---------------------------------------------------------------------------
 syndication:
   # Per-language canonical mode + where the article body actually publishes.
@@ -123,8 +125,16 @@ syndication:
       # dev.to copy: full text; frontmatter canonical_url -> the site page.
       # (Add/repoint once the site can host canonical articles.)
       canonical_url_base: "https://example.com/articles"
-    zenn:
-      # JA canonical via repo-sync; the site gets a <=20-line mode:external
-      # record with the body forbidden (AC-4).
-      external_record_max_lines: 20
-      body_forbidden: true
+
+# ---------------------------------------------------------------------------
+# Owner-site external-record schema (`site-record` subcommand; FR62).
+# For a language whose `syndication.policy` mode is `external`, the SITE holds
+# a short index-facing record instead of the body. These constants are facts
+# about the owner's site — not platform packaging (they deliberately live
+# outside `syndication.variants`, which platform profiles superseded).
+# ---------------------------------------------------------------------------
+site_record:
+  # The record is a <=N-line frontmatter-only stub (title, canonical URL, real
+  # publication date); the body is forbidden on the site for external pieces.
+  external_record_max_lines: 20
+  body_forbidden: true
