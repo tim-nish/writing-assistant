@@ -7,6 +7,22 @@ Skills never hard-code identity — they read it from here (CAP-6).
 |------|---------|-------|------|----------|
 | `user-config.yaml` | **who is writing**: owner identity (name, site, pointer block, frontmatter schema, syndication policy) | machine-global, per-person | `~/.config/writing-assistant/` | `scripts/resolve-user-config.py` |
 | `writing-sources.yaml` | **what this repo's articles draw from**: declared sources + draft output location | per host repo | machine-global: `resolve-paths.py sources-file` prints it (#211 — never in the host repo) | `scripts/resolve-writing-sources.py` |
+| `platform-profiles/<platform>.yaml` | **how a platform packages a variant**: `platform`, `audience`, `language`, `packaging`, `distribution_hook` (one file per platform) | per host repo, machine-global | `platform-profiles/` under `resolve-paths.py repo-config-dir` (never in the host repo) | `scripts/resolve-platform-profiles.py` |
+
+## Platform profiles vs. syndication policy (who owns what)
+
+A **platform profile** declares facts about a *platform* and must stay reusable
+by a different owner unmodified — so it carries **packaging** only (frontmatter
+schema, tag cap, TL;DR placement, cover, `canonical_url` where/format, `visuals`
+rendering treatment, and — for Zenn — the synced repo's target directory
+`layout`). Publishing **intent** — the per-language canonical/external decision —
+is owner policy over the whole outlet set and stays in `user-config.yaml`'s
+`syndication.policy`; a profile that declares `mode`/`canonical`/`syndication` is
+rejected (SPEC-platform-variants CAP-2). Legacy `syndication.variants.*` keys
+migrate *nothing* into profiles — profiles' fields are new declarations, and each
+legacy key re-homes inside `user-config.yaml` as it is deprecated
+(`resolve-platform-profiles.py deprecations` lists the re-homing targets, #211).
+Adding a third platform is one profile file and zero stage-code changes.
 
 ## What the syndication / frontmatter sections are for
 

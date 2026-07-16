@@ -1,0 +1,39 @@
+# platform-profiles/zenn.example.yaml — Zenn publication profile (Story 16.1).
+#
+# Copy to the machine-global per-repo profiles directory (NEVER the host repo):
+#   dir=$(python3 scripts/resolve-paths.py repo-config-dir --root <host-repo>)
+#   cp config/platform-profiles/zenn.example.yaml "$dir/platform-profiles/zenn.yaml"
+#
+# Packaging only — publishing intent lives in user config's `syndication.policy`.
+
+platform: zenn
+
+# A JA reader differs from an EN canonical draft's audience/language, so
+# emission gets exactly one lede re-targeting proposal (です/ます register)
+# under the proposal contract (Story 16.5).
+audience: ja-practitioner
+language: ja
+
+packaging:
+  # Zenn frontmatter schema.
+  frontmatter: [title, emoji, type, topics, published]
+  # Zenn caps topics at 5.
+  tag_cap: 5
+  tldr_placement: none
+  cover: none
+  # Zenn is canonical via repo-sync, so a variant carries no canonical_url.
+  canonical_url:
+    policy: none
+  # Zenn does not render inline Mermaid, so a diagram is HTML-commented and a
+  # render publish blocker is raised (SPEC-article-visuals CAP-5).
+  visuals: html-comment-blocked
+  # The Zenn-synced repo's TARGET DIRECTORY layout. This is a CONFORMANCE
+  # RECORD of the platform's sync contract, never an authority: the
+  # output.drafts destination repo's actual directory structure is
+  # authoritative, checked by existence (Story 16.6 lint). The articles repo
+  # still owns its stored record schema.
+  layout:
+    repo: articles
+    dir: articles/
+
+distribution_hook: zenn-follow
