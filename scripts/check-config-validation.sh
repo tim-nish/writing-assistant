@@ -115,6 +115,59 @@ grep -qi 'hard stop' "$DRAFT" && grep -qi 'owner-confirmed' "$DRAFT" \
   && ok "draft SKILL: missing sources halts with an owner-confirmed scaffold (#144)" \
   || err "draft SKILL missing the hard-stop/scaffold contract for missing sources"
 
+# 7. Story 16.2 — platform-profile validation folds into the same stage-0 pass.
+#    Profiles live under the resolver's repo-config dir; drive it via a scoped
+#    XDG_CONFIG_HOME so the fixture controls the machine-global location.
+export XDG_CONFIG_HOME="$work/cfg"
+repo_key=$(python3 scripts/resolve-paths.py repo-key --root "$work/root")
+ppdir="$work/cfg/writing-assistant/repos/$repo_key/platform-profiles"
+mkdir -p "$ppdir"
+
+# 7a. A profile missing a required key halts stage 0, naming the profile file.
+cat > "$ppdir/bad.yaml" <<'YAML'
+platform: bad
+language: en
+packaging: {}
+distribution_hook: x
+YAML
+if out=$(V --global-config "$work/clean.yaml" 2>&1); then rc=0; else rc=$?; fi
+if [ "$rc" -ne 0 ] && printf '%s' "$out" | grep -q 'bad.yaml' \
+   && printf '%s' "$out" | grep -qi 'audience'; then
+  ok "profile missing a required key halts stage 0 naming the profile"
+else err "profile missing-key not folded into stage 0 (rc=$rc, out='$out')"; fi
+rm "$ppdir/bad.yaml"
+
+# 7b. A profile declaring an intent key (mode) is rejected — intent lives in
+#     user config's syndication.policy, never a profile.
+cat > "$ppdir/intent.yaml" <<'YAML'
+platform: intent
+audience: en-reader
+language: en
+mode: canonical
+packaging:
+  visuals: mermaid-embedded
+distribution_hook: x
+YAML
+if out=$(V --global-config "$work/clean.yaml" 2>&1); then rc=0; else rc=$?; fi
+if [ "$rc" -ne 0 ] && printf '%s' "$out" | grep -q 'intent.yaml' \
+   && printf '%s' "$out" | grep -qi 'intent'; then
+  ok "profile intent key (mode) rejected at stage 0"
+else err "profile intent-key not rejected (rc=$rc, out='$out')"; fi
+rm "$ppdir/intent.yaml"
+
+# 7c. Legacy syndication.variants.* relayed EXACTLY once as an advisory notice
+#     (non-blocking) when profiles are configured; a clean valid profile adds no
+#     blocking finding.
+cp config/platform-profiles/devto.example.yaml "$ppdir/devto.yaml"
+out=$(V --global-config "$work/clean.yaml" 2>&1 || true)
+n=$(printf '%s\n' "$out" | grep -c 'notice: deprecated: syndication.variants')
+if [ "$n" -eq 1 ]; then ok "legacy syndication.variants.* relayed exactly once"
+else err "deprecation notice not relayed exactly once (got $n)"; fi
+if out=$(V --global-config "$work/clean.yaml" 2>&1); then rc=0; else rc=$?; fi
+if [ "$rc" -eq 0 ]; then ok "clean valid profile adds no blocking finding (exit 0)"
+else err "clean valid profile blocked stage 0 (rc=$rc, out='$out')"; fi
+rm "$ppdir/devto.yaml"
+
 if [ "$fail" -eq 0 ]; then
   printf '\nAll config-validation checks passed.\n'; exit 0
 else

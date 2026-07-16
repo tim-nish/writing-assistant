@@ -12,11 +12,20 @@ problem is never discovered as a late article-quality finding:
   * missing required keys.
 
 On any defect it prints a per-key report naming the file
-(`user-config.yaml` / `writing-sources.yaml`) and the fix, then exits non-zero.
-A clean, fully resolved configuration prints nothing and exits 0.
+(`user-config.yaml` / `writing-sources.yaml` / a platform profile) and the fix,
+then exits non-zero. A clean, fully resolved configuration prints nothing and
+exits 0.
+
+When platform profiles are configured (Story 16.2) their validation folds into
+this same round-trip: a profile with a missing required key, an intent key
+(`mode`/`canonical`/`syndication` — publishing intent lives in user config, not
+a profile), an unresolved placeholder, or a malformed URL halts stage 0 with a
+per-key report naming the profile file; legacy `syndication.variants.*` keys are
+relayed once as an advisory (non-blocking) deprecation notice.
 
 Stdlib-only by design; it drives the existing resolvers (`resolve-user-config.py`,
-`resolve-writing-sources.py`) so there is one parse path, not two.
+`resolve-writing-sources.py`, `resolve-platform-profiles.py`) so there is one
+parse path, not two.
 """
 
 import argparse
@@ -29,6 +38,7 @@ import sys
 HERE = os.path.dirname(os.path.realpath(__file__))
 USER_RES = os.path.join(HERE, "resolve-user-config.py")
 SRC_RES = os.path.join(HERE, "resolve-writing-sources.py")
+PROFILE_RES = os.path.join(HERE, "resolve-platform-profiles.py")
 EXAMPLE = os.path.realpath(os.path.join(HERE, "..", "config", "user-config.example.yaml"))
 SOURCES_EXAMPLE = os.path.realpath(os.path.join(HERE, "..", "config", "writing-sources.example.yaml"))
 
@@ -65,6 +75,10 @@ COMPOSED_URL_KEYS = {
 # Generic placeholder tokens (case-insensitive substring match) beyond an exact
 # match against the shipped example.
 PLACEHOLDER_TOKENS = ["example.com", "your name", "your-topic", "another-topic"]
+
+# Placeholder tokens a live platform profile must not still carry (a copied but
+# un-customized example). `<` catches angle-bracket placeholders like `<hook>`.
+PROFILE_PLACEHOLDER_TOKENS = ["example.com", "change-me", "changeme", "<"]
 
 
 def _resolver_json(script, args):
@@ -205,6 +219,95 @@ def validate_policy_source(args, findings):
             findings.append((SOURCES_FILE, "policy_source", line))
 
 
+def _walk_strings(obj, prefix=""):
+    """Yield (dotted-keypath, value) for every string leaf in a profile map."""
+    if isinstance(obj, dict):
+        for k, v in obj.items():
+            if k == "_path":
+                continue
+            yield from _walk_strings(v, f"{prefix}.{k}" if prefix else k)
+    elif isinstance(obj, list):
+        for i, v in enumerate(obj):
+            yield from _walk_strings(v, f"{prefix}[{i}]")
+    elif isinstance(obj, str):
+        yield prefix, obj
+
+
+def _profile_res(args, sub, *extra):
+    # resolve-platform-profiles.py takes --root as a SUB-command argument, so the
+    # subcommand must come first (`<sub> --root R`), not before the flags.
+    cmd = [sys.executable, PROFILE_RES, sub]
+    if args.root:
+        cmd += ["--root", args.root]
+    cmd += list(extra)
+    return subprocess.run(cmd, capture_output=True, text=True)
+
+
+def validate_platform_profiles(args, findings, notices):
+    """Fold platform-profile validation into the stage-0 aggregate (Story 16.2).
+
+    Profiles are optional: with no profiles directory this is a silent no-op.
+    When profiles ARE configured it (1) relays the resolver's structural
+    findings — missing required keys, and intent keys (`mode`/`canonical`/
+    `syndication`) that are unrepresentable in a profile — as per-key findings;
+    (2) flags unresolved placeholders and malformed URLs in profile values; and
+    (3) relays each legacy `syndication.variants.*` key as a one-time
+    deprecation notice (advisory, non-blocking — profiles migrate nothing)."""
+    # Gate: only engage when a profiles directory actually exists (a migration
+    # in progress). A repo not using variants is never nagged.
+    dp = _profile_res(args, "dir")
+    if dp.returncode != 0 or not os.path.isdir(dp.stdout.strip()):
+        return
+
+    # 1. Structural findings (resolver exit 4 → per-key `  [file] key: msg`).
+    v = _profile_res(args, "validate")
+    if v.returncode == 4:
+        for line in v.stderr.strip().splitlines():
+            m = re.match(r"^\s*\[(.+?)\]\s+(\S+):\s+(.*)$", line)
+            if m:
+                findings.append((m.group(1), m.group(2), m.group(3)))
+            else:  # pragma: no cover - defensive
+                findings.append(("platform-profiles", "(profile)", line.strip()))
+
+    # 2. Content findings over structurally-valid profiles (placeholder / URL).
+    r = _profile_res(args, "resolved")
+    if r.returncode == 0:
+        try:
+            profiles = json.loads(r.stdout)
+        except json.JSONDecodeError:  # pragma: no cover - defensive
+            profiles = {}
+        for platform, prof in profiles.items():
+            fname = f"{platform}.yaml"
+            for keypath, val in _walk_strings(prof):
+                low = val.lower()
+                if any(t in low for t in PROFILE_PLACEHOLDER_TOKENS):
+                    findings.append((fname, keypath,
+                                     f"value '{val}' looks like an unresolved placeholder. "
+                                     "Fix: set a real value."))
+                    continue
+                if re.match(r"^https?://", val):
+                    after = re.sub(r"^https?://", "", val)
+                    path_part = after[after.find("/"):] if "/" in after else ""
+                    if "//" in path_part:
+                        findings.append((fname, keypath,
+                                         f"'{val}' contains a double slash in its path. "
+                                         "Fix: remove the doubled '/'."))
+
+    # 3. Legacy syndication.variants.* → one-time deprecation notice.
+    dcmd = [sys.executable, PROFILE_RES, "deprecations"]
+    if args.root:
+        dcmd += ["--root", args.root]
+    if args.global_config:
+        dcmd += ["--global-config", args.global_config]
+    if args.repo_config:
+        dcmd += ["--repo-config", args.repo_config]
+    d = subprocess.run(dcmd, capture_output=True, text=True)
+    if d.returncode == 0:
+        for line in d.stdout.strip().splitlines():
+            if line.startswith("deprecated:"):
+                notices.append(line)
+
+
 def main(argv=None):
     p = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -216,13 +319,20 @@ def main(argv=None):
     args = p.parse_args(argv)
 
     findings = []
+    notices = []
     validate_user_config(args, findings)
     if not args.skip_writing_sources:
         validate_writing_sources(args, findings)
         validate_policy_source(args, findings)
+        validate_platform_profiles(args, findings, notices)
+
+    # Advisory notices (e.g. legacy-key deprecation) are relayed exactly once
+    # and never block — a clean config with a pending migration still exits 0.
+    for line in notices:
+        sys.stderr.write(f"notice: {line}\n")
 
     if not findings:
-        return 0  # clean config: silent, exit 0
+        return 0  # clean config: silent (but for any notices above), exit 0
 
     sys.stderr.write(
         "Stage 0 — configuration validation failed. Fix these before the "
