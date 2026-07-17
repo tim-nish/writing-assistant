@@ -153,6 +153,54 @@ grep -qi 'whole-surface authoring' "specs/spec-policy-source-seam/SPEC.md" \
 grep -q 'companion' "specs/spec-policy-source-seam/seam-formats.md" \
   && ok "seam-formats: seed.companion documented" || err "seam-formats missing seed.companion"
 
+# --- 6b. #302 — one slot is RESERVED for a policy tension item -------------------
+# Reproduces the run that found the defect: 6 confirmed NEEDS-OWNER gaps + 3
+# valid tension items. Priority alone fills the cap with gaps and emits zero
+# tension questions, silently corrupting the anchor and emptying contribute-back.
+python3 - "$work/starve-state.json" "$work/starve-items.json" <<'PYEOF'
+import json, sys
+topics = ["audience", "surprise", "significance", "tradeoff", "warning", "motivation"]
+state = {"stage": "consume",
+         "fact_sheet": [{"kind": "number", "claim": "the bench recorded a 2x drop"}],
+         "needs_owner": [{"topic": t, "candidate": f"owner input on {t}",
+                          "reason": "owner's opinion"} for t in topics]}
+sha = "91ec5c01e4a5b6c7d8e9f0a1b2c3d4e5f6071829"
+seeds = [("contradiction", "rejected as generate-then-filter",
+          "Your pipeline assembles many facts before any prose exists — where does the judgment gate sit relative to the pattern you declined?"),
+         ("reversal-candidate", "prose generation demoted to non-goal",
+          "That non-goal predates the readability rubric — does it still hold now that drafting gates prose on it?"),
+         ("ambiguity", "lessons first",
+          "When a lesson and a topic line disagree about emphasis, which governs the article's claim?")]
+items = [{"id": f"t{i}", "gap_type": gt,
+          "seed": {"quote": q, "pointer": f"topics/articles.md:{30+i}@{sha}"},
+          "question": qq, "owner_answer": ""}
+         for i, (gt, q, qq) in enumerate(seeds, 1)]
+json.dump(state, open(sys.argv[1], "w")); json.dump(items, open(sys.argv[2], "w"))
+PYEOF
+python3 "$PIPE" interview --framework F2 --items "$work/starve-items.json" \
+  "$work/starve-state.json" > "$work/starve-out.json"
+python3 - "$work/starve-out.json" <<'PYEOF' && ok "6 gaps + 3 tensions: 5 asked, exactly 1 tension survives (reserved slot)" || err "#302 reserved slot: tension starved or cap broken"
+import json, sys
+d = json.load(open(sys.argv[1]))
+qs = d["questions"]
+seeded = [q for q in qs if q.get("rationale") == "policy-seed"]
+gaps = [q for q in qs if q.get("from_gap")]
+assert len(qs) == 5, f"cap broken: {len(qs)} asked"
+assert len(seeded) == 1, f"expected exactly 1 tension question, got {len(seeded)}"
+assert len(gaps) == 4, f"expected 4 gap questions alongside it, got {len(gaps)}"
+assert seeded[0]["id"] == "t1", f"reserved slot took {seeded[0]['id']}, not the highest-priority t1"
+PYEOF
+
+# No tension items → no reservation, no residue: selection is exactly as before.
+python3 "$PIPE" interview --framework F2 "$work/starve-state.json" > "$work/nores.json"
+python3 - "$work/nores.json" <<'PYEOF' && ok "no tension items: 5 gaps asked, no slot held open (no reservation residue)" || err "#302: reservation left residue on an unseeded run"
+import json, sys
+d = json.load(open(sys.argv[1]))
+qs = d["questions"]
+assert len(qs) == 5, f"expected a full 5 gap questions, got {len(qs)}"
+assert not [q for q in qs if q.get("rationale") == "policy-seed"], "phantom seed"
+PYEOF
+
 # --- 7. #306 — a seed older than the material it contradicts is STALE, not live ----
 grep -qi 'Stale seed, not a live tension' "$SKILL" \
   && ok "SKILL: staleness is distinguished from a live tension" \
@@ -170,6 +218,12 @@ grep -qi 'proposes an update, not a resolution' "$SKILL" \
 grep -qi 'staleness routing' "specs/spec-policy-source-seam/SPEC.md" \
   && ok "seam SPEC: staleness routing is contract (CAP-3)" \
   || err "seam SPEC missing the staleness-routing rule"
+grep -qi 'one slot reserved for policy tension' "$SKILL" \
+  && ok "SKILL: the reserved tension slot is documented (#302)" \
+  || err "SKILL missing the reserved-slot rule"
+grep -qi 'one slot is reserved' "specs/spec-article-draft-pipeline/SPEC.md" \
+  && ok "pipeline SPEC: the reserved slot is contract (CAP-2)" \
+  || err "pipeline SPEC missing the reserved-slot amendment"
 
 if [ "$fail" -eq 0 ]; then
   printf '\nAll stage-2 policy-seam checks passed.\n'; exit 0
