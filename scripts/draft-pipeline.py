@@ -25,6 +25,7 @@ an undeclared path passed here cannot expand what gets read.
 """
 
 import argparse
+import bisect
 import hashlib
 import json
 import os
@@ -310,6 +311,155 @@ def _sentences(paragraph):
     return [s for s in _SENT_SPLIT.split(paragraph.strip()) if s.strip()]
 
 
+# --- Dimension 3: explanation calibration (#305) ------------------------------
+# A CLOSED scan over repo-internal vocabulary against the rubric's written
+# introduction contract — not open-ended judgment. An unpinned LLM judgment
+# reported one item at a time cannot converge inside the D5 bound of 2 cycles:
+# four cycles over one draft named twelve terms and never passed, because each
+# pass re-litigated what "introduced" means (expanding `de-dup` to
+# `de-duplication check` even manufactured the next violation). A mechanical
+# scan is exhaustive AND deterministic by construction, satisfying both halves
+# of the defect at once.
+#
+# Longest-first: `de-duplication check` must win over `de-dup` so an expansion
+# is never scored as a fresh, unintroduced term (contract rule 6).
+INTERNAL_VOCAB = (
+    "de-duplication check", "de-duplication", "de-dup",
+    "explanation calibration", "quality gate", "article framework",
+    "platform variants", "isolated judge", "provenance map", "fact sheet",
+    "knowledge units", "knowledge unit", "turn budget", "dogfood entry",
+    "dogfood log", "editorial anchor", "staging candidate", "policy seed",
+    "tension item", "arbitration", "harvest", "GATE",
+)
+# `Stage 3`, `F2`, and friends are patterns rather than fixed strings.
+INTERNAL_VOCAB_RE = (
+    r"Stage \d+", r"\bF[1-4]\b", r"\bNEEDS-OWNER\b", r"\[VERIFY\]",
+)
+# An inline appositive gloss AT the point of use: `term (gloss)`, `term, gloss,`
+# or `term — gloss`. Sufficient by contract — the reader never meets the term
+# unexplained (this is the call the cycle-4 judge disputed; the rule settles it).
+_APPOSITIVE = r"\s*(\([^)]{8,}\)|,\s[^,.]{8,},|\s[—–-]\s[^.]{8,})"
+# A defining sentence: the term with a definitional verb, anywhere before first use.
+_DEFINING = re.compile(r"\b(is|are|means|refers to|denotes|stands for|=)\b", re.I)
+
+
+def _dim3_scan_units(draft_text):
+    """Yield (text, kind, line_of) for every scannable BLOCK of the draft body.
+
+    Blocks, not physical lines: prose wraps, so a term and the gloss that
+    introduces it routinely straddle a line break (`Stage 3 — the` / `framework
+    -fill step`). A line-based scan would call that gloss absent and manufacture
+    exactly the false violation this dimension exists to stop. Each paragraph is
+    joined into one text; `line_of(pos)` maps a match offset back to the
+    physical line, so verdicts still name a real location.
+
+    kind: 'prose' (a load-bearing context) or 'heading' (NEUTRAL by contract —
+    neither an introduction nor a use). Frontmatter is skipped; mermaid fence
+    bodies are prose because a diagram LABEL is a load-bearing use requiring a
+    prior prose introduction; other code fences are skipped as verbatim text.
+    """
+    lines = draft_text.splitlines()
+    i, in_front, fence = 0, False, None
+    if lines and lines[0].strip() == "---":
+        in_front, i = True, 1
+
+    def flush(buf):
+        """Join a paragraph's lines, keeping an offset->lineno index."""
+        text, index, pos = "", [], 0
+        for lineno, s in buf:
+            if text:
+                text += " "
+                pos += 1
+            index.append((pos, lineno))
+            text += s
+            pos += len(s)
+        starts = [p for p, _ in index]
+
+        def line_of(match_pos):
+            k = bisect.bisect_right(starts, match_pos) - 1
+            return index[max(k, 0)][1]
+        return text, "prose", line_of
+
+    buf = []
+    for lineno, raw in enumerate(lines[i:], start=i + 1):
+        s = raw.strip()
+        if in_front:
+            if s == "---":
+                in_front = False
+            continue
+        if s.startswith("```"):
+            lang = s[3:].strip().lower()
+            fence = None if fence else (lang or "plain")
+            continue
+        if fence and fence != "mermaid":
+            continue
+        if not s:                                   # blank line ends a paragraph
+            if buf:
+                yield flush(buf)
+                buf = []
+            continue
+        if s.startswith("#"):
+            if buf:
+                yield flush(buf)
+                buf = []
+            yield s, "heading", (lambda _p, _l=lineno: _l)
+            continue
+        buf.append((lineno, s))
+    if buf:
+        yield flush(buf)
+
+
+def _dimension3(draft_text, allowlist=()):
+    """Return the COMPLETE list of dim3 violations as (term, line) — every
+    uncalibrated term in one pass, so a single revision can clear the dimension.
+
+    A term is introduced (contract, `quality-rubric.md`) by: a preceding gloss
+    or defining sentence; an inline appositive at first load-bearing use; an
+    abbreviation expanded-with-gloss. A heading occurrence is neutral; a
+    diagram label is a use; an expansion of an already-introduced base term is
+    never re-promoted to unintroduced.
+    """
+    known = {t.lower() for t in allowlist}
+    units = list(_dim3_scan_units(draft_text))
+    patterns = [(t, re.compile(re.escape(t), re.I)) for t in INTERNAL_VOCAB
+                if t.lower() not in known]
+    patterns += [(p, re.compile(p)) for p in INTERNAL_VOCAB_RE
+                 if p.lower() not in known]
+
+    # Pass 1 — locate each term's first load-bearing use and decide whether it
+    # is introduced at or before that point. Two passes are required: the
+    # vocabulary is scanned longest-first (so an expansion never matches as its
+    # own shorter base), which means a base term's introduction is not yet known
+    # when its expansion is examined.
+    findings, introduced = {}, []
+    for label, rx in patterns:
+        for text, kind, line_of in units:
+            m = rx.search(text)
+            if not m:
+                continue
+            if kind == "heading":
+                continue                      # neutral: triggers nothing
+            surface, lineno = m.group(0), line_of(m.start())
+            if re.compile(rx.pattern + _APPOSITIVE, re.I).search(text) \
+                    or _DEFINING.search(text):
+                findings[label] = (True, lineno, surface)
+                introduced.extend((surface, label))
+            else:
+                findings[label] = (False, lineno, surface)
+            break                              # first load-bearing use decides
+
+    # Pass 2 — rule 6: an expansion of an already-introduced base term is never
+    # re-promoted to unintroduced (`de-dup` -> `de-duplication check`, the case
+    # where fixing one dim3 finding manufactured the next).
+    violations = [
+        (surface, lineno)
+        for label, (ok, lineno, surface) in findings.items()
+        if not ok and not any(b.lower() != surface.lower()
+                              and b.lower() in surface.lower() for b in introduced)
+    ]
+    return sorted(violations, key=lambda v: (v[1], v[0]))
+
+
 def _dimension4(draft_text, prov_entries):
     """Mechanical readability-mechanics checks; returns a list of failing
     locations (empty = pass)."""
@@ -345,12 +495,22 @@ def _dimension4(draft_text, prov_entries):
 
 
 def cmd_quality_gate(args):
-    """Stage 3→4 quality gate (Story 11.4). Dimension 4 is mechanical here;
-    dimensions 1–3 come from the single-pass judge's verdicts (--judge, a file of
-    `dim1|dim2|dim3: pass|fail [locations]`, one verdict per line). A judge file
-    that does not parse under that grammar is a distinct named error (exit 2) —
-    never a per-dimension fail: a gate that cannot read its judge has not judged
-    (#303). Emits a per-dimension verdict; a non-zero exit BLOCKS stage 4 (a
+    """Stage 3→4 quality gate (Story 11.4). Dimensions 3 and 4 are mechanical
+    here; dimensions 1–2 come from the single-pass judge's verdicts (--judge, a
+    file of `dim1|dim2: pass|fail [locations]`, one verdict per line). A judge
+    file that does not parse under that grammar is a distinct named error (exit
+    2) — never a per-dimension fail: a gate that cannot read its judge has not
+    judged (#303).
+
+    Dimension 3 is a deterministic vocabulary scan against the rubric's written
+    introduction contract (#305), emitting the COMPLETE violation set in one
+    verdict; audience-known terms are excluded via --audience-known (the per-run
+    allowlist derived once from the owner-ratified audience answer). A `dim3:`
+    line from the judge is accepted but ADVISORY — it never gates, because an
+    unpinned judgment reported one item per pass cannot converge inside the D5
+    bound of 2 cycles.
+
+    Emits a per-dimension verdict; a non-zero exit BLOCKS stage 4 (a
     precondition, not an advisory finding).
     """
     draft = sys.stdin.read() if args.draft == "-" else open(args.draft, encoding="utf-8").read()
@@ -363,12 +523,14 @@ def cmd_quality_gate(args):
             return 2
 
     results = {}
-    # Dimensions 1–3: judge verdicts. When a judge file is supplied it must
+    # Dimensions 1–2: judge verdicts. When a judge file is supplied it must
     # parse under the stated grammar — `dimN: pass|fail [locations]`, one line
-    # per dimension, dim1..dim3 all present. Anything else (e.g. the natural-
-    # language form `dimension 1: pass`) is a format mismatch, which is
+    # per dimension, dim1 and dim2 each present. Anything else (e.g. the
+    # natural-language form `dimension 1: pass`) is a format mismatch, which is
     # indistinguishable from a genuine rubric failure if graded — so it exits
-    # 2 with a named error before any dimension is judged (#303).
+    # 2 with a named error before any dimension is judged (#303). A `dim3:`
+    # line is accepted and kept as an ADVISORY note (#305): dim3 is scanned
+    # mechanically below and the judge's opinion of it never gates.
     judged = {}
     if args.judge:
         bad, verdict_re = [], re.compile(r"^(dim[123])\s*:\s*(pass|fail)\b(.*)$", re.IGNORECASE)
@@ -381,18 +543,28 @@ def cmd_quality_gate(args):
                 bad.append((lineno, ln))
                 continue
             judged[m.group(1).lower()] = (m.group(2).lower(), m.group(3).strip(" :-"))
-        missing = [d for d in ("dim1", "dim2", "dim3") if d not in judged]
+        missing = [d for d in ("dim1", "dim2") if d not in judged]
         if bad or missing:
             sys.stderr.write("error: judge verdicts unparseable — expected "
-                             "`dimN: pass|fail [locations]` per line, dim1..dim3 each present\n")
+                             "`dimN: pass|fail [locations]` per line, dim1 and dim2 each "
+                             "present (dim3 is scanned mechanically; a dim3 line is advisory)\n")
             for lineno, ln in bad:
                 sys.stderr.write(f"  line {lineno}: {ln}\n")
             if missing:
                 sys.stderr.write(f"  missing verdicts: {', '.join(missing)}\n")
             return 2
-    for dim in ("dim1", "dim2", "dim3"):
+    for dim in ("dim1", "dim2"):
         verdict, locations = judged.get(dim, ("fail", "no judge verdict"))
         results[dim] = (verdict, "" if verdict == "pass" else locations)
+
+    # Dimension 3: mechanical, exhaustive, deterministic (#305).
+    known = []
+    for a in (getattr(args, "audience_known", None) or []):
+        known.extend(t.strip() for t in a.split(",") if t.strip())
+    d3 = _dimension3(draft, known)
+    results["dim3"] = ("pass", "") if not d3 else (
+        "fail", "; ".join(f"{t} (line {n})" for t, n in d3))
+
     # Dimension 4: mechanical.
     d4 = _dimension4(draft, prov_entries)
     results["dim4"] = ("pass", "") if not d4 else ("fail", "; ".join(d4))
@@ -418,6 +590,14 @@ def cmd_quality_gate(args):
     out = {"gate": "quality", "pass": not failing,
            "dimensions": {d: {"verdict": v, "locations": loc} for d, (v, loc) in results.items()},
            "failing_dimensions": failing}
+    # The judge's dim3 opinion, when it offered one, rides along as an advisory
+    # for the completion summary's informational bucket — never a gate verdict
+    # (#305). It is recorded, not obeyed.
+    if "dim3" in judged:
+        verdict, locations = judged["dim3"]
+        out["advisories"] = [{"dimension": "dim3", "source": "rubric-judge",
+                              "verdict": verdict, "locations": locations,
+                              "note": "advisory only — dim3 is gated by the mechanical scan"}]
     print(json.dumps(out, indent=2))
     return 0 if not failing else 1
 
@@ -1962,9 +2142,14 @@ def main(argv=None):
     sp = sub.add_parser("quality-gate")
     sp.add_argument("--draft", default="-", help="the filled draft, or - for stdin")
     sp.add_argument("--map", help="the sidecar provenance map (for the stitched-fact-sheet check)")
-    sp.add_argument("--judge", help="rubric judge verdicts for dims 1-3: `dimN: pass|fail [locations]` "
-                                    "per line, dim1..dim3 each present; any other format exits 2 "
-                                    "(judge verdicts unparseable), never a per-dimension fail")
+    sp.add_argument("--judge", help="rubric judge verdicts for dims 1-2: `dimN: pass|fail [locations]` "
+                                    "per line, dim1 and dim2 each present; any other format exits 2 "
+                                    "(judge verdicts unparseable), never a per-dimension fail. A "
+                                    "`dim3:` line is accepted but advisory — dim3 is scanned")
+    sp.add_argument("--audience-known", action="append", metavar="TERMS",
+                    help="comma-separated repo-internal terms the ratified audience already "
+                         "knows; excluded from the dim3 scan (repeatable). Audience judgment "
+                         "enters once, as owner-ratified data — never re-judged per pass")
     sp = sub.add_parser("verify-markers")
     sp.add_argument("draft", nargs="?", default="-", help="draft file, or - for stdin")
     sp.add_argument("--count", action="store_true", help="print the count of well-formed markers")
