@@ -278,7 +278,25 @@ dependency; no exit code here may abort the run**:
   the pinned commit. The policy source supplies **questions only** — never an
   answer, never a recommendation (NFR15: triage and recommendations stay a
   view over harvest output). A question that merely restates its seed will be
-  rejected (R4) — ask the tension, not the quote. Write the items to
+  rejected (R4) — ask the tension, not the quote.
+
+  **Author against the consulted surface as a whole, never a single line
+  (#299).** Before characterizing a quoted line as a tension, read the *rest of
+  what the reader returned* for a **companion line that already resolves it** —
+  the same batch that records a rejection often records the discriminator right
+  beside it. If a companion resolves the apparent conflict, either **do not
+  raise the item at all**, or raise it **with the resolving line** in the seed's
+  `companion` field, so the owner arbitrates the real residual question instead
+  of re-deciding settled ground. A tension the surface already answers is a
+  manufactured tension: it spends an owner-gate slot on nothing, and an answer
+  to it contributes a "resolution" to a conflict that never existed.
+
+  **The line the discriminator usually turns on:** *harvest is evidence
+  assembly; the interview is the judgment gate.* Assembling many source-pointed
+  facts is not the same act as generating prose from them — the owner's answers
+  are what turn evidence into an argument. Do not seed a tension that treats
+  evidence assembly as if it were unattended generation without first checking
+  whether the surface itself draws that line. Write the items to
   `"$WS/policy-items.json"` (seam-formats.md §2) and pass them via `--items`
   below; they are schema-validated **before** triage.
 - **10** (`policy_source` unset) — generic interview, **silently**: no items,

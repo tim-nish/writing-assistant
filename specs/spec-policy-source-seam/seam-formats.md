@@ -33,7 +33,11 @@ Every Stage-2 candidate question, seeded or generic, is one item:
   "gap_type": "contradiction",
   "seed": {
     "quote": "verbatim policy line(s)",
-    "pointer": "LESSONS.md:41@8f3c2d1"
+    "pointer": "LESSONS.md:41@8f3c2d1",
+    "companion": {
+      "quote": "the same-surface line that resolves the apparent conflict",
+      "pointer": "topics/articles.md:32@8f3c2d1"
+    }
   },
   "question": "one owner-facing question",
   "owner_answer": ""
@@ -47,6 +51,13 @@ Every Stage-2 candidate question, seeded or generic, is one item:
   item carries `seed: null`.
 - `pointer` is `file:line@commit` (`file:line1-line2@commit` for a wrapped
   quote), file path relative to `policy_source.path`, commit = the run's pin.
+- `seed.companion` is **optional** (added 2026-07-17, #299): the same-surface
+  line that already resolves the apparent conflict, carried so the owner
+  arbitrates the residual question rather than settled ground. Same
+  `{quote, pointer}` shape and the same pinned-pointer grammar as the seed.
+  Tension items are authored against the **whole** consulted surface: when a
+  companion resolves the conflict, the item is either not raised or raised
+  with it — never as an unresolved contradiction (SPEC CAP-3).
 - `owner_answer` is structurally empty at generation.
 
 Validator rejection classes (each a seeded test fixture):

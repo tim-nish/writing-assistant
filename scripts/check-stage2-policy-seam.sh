@@ -132,6 +132,27 @@ grep -q -- '--policy-note' "$SKILL" && ok "SKILL: journal records why a run was 
 grep -q 'questions only' "$SKILL" && ok "SKILL: NFR15 — policy supplies questions only" \
   || err "SKILL missing the questions-only boundary"
 
+# --- 6. #299 — tension items are authored against the WHOLE consulted surface ------
+grep -qi 'consulted surface as a whole, never a single line' "$SKILL" \
+  && ok "SKILL: tension items are authored against the whole consulted surface" \
+  || err "SKILL missing the whole-surface authoring rule (#299)"
+grep -qi 'companion line that already resolves it' "$SKILL" \
+  && grep -qi 'raise the item at all' "$SKILL" \
+  && grep -qi 'with the resolving line' "$SKILL" \
+  && ok "SKILL: a same-surface companion means don't raise, or raise with the resolver" \
+  || err "SKILL missing the companion-resolution rule (#299)"
+grep -qi 'harvest is evidence' "$SKILL" && grep -qi 'interview is the judgment gate' "$SKILL" \
+  && ok "SKILL: harvest=evidence assembly vs interview=judgment gate stated where items are authored" \
+  || err "SKILL missing the assembly-vs-judgment discriminator (#299)"
+grep -qi 'manufactured tension' "$SKILL" \
+  && ok "SKILL: names the manufactured-tension cost (an owner slot on settled ground)" \
+  || err "SKILL missing the manufactured-tension rationale"
+grep -qi 'whole-surface authoring' "specs/spec-policy-source-seam/SPEC.md" \
+  && ok "seam SPEC: whole-surface authoring is contract (CAP-3)" \
+  || err "seam SPEC missing the whole-surface authoring rule"
+grep -q 'companion' "specs/spec-policy-source-seam/seam-formats.md" \
+  && ok "seam-formats: seed.companion documented" || err "seam-formats missing seed.companion"
+
 if [ "$fail" -eq 0 ]; then
   printf '\nAll stage-2 policy-seam checks passed.\n'; exit 0
 else

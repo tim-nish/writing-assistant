@@ -44,6 +44,14 @@ expect r3-bad-pointer.json        R3 "q_a pointer + unpinned pointer"
 expect r4-confirmation.json       R4 "confirmation-shaped seeded question"
 expect r5-unknown-gap-type.json   R5 "unknown gap_type"
 
+# #299 — whole-surface authoring: a tension raised despite a same-surface
+# resolving line must carry it in `seed.companion`, held to the seed's own
+# quote+pinned-pointer rule.
+set +e; out=$(python3 "$VAL" "$FIX/valid-companion.json" 2>&1); rc=$?; set -e
+[ "$rc" -eq 0 ] && [ -z "$out" ] && ok "a tension carrying its resolving companion line passes" \
+  || err "valid-companion: rc=$rc out='$out'"
+expect r3-companion-bad-pointer.json R3 "companion pointer unpinned"
+
 # r3 covers BOTH failure shapes: out-of-whitelist and unpinned.
 set +e; msg=$(python3 "$VAL" "$FIX/r3-bad-pointer.json" 2>&1 >/dev/null); set -e
 n=$(printf '%s\n' "$msg" | grep -c 'R3:' || true)

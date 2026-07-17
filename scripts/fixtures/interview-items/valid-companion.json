@@ -1,0 +1,9 @@
+[
+  {"id": "t1", "gap_type": "contradiction",
+   "seed": {"quote": "\"AI generates full articles by combining 4-5 KUs\": rejected as generate-then-filter; output coherent but insight-free.",
+            "pointer": "topics/articles.md:36@91ec5c01e4a5b6c7d8e9f0a1b2c3d4e5f6071829",
+            "companion": {"quote": "Seed -> agent-evidence-assembly -> genre-template outline; the human writes only the opinionated/quotable paragraphs.",
+                          "pointer": "topics/articles.md:32@91ec5c01e4a5b6c7d8e9f0a1b2c3d4e5f6071829"}},
+   "question": "Your recorded pipeline puts the judgment gate at the interview, which the rejected pattern lacked entirely — does that boundary still hold when a run assembles seventeen facts before the gate, or does volume alone move a run toward the pattern you declined?",
+   "owner_answer": ""}
+]

@@ -27,6 +27,11 @@ Rejection classes (each has a fixture under fixtures/interview-items/):
       whitelist: `GLOSSARY.md | LESSONS.md | topics/<basename>.md`
       `:line[-line]@sha` (7-40 hex; the same FILEPIN grammar as fact sheets).
       A seed with an empty quote is the same failure — nothing auditable.
+      The optional `seed.companion` — the same-surface line that resolves an
+      apparent conflict, carried so a tension raised anyway is raised WITH its
+      resolver (#299) — is held to the identical quote+pointer rule: a
+      companion that is not auditable is worse than no companion, because it
+      is shown to the owner as the reason the question is narrow.
   R4  a seeded question that merely RESTATES its seed — confirmation is not a
       gap type. Mechanical rule (documented, not vibes): strip a leading
       confirmation stem ("do you", "is it", "would you agree", …) and
@@ -141,6 +146,19 @@ def validate_items(items):
                 rej("R3", f"seed pointer {pointer!r} is missing, unpinned, or outside "
                           "the whitelist (GLOSSARY.md | LESSONS.md | topics/<basename>.md"
                           ":line[-line]@sha)")
+            # The optional resolving line (#299) is auditable on the same terms
+            # as the seed itself: it is shown to the owner as the reason the
+            # question is narrow, so an unpinned or quote-less companion is a
+            # rejection, not a nicety.
+            if isinstance(seed, dict) and seed.get("companion") is not None:
+                comp = seed["companion"]
+                if not isinstance(comp, dict) or not str(comp.get("quote", "")).strip():
+                    rej("R3", "seed.companion has no quote — a resolving line shown to "
+                              "the owner must be quotable")
+                elif not POINTER_RE.match(str(comp.get("pointer", "")) or ""):
+                    rej("R3", f"seed.companion pointer {comp.get('pointer')!r} is missing, "
+                              "unpinned, or outside the whitelist — the resolving line "
+                              "must be auditable at the pin, like the seed")
             elif isinstance(seed, dict) and seed.get("quote", "").strip() \
                     and not str(item["question"]).strip():
                 rej("R4", "empty question")
