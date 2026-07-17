@@ -47,6 +47,16 @@ Subcommands (each takes --root; default: the git top-level of cwd):
       lands in the articles repository, and nothing is written to the host
       source repo. A non-conforming destination falls back to user-scoped
       state and NO `plans/` directory is created there. Prints the result JSON.
+
+  consult [--root R]
+      Read existing article plans for consultation at draft start (CAP-3,
+      Story 13.57). READ-ONLY: it reads `plans/*.md` from the articles repo
+      through the schema and creates/modifies NOTHING. Emits each plan's
+      discovery surface (slug, intent, claim, status, pin, relates) as JSON so
+      the run can surface plan-grounded proposals under the proposal contract.
+      A repo with no plans, or a schema-less destination, degrades silently:
+      it prints an empty plan list with a `degraded` reason — never a failure,
+      never a prompt about missing plans.
 """
 
 import argparse
@@ -346,6 +356,51 @@ def cmd_write(args):
     return 0
 
 
+def _read_plan_summary(path):
+    """Parse one plan file into its discovery surface, or None if unreadable /
+    not an article plan. Read-only."""
+    try:
+        with open(path, encoding="utf-8") as fh:
+            fields, _, _ = split_frontmatter(fh.read())
+    except OSError:
+        return None
+    if fields.get("kind") != PLAN_KIND:
+        return None
+    slug = fields.get("slug") or os.path.splitext(os.path.basename(path))[0]
+    return {"slug": slug, "intent": fields.get("intent"),
+            "claim": fields.get("claim"), "status": fields.get("status"),
+            "pin": fields.get("pin"), "relates": fields.get("relates"),
+            "policy_seeded": fields.get("policy_seeded")}
+
+
+def cmd_consult(args):
+    """Read existing plans for draft-start consultation (CAP-3). Read-only and
+    silent-degrading: no articles-repo schema, or no plans/ directory, yields
+    an empty list with a reason — never a failure, never a side effect."""
+    root = rp.host_root(args.root)
+    repo = articles_repo_root(root)
+    if not has_articles_schema(repo):
+        print(json.dumps({"plans": [], "degraded":
+                          "destination has no articles-repo schema; "
+                          "consultation is skipped (today's behavior)"}))
+        return 0
+    plans_dir = os.path.join(repo, PLAN_DIR)
+    if not os.path.isdir(plans_dir):
+        print(json.dumps({"plans": [], "degraded":
+                          "no plans/ directory in the articles repo"}))
+        return 0
+    summaries = []
+    for name in sorted(os.listdir(plans_dir)):
+        if not name.endswith(".md"):
+            continue
+        s = _read_plan_summary(os.path.join(plans_dir, name))
+        if s is not None:
+            summaries.append(s)
+    print(json.dumps({"plans": summaries, "articles_repo": repo,
+                      "degraded": None}))
+    return 0
+
+
 def main(argv=None):
     p = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -368,11 +423,13 @@ def main(argv=None):
     sp.add_argument("plan", nargs="?", default="-")
     sp.add_argument("--slug", required=True)
 
+    sub.add_parser("consult", parents=[root_parent])
+
     args = p.parse_args(argv)
     if not hasattr(args, "root"):
         args.root = None
     return {"validate": cmd_validate, "dest": cmd_dest,
-            "write": cmd_write}[args.cmd](args)
+            "write": cmd_write, "consult": cmd_consult}[args.cmd](args)
 
 
 if __name__ == "__main__":

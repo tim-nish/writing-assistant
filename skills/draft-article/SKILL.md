@@ -155,6 +155,38 @@ The **only** files this pipeline writes into the host repo are the declared
 products at `output.drafts` (Stage 5). Pass `$WS` to Stage 1 so harvest writes
 there rather than minting its own workspace.
 
+### Plan consultation at draft start (SPEC-article-plan CAP-3, Story 13.57)
+
+After Stage 0, before the interview, **consult existing article plans** in the
+articles repository — serial engineering-lessons articles should build on prior
+decisions instead of repeating them. The read is **read-only through the repo's
+schema** — nothing under the articles repository is created or modified by
+consultation, and plan content **never enters the harvest evidence stream**
+(Story 13.56's fences apply):
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/write-article-plan.py consult --root <host-repo>
+```
+
+It returns each prior plan's discovery surface (slug, intent, claim, status,
+pin, relates). From these you **may surface plan-grounded proposals** — each
+under the [owner-facing proposal contract](../owner-facing-proposal-contract.md),
+**none auto-applied**:
+
+- "article Y already covered X — link to it instead of re-explaining";
+- "lesson Z has new evidence since `<pin sha>` — update it?";
+- a **continue / fill / update / new** recommendation for how this article
+  relates to the prior plans (recorded as `relates` on the plan this run
+  eventually emits).
+
+**The tool never applies a prior plan.** Every proposal is the owner's to ratify
+or decline. A **declined** proposal leaves **zero friction and no residue** —
+the run proceeds exactly as if the proposal had never been surfaced (the
+presented-payload log keeps the decline, like every other proposal). A
+repository with **no plans, or a schema-less destination, degrades silently**:
+`consult` returns an empty list with a reason, and the run behaves exactly as it
+does today — never a failure, and never a prompt about missing plans.
+
 ### Durability — checkpoint each stage, resume from the last completed one (Story 13.5)
 
 Wall-clock is unconstrained but the **turn/compute budget is a real ceiling**, so

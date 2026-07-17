@@ -190,6 +190,53 @@ grep -qi 'no new owner interaction\|no new owner interaction' "$DSKILL" \
   && ok "skill states the plan needs no new owner interaction (CAP-1)" \
   || err "skill missing the no-interaction guarantee"
 
+# --- CAP-3: read-only plan consultation at draft start (Story 13.57) --------
+# The good plan from CAP-1 is already written at $a/plans/. Consultation reads
+# it back read-only and returns its discovery surface.
+good
+python3 "$W" write --slug interview-is-the-difference --root "$h" "$work/plan.md" >/dev/null 2>&1
+pre_snapshot=$(find "$a" -type f | sort; git -C "$a" status --porcelain)
+c=$(python3 "$W" consult --root "$h" 2>/dev/null)
+printf '%s' "$c" | grep -q '"slug": "interview-is-the-difference"' \
+  && ok "CAP-3: consult reads existing plans and returns their discovery surface" \
+  || err "consult did not surface the existing plan: $c"
+printf '%s' "$c" | grep -q '"claim": "the interview is the difference' \
+  && ok "CAP-3: consult carries the plan's claim (proposal-grounding surface)" \
+  || err "consult missing the claim surface"
+post_snapshot=$(find "$a" -type f | sort; git -C "$a" status --porcelain)
+[ "$pre_snapshot" = "$post_snapshot" ] \
+  && ok "CAP-3: consultation is read-only — nothing created or modified" \
+  || err "consultation modified the articles repo"
+
+# Degrade silently: no plans/ directory -> empty list with a reason, no failure.
+a2="$work/articles2"; mkdir -p "$a2/drafts" "$a2/backlog"; : > "$a2/INDEX.md"
+git -C "$a2" init -q      # a conforming articles repo that simply has no plans yet
+h3="$work/host3"; mkdir -p "$h3"; git -C "$h3" init -q
+python3 "$root/scripts/resolve-writing-sources.py" --root "$h3" \
+  set-draft-location "$a2/drafts/" >/dev/null 2>&1
+c=$(python3 "$W" consult --root "$h3" 2>/dev/null) \
+  && ok "CAP-3: consult on a repo with no plans exits 0 (never a failure)" \
+  || err "consult failed on a repo with no plans"
+printf '%s' "$c" | grep -q '"plans": \[\]' && printf '%s' "$c" | grep -qi 'no plans' \
+  && ok "CAP-3: no plans -> empty list with a reason (silent degrade)" \
+  || err "consult did not degrade silently: $c"
+[ ! -d "$a2/plans" ] && ok "CAP-3: consultation created no plans/ directory" \
+  || err "consultation created a plans/ dir"
+
+# Schema-less destination -> degrade silently too.
+c=$(python3 "$W" consult --root "$h2" 2>/dev/null) \
+  && printf '%s' "$c" | grep -q '"plans": \[\]' \
+  && ok "CAP-3: schema-less destination degrades to today's behavior" \
+  || err "consult did not degrade on a schema-less destination: $c"
+
+# The skill documents consultation as read-only, proposal-shaped, none auto-applied.
+grep -q 'write-article-plan.py consult' "$DSKILL" \
+  && ok "CAP-3: draft skill wires in plan consultation" || err "skill missing consult wiring"
+grep -qi 'none auto-applied\|never applies a prior plan' "$DSKILL" \
+  && ok "CAP-3: skill states no plan is auto-applied" || err "skill missing the no-auto-apply rule"
+grep -qi 'no residue' "$DSKILL" \
+  && ok "CAP-3: skill states a declined proposal leaves no residue" || err "skill missing no-residue rule"
+
 if [ "$fail" -eq 0 ]; then
   printf '\nAll article-plan checks passed.\n'; exit 0
 else
