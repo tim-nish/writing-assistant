@@ -193,14 +193,24 @@ REWRITE_BUDGET = 1
 # (Story 11.2) adds the semantic layer (falsifiability + the six forbidden
 # derivation categories).
 PROV_CLASSES = ("sourced", "derived", "narration", "verify")
+# A position may carry a LINE ANCHOR — `P1.S1[L7]` (#304). Without it a judge
+# must re-derive the P{n}.S{n} numbering from the draft by applying the skip
+# rules (frontmatter, headings, blockquotes, mermaid, pointer block); three
+# independent judges did that over one draft and each produced a DIFFERENT
+# numbering, then returned confident verdicts against sentences that were not
+# at the positions they named. The map is machine-generated and the draft is
+# fixed at grading time, so the ambiguity is gratuitous: the anchor lets a judge
+# MATCH instead of derive. The suffix is optional in the grammar (older maps
+# still parse) and required where it matters — see `provenance --draft`.
 PROV_LINE = re.compile(
-    r"^(?P<pos>\S+):\s*(?P<cls>sourced|derived|narration|verify)"
+    r"^(?P<pos>[^\s:\[]+)(?:\[L(?P<anchor>\d+)\])?"
+    r":\s*(?P<cls>sourced|derived|narration|verify)"
     r"(?:\s*<-\s*(?P<ptrs>.+?))?\s*$"
 )
 
 
 def parse_provenance_map(text):
-    """Parse the sidecar map text into [(pos, cls, [pointers])], raising
+    """Parse the sidecar map text into [(pos, cls, [pointers], anchor)], raising
     ValueError on a malformed line, a class name outside the closed set, or a
     duplicate position key (#308). Duplicates fail closed here — before any
     normalization and before any judge is invoked — because a map that cannot
@@ -220,7 +230,8 @@ def parse_provenance_map(text):
             raise ValueError(f"line {lineno}: malformed provenance entry: {raw!r}")
         ptrs = [p.strip() for p in (m.group("ptrs") or "").split(",") if p.strip()]
         seen.setdefault(m.group("pos"), []).append(lineno)
-        entries.append((m.group("pos"), m.group("cls"), ptrs))
+        anchor = int(m.group("anchor")) if m.group("anchor") else None
+        entries.append((m.group("pos"), m.group("cls"), ptrs, anchor))
     dupes = {pos: lns for pos, lns in seen.items() if len(lns) > 1}
     if dupes:
         detail = "; ".join(
@@ -241,6 +252,12 @@ def cmd_provenance(args):
     --count prints the per-class tallies (dimension-4 quote-density reads these).
     A structural violation exits non-zero; the semantic checks live in
     `verify-provenance` (Story 11.2).
+
+    With --draft, every position must also carry a LINE ANCHOR (`P1.S1[L7]`)
+    that resolves to a real, non-blank line of that draft (#304). The anchor is
+    what lets an isolated judge match a sentence instead of re-deriving the
+    numbering; a map handed to a judge without one is not gradeable, so this is
+    a structural failure like any other, not an advisory.
     """
     text = sys.stdin.read() if args.map == "-" else open(args.map, encoding="utf-8").read()
     try:
@@ -249,9 +266,13 @@ def cmd_provenance(args):
         sys.stderr.write(f"error: {e}\n")
         return 1
 
+    draft_lines = None
+    if getattr(args, "draft", None):
+        draft_lines = _read_text(args.draft).splitlines()
+
     tally = {c: 0 for c in PROV_CLASSES}
     problems = []
-    for pos, cls, ptrs in entries:
+    for pos, cls, ptrs, anchor in entries:
         tally[cls] += 1
         if cls == "sourced" and len(ptrs) < 1:
             problems.append(f"{pos}: sourced claim carries no pointer")
@@ -259,6 +280,16 @@ def cmd_provenance(args):
             problems.append(f"{pos}: derived claim must inherit >=2 pointers (got {len(ptrs)})")
         elif cls in ("narration", "verify") and ptrs:
             problems.append(f"{pos}: {cls} must carry no pointer (got {len(ptrs)})")
+        if draft_lines is not None:
+            if anchor is None:
+                problems.append(f"{pos}: no line anchor — a judge cannot locate this "
+                                "sentence without re-deriving the numbering (write "
+                                f"`{pos}[L<line>]`)")
+            elif not (1 <= anchor <= len(draft_lines)):
+                problems.append(f"{pos}: anchor L{anchor} is outside the draft "
+                                f"(1..{len(draft_lines)})")
+            elif not draft_lines[anchor - 1].strip():
+                problems.append(f"{pos}: anchor L{anchor} points at a blank line")
 
     if args.count:
         print(json.dumps(tally))
@@ -505,7 +536,7 @@ def _dimension4(draft_text, prov_entries):
     # Stitched-fact-sheet signature: wall-to-wall sourced claims, no
     # derived/narration connective tissue (reads the provenance map).
     if prov_entries:
-        classes = [c for _, c, _ in prov_entries]
+        classes = [c for _, c, _, _ in prov_entries]
         total = len(classes)
         sourced = classes.count("sourced")
         tissue = classes.count("derived") + classes.count("narration")
@@ -2175,6 +2206,9 @@ def main(argv=None):
     sp = sub.add_parser("provenance")
     sp.add_argument("--map", default="-", help="the sidecar provenance map, or - for stdin")
     sp.add_argument("--count", action="store_true", help="print per-class tallies as JSON")
+    sp.add_argument("--draft", help="the draft the map describes; enables anchor validation "
+                                    "(every position must carry `[L<line>]` resolving to a "
+                                    "real non-blank line — #304)")
     sp = sub.add_parser("quality-gate")
     sp.add_argument("--draft", default="-", help="the filled draft, or - for stdin")
     sp.add_argument("--map", help="the sidecar provenance map (for the stitched-fact-sheet check)")

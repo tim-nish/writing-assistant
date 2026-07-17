@@ -69,6 +69,61 @@ printf 'P1.S3: narration <- fs-1\n' | python3 "$VP" --map - >/dev/null 2>&1 \
 # The judge worklist is extractable (list narration + derived for grading).
 [ "$(python3 "$VP" --map "$work/good.txt" --list-narration)" = "P1.S3" ] \
   && ok "narration positions are listable for the judge" || err "--list-narration wrong"
+
+# --- #304: positions carry a line ANCHOR so the judge matches, never re-derives --
+cat > "$work/anch-draft.md" <<'MD'
+---
+slug: t
+audience: en-practitioner
+---
+# The one claim
+
+Structured discovery halved our token bill.
+Under a binary rule, a sentence is either sourced or marked, and connective tissue is neither.
+The bench recorded a 2x drop.
+MD
+cat > "$work/anch-map.txt" <<'MAP'
+P1.S1[L7]: sourced <- fs-1
+P1.S2[L8]: narration
+P2.S1[L9]: sourced <- fs-3
+MAP
+# The hand-off carries the anchored line verbatim — no skip rules to apply.
+python3 "$VP" --map "$work/anch-map.txt" --draft "$work/anch-draft.md" --list-narration \
+  | grep -q 'P1.S2 \[L8\]: Under a binary rule' \
+  && ok "hand-off carries each position's anchored line verbatim (#304)" \
+  || err "--list-narration --draft did not carry the anchored text"
+python3 "$VP" --map "$work/anch-map.txt" --draft "$work/anch-draft.md" --list-derived >/dev/null 2>&1 \
+  && ok "--list-derived accepts anchored maps" || err "--list-derived broke on anchored map"
+
+# Determinism: every judge spawn receives byte-identical text (the defect was
+# three judges deriving three different numberings from the same draft).
+n=$(for i in 1 2 3; do python3 "$VP" --map "$work/anch-map.txt" --draft "$work/anch-draft.md" --list-narration; done | sort -u | wc -l)
+[ "$n" -eq 1 ] && ok "three independent spawns get an identical hand-off (deterministic)" \
+  || err "hand-off differed across spawns ($n variants)"
+
+# A mislocated verdict is detectable from the record alone: the judge echoes the
+# sentence it graded, and it does not match the anchor. This is the observed
+# case — a confident finding against text that was not at that position.
+printf 'P1.S2 ~ "enumerates six universal derivation rules": asserts a checkable proposition\n' \
+  > "$work/jf-bad.txt"
+python3 "$VP" --map "$work/anch-map.txt" --draft "$work/anch-draft.md" \
+  --judge-findings "$work/jf-bad.txt" 2>&1 | grep -q 'ANCHOR MISMATCH' \
+  && ok "a judge verdict quoting the wrong sentence is caught mechanically (#304)" \
+  || err "anchor mismatch not detected"
+# A judge quoting the real anchored sentence is graded as a normal finding.
+printf 'P1.S2 ~ "Under a binary rule, a sentence is either sourced": asserts a checkable proposition\n' \
+  > "$work/jf-ok.txt"
+out=$(python3 "$VP" --map "$work/anch-map.txt" --draft "$work/anch-draft.md" \
+      --judge-findings "$work/jf-ok.txt" 2>&1 || true)
+printf '%s' "$out" | grep -q 'asserts a checkable proposition' \
+  && ! printf '%s' "$out" | grep -q 'ANCHOR MISMATCH' \
+  && ok "a correctly-located verdict is graded normally, not discarded" \
+  || err "a correct verdict was mishandled: $out"
+# A verdict against a position absent from the map cannot be trusted.
+printf 'P9.S9: asserts a checkable proposition\n' > "$work/jf-ghost.txt"
+python3 "$VP" --map "$work/anch-map.txt" --draft "$work/anch-draft.md" \
+  --judge-findings "$work/jf-ghost.txt" 2>&1 | grep -q 'not in the map' \
+  && ok "a verdict against an unmapped position is rejected" || err "ghost position accepted"
 python3 "$VP" --map "$work/good.txt" --list-derived | grep -q 'P1.S2: fs-12, fs-14' \
   && ok "derived claims are listable for the judge" || err "--list-derived wrong"
 

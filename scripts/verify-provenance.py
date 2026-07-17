@@ -36,8 +36,14 @@ import re
 import sys
 
 PROV_CLASSES = ("sourced", "derived", "narration", "verify")
+# `POS ~ "<quoted>": reason` — the judge echoing the sentence it graded.
+JUDGE_ECHO = re.compile(r'^(?P<pos>[^~:]+)~\s*"(?P<quote>[^"]*)"\s*:\s*(?P<reason>.*)$')
+# Positions may carry a line anchor — `P1.S1[L7]` (#304). This parser stays
+# independent of the pipeline's (NFR13: the drafting context never grades its
+# own map), so the grammar is mirrored here deliberately, not imported.
 PROV_LINE = re.compile(
-    r"^(?P<pos>\S+):\s*(?P<cls>sourced|derived|narration|verify)"
+    r"^(?P<pos>[^\s:\[]+)(?:\[L(?P<anchor>\d+)\])?"
+    r":\s*(?P<cls>sourced|derived|narration|verify)"
     r"(?:\s*<-\s*(?P<ptrs>.+?))?\s*$"
 )
 
@@ -52,8 +58,23 @@ def parse_map(text):
         if not m:
             raise ValueError(f"line {lineno}: malformed provenance entry: {raw!r}")
         ptrs = [p.strip() for p in (m.group("ptrs") or "").split(",") if p.strip()]
-        entries.append((m.group("pos"), m.group("cls"), ptrs))
+        anchor = int(m.group("anchor")) if m.group("anchor") else None
+        entries.append((m.group("pos"), m.group("cls"), ptrs, anchor))
     return entries
+
+
+def anchored_text(anchor, draft_lines):
+    """The verbatim draft line an anchor names — what the judge MATCHES against.
+
+    Returning the line (not a re-split sentence) is the point: any derivation
+    the judge has to perform is a derivation it can get wrong, and three judges
+    already proved they get it wrong differently.
+    """
+    if anchor is None or draft_lines is None:
+        return None
+    if not (1 <= anchor <= len(draft_lines)):
+        return None
+    return draft_lines[anchor - 1].strip()
 
 
 def _read(path):
@@ -75,6 +96,7 @@ def main(argv=None):
     p.add_argument("--judge-findings", help="independent judge's verdicts: `POS: reason` per line")
     p.add_argument("--list-narration", action="store_true", help="list narration positions for the judge")
     p.add_argument("--list-derived", action="store_true", help="list derived positions + pointers for the judge")
+    p.add_argument("--draft", help="the draft the map describes; makes the judge hand-off carry each\nposition's anchored line verbatim, and lets an echoed judge quote be checked (#304)")
     args = p.parse_args(argv)
 
     try:
@@ -83,22 +105,34 @@ def main(argv=None):
         sys.stderr.write(f"error: {e}\n")
         return 2
 
+    draft_lines = _read(args.draft).splitlines() if args.draft else None
+
+    # The judge hand-off. With --draft each position carries its anchored line
+    # verbatim, so the judge MATCHES the sentence instead of re-deriving the
+    # P{n}.S{n} numbering from skip rules (#304). Emission is a pure function of
+    # (map, draft): every spawn receives byte-identical text, which is what makes
+    # three judges agree on what P8.S3 is.
     if args.list_narration:
-        for pos, cls, _ in entries:
-            if cls == "narration":
-                print(pos)
+        for pos, cls, _, anchor in entries:
+            if cls != "narration":
+                continue
+            text = anchored_text(anchor, draft_lines)
+            print(f"{pos} [L{anchor}]: {text}" if text is not None else pos)
         return 0
     if args.list_derived:
-        for pos, cls, ptrs in entries:
-            if cls == "derived":
-                print(f"{pos}: {', '.join(ptrs)}")
+        for pos, cls, ptrs, anchor in entries:
+            if cls != "derived":
+                continue
+            text = anchored_text(anchor, draft_lines)
+            head = f"{pos} [L{anchor}]" if text is not None else pos
+            print(f"{head}: {', '.join(ptrs)}" + (f" | {text}" if text is not None else ""))
         return 0
 
     valid = _load_set(args.fact_sheet)
     findings = []
 
     # --- mechanical layer ---
-    for pos, cls, ptrs in entries:
+    for pos, cls, ptrs, anchor in entries:
         if cls in ("narration", "verify") and ptrs:
             findings.append((pos, f"{cls} must carry no pointer"))
         if cls == "sourced" and not ptrs:
@@ -111,14 +145,41 @@ def main(argv=None):
                     findings.append((pos, f"pointer {ptr!r} does not resolve to a fact-sheet entry"))
 
     # --- semantic layer (independent judge's verdicts) ---
+    # Grammar: `POS: reason`, or `POS ~ "<quoted sentence>": reason` when the
+    # judge echoes the text it graded. The echo is what makes a MISLOCATED
+    # verdict detectable from the record alone (#304): a judge that graded the
+    # wrong sentence still returns a confident finding, and previously the only
+    # way to notice was a human comparing quote to draft — which needs exactly
+    # the drafting context NFR13 denies the judge. With the echo, the mismatch
+    # is arithmetic.
     if args.judge_findings:
-        positions = {pos for pos, _, _ in entries}
+        anchors = {pos: anchor for pos, _, _, anchor in entries}
+        known = set(anchors)
         for ln in _read(args.judge_findings).splitlines():
             ln = ln.strip()
             if not ln or ln.startswith("#"):
                 continue
-            pos, _, reason = ln.partition(":")
-            pos, reason = pos.strip(), reason.strip()
+            m = JUDGE_ECHO.match(ln)
+            if m:
+                pos, quoted, reason = m.group("pos").strip(), m.group("quote"), m.group("reason").strip()
+            else:
+                pos, _, reason = ln.partition(":")
+                pos, quoted, reason = pos.strip(), None, reason.strip()
+            if pos not in known:
+                findings.append((pos, f"judge graded position {pos!r}, which is not in the map "
+                                      "— the verdict cannot be trusted"))
+                continue
+            if quoted is not None:
+                actual = anchored_text(anchors[pos], draft_lines)
+                if actual is None:
+                    findings.append((pos, "judge echoed a sentence but the map gives no "
+                                          "resolvable anchor to check it against"))
+                    continue
+                if quoted.strip() not in actual:
+                    findings.append((pos, f"ANCHOR MISMATCH: judge graded {quoted.strip()!r} "
+                                          f"but {pos} anchors to {actual!r} — the verdict is "
+                                          "about a different sentence and is discarded"))
+                    continue
             findings.append((pos, reason or "judge flagged a provenance violation"))
 
     if not findings:
