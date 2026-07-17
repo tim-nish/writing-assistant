@@ -1061,6 +1061,43 @@ written to `$WS` only — applying it to the site tree is the owner's act; the
 pipeline never writes the site tree. Without `--url` it reports the offer as
 pending — re-offer it next invocation.
 
+## Emit the article plan (SPEC-article-plan CAP-1/CAP-2, Story 13.55)
+
+At run completion — after the verified draft exists — emit the run's editorial
+decisions as an **article plan** at `plans/<slug>.md` in the articles
+repository, so they survive the disposable workspace and a later run can
+consult them (Story 13.57). The plan is a **deterministic projection** of
+artifacts this run already produced (journal, editorial anchor, dispositioned
+answers, visual decisions, unresolved items) — **no new owner interaction**,
+and regenerating it from the same artifacts is byte-identical.
+
+Assemble the plan text from run state and hand it to the sanctioned writer,
+which validates fail-closed and places it:
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/write-article-plan.py write \
+  --slug <slug> --root <host-repo> "$WS/article-plan.md"
+```
+
+- The frontmatter is the closed schema (SPEC-article-plan CAP-2): `kind:
+  article-plan` (constant, the machine marker that keeps a plan **out of the
+  evidence stream**), `slug` (equal to the filename stem), `intent`, `claim`,
+  `status` (`outlined`/`drafted`/`superseded`), `run_id`, `pin`
+  (`<source-repo>@<commit>`); optional `audience`, `policy_seeded`+`seed`,
+  `relates`. Everything the draft or its variants own (title, summary, topics,
+  language, …), machine state (journal/checkpoint/provenance map), and
+  free-text `evidence:` are **forbidden** — the writer refuses them with
+  per-key diagnostics. Every evidence reference in the **body** is a
+  commit-pinned pointer or an interview-answer id, never prose.
+- **Only the plan file is emitted.** No journal, checkpoint, or
+  provenance-map data lands in the articles repository, and **nothing is
+  written to the host source repo** — the footprint invariant is untouched.
+- **Schema-less destination fallback.** If `output.drafts` points somewhere
+  without the articles-repo schema, the writer lands the plan in user-scoped
+  state (keyed by repo + slug, draft association intact) and creates **no**
+  `plans/` directory in that destination. The write succeeds either way;
+  check `dest --slug <slug>` first if you need to tell the owner where it went.
+
 ## Completion summary
 
 End every run with the shared
