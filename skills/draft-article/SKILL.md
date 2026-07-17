@@ -743,11 +743,54 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py verify-markers <draft>
 Malformed markers fail; Stage 4 then resolves each `[VERIFY]` until
 `verify-markers --count` reports zero.
 
+### Visual-set plan (SPEC-article-visuals CAP-2a, Story 13.58)
+
+**Before any individual visual proposal, propose the article's visual set as a
+whole** — one owner-ratifiable item under the
+[**owner-facing proposal contract**](../owner-facing-proposal-contract.md)
+(Where/Why/Effect labels; plain-text payload per contract section (g)). The
+set-level question is always asked **deliberately**, instead of the effective
+zero-or-one outcome the per-slot reactive flow produced. The plan enumerates,
+as a whole:
+
+- **how many** visuals — `0..cap`, where the cap is the framework's **declared
+  slot + 2 opportunistic extras** (CAP-2's cap stands; the plan proposes
+  within it, never raises it). **Zero is a valid plan** — when the article
+  needs no visual, the plan says so and **nothing is padded toward the cap**;
+- **per member**: its **communicative role** (what part of the argument it
+  carries), **required elements** (the nodes/relationships/rows the role
+  demands), **format** (the CAP-4 table-vs-diagram rule applied per member),
+  **placement** (framework slot or section), and **per-element evidence
+  pointers** (commit-pinned or interview-answer ids, per CAP-3). An element
+  with no pointer routes to **`[VERIFY]`/NEEDS-OWNER**, exactly as CAP-3
+  requires — the set plan never launders an unsourced element in.
+
+Recommend multiple visuals **only when distinct parts of the argument
+materially benefit** — the step makes the set deliberate, never larger.
+Validate the assembled plan (the cap + the zero-plan-no-padding rule) with:
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/validate-visual-set.py --slot-count <n> "$WS/visual-set-plan.json"
+```
+
+**The owner ratifies, modifies, or declines the whole plan.** Modification
+(remove a member, change a role/format/placement, add one within the cap)
+happens **at the plan step without re-litigating approved members**. **Declining
+the whole plan degrades to the per-slot flow below** — the individual
+proposals run exactly as before. A declined planned member leaves **no
+placeholder residue**, and downstream per-visual machinery (source proposal,
+fallback ladder, no-rendering) is **unchanged**. When a plan is ratified, the
+individual proposals below **follow it** (CAP-2) rather than re-deciding the
+set.
+
 ### Visual proposals (SPEC-article-visuals CAP-2)
 
 As the framework fills, reach its **declared visual slot** (Story 8.1;
 `frameworks/CONVENTIONS.md`) — and identify **up to 2 opportunistic extra
-visuals** where one would materially help. **Propose** each; never insert one
+visuals** where one would materially help. When a **ratified visual-set plan**
+exists (CAP-2a above), these individual proposals **follow the plan's members**
+rather than re-opening the set decision; absent a plan (the owner declined it),
+this is the per-slot fallback flow. **Propose** each; never insert one
 unasked. Each proposal is **two steps** (SPEC-draft-article-ux CAP-3, Story
 13.29) — the intent decision comes before any finished source, because the
 fallback ladder's table-vs-diagram choice depends on it. Both steps follow the
