@@ -1095,6 +1095,12 @@ def cmd_interview(args):
     additionally ground an `open` question from a fact-sheet owner-judgment
     entry and present it as recommended (rationale `owner-judgment`). Zero
     questions are asked when everything is covered — never padded.
+
+    Selection reserves ONE of the <=5 slots for the highest-priority
+    policy-seeded tension item whenever one survives validation (#302): it
+    displaces the lowest-priority survivor, never extends the cap. Without the
+    reservation, a repo with >=5 confirmed NEEDS-OWNER gaps silently degrades
+    to a generic interview no matter what the policy probe found.
     """
     framework = args.framework.upper()
     if framework not in FRAMEWORK_PRIORITY:
@@ -1190,7 +1196,26 @@ def cmd_interview(args):
     survivors = [r for r in triage if r["outcome"] != "suppressed"]
     survivors.sort(key=lambda r: 0 if r["outcome"] == "recommended"
                    else 1 if r["rationale"] == "policy-seed" else 2)
-    survivors = survivors[:QUESTION_BUDGET]
+    # ONE SLOT IS RESERVED for the highest-priority policy-seeded tension item
+    # whenever one exists (#302; SPEC-article-draft-pipeline CAP-2 amended
+    # 2026-07-17). Priority order alone starves seeds on any repo whose harvest
+    # yields >= QUESTION_BUDGET NEEDS-OWNER gaps — i.e. exactly the fact-rich
+    # repos the seam was built for — and the starvation is silent: the editorial
+    # anchor (13.38) resolves to a routine slot answer with policy_seeded false,
+    # and the staging-candidate emitter (seam CAP-4) writes an empty file. The
+    # cap itself is untouched: the reserved item DISPLACES the lowest-priority
+    # survivor, it never extends the budget.
+    if len(survivors) > QUESTION_BUDGET:
+        seeds = [r for r in survivors if r.get("rationale") == "policy-seed"]
+        if seeds and QUESTION_BUDGET >= 1:
+            keep = {id(seeds[0])}          # the reservation
+            for r in survivors:            # fill the rest in priority order
+                if len(keep) >= QUESTION_BUDGET:
+                    break
+                keep.add(id(r))
+            survivors = [r for r in survivors if id(r) in keep]
+        else:
+            survivors = survivors[:QUESTION_BUDGET]
 
     # Presentation reorder (Story 13.30, CAP-4): selection above is untouched;
     # the asked set is SHOWN claim/angle → audience → significance → color.

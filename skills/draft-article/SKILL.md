@@ -365,6 +365,15 @@ The surviving (non-suppressed) questions are returned as `questions`, and are:
   questions**, then generic open questions, using the GATE-slot order as the
   deterministic tie-break when more than five could apply — the ≤5 cap holds
   even when the NEEDS-OWNER list is longer or policy items are in play;
+- **one slot reserved for policy tension (#302).** When at least one valid
+  policy-seeded tension item exists, the **highest-priority one is guaranteed a
+  slot**: it displaces the lowest-priority survivor rather than extending the
+  budget. Priority order alone starves seeds on any repo whose harvest yields
+  five or more confirmed gaps — precisely the fact-rich repos the seam exists
+  for — and the loss is silent: the editorial anchor falls back to a routine
+  slot answer (`policy_seeded: false`) and contribute-back emits an empty file.
+  With no valid tension item, selection is exactly as before — no slot is held
+  open and nothing is padded;
 - **at most 5**, and **zero** when harvest already covers everything — never
   padded to five.
 
