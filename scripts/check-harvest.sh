@@ -54,9 +54,34 @@ has "NEEDS-OWNER" "open/deferred findings route to NEEDS-OWNER"
 has "github-issues source skipped" "unreachable API degrades with one logged line"
 has "Degrade, never fail" "degrade is never a failure"
 # The stage-2 triage side of the rule lives in the draft skill (not inference).
-grep -qF "Story 13.50" "skills/draft-article/SKILL.md" \
+grep -qF "13.50" "skills/draft-article/SKILL.md" \
+  && grep -qF "eligible grounding for" "skills/draft-article/SKILL.md" \
   && ok "stage-2 triage states the issue-fact grounding rule" \
   || err "draft-article triage missing the issue-fact rule"
+
+# 4c. tanuki-den typed source (Story 13.51): declared opt-in, bounded read-only
+#     reader, den: pointer form documented beside the others, data-not-judgment,
+#     degrade-never-fail, no fallback to undeclared producer state.
+has "tanuki-den" "documents the tanuki-den source"
+has "den:<ledger-id>@<run>" "den pointer form documented"
+has "bounded reader" "den read goes through a bounded reader"
+has "no write path exists" "no write path into Tanuki's state"
+has "never amplifies recurrence into significance" "recurrence is never amplified"
+has "tanuki-den source skipped" "missing/unreadable Den degrades with one logged line"
+has "fallback to reading undeclared producer state" "never falls back to undeclared producer state"
+# The pointer grammar lists den: beside path:line@sha / sha / URL.
+grep -qF 'den:<ledger-id>@<run>' "$SKILL" && grep -qF 'path:line@sha' "$SKILL" \
+  && ok "den: form documented beside the file/sha/URL pointer forms" \
+  || err "den form not documented in the pointer grammar"
+# The validator accepts the form (the grammar is shared, not restated).
+grep -qF 'den:' "scripts/validate-fact-sheet.py" \
+  && ok "validate-fact-sheet accepts the den pointer form" \
+  || err "validator missing the den pointer form"
+# The Den triage rule reaches the draft skill too (same rules as 13.50).
+grep -qF "13.51" "skills/draft-article/SKILL.md" \
+  && grep -qF "recurrence count is data" "skills/draft-article/SKILL.md" \
+  && ok "stage-2 triage states the Den-fact rule (recurrence never amplified)" \
+  || err "draft-article triage missing the Den-fact rule"
 
 # --- behavioral: the source-scope enumerator (the enforced boundary) --------
 work=$(mktemp -d); trap 'rm -rf "$work"' EXIT

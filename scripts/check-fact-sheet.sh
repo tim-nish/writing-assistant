@@ -57,6 +57,18 @@ V && ok "valid: bare commit sha in a declared repo" || err "commit-sha source re
 emit "- Prior art / https://example.com/a / event"
 V && ok "valid: URL source" || err "URL source rejected"
 
+# 2b. den:<ledger-id>@<run> — a Tanuki Den finding (Story 13.51). A pinned
+#     pointer type whose pin is the judging RUN, not a commit: the Den ledger
+#     is not a git tree, so the FORM is the contract (as for a URL) and the
+#     validator never reaches into Tanuki's state to resolve it.
+emit "- flaky gate, type friction, recurrence 4, accepted / den:f-19@r-208 / event"
+V && ok "valid: den:<ledger-id>@<run> source (Story 13.51)" || err "den pointer rejected"
+emit "- finding / den:f_19.a-2@2026-07-17.r3 / decision"
+V && ok "valid: den pointer with the full [A-Za-z0-9._-] id/run charset" || err "den charset rejected"
+emit "- Unpinned den / den:f-19 / event"
+reason | grep -q 'not pinned to a run' && ok "reject: bare den:<id> (unpinned) names the fix" \
+  || err "unpinned den pointer accepted"
+
 # 3. Structural rejections.
 emit "- Missing the other fields"
 reason | grep -q 'malformed' && ok "reject: missing SOURCE/KIND (malformed)" || err "malformed entry accepted"
