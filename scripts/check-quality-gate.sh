@@ -159,6 +159,15 @@ python3 "$DP" quality-gate --draft "$work/vocab-fixed.md" | jget 'd["dimensions"
   && ok "one revision addressing the complete set clears dim3 (convergence)" \
   || err "dim3 still failing after a complete revision — the loop cannot converge"
 
+# #305 — WRAPPED GLOSS reproduction: prose wraps, so a term and the gloss that
+# introduces it straddle a line break. A line-based scan calls the gloss absent
+# and manufactures a false violation. Asserted explicitly (not only via the
+# convergence case) so unwrapping that fixture can never silently drop it.
+printf -- '---\nslug: w\naudience: en-practitioner\n---\n# T\n\nThe fact\nsheet, the list of gathered claims, fed Stage 3 — the framework-fill\nstep — without any trouble.\n' > "$work/wrapped.md"
+python3 "$DP" quality-gate --draft "$work/wrapped.md" | jget 'd["dimensions"]["dim3"]["verdict"]' | grep -q pass \
+  && ok "a gloss wrapped across a line break still introduces its term (no false violation)" \
+  || err "wrapped gloss manufactured a false dim3 violation"
+
 # #305 — the de-dup -> de-duplication reproduction: expanding an introduced
 # abbreviation must NOT manufacture a fresh violation (contract rule 6).
 cat > "$work/dedup.md" <<'MD'

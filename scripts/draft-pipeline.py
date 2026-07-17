@@ -321,20 +321,41 @@ def _sentences(paragraph):
 # scan is exhaustive AND deterministic by construction, satisfying both halves
 # of the defect at once.
 #
-# Longest-first: `de-duplication check` must win over `de-dup` so an expansion
-# is never scored as a fresh, unintroduced term (contract rule 6).
-INTERNAL_VOCAB = (
-    "de-duplication check", "de-duplication", "de-dup",
-    "explanation calibration", "quality gate", "article framework",
-    "platform variants", "isolated judge", "provenance map", "fact sheet",
-    "knowledge units", "knowledge unit", "turn budget", "dogfood entry",
-    "dogfood log", "editorial anchor", "staging candidate", "policy seed",
-    "tension item", "arbitration", "harvest", "GATE",
-)
-# `Stage 3`, `F2`, and friends are patterns rather than fixed strings.
-INTERNAL_VOCAB_RE = (
-    r"Stage \d+", r"\bF[1-4]\b", r"\bNEEDS-OWNER\b", r"\[VERIFY\]",
-)
+# The gated inventory is a versioned plugin asset, not a constant in this file:
+# dimension 3 is only as exhaustive as the inventory, so the inventory is the
+# CONTRACT (`internal-vocabulary.json`) and `check-internal-vocabulary.sh`
+# fails when a derivable family — framework IDs, pipeline stage names, markers —
+# drifts out of it. A hardcoded tuple could go stale silently and the gate would
+# keep reporting `dim3: pass`; that is the failure mode this indirection exists
+# to remove. Missing or malformed asset = named error, never a silent empty scan.
+VOCAB_ASSET = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                           "skills", "draft-article", "internal-vocabulary.json")
+
+
+def _load_internal_vocabulary(path=None):
+    """Return (terms, patterns) from the registered inventory, longest-first.
+
+    Longest-first matters for contract rule 6: `de-duplication check` must match
+    before `de-dup` so an expansion is never scored as a fresh, unintroduced
+    term. Raises SystemExit with a named diagnostic when the asset is missing or
+    malformed — an unreadable inventory means dim3 has not scanned, and a gate
+    that cannot read its inventory must not report a verdict on it.
+    """
+    p = path or VOCAB_ASSET
+    try:
+        with open(p, encoding="utf-8") as fh:
+            data = json.load(fh)
+    except (OSError, json.JSONDecodeError) as e:
+        raise SystemExit(
+            f"error: internal-vocabulary inventory unreadable at {p}: {e} — dim3 "
+            "cannot scan without its registered inventory (#305)")
+    terms = data.get("terms")
+    patterns = data.get("patterns")
+    if not isinstance(terms, list) or not isinstance(patterns, list) or not terms:
+        raise SystemExit(
+            f"error: internal-vocabulary inventory at {p} is malformed — expected "
+            "non-empty `terms` and a `patterns` list (#305)")
+    return tuple(sorted(terms, key=len, reverse=True)), tuple(patterns)
 # An inline appositive gloss AT the point of use: `term (gloss)`, `term, gloss,`
 # or `term — gloss`. Sufficient by contract — the reader never meets the term
 # unexplained (this is the call the cycle-4 judge disputed; the rule settles it).
@@ -419,11 +440,12 @@ def _dimension3(draft_text, allowlist=()):
     diagram label is a use; an expansion of an already-introduced base term is
     never re-promoted to unintroduced.
     """
+    vocab_terms, vocab_res = _load_internal_vocabulary()
     known = {t.lower() for t in allowlist}
     units = list(_dim3_scan_units(draft_text))
-    patterns = [(t, re.compile(re.escape(t), re.I)) for t in INTERNAL_VOCAB
+    patterns = [(t, re.compile(re.escape(t), re.I)) for t in vocab_terms
                 if t.lower() not in known]
-    patterns += [(p, re.compile(p)) for p in INTERNAL_VOCAB_RE
+    patterns += [(p, re.compile(p)) for p in vocab_res
                  if p.lower() not in known]
 
     # Pass 1 — locate each term's first load-bearing use and decide whether it
@@ -564,6 +586,18 @@ def cmd_quality_gate(args):
     d3 = _dimension3(draft, known)
     results["dim3"] = ("pass", "") if not d3 else (
         "fail", "; ".join(f"{t} (line {n})" for t, n in d3))
+    # Which inventory produced that verdict is part of the verdict: a dim3 pass
+    # means "nothing in the registered inventory was uncalibrated", never
+    # "nothing was uncalibrated". Stamping it keeps the scope of the claim
+    # visible to whoever reads the gate output (#305).
+    try:
+        with open(VOCAB_ASSET, encoding="utf-8") as fh:
+            _v = json.load(fh)
+        vocab_stamp = {"vocabulary_version": _v.get("vocabulary_version"),
+                       "registered_terms": len(_v.get("terms", [])),
+                       "registered_patterns": len(_v.get("patterns", []))}
+    except (OSError, json.JSONDecodeError):
+        vocab_stamp = None
 
     # Dimension 4: mechanical.
     d4 = _dimension4(draft, prov_entries)
@@ -590,6 +624,8 @@ def cmd_quality_gate(args):
     out = {"gate": "quality", "pass": not failing,
            "dimensions": {d: {"verdict": v, "locations": loc} for d, (v, loc) in results.items()},
            "failing_dimensions": failing}
+    if vocab_stamp:
+        out["dim3_inventory"] = vocab_stamp
     # The judge's dim3 opinion, when it offered one, rides along as an advisory
     # for the completion summary's informational bucket — never a gate verdict
     # (#305). It is recorded, not obeyed.
