@@ -92,6 +92,20 @@ defaults to the git top-level of the current directory and errors if cwd is not
 inside a git repo; pass it explicitly whenever the session's working directory
 might not be the host repo.)
 
+**Say which repository you are operating on, first (#309).** `stage0` returns the
+resolved `target`; make it the run's **first owner-visible line** — before any
+scope read, workspace mint, or LLM spend:
+
+```
+Operating on host repo: <target>
+```
+
+An operation against the wrong repository is otherwise undetectable until the
+work is already paid for, and with a `policy_source` declared a wrong target
+seeds the interview from the wrong repo's recorded positions. If an explicit
+`--root` disagrees with the session's cwd, the resolver prints a one-line notice
+naming both — relay it; `--root` still wins.
+
 It does, in order, halting on the first problem so nothing starts on a bad
 config or framework:
 

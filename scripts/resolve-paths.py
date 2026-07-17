@@ -60,6 +60,22 @@ PLUGIN = "writing-assistant"
 # --------------------------------------------------------------------------
 # Roots
 # --------------------------------------------------------------------------
+def _cwd_toplevel():
+    """The git toplevel of cwd, realpath'd — or None when cwd is not in a repo.
+
+    Separated from host_root so the --root branch can report a disagreement
+    without changing precedence (#309).
+    """
+    try:
+        top = subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"],
+            capture_output=True, text=True, check=True,
+        ).stdout.strip()
+        return os.path.realpath(top) if top else None
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return None
+
+
 def host_root(arg_root):
     """The host repo root: explicit --root, else git toplevel of cwd.
 
@@ -77,15 +93,9 @@ def host_root(arg_root):
                   file=sys.stderr)
             sys.exit(2)
         return real
-    try:
-        top = subprocess.run(
-            ["git", "rev-parse", "--show-toplevel"],
-            capture_output=True, text=True, check=True,
-        ).stdout.strip()
-        if top:
-            return os.path.realpath(top)
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        pass
+    top = _cwd_toplevel()
+    if top:
+        return top
     print(f"error: cannot resolve the host repo: {os.getcwd()} is not inside a git repository; "
           "pass --root <host-repo>", file=sys.stderr)
     sys.exit(2)
@@ -221,6 +231,42 @@ def cmd_state_root(args):
 
 def cmd_config_home(args):
     print(config_home())
+    return 0
+
+
+def root_disagreement(arg_root, resolved):
+    """The one-line --root/cwd disagreement notice, or None (#309).
+
+    Deliberately NOT inside host_root: that runs on every path resolution, many
+    times per run, where a notice would be pure noise (and would break flows
+    contracted to stay silent on stderr). The disagreement is an ENTRY-surface
+    signal — it belongs where the run announces its target, once.
+    """
+    if not arg_root:
+        return None
+    cwd_top = _cwd_toplevel()
+    if cwd_top and cwd_top != resolved:
+        return (f"note: --root resolves to {resolved}; cwd is inside {cwd_top} "
+                "— using --root")
+    return None
+
+
+def cmd_target(args):
+    """Print the resolved target repository path (#309).
+
+    One call, made by every entry flow before it reads scope, mints a workspace,
+    or spends a token — so operating on the wrong repository is detectable while
+    it is still free. Resolution goes through host_root, so the precedence
+    (explicit --root > git toplevel of cwd > fail closed) is the same one the
+    rest of the run obeys: this surfaces the decision, it never makes a second
+    one. A --root/cwd disagreement is reported here, informational and
+    fail-open — explicit --root still wins.
+    """
+    root = host_root(args.root)
+    note = root_disagreement(args.root, root)
+    if note:
+        print(note, file=sys.stderr)
+    print(root)
     return 0
 
 
@@ -362,6 +408,11 @@ def main(argv=None):
                         "with picker metadata (Story 13.31)")
     sp.add_argument("--root", help="host-repo root (default: git top-level of cwd; errors outside a git repo)")
 
+    sp = sub.add_parser("target", help="print the resolved target repository path (#309): the one "
+                                       "call every entry flow makes before any scope read, "
+                                       "workspace mint, or LLM spend")
+    sp.add_argument("--root", help="host-repo root (default: git top-level of cwd; errors outside a git repo)")
+
     args = p.parse_args(argv)
     return {
         "state-root": cmd_state_root,
@@ -373,6 +424,7 @@ def main(argv=None):
         "new-run": cmd_new_run,
         "run-workspace": cmd_run_workspace,
         "list-drafts": cmd_list_drafts,
+        "target": cmd_target,
     }[args.cmd](args)
 
 

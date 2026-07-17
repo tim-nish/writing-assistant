@@ -2139,8 +2139,13 @@ def cmd_stage0(args):
         return code
     # 3. Workspace autostart (mint or resume).
     rp = _load("resolve-paths.py")
-    out = {"config_ok": True, "run_state": run_state}
-    out.update(_autostart(rp.host_root(args.root)))
+    root = rp.host_root(args.root)
+    # The resolved target rides in stage 0's output so the run's first
+    # owner-visible line can name the repository it is about to operate on —
+    # before scope is read, a workspace is minted, or a token is spent (#309).
+    # One root per run: everything below keys to this same value.
+    out = {"config_ok": True, "target": root, "run_state": run_state}
+    out.update(_autostart(root))
     print(json.dumps(out, indent=2))
     return 0
 

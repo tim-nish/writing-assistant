@@ -12,6 +12,19 @@ description: >
 
 # Setup — repository onboarding
 
+**Name the target repository first (#309).** Before reading any scope, print the
+resolved target as the flow's first owner-visible line:
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-paths.py target --root <host-repo>
+```
+
+Relay it as `Operating on host repo: <path>`. A wrong-target run is otherwise
+only discoverable after the work is paid for. When an explicit `--root`
+disagrees with the session's cwd the resolver notes both on stderr — relay that
+line too; `--root` still wins.
+
+
 Prepare a host repository for `draft-article` in one guided pass. The owner
 approves values; **the owner never opens or edits a config file** — you draft
 every value from repo inspection, and every write goes through a
