@@ -52,6 +52,12 @@ set +e; out=$(python3 "$VAL" "$FIX/valid-companion.json" 2>&1); rc=$?; set -e
   || err "valid-companion: rc=$rc out='$out'"
 expect r3-companion-bad-pointer.json R3 "companion pointer unpinned"
 
+# #306 — a stale seed (recorded before the material it contradicts) is carried as
+# a reversal-candidate asking confirm-or-update, not a live contradiction.
+set +e; out=$(python3 "$VAL" "$FIX/valid-stale-seed-reversal.json" 2>&1); rc=$?; set -e
+[ "$rc" -eq 0 ] && [ -z "$out" ] && ok "a stale seed routed as reversal-candidate validates" \
+  || err "valid-stale-seed-reversal: rc=$rc out='$out'"
+
 # r3 covers BOTH failure shapes: out-of-whitelist and unpinned.
 set +e; msg=$(python3 "$VAL" "$FIX/r3-bad-pointer.json" 2>&1 >/dev/null); set -e
 n=$(printf '%s\n' "$msg" | grep -c 'R3:' || true)
