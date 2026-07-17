@@ -120,6 +120,29 @@ def declared_repo_for(abspath, sources):
     return None
 
 
+# An article plan (SPEC-article-plan) is the machine-checkable no-facts marker:
+# a plan may shape questions and recommendations but can never ground a claim.
+# `kind: article-plan` in the file's frontmatter is that marker (Story 13.56).
+_PLAN_REJECT = ("SOURCE points into an article plan (kind: article-plan) — an "
+                "article plan is never evidence; re-ground the claim on current "
+                "evidence (a fresh pin or an interview disposition), never a bare "
+                "plan reference (SPEC-article-plan; Story 13.56)")
+
+
+def _is_article_plan(lines):
+    """True iff `lines` open with a frontmatter block declaring
+    `kind: article-plan` — the no-facts marker a SOURCE may never cite."""
+    if not lines or lines[0].strip() != "---":
+        return False
+    for ln in lines[1:]:
+        if ln.strip() == "---":
+            return False
+        m = re.match(r"^kind\s*:\s*(.+?)\s*$", ln)
+        if m and m.group(1).strip().strip('"').strip("'") == "article-plan":
+            return True
+    return False
+
+
 def _resolve_lines(path, sha, host, sources):
     """Resolve a pinned file pointer to its source lines at the commit.
 
@@ -131,12 +154,22 @@ def _resolve_lines(path, sha, host, sources):
         return None, None, f"source path is outside the declared repos: {path}"
     rel = os.path.relpath(abspath, repo)
     if _git(repo, "rev-parse", "--git-dir").returncode != 0:
+        # not a git repo: structural pass — but still refuse a plan file we can
+        # read on disk (the marker fence must not depend on git resolution).
+        try:
+            with open(abspath, encoding="utf-8") as fh:
+                if _is_article_plan(fh.read().split("\n")):
+                    return None, None, _PLAN_REJECT
+        except OSError:
+            pass
         return None, rel, None           # not a git repo: structural pass (pin present)
     if _git(repo, "cat-file", "-e", f"{sha}^{{commit}}").returncode != 0:
         return None, None, f"commit {sha} not found in {os.path.basename(repo)}"
     show = _git(repo, "show", f"{sha}:{rel}")
     if show.returncode != 0:
         return None, None, f"path {rel} does not exist at commit {sha}"
+    if _is_article_plan(show.stdout.split("\n")):
+        return None, None, _PLAN_REJECT
     return show.stdout.split("\n"), rel, None
 
 
