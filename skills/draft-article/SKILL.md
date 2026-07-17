@@ -504,6 +504,51 @@ It enforces the D2 rules — an **approved** answer must inherit ≥1 pointer;
 judgment); a **skip** carries neither. The recorded answer text is kept
 **verbatim**, keyed by question `id`, for stage-3 traceability.
 
+### Recommended defaults for editorial-judgment gaps (SPEC-policy-editorial-direction CAP-6, Story 13.60)
+
+When a confirmed NEEDS-OWNER gap is an **editorial-judgment** class — `opinion`,
+`significance`, `surprise`, `tradeoff`, `warning`, `audience` — and the policy
+surface already holds a relevant recorded position, present it as a **proposed
+default** the owner ratifies, instead of a bare open question. This is the
+propose-ratify invariant applied to the *shape* of the answer: it saves the
+owner seconds per question, and is **no substitute for #302's reserved slot**
+(the cap fills on count, not time).
+
+- **Item shape (Story 13.59).** Carry the recalled position on the interview
+  item as `recommended_default {default, quote, pointer}`, with `owner_answer`
+  structurally empty at generation. `validate-interview-items.py` refuses a
+  default on an ineligible class (**R6**) or a tension item (**R7**), and one
+  whose recalled position is not auditable (**R3**) — so a bad default never
+  reaches the owner.
+- **Presentation.** Present the default under the owner-facing proposal
+  contract like every other ask (Where/Why/Effect, plain-text payload per
+  section (g); the seed quote + `file:line@commit` pointer is the **Why**),
+  and **capture it** via `validate-proposal-payload.py --ws --surface interview`.
+  **Every presented default counts toward the ≤5 interview cap** — never a
+  pre-interview side batch that moves the decision outside the owner-attention
+  bound.
+- **Ratification — four effect-stating choices, owner judgment throughout:**
+  - **Ratify** → "use this recalled position as written" — record with
+    `--disposition ratified`: the default text becomes the interview answer as
+    **owner judgment** (`interview` provenance), **never** the pointer-inheriting
+    `approved` class. The recalled policy pointer is **not** a SOURCE.
+  - **Modify** → "edit it, then use it" — `--disposition modified` (owner text,
+    no pointers).
+  - **Replace** → "discard it, use my own" — `--disposition replaced`.
+  - **Skip** → the gap stays an **unresolved NEEDS-OWNER item**, exactly as if
+    no default had been offered; only the skip is recorded.
+- **Audit (invariant 3).** The recalled position appears only in the `seed<-`/
+  `consulted:` records — record it with `journal --seed-extra
+  '<pointer>=<gap_type>'`. A factual claim grounded only in a policy line still
+  fails the provenance gate or stays `[VERIFY]`; a policy pointer is never a
+  SOURCE.
+- **Gating (#299 / #306).** Recall a default only under the
+  whole-consulted-surface authoring rule (a same-surface companion line
+  accompanies or suppresses the recall) and staleness protection (a seed
+  predating the material it addresses routes to reversal-candidate handling,
+  never a confident default). Consultation uses only the existing pinned,
+  bounded, read-only policy reader — no new access path.
+
 **Validate the answers in one batch, not one round-trip per answer (Story 13.6).**
 When you have the owner's answers to the surviving questions, pass them all at
 once as a JSON list of answer specs and get **one consolidated report of every

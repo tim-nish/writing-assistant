@@ -59,6 +59,22 @@ ans --id q3 --disposition skipped --text "oops" >/dev/null 2>&1 && err "skip wit
 # invalid disposition rejected.
 ans --id q1 --disposition bogus --text x >/dev/null 2>&1 && err "invalid disposition accepted" || ok "invalid disposition rejected"
 
+# Story 13.60 (CAP-6) — ratifying a recalled policy default is OWNER JUDGMENT:
+# interview provenance, never the pointer-inheriting `approved` class, and it
+# never carries a policy pointer as a SOURCE.
+out=$(ans --id d1 --disposition ratified --text "solo developers shipping their own tools")
+[ "$(printf '%s' "$out" | jget 'd["provenance"]')" = "interview" ] \
+  && ok "ratified default is interview-sourced owner judgment (not sourced)" || err "ratified not interview"
+[ "$(printf '%s' "$out" | jget 'd["answer"]')" = "solo developers shipping their own tools" ] \
+  && ok "ratified default keeps the recalled text as the answer" || err "ratified text altered"
+printf '%s' "$out" | jget 'd["pointers"]==[]' | grep -q True \
+  && ok "ratified default carries no source pointers (policy pointer never a SOURCE)" || err "ratified inherited pointers"
+# A ratified default must NOT smuggle a policy pointer in as a SOURCE.
+ans --id d1 --disposition ratified --text "x" --pointer "LESSONS.md:22@8f3c2d1" >/dev/null 2>&1 \
+  && err "ratified with a pointer was accepted" || ok "ratified with a source pointer is rejected (owner judgment)"
+# ratified still needs the accepted text.
+ans --id d1 --disposition ratified >/dev/null 2>&1 && err "ratified without text accepted" || ok "ratified without text is rejected"
+
 # Story 13.6 — batch validation reports EVERY rejection in one pass (round-trip cut).
 work=$(mktemp -d); trap 'rm -rf "$work"' EXIT
 cat > "$work/batch.json" <<'JSON'
