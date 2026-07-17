@@ -59,6 +59,18 @@ material in scope. It already:
 it is adjacent on disk, and do not fall back to scanning the whole repo or
 filesystem. An undeclared repository is never read.
 
+**Article plans are never harvest input (SPEC-article-plan; Story 13.56).** An
+article plan (`plans/<slug>.md`, `kind: article-plan`) is a planning artifact,
+not evidence — even when it sits inside a declared scope (e.g. the host repo is
+also the articles repo). **Exclude any file carrying the `kind: article-plan`
+frontmatter marker from fact extraction:** nothing in a plan may become a
+fact-sheet entry, and no plan line may become a SOURCE pointer. The
+`validate-fact-sheet.py` gate enforces this mechanically — a SOURCE resolving
+into an article-plan file is **rejected** — so a plan pointer never reaches the
+sheet even if a file is read. A reused idea from a prior plan is **re-grounded
+on current evidence** (a fresh pin or an interview disposition), never carried
+as a bare plan reference.
+
 ## 2. Fail closed
 
 If the command prints no files — `writing-sources.yaml` is missing, malformed,
