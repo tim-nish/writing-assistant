@@ -46,7 +46,7 @@ An opportunity to capture, ratified 2026-07-14: the owner keeps an authoritative
 
 ## Constraints
 
-- Policy reading seeds candidate **questions only**. Triage (suppress/recommend/open) and recommendation generation remain a view over harvest output — the policy source never supplies or pre-fills an answer (preserves SPEC-article-draft-pipeline CAP-2 and `docs/interview-architecture.md` D1).
+- Policy reading seeds candidate **questions only**, with one bounded exception (added 2026-07-18, SPEC-policy-editorial-direction CAP-6): a **recommended default for an editorial-judgment gap** — recalled and owner-ratified, `owner_answer` empty at generation, counted against the ≤5 cap. Triage (suppress/recommend/open) and recommendation generation otherwise remain a view over harvest output — the policy source never supplies or pre-fills a factual answer, and a policy line never becomes a SOURCE pointer (preserves SPEC-article-draft-pipeline CAP-2 and `docs/interview-architecture.md` D1).
 - Policy-seeded questions obey the owner-facing proposal contract unchanged: selective prompts, Where/Why/Effect, journal entries; the seed quote + pointer is presented as the question's Why context, and the journal records seed pointers like recommendation groundings.
 - The whitelist, the ≤2-topics cap, and read-only-ness are code-enforced (reader takes an allowlist), never prompt-enforced.
 - Reader and validator are stdlib-only Python in `scripts/` (repo convention: no PyYAML, no JS/TS); each ships with a `check-*.sh` harness like every other script.

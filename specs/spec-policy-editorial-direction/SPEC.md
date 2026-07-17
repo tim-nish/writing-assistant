@@ -65,6 +65,42 @@ every extension below must preserve:
   strategy (which platforms, what each carries — e.g. recorded positions on
   content channels) is in scope for the redefinition but deferred until
   CAP-1–4 prove out; noted so it is not re-proposed from scratch.
+- **CAP-6 — recommended defaults for editorial-judgment gaps
+  (recall-then-ratify, fail-closed; added 2026-07-18 per #312).** Before the
+  Stage-2 interview, a confirmed NEEDS-OWNER gap of an *editorial-judgment*
+  class — `opinion`, `significance`, `surprise`, `tradeoff`, `warning`,
+  `audience` — may be presented as a **proposed default** recalled from the
+  policy surface, which the owner explicitly approves, modifies, replaces, or
+  skips, instead of as a bare open question. This is invariant 1
+  (propose-ratify) applied to the *shape* of an editorial-judgment answer, not
+  a new influence class: it reduces per-question effort, never the question
+  count, and is no substitute for #302's reserved-slot guarantee (the interview
+  cap fills on count, not time). It is bounded and fail-closed:
+  - **Eligible classes are editorial judgments only.** Factual, numerical,
+    repository-state, and verification gaps — including NEEDS-OWNER re-raises
+    and confirm/deny of repository claims — are ineligible; a default on an
+    ineligible class is a **named validator rejection** (same posture as the
+    Story-14.3 pre-filled-answer / confirmation-shaped-seed classes). A
+    policy-seeded *tension* question is ineligible and never carries a default
+    (NFR15 — owner-only by nature).
+  - **A default is never an answer and never evidence** (invariant 2). The item's
+    `owner_answer` stays structurally empty at generation; a ratified default is
+    recorded as interview-sourced owner judgment (the modified/replaced
+    provenance class), never the pointer-inheriting `approved` class. Policy
+    pointers appear only in `seed<-`/`consulted:` audit records (invariant 3)
+    and never become SOURCE pointers; a factual claim grounded only in a policy
+    line still fails the provenance gate or remains `[VERIFY]`.
+  - **The owner ratifies every default; nothing is silently adopted.** A
+    rejected or skipped default leaves its gap an unresolved NEEDS-OWNER item,
+    exactly as if none had been offered. **Every presented default counts toward
+    the existing ≤5 interview cap** — no pre-interview side batch relocates gap
+    decisions outside the ratified owner-attention bound.
+  - **A default may be recalled only under the whole-consulted-surface authoring
+    rule (#299) and staleness protection (#306):** a seed predating the material
+    it addresses routes to staleness/reversal handling, never a confident
+    default. Consultation uses the existing pinned, bounded, read-only policy
+    reader (`read-policy-source.py`, ≤2 draft-time-selected topics, code-enforced
+    allowlist, recorded pin) — no new reader or access path.
 
 ## Constraints
 
