@@ -12,6 +12,11 @@ sources:
 
 > **Deferred contract.** This spec exists so the build decision is pre-made and fires mechanically on evidence: the dogfood findings log and the published-article count are the tripwires. Until the `build-trigger` in frontmatter is met, this spec generates no epics, stories, or code.
 
+> **Reconciliation (added 2026-07-17, #310):** when the build trigger fires,
+> the index is built as a **derived view over article plans**
+> (SPEC-article-plan) — one index line per plan — never a second record with
+> its own lifecycle.
+
 # Article Index
 
 ## Why
