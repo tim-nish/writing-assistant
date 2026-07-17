@@ -59,6 +59,31 @@ grep -q 'VERIFY: <reason>' "$SKILL" && ok "SKILL keeps the inline [VERIFY] marke
 # malformed line rejected.
 prov 'this is not a valid entry' >/dev/null 2>&1 && err "malformed line accepted" || ok "malformed provenance line rejected"
 
+# #308 — duplicate position keys fail closed with a named error listing every
+# duplicate and all its input line numbers; never last-write-wins, never
+# counted twice into the class tallies. Three shapes: identical class,
+# conflicting classes (the observed case), conflicting pointer sets.
+dup_same='P1.S1: narration
+P1.S1: narration'
+dup_class='P12.S2: sourced <- t1
+P12.S3: narration
+P12.S2: sourced <- docs/x.md:1@abc
+P12.S2: narration'
+dup_ptrs='P2.S1: sourced <- fs-1
+P2.S1: sourced <- fs-2'
+prov "$dup_same" >/dev/null 2>&1 && err "exact-duplicate key (same class) accepted" \
+  || ok "exact-duplicate key (same class) rejected"
+prov "$dup_class" >/dev/null 2>&1 && err "duplicate key with conflicting classes accepted" \
+  || ok "duplicate key with conflicting classes rejected"
+prov "$dup_ptrs" >/dev/null 2>&1 && err "duplicate key with conflicting pointers accepted" \
+  || ok "duplicate key with conflicting pointer sets rejected"
+duperr=$(prov "$dup_class" 2>&1 >/dev/null) || true
+echo "$duperr" | grep -q 'duplicate position key' && ok "duplicate diagnostic is named" \
+  || err "duplicate diagnostic not named"
+echo "$duperr" | grep -q 'P12.S2' && echo "$duperr" | grep -q '1' && echo "$duperr" | grep -q '3' && echo "$duperr" | grep -q '4' \
+  && ok "diagnostic lists the key and all occurrence lines" \
+  || err "diagnostic missing key or occurrence line numbers: $duperr"
+
 # Sidecar map is written to the run workspace, not inline.
 grep -q 'draft-pipeline.py provenance' "$SKILL" && grep -q 'provenance-map' "$SKILL" \
   && grep -qi 'sidecar' "$SKILL" && ok "SKILL writes a sidecar provenance map to the workspace" \
