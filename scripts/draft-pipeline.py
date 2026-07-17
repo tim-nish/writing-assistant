@@ -200,8 +200,16 @@ PROV_LINE = re.compile(
 
 def parse_provenance_map(text):
     """Parse the sidecar map text into [(pos, cls, [pointers])], raising
-    ValueError on a malformed line or a class name outside the closed set."""
+    ValueError on a malformed line, a class name outside the closed set, or a
+    duplicate position key (#308). Duplicates fail closed here — before any
+    normalization and before any judge is invoked — because a map that cannot
+    be read unambiguously has not been read: last-write-wins silently drops a
+    classification, and counting both inflates the class totals dimension 4
+    reads. The diagnostic names every duplicated key with all of its input
+    line numbers, so a scripted edit that collided several paragraphs is fixed
+    in one pass, not one collision per run."""
     entries = []
+    seen = {}  # pos -> [line numbers]
     for lineno, raw in enumerate(text.splitlines(), 1):
         line = raw.strip()
         if not line or line.startswith("#"):
@@ -210,7 +218,13 @@ def parse_provenance_map(text):
         if not m:
             raise ValueError(f"line {lineno}: malformed provenance entry: {raw!r}")
         ptrs = [p.strip() for p in (m.group("ptrs") or "").split(",") if p.strip()]
+        seen.setdefault(m.group("pos"), []).append(lineno)
         entries.append((m.group("pos"), m.group("cls"), ptrs))
+    dupes = {pos: lns for pos, lns in seen.items() if len(lns) > 1}
+    if dupes:
+        detail = "; ".join(
+            f"{pos} (lines {', '.join(map(str, lns))})" for pos, lns in dupes.items())
+        raise ValueError(f"duplicate position key(s): {detail}")
     return entries
 
 
