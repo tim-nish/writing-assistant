@@ -94,10 +94,92 @@ rc=0; errout=$(python3 "$DP" quality-gate --draft "$work/good.md" --map "$work/g
 [ "$rc" -eq 2 ] && ok "prose-form judge verdicts exit 2 (unparseable), not a dimension fail" \
   || err "prose-form judge verdicts exited $rc, expected 2"
 echo "$errout" | grep -q 'judge verdicts unparseable' && ok "unparseable-judge error is named" || err "unparseable-judge error not named"
-printf 'dim1: pass\ndim3: pass\n' > "$work/judge-missing.txt"
+printf 'dim1: pass\n' > "$work/judge-missing.txt"
 rc=0; python3 "$DP" quality-gate --draft "$work/good.md" --map "$work/good-map.txt" --judge "$work/judge-missing.txt" >/dev/null 2>&1 || rc=$?
-[ "$rc" -eq 2 ] && ok "a judge file missing a dimension exits 2 (incomplete = unparseable)" \
+[ "$rc" -eq 2 ] && ok "a judge file missing a gated dimension exits 2 (incomplete = unparseable)" \
   || err "missing-dimension judge file exited $rc, expected 2"
+
+# #305 — dim3 is MECHANICAL: the judge gates dims 1-2 only, and a judge file
+# carrying no dim3 line is complete.
+printf 'dim1: pass\ndim2: pass\n' > "$work/judge-12.txt"
+python3 "$DP" quality-gate --draft "$work/good.md" --map "$work/good-map.txt" --judge "$work/judge-12.txt" >/dev/null 2>&1 \
+  && ok "a dim1+dim2 judge file is complete (dim3 is scanned, not judged)" \
+  || err "dim1+dim2 judge file rejected"
+# A judge dim3 verdict is recorded as an ADVISORY and never gates: here the
+# judge says dim3 fails, the scan says it passes -> the gate passes.
+printf 'dim1: pass\ndim2: pass\ndim3: fail line 9: "harvest" unintroduced\n' > "$work/judge-d3.txt"
+python3 "$DP" quality-gate --draft "$work/good.md" --map "$work/good-map.txt" --judge "$work/judge-d3.txt" >/dev/null 2>&1 \
+  && ok "a judge dim3 FAIL does not gate (advisory only)" || err "judge dim3 gated the run"
+python3 "$DP" quality-gate --draft "$work/good.md" --map "$work/good-map.txt" --judge "$work/judge-d3.txt" \
+  | jget 'd["advisories"][0]["dimension"] + ":" + d["advisories"][0]["source"]' | grep -q 'dim3:rubric-judge' \
+  && ok "the judge's dim3 opinion is recorded as an advisory" || err "dim3 advisory not recorded"
+
+# #305 — the scan is exhaustive: N uncalibrated terms yield N in ONE verdict.
+cat > "$work/vocab.md" <<'MD'
+---
+slug: v
+audience: en-practitioner
+---
+# T
+
+The harvest fed Stage 3, the GATE, and the fact sheet in one pass here.
+MD
+n=$(python3 "$DP" quality-gate --draft "$work/vocab.md" \
+    | jget 'd["dimensions"]["dim3"]["locations"].count(";") + 1' 2>/dev/null || echo 0)
+[ "$n" -ge 3 ] && ok "dim3 reports the COMPLETE violation set in one verdict ($n terms)" \
+  || err "dim3 reported $n violations, expected the full set (>=3)"
+python3 "$DP" quality-gate --draft "$work/vocab.md" | jget 'd["dimensions"]["dim3"]["verdict"]' | grep -q fail \
+  && ok "uncalibrated vocabulary fails dim3 mechanically" || err "uncalibrated draft passed dim3"
+
+# #305 — determinism: the same text yields a byte-identical verdict every run.
+a=$(python3 "$DP" quality-gate --draft "$work/vocab.md" | jget 'd["dimensions"]["dim3"]["locations"]')
+b=$(python3 "$DP" quality-gate --draft "$work/vocab.md" | jget 'd["dimensions"]["dim3"]["locations"]')
+[ "$a" = "$b" ] && ok "dim3 verdict is deterministic across runs (no interpretation drift)" \
+  || err "dim3 verdict drifted: '$a' vs '$b'"
+
+# #305 — the audience allowlist enters ONCE as owner-ratified data.
+python3 "$DP" quality-gate --draft "$work/vocab.md" \
+  --audience-known "harvest,fact sheet,GATE,Stage 3" | jget 'd["dimensions"]["dim3"]["verdict"]' | grep -q pass \
+  && ok "audience-known terms are excluded from the scan (--audience-known)" \
+  || err "allowlisted terms still failed dim3"
+
+# #305 — convergence: one revision addressing the complete set clears dim3.
+cat > "$work/vocab-fixed.md" <<'MD'
+---
+slug: v
+audience: en-practitioner
+---
+# T
+
+The harvest (the step that gathers source-pointed facts) fed Stage 3 — the
+framework-fill step — the GATE, which marks each required slot, and the fact
+sheet, the list of those gathered facts, in turn.
+MD
+python3 "$DP" quality-gate --draft "$work/vocab-fixed.md" | jget 'd["dimensions"]["dim3"]["verdict"]' | grep -q pass \
+  && ok "one revision addressing the complete set clears dim3 (convergence)" \
+  || err "dim3 still failing after a complete revision — the loop cannot converge"
+
+# #305 — the de-dup -> de-duplication reproduction: expanding an introduced
+# abbreviation must NOT manufacture a fresh violation (contract rule 6).
+cat > "$work/dedup.md" <<'MD'
+---
+slug: d
+audience: en-practitioner
+---
+# T
+
+The de-dup, which suppresses any question the facts already answer, ran first.
+Later the de-duplication check ran again over the revised set of questions.
+MD
+python3 "$DP" quality-gate --draft "$work/dedup.md" | jget 'd["dimensions"]["dim3"]["verdict"]' | grep -q pass \
+  && ok "expanding an introduced abbreviation does not re-promote it (de-dup case)" \
+  || err "de-dup -> de-duplication check manufactured a violation"
+
+# #305 — a heading occurrence is NEUTRAL: it neither introduces nor uses.
+printf -- '---\nslug: h\naudience: en-practitioner\n---\n## The harvest step\n\nNothing else is said here at all.\n' > "$work/heading.md"
+python3 "$DP" quality-gate --draft "$work/heading.md" | jget 'd["dimensions"]["dim3"]["verdict"]' | grep -q pass \
+  && ok "a heading occurrence is neutral (neither introduction nor use)" \
+  || err "a heading-only term failed dim3"
 
 # Story 13.41 — audience presence is a stage-progression precondition: a draft
 # with an unfilled (or absent) `audience` fails the gate mechanically.
@@ -112,7 +194,17 @@ python3 "$DP" quality-gate --draft "$work/noaud.md" --map "$work/good-map.txt" -
 # SKILL contract: precondition wording, mechanical dim4 + judged dims1-3,
 # bounded ≤2 cycles re-running both gates, publish blocker, NFR12.
 grep -qi 'stage-progression precondition' "$SKILL" && ok "SKILL: gate is a stage-progression precondition" || err "SKILL missing precondition wording"
-grep -qi 'mechanically' "$SKILL" && grep -qi 'single-pass' "$SKILL" && ok "SKILL: dim4 mechanical, dims1-3 single-pass judge" || err "SKILL missing gate composition"
+grep -qi 'mechanically' "$SKILL" && grep -qi 'single-pass' "$SKILL" \
+  && grep -qi 'Dimensions 1–2' "$SKILL" && grep -qi 'Dimension 3 is mechanical' "$SKILL" \
+  && ok "SKILL: dims 3+4 mechanical, dims 1-2 single-pass judge (#305)" || err "SKILL missing gate composition"
+grep -qi 'Dimensions 1–2 are judged' "skills/draft-article/quality-rubric.md" \
+  && ok "rubric: states the judged/mechanical split (dims 1-2 judged)" || err "rubric missing the split"
+grep -qi -- '--audience-known' "$SKILL" \
+  && ok "SKILL: the audience allowlist is passed once, from the ratified answer" \
+  || err "SKILL missing --audience-known wiring"
+grep -qi 'advisory' "$SKILL" \
+  && ok "SKILL: a judge dim3 line is advisory, never a gate verdict" \
+  || err "SKILL missing the dim3-advisory rule"
 grep -qiE '2 revision cycles|at most 2' "$SKILL" && ok "SKILL: at most 2 revision cycles" || err "SKILL missing the retry bound"
 grep -qi 'verify-provenance' "$SKILL" && grep -qi 're-run' "$SKILL" && ok "SKILL: revision re-runs both rubric and verify-provenance" || err "SKILL missing both-gates re-run"
 grep -qi 'publish blocker' "$SKILL" && ok "SKILL: surviving failure surfaces as a publish blocker" || err "SKILL missing blocker surface"

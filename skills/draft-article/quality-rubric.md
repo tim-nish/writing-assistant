@@ -9,9 +9,10 @@ The fixed quality standard a draft must meet at the Stage 3→4 gate
 This is a **versioned plugin asset**: exemplar-derived threshold tuning edits
 **this file** (bump `rubric-version` above), never the specs. Four dimensions,
 each with an **operational check** — a test with a definite verdict, not a vibe.
-Dimensions 1–3 are judged by one single-pass cheap-tier rubric judge; dimension
-4 is mechanical (zero tokens). A draft **passes** only when every dimension
-passes.
+Dimensions 1–2 are judged by one single-pass cheap-tier rubric judge;
+dimensions 3 and 4 are mechanical (zero tokens — dimension 3 became a
+deterministic scan on 2026-07-17, #305). A draft **passes** only when every
+dimension passes.
 
 ## Dimension 1 — Narrative arc
 

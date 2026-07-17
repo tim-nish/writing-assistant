@@ -756,15 +756,31 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py quality-gate \
 - **Audience presence is checked mechanically here too (Story 13.41):** an
   absent or unfilled `audience` fails the gate — the named reader must be set at
   stage-3 fill before the draft can progress.
-- **Dimensions 1–3** are judged by **one single-pass cheap-tier rubric judge**
+- **Dimensions 1–2** are judged by **one single-pass cheap-tier rubric judge**
   emitting **pass/fail per dimension + failing locations, no rewritten text**;
   its verdicts feed `--judge`. **Verdict grammar (exact — instruct the judge
-  verbatim, #303):** one line per dimension, `dim1: pass|fail [locations]`,
-  `dim2: …`, `dim3: …` — the literal keys `dim1`/`dim2`/`dim3`, never prose
-  forms like `dimension 1: pass`. The gate refuses an unparseable judge file
-  with a named error (exit 2) before judging anything; re-spawn the judge with
-  the grammar restated rather than treating that error as a quality failure —
-  it does not consume a revision cycle. Like `verify-provenance` (NFR13), this judge runs
+  verbatim, #303):** one line per dimension, `dim1: pass|fail [locations]` and
+  `dim2: …` — the literal keys, never prose forms like `dimension 1: pass`. The
+  gate refuses an unparseable judge file with a named error (exit 2) before
+  judging anything; re-spawn the judge with the grammar restated rather than
+  treating that error as a quality failure — it does not consume a revision
+  cycle.
+- **Dimension 3 is mechanical (#305)** — a deterministic scan over repo-internal
+  vocabulary against the rubric's written introduction contract, emitting the
+  **complete** violation set in one verdict, so one revision can clear the
+  dimension inside the D5 bound. Pass the audience's known terms once, from the
+  ratified audience answer, so audience judgment enters as owner-ratified data
+  rather than being re-judged every pass:
+
+  ```
+  --audience-known "term one,term two"
+  ```
+
+  The judge may still offer a `dim3:` line; it is accepted and recorded as an
+  **advisory** in the gate's `advisories` (informational bucket) — it never
+  gates. Before #305 dim3 was an unpinned judgment reported one item per pass:
+  four cycles over one draft named twelve terms and never passed, because each
+  fix re-litigated what "introduced" means. Like `verify-provenance` (NFR13), this judge runs
   in a **fresh subagent that never saw the drafting turn** — spawn it with the
   harness Task tool, never inline; hand it only the draft, the rubric, and the
   provenance map, never the drafting rationale.
