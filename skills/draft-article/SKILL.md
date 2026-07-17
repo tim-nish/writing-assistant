@@ -708,7 +708,13 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py quality-gate \
   stage-3 fill before the draft can progress.
 - **Dimensions 1–3** are judged by **one single-pass cheap-tier rubric judge**
   emitting **pass/fail per dimension + failing locations, no rewritten text**;
-  its verdicts feed `--judge`. Like `verify-provenance` (NFR13), this judge runs
+  its verdicts feed `--judge`. **Verdict grammar (exact — instruct the judge
+  verbatim, #303):** one line per dimension, `dim1: pass|fail [locations]`,
+  `dim2: …`, `dim3: …` — the literal keys `dim1`/`dim2`/`dim3`, never prose
+  forms like `dimension 1: pass`. The gate refuses an unparseable judge file
+  with a named error (exit 2) before judging anything; re-spawn the judge with
+  the grammar restated rather than treating that error as a quality failure —
+  it does not consume a revision cycle. Like `verify-provenance` (NFR13), this judge runs
   in a **fresh subagent that never saw the drafting turn** — spawn it with the
   harness Task tool, never inline; hand it only the draft, the rubric, and the
   provenance map, never the drafting rationale.

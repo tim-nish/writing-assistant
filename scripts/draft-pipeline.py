@@ -333,8 +333,11 @@ def _dimension4(draft_text, prov_entries):
 def cmd_quality_gate(args):
     """Stage 3→4 quality gate (Story 11.4). Dimension 4 is mechanical here;
     dimensions 1–3 come from the single-pass judge's verdicts (--judge, a file of
-    `dim1|dim2|dim3: pass|fail [locations]`). Emits a per-dimension verdict; a
-    non-zero exit BLOCKS stage 4 (a precondition, not an advisory finding).
+    `dim1|dim2|dim3: pass|fail [locations]`, one verdict per line). A judge file
+    that does not parse under that grammar is a distinct named error (exit 2) —
+    never a per-dimension fail: a gate that cannot read its judge has not judged
+    (#303). Emits a per-dimension verdict; a non-zero exit BLOCKS stage 4 (a
+    precondition, not an advisory finding).
     """
     draft = sys.stdin.read() if args.draft == "-" else open(args.draft, encoding="utf-8").read()
     prov_entries = []
@@ -346,20 +349,36 @@ def cmd_quality_gate(args):
             return 2
 
     results = {}
-    # Dimensions 1–3: judge verdicts.
+    # Dimensions 1–3: judge verdicts. When a judge file is supplied it must
+    # parse under the stated grammar — `dimN: pass|fail [locations]`, one line
+    # per dimension, dim1..dim3 all present. Anything else (e.g. the natural-
+    # language form `dimension 1: pass`) is a format mismatch, which is
+    # indistinguishable from a genuine rubric failure if graded — so it exits
+    # 2 with a named error before any dimension is judged (#303).
     judged = {}
     if args.judge:
-        for ln in _read_text(args.judge).splitlines():
+        bad, verdict_re = [], re.compile(r"^(dim[123])\s*:\s*(pass|fail)\b(.*)$", re.IGNORECASE)
+        for lineno, ln in enumerate(_read_text(args.judge).splitlines(), 1):
             ln = ln.strip()
             if not ln or ln.startswith("#"):
                 continue
-            dim, _, rest = ln.partition(":")
-            judged[dim.strip()] = rest.strip()
+            m = verdict_re.match(ln)
+            if not m:
+                bad.append((lineno, ln))
+                continue
+            judged[m.group(1).lower()] = (m.group(2).lower(), m.group(3).strip(" :-"))
+        missing = [d for d in ("dim1", "dim2", "dim3") if d not in judged]
+        if bad or missing:
+            sys.stderr.write("error: judge verdicts unparseable — expected "
+                             "`dimN: pass|fail [locations]` per line, dim1..dim3 each present\n")
+            for lineno, ln in bad:
+                sys.stderr.write(f"  line {lineno}: {ln}\n")
+            if missing:
+                sys.stderr.write(f"  missing verdicts: {', '.join(missing)}\n")
+            return 2
     for dim in ("dim1", "dim2", "dim3"):
-        verdict = judged.get(dim, "")
-        passed = verdict.lower().startswith("pass")
-        results[dim] = ("pass" if passed else "fail",
-                        "" if passed else (verdict[4:].strip(" :-") if verdict else "no judge verdict"))
+        verdict, locations = judged.get(dim, ("fail", "no judge verdict"))
+        results[dim] = (verdict, "" if verdict == "pass" else locations)
     # Dimension 4: mechanical.
     d4 = _dimension4(draft, prov_entries)
     results["dim4"] = ("pass", "") if not d4 else ("fail", "; ".join(d4))
@@ -1904,7 +1923,9 @@ def main(argv=None):
     sp = sub.add_parser("quality-gate")
     sp.add_argument("--draft", default="-", help="the filled draft, or - for stdin")
     sp.add_argument("--map", help="the sidecar provenance map (for the stitched-fact-sheet check)")
-    sp.add_argument("--judge", help="rubric judge verdicts for dims 1-3: `dimN: pass|fail [locations]` per line")
+    sp.add_argument("--judge", help="rubric judge verdicts for dims 1-3: `dimN: pass|fail [locations]` "
+                                    "per line, dim1..dim3 each present; any other format exits 2 "
+                                    "(judge verdicts unparseable), never a per-dimension fail")
     sp = sub.add_parser("verify-markers")
     sp.add_argument("draft", nargs="?", default="-", help="draft file, or - for stdin")
     sp.add_argument("--count", action="store_true", help="print the count of well-formed markers")
