@@ -50,6 +50,34 @@ LONG=$(python3 -c "print('x'*300)")
 OVER='{"items":[{"where":"'"$LONG"'","why":"y","choices":[{"label":"a","effect":"keep it"}]}]}'
 blocks "$OVER" "over-budget field blocks (re-author, do not clip)"
 
+# --- Plain-text payload contract (g) (Story 13.47, #300) ---
+# Forbidden marker classes: each blocks presentation with a per-field diagnostic.
+BOLD='{"items":[{"where":"Section 2","why":"the **key result** is not stated","choices":[{"label":"a","effect":"keep it"}]}]}'
+blocks "$BOLD" "(g) bold emphasis ** blocks presentation"
+UNDER='{"items":[{"where":"Section 2","why":"the __key result__ is not stated","choices":[{"label":"a","effect":"keep it"}]}]}'
+blocks "$UNDER" "(g) underline emphasis __ blocks presentation"
+TICK='{"items":[{"where":"Section 2 (see `specs/qa.md`)","why":"y","choices":[{"label":"a","effect":"keep it"}]}]}'
+blocks "$TICK" "(g) backtick markup blocks presentation"
+HEAD='{"items":[{"where":"Section 2","why":"context follows.\n# Evidence\nthe result","choices":[{"label":"a","effect":"keep it"}]}]}'
+blocks "$HEAD" "(g) # heading marker blocks presentation"
+LINK='{"items":[{"where":"Section 2","why":"see [the spec](specs/qa.md) for detail","choices":[{"label":"a","effect":"keep it"}]}]}'
+blocks "$LINK" "(g) [text](url) link blocks presentation"
+# Markers hide in ANY presented field, not just where/why.
+EFFTICK='{"items":[{"where":"Section 2","why":"y","choices":[{"label":"a","effect":"rewrite from `answers.md`"}]}]}'
+blocks "$EFFTICK" "(g) marker inside a choice Effect blocks presentation"
+
+# Allowed plain-text conventions are never flagged: indentation, - dashes,
+# quoting by indentation, CAPITALIZED emphasis, blank-line separation.
+ALLOWED='{"items":[{"where":"Section 2 (Evidence) - currently reads:\n    Throughput rose 2x on the last run.\n\nProposed additions:\n  - state the baseline\n  - name the WORKLOAD explicitly","why":"the single result that matters most is not stated","choices":[{"label":"approve","effect":"keep the section as drafted"}]}]}'
+passes "$ALLOWED" "(g) allowed conventions (indent, dashes, CAPS, blank lines) pass"
+# Bare path / URL (no [text](url) wrapping) is the sanctioned link form.
+BARE='{"items":[{"where":"Section 2, sourced from specs/qa.md and https://example.com/run/7","why":"y","choices":[{"label":"a","effect":"keep it"}]}]}'
+passes "$BARE" "(g) bare paths and URLs pass"
+
+# Contract (g) is documented once, in the shared convention.
+grep -q 'plain text' "$root/skills/owner-facing-proposal-contract.md" \
+  && ok "contract (g) documents the plain-text payload rule" || err "contract missing plain-text section"
+
 # --- Presented-payload capture (Story 13.28, SPEC-draft-article-ux CAP-2) ---
 ws=$(mktemp -d); trap 'rm -rf "$ws"' EXIT
 GOOD='{"items":[{"where":"Section 2 (Evidence)","why":"the key result is not stated","choices":[{"label":"approve","effect":"keep the section as drafted"}]}]}'
@@ -83,6 +111,15 @@ tail -1 "$LOG" | grep -q '"kind": "answer"' && tail -1 "$LOG" | grep -q '"ask_id
 printf '%s' "$GOOD" | python3 "$V" --ws "$ws" --surface verification - >/dev/null \
   && [ "$(wc -l < "$LOG")" -eq 3 ] \
   && ok "capture: resumed/subsequent asks append, never overwrite" || err "second ask did not append"
+
+# (g) markers are blocked on every ask surface the validator serves, and a
+# blocked payload is never captured (Story 13.47).
+for surface in interview visual-proposal verification arbitration; do
+  printf '%s' "$BOLD" | python3 "$V" --ws "$ws" --surface "$surface" - >/dev/null 2>&1 \
+    && err "(g) marker payload NOT blocked on surface $surface" \
+    || ok "(g) marker payload blocked on surface $surface"
+done
+[ "$(wc -l < "$LOG")" -eq 3 ] && ok "(g) blocked marker payloads never captured" || err "(g) a blocked marker payload was captured"
 
 # Convention documents the capture (contract (f)).
 grep -q 'presented-payloads.jsonl' "$root/skills/owner-facing-proposal-contract.md" \

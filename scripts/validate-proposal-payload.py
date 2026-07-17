@@ -25,7 +25,11 @@ Payload shape (JSON) — one proposal item, or a list under `items`:
     }
 
 Each item must carry Where and Why, and at least one choice, every choice
-stating a non-empty Effect. Each field must be present, non-empty, and
+stating a non-empty Effect. Every presented string field must also be plain
+text (contract (g), #300): Markdown markers the selection surface cannot
+render — `**`/`__` emphasis, backticks, `#` headings, `[text](url)` links —
+block presentation with a per-field diagnostic naming the marker and its
+location. Each field must be present, non-empty, and
 untruncated. "Untruncated" is enforced two ways: a field ending in an ellipsis
 (`…` or `...`) is a mid-sentence cut, and a field longer than its display budget
 is a failure — content is made to fit by AUTHORSHIP (write shorter), never by
@@ -38,12 +42,52 @@ Exit 0 = presentable; non-zero = blocked, with a per-field report.
 import argparse
 import json
 import os
+import re
 import sys
 
 # Display budgets (characters). Illustrative caps tied to the presentation
 # mechanism, kept with the implementation per interview-architecture O2.
 BUDGETS = {"where": 240, "why": 200, "effect": 140}
 ELLIPSES = ("…", "...")
+
+# Plain-text payload contract (g), #300: the selection surface renders no
+# Markdown, so these markers are a blocking defect in ANY presented field —
+# same posture as a missing Effect line. Allowed conventions (indentation,
+# `-` dashes, CAPITALIZATION, blank-line separation) match none of these.
+FORBIDDEN_MARKERS = (
+    ("bold emphasis", re.compile(r"\*\*")),
+    ("underline emphasis", re.compile(r"__")),
+    ("backtick markup", re.compile(r"`")),
+    ("heading marker", re.compile(r"^\s{0,3}#{1,6}\s", re.MULTILINE)),
+    ("markdown link", re.compile(r"\[[^\]]+\]\([^)\s]+\)")),
+)
+
+
+def _iter_strings(obj, path):
+    """Yield (path, value) for every string field under obj."""
+    if isinstance(obj, str):
+        yield path, obj
+    elif isinstance(obj, dict):
+        for k, v in obj.items():
+            yield from _iter_strings(v, f"{path}.{k}")
+    elif isinstance(obj, list):
+        for i, v in enumerate(obj):
+            yield from _iter_strings(v, f"{path}[{i}]")
+
+
+def _markup_errors(item, tag):
+    """Yield (path, reason) for every forbidden formatting marker in any
+    presented string field of `item` (contract (g))."""
+    for path, value in _iter_strings(item, tag):
+        for name, rx in FORBIDDEN_MARKERS:
+            m = rx.search(value)
+            if m:
+                line = value.count("\n", 0, m.start()) + 1
+                col = m.start() - value.rfind("\n", 0, m.start())
+                yield (path, f"forbidden marker {m.group(0)!r} ({name}) at "
+                             f"line {line} col {col} — the surface renders "
+                             "plain text only (contract (g)); use indentation, "
+                             "dashes, or CAPITALIZATION instead")
 
 
 def _truncation_error(field, value, budget):
@@ -81,6 +125,7 @@ def validate(payload):
             reason = _truncation_error(field, item.get(field), BUDGETS[field])
             if reason:
                 yield (f"{tag}.{field}", reason)
+        yield from _markup_errors(item, tag)
         choices = item.get("choices")
         if not isinstance(choices, list) or not choices:
             yield (f"{tag}.choices", "no choices — selective presentation requires effect-stating options")
