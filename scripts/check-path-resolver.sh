@@ -207,6 +207,41 @@ eq "target: explicit --root still wins the disagreement" "$picked" "$(cd "$tgt/o
 set +e; quiet=$(cd "$root" && $PY target --root "$root" 2>&1 >/dev/null); set -e
 [ -z "$quiet" ] && ok "target: no notice when --root agrees with cwd" || err "spurious notice: $quiet"
 
+
+# --- #309 (13.54): stage0's entry gate keys to the RESOLVED root ---------------
+# The gate ran `git tag` with cwd=(root or None) — raw process cwd — while the
+# workspace and config keyed to the resolved toplevel. Outside a git repo that
+# produced a confident, WRONG diagnostic ("no tagged release") for what was
+# actually an unresolvable target.
+DPIPE="$root/scripts/draft-pipeline.py"
+gatehost=$(mktemp -d); trap 'rm -rf "$work" "$tgt" "$gatehost"' EXIT
+git init -q "$gatehost/h" && git -C "$gatehost/h" commit -q --allow-empty -m init
+mkdir -p "$gatehost/h/sub"
+
+# Outside any git repo with no --root: fail closed on the TARGET, not the gate.
+set +e
+gmsg=$(cd / && python3 "$DPIPE" start F1 README.md 2>&1 >/dev/null); grc=$?
+set -e
+[ "$grc" -eq 2 ] && ok "stage0/start: outside a git repo exits 2 (no raw-cwd side channel)" \
+  || err "expected exit 2, got $grc"
+printf '%s' "$gmsg" | grep -q 'cannot resolve the host repo' \
+  && ok "stage0/start: the diagnostic names the unresolvable target, not a phantom gate failure" \
+  || err "wrong diagnostic outside a repo: $gmsg"
+
+# The gate keys to the resolved root: same verdict from the repo root and a
+# subdirectory (untagged -> precondition unmet in both).
+set +e
+r_root=$(cd "$gatehost/h" && python3 "$DPIPE" start F1 README.md 2>&1 >/dev/null); rc_root=$?
+r_sub=$(cd "$gatehost/h/sub" && python3 "$DPIPE" start F1 README.md 2>&1 >/dev/null); rc_sub=$?
+set -e
+eq "stage0/start: identical gate verdict from repo root and subdirectory" "$rc_root" "$rc_sub"
+
+# With a tag, the gate passes from a subdirectory too — same root, same answer.
+git -C "$gatehost/h" tag v1
+(cd "$gatehost/h/sub" && python3 "$DPIPE" start F1 README.md >/dev/null 2>&1) \
+  && ok "stage0/start: a tagged host passes the gate from a subdirectory" \
+  || err "tagged host failed the gate from a subdirectory"
+
 if [ "$fail" -eq 0 ]; then
   printf '\nAll path-resolver checks passed.\n'; exit 0
 else
