@@ -365,13 +365,16 @@ Where a question triaged **open** is in fact groundable from a fact-sheet
 owner statement), present it as **recommended** instead — this recommendation
 pass is a **view over the harvest output**, introducing no new unsourced material.
 
-**Issue-sourced facts follow the same rule, stated here so it is never left to
-inference (Story 13.50):** a fact harvested from a `github-issues` source that
-carries an **owner disposition** (accepted/dismissed) is eligible grounding for
-a recommended answer **exactly like any harvest fact** — the disposition is a
-sourced owner statement. Open or deferred findings never reach the fact sheet
-(harvest routes them to NEEDS-OWNER), so they surface as confirmed gaps here,
-not as grounding.
+**Issue- and Den-sourced facts follow the same rule, stated here so it is never
+left to inference (Stories 13.50 / 13.51):** a fact harvested from a
+`github-issues` or `tanuki-den` source that carries an **owner disposition**
+(accepted/dismissed) is eligible grounding for a recommended answer **exactly
+like any harvest fact** — the disposition is a sourced owner statement. Open or
+deferred findings never reach the fact sheet (harvest routes them to
+NEEDS-OWNER), so they surface as confirmed gaps here, not as grounding. A
+finding's **recurrence count is data the recommendation may quote, never a
+reason the pipeline treats it as more significant** — significance is the
+owner's call, asked, not inferred from a count.
 
 Validated policy items join the candidate set as **asked** questions
 (`outcome: open`, `rationale: policy-seed`, their `seed` carried through): a

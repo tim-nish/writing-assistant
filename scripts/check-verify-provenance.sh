@@ -45,6 +45,26 @@ MAP
 python3 "$VP" --map "$work/good.txt" --fact-sheet "$work/ids.txt" >/dev/null 2>&1 \
   && ok "a clean map passes with no findings" || err "clean map failed"
 
+# Story 13.51 — a `den:<ledger-id>@<run>` pointer resolves like any other
+# declared fact-sheet pointer (the pointer set is the resolution surface; the
+# colon/@ in the form must not break map parsing), and an undeclared one still
+# fails.
+printf 'den:f-19@r-208\nden:f-3@r-208\nfs-12\n' > "$work/den-ids.txt"
+cat > "$work/den.txt" <<'MAP'
+P1.S1: sourced <- den:f-19@r-208
+P1.S2: derived <- den:f-19@r-208, den:f-3@r-208
+P2.S1: derived <- den:f-19@r-208, fs-12
+MAP
+python3 "$VP" --map "$work/den.txt" --fact-sheet "$work/den-ids.txt" >/dev/null 2>&1 \
+  && ok "den:<ledger-id>@<run> pointers parse and resolve (Story 13.51)" \
+  || err "den pointer rejected by verify-provenance"
+cat > "$work/den-bad.txt" <<'MAP'
+P1.S1: sourced <- den:f-99@r-208
+MAP
+python3 "$VP" --map "$work/den-bad.txt" --fact-sheet "$work/den-ids.txt" >/dev/null 2>&1 \
+  && err "undeclared den pointer accepted" \
+  || ok "a den pointer absent from the fact sheet is still a gate failure"
+
 # AC3a — a derived claim whose inherited pointer does not resolve is a gate failure.
 cat > "$work/badptr.txt" <<'MAP'
 P1.S2: derived <- fs-12, fs-99

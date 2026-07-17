@@ -106,6 +106,35 @@ scope.
   — and continue with the declared file sources. This source never turns a
   harvest into a failure.
 
+## 2c. Declared non-file sources — `tanuki-den` (Story 13.51)
+
+A declared `tanuki-den` entry harvests **Tanuki's findings ledger** for this
+target — judged, deduped, recurrence-counted findings, the healthiest dogfood
+evidence a repo has. The read is **read-only through a bounded reader**: read
+the ledger for the declared target and **nothing else** under Tanuki's state —
+**no write path exists**; nothing under Tanuki's state is created or modified,
+and a run never touches the Den's history, queues, or scratch. Only a
+**declared** entry is read: never fall back to reading undeclared producer
+state because it happens to exist on disk.
+
+- **SOURCE is `den:<ledger-id>@<run>`** — a new **pinned** pointer type
+  (decided at the spec gate): the Den ledger is not a git-pinned tree, so a
+  finding pins to the **run that judged it**, not a commit. `<ledger-id>` and
+  `<run>` are `[A-Za-z0-9._-]`. A later audit resolves the pair back to the
+  exact finding. An unpinned `den:<id>` is rejected by the validator, exactly
+  as a `path:line` with no `@sha` is.
+- **A finding's type, recurrence count, and disposition are data on the fact**
+  — e.g. `- flaky gate, type friction, recurrence 4, accepted / den:f-19@r-208 / event`.
+  The pipeline **never amplifies recurrence into significance** on its own: a
+  count of 9 is quoted as a count, never rendered as "a major problem".
+- **Routing (same triage rules as Story 13.50):** a **dispositioned** finding
+  is a sourced fact and grounds recommended answers; an **open or deferred**
+  finding routes to **NEEDS-OWNER** for the gap interview.
+- **Degrade, never fail:** no Den for the target, or a ledger whose schema is
+  unreadable → log **one line** (`tanuki-den source skipped: <reason>`) and
+  continue with the declared file sources. Never a failure, and never a
+  fallback to reading undeclared producer state.
+
 ## 3. Extract facts, each as `CLAIM / SOURCE / KIND`
 
 Read the in-scope files and extract facts. **Read every file you cite fresh with
@@ -116,12 +145,20 @@ trustworthy as the read that produced it; a remembered number is how off-by-one
 and fabricated pointers reach the sheet (the `pin-source.py` step below fixes the
 `@sha`, not the line you chose). Every entry is one line — `CLAIM / SOURCE / KIND`:
 
-- **SOURCE** is a resolvable pointer: `path:line@sha` (a file line PINNED to the
-  commit it came from, so it survives later edits that shift line numbers), a
-  commit `sha`, or a URL for a declared external source. A bare `path:line`
-  without `@sha` is not accepted. For every KIND **except `quote`**, SOURCE names
-  a **single** commit-pinned line — `path:line@sha`, **not** a range (`12-19` is
-  rejected; split it into per-line pointers).
+- **SOURCE** is a resolvable pointer, one of the four pinned forms:
+  - `path:line@sha` — a file line PINNED to the commit it came from, so it
+    survives later edits that shift line numbers;
+  - `sha` — a commit;
+  - `https://…` — a URL for a declared external source (a `github-issues`
+    entry's issue URL, section 2b);
+  - `den:<ledger-id>@<run>` — a Tanuki Den finding from a declared
+    `tanuki-den` entry (section 2c), pinned to the **run** that judged it
+    rather than a commit, because the Den ledger is not a git tree.
+
+  A bare `path:line` without `@sha` is not accepted, and neither is a bare
+  `den:<id>` without `@<run>` — every pointer pins. For every KIND **except
+  `quote`**, SOURCE names a **single** commit-pinned line — `path:line@sha`,
+  **not** a range (`12-19` is rejected; split it into per-line pointers).
 - **KIND** ∈ {result, decision, number, quote, event}.
 - A `quote` entry's CLAIM is the source text **verbatim and ONLY the source text**
   — no label, attribution, or prefix (not "Decision from batch 16: …"), and never

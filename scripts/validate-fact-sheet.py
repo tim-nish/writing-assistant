@@ -14,6 +14,11 @@ Contract enforced per entry (a `- ` bullet line):
                       verbatim text spans consecutive physical lines (#119)
       sha             a commit sha (7-40 hex)
       https://…       a URL (external, declared-source citation)
+      den:<id>@<run>  a Tanuki Den finding, pinned to the run that judged it
+                      (Story 13.51) — a declared `tanuki-den` source's pointer
+                      form. The Den ledger is not a git tree, so this pins to a
+                      run id rather than a commit; like a URL, the FORM is the
+                      contract here and resolution belongs to the Den reader.
     A bare `path:line` with no `@sha` is rejected — pointers must pin. A line
     range on any KIND except `quote` is rejected: single-line-only for facts,
     with the REJECT naming the fix (split the range into per-line pointers).
@@ -44,6 +49,11 @@ FILEPIN_RE = re.compile(r"^(?P<path>.+):(?P<line>\d+)@(?P<sha>[0-9a-f]{7,40})$")
 FILEPINRANGE_RE = re.compile(
     r"^(?P<path>.+):(?P<l1>\d+)-(?P<l2>\d+)@(?P<sha>[0-9a-f]{7,40})$")
 URL_RE = re.compile(r"^https?://\S+$")
+# `den:<ledger-id>@<run>` — a Tanuki Den finding (Story 13.51). A new PINNED
+# pointer type: the Den ledger is not a git-pinned tree, so the pin is the run
+# that judged the finding, not a commit. An unpinned `den:<id>` is rejected —
+# the pin is what a later audit resolves to the exact finding.
+DEN_RE = re.compile(r"^den:(?P<ledger>[A-Za-z0-9._-]+)@(?P<run>[A-Za-z0-9._-]+)$")
 
 
 def source_form_ok(source, kind):
@@ -55,6 +65,8 @@ def source_form_ok(source, kind):
     verbatim match) is a separate, deeper check the validator does and consume
     deliberately does not (it never re-reads sources)."""
     if URL_RE.match(source) or SHA_RE.match(source) or FILEPIN_RE.match(source):
+        return True
+    if DEN_RE.match(source):
         return True
     if kind == "quote" and FILEPINRANGE_RE.match(source):
         return True
@@ -132,6 +144,15 @@ def validate_source(source, kind, claim, host, sources):
     """Return None if the source is valid, else a rejection reason."""
     if URL_RE.match(source):
         return None                      # external citation; form is the contract
+    if DEN_RE.match(source):
+        # A Den finding (Story 13.51): pinned to the run that judged it. The
+        # ledger is not a git tree — the form is the contract, exactly as for a
+        # URL; the bounded Den reader owns resolution, and this validator never
+        # reaches into Tanuki's state to check it.
+        return None
+    if re.match(r"^den:", source):
+        return ("den pointer is not pinned to a run (use den:<ledger-id>@<run>; "
+                "ledger-id and run are [A-Za-z0-9._-])")
     if SHA_RE.match(source):             # bare commit sha — must exist in a declared repo
         for s in sources:
             if os.path.isdir(os.path.join(s["path"], ".git")) or _git(s["path"], "rev-parse", "--git-dir").returncode == 0:
