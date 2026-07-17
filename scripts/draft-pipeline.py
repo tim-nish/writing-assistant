@@ -1518,8 +1518,16 @@ DISPOSITION_PROVENANCE = {
     "modified": "interview",
     "replaced": "interview",
     "answered": "interview",
+    "ratified": "interview",   # a recalled policy default the owner accepted as-is
     "skipped": None,
 }
+
+# Dispositions that record accepting a policy-recalled recommended default
+# (Story 13.60, SPEC-policy-editorial-direction CAP-6). Unlike `approved`
+# (which inherits the recommendation's fact-sheet pointers as `sourced`), a
+# ratified default is OWNER JUDGMENT: it never inherits the policy pointer as a
+# SOURCE — the seed pointer stays in the `seed<-`/`consulted:` audit records.
+DEFAULT_DISPOSITIONS = {"ratified", "modified", "replaced"}
 
 
 def _validate_answer(spec):
@@ -1552,12 +1560,21 @@ def _validate_answer(spec):
         if not text:
             return None, ("an approved answer must carry the adopted recommendation "
                           "text (pass --text)")
-    else:  # modified / replaced / answered
+    else:  # modified / replaced / answered / ratified
         if not text:
             return None, f"a {disposition} answer must carry the owner's text (pass --text)"
         if pointers:
-            return None, (f"a {disposition} answer is owner judgment (interview-sourced); "
-                          "it carries no source pointers")
+            # `ratified` is the recall-then-ratify accept path (Story 13.60): a
+            # policy default the owner took as-is is owner judgment, so — like
+            # modified/replaced — it inherits NO policy pointer as a SOURCE. The
+            # recalled pointer lives only in the seed/consulted audit records.
+            owner_judgment = ("a ratified default is owner judgment; the recalled "
+                              "policy pointer stays in the seed/consulted audit and "
+                              "never becomes a SOURCE"
+                              if disposition == "ratified"
+                              else f"a {disposition} answer is owner judgment "
+                                   "(interview-sourced)")
+            return None, f"{owner_judgment}; it carries no source pointers"
 
     return ({"id": qid, "disposition": disposition, "provenance": provenance,
              "answer": text or None, "pointers": pointers}, None)
@@ -2202,7 +2219,9 @@ def main(argv=None):
     sp = sub.add_parser("answer")
     sp.add_argument("--id", help="the question id this answer keys to (single-answer form)")
     sp.add_argument("--disposition",
-                    help="approved | modified | replaced | answered | skipped (single-answer form)")
+                    help="approved | modified | replaced | answered | ratified | skipped "
+                         "(single-answer form; `ratified` = a recalled policy default "
+                         "accepted as-is, recorded as owner judgment)")
     sp.add_argument("--text", help="the answer text (adopted recommendation, or owner's bullet)")
     sp.add_argument("--pointer", action="append",
                     help="inherited source pointer (approved answers only; repeatable)")
