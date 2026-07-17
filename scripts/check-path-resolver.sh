@@ -174,8 +174,42 @@ assert rp._INTENT_LABELS == {k.upper(): v for k, v in dp.INTENT_LABELS.items()},
     (rp._INTENT_LABELS, dp.INTENT_LABELS)
 PYEOF
 
+# --- #309: target-repo selection is visible, and its precedence is tested -------
+# The story's gap: no check exercised the cwd-default path or a --root/cwd
+# disagreement, so the exit-2 contract and the precedence lived only in code.
+tgt=$(mktemp -d); trap 'rm -rf "$work" "$tgt"' EXIT
+git init -q "$tgt/other" && git -C "$tgt/other" commit -q --allow-empty -m x
+
+# (a) from the repo root and (b) from a subdirectory -> the same resolved root.
+root_here=$(cd "$root" && $PY target)
+sub_here=$(cd "$root/scripts" && $PY target)
+eq "target: same resolved root from the repo root and a subdirectory" "$root_here" "$sub_here"
+
+# (c) outside any git repo with no --root -> exit 2, naming the fix.
+set +e
+msg=$(cd / && $PY target 2>&1 >/dev/null); rc=$?
+set -e
+[ "$rc" -eq 2 ] && ok "target: outside a git repo with no --root exits 2 (fail closed)" \
+  || err "expected exit 2 outside a git repo, got $rc"
+printf '%s' "$msg" | grep -q -- '--root' \
+  && ok "target: the exit-2 diagnostic names --root as the fix" || err "exit-2 diagnostic unhelpful"
+
+# (d) --root disagreeing with cwd -> informational notice naming BOTH; --root wins.
+set +e
+note=$(cd "$root" && $PY target --root "$tgt/other" 2>&1 >/dev/null)
+picked=$(cd "$root" && $PY target --root "$tgt/other" 2>/dev/null)
+set -e
+printf '%s' "$note" | grep -q "$(cd "$tgt/other" && pwd -P)" && printf '%s' "$note" | grep -q "$root" \
+  && ok "target: a --root/cwd disagreement names both roots" || err "disagreement notice missing a root: $note"
+eq "target: explicit --root still wins the disagreement" "$picked" "$(cd "$tgt/other" && pwd -P)"
+
+# (e) agreement -> no notice (the notice must not become noise on every run).
+set +e; quiet=$(cd "$root" && $PY target --root "$root" 2>&1 >/dev/null); set -e
+[ -z "$quiet" ] && ok "target: no notice when --root agrees with cwd" || err "spurious notice: $quiet"
+
 if [ "$fail" -eq 0 ]; then
   printf '\nAll path-resolver checks passed.\n'; exit 0
 else
   printf '\npath-resolver checks FAILED.\n' >&2; exit 1
 fi
+

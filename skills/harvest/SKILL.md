@@ -10,6 +10,19 @@ description: >
 
 # Harvest
 
+**Name the target repository first (#309).** Before reading any scope, print the
+resolved target as the flow's first owner-visible line:
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-paths.py target --root <host-repo>
+```
+
+Relay it as `Operating on host repo: <path>`. A wrong-target run is otherwise
+only discoverable after the work is paid for. When an explicit `--root`
+disagrees with the session's cwd the resolver notes both on stderr — relay that
+line too; `--root` still wins.
+
+
 Produce a **fact sheet** from a repository's own material. Invocable two ways,
 with the **same output contract** both times:
 
