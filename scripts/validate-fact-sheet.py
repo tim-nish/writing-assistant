@@ -173,7 +173,26 @@ def _resolve_lines(path, sha, host, sources):
     return show.stdout.split("\n"), rel, None
 
 
-def validate_source(source, kind, claim, host, sources):
+# The policy surface is never harvest evidence (SPEC-policy-source-seam: policy
+# seeds questions and recommended defaults, never facts; Story 13.61). A
+# fact-sheet SOURCE resolving into the declared policy_source repo is rejected
+# the same way an article-plan pointer is — a policy line never grounds a claim.
+_POLICY_REJECT = ("SOURCE points into the declared policy_source repo — the "
+                  "policy surface is never harvest evidence (SPEC-policy-source-"
+                  "seam; Story 13.61); a recalled position may shape a question "
+                  "or a recommended default, never ground a claim. Re-ground on "
+                  "current repository evidence or route to NEEDS-OWNER.")
+
+
+def _in_policy_repo(path, host, policy_repo):
+    """True iff the host-relative pointer `path` resolves inside `policy_repo`."""
+    if not policy_repo:
+        return False
+    abspath = os.path.realpath(os.path.join(host, path))
+    return rws._contains(policy_repo, abspath)
+
+
+def validate_source(source, kind, claim, host, sources, policy_repo=None):
     """Return None if the source is valid, else a rejection reason."""
     if URL_RE.match(source):
         return None                      # external citation; form is the contract
@@ -198,6 +217,8 @@ def validate_source(source, kind, claim, host, sources):
     rng = FILEPINRANGE_RE.match(source)
     if rng:
         l1, l2, sha, path = int(rng["l1"]), int(rng["l2"]), rng["sha"], rng["path"]
+        if _in_policy_repo(path, host, policy_repo):
+            return _POLICY_REJECT
         if kind != "quote":
             return (f"SOURCE must be a single line for KIND '{kind}'; a line range is "
                     f"only allowed for a 'quote' that spans consecutive physical lines "
@@ -231,6 +252,8 @@ def validate_source(source, kind, claim, host, sources):
             return "file pointer is not pinned to a commit (use path:line@sha)"
         return f"unrecognized SOURCE form: {source!r}"
     path, line, sha = m["path"], int(m["line"]), m["sha"]
+    if _in_policy_repo(path, host, policy_repo):
+        return _POLICY_REJECT
     lines, rel, reason = _resolve_lines(path, sha, host, sources)
     if reason:
         return reason
@@ -248,14 +271,14 @@ def validate_source(source, kind, claim, host, sources):
     return None
 
 
-def validate_entry(raw, host, sources):
+def validate_entry(raw, host, sources, policy_repo=None):
     parts = [p.strip() for p in raw.rsplit(" / ", 2)]
     if len(parts) != 3 or any(p == "" for p in parts):
         return raw, "malformed: expected `CLAIM / SOURCE / KIND` with all fields non-empty"
     claim, source, kind = parts
     if kind not in KINDS:
         return raw, f"invalid KIND {kind!r} (must be one of {sorted(KINDS)})"
-    reason = validate_source(source, kind, claim, host, sources)
+    reason = validate_source(source, kind, claim, host, sources, policy_repo)
     return raw, reason
 
 
@@ -285,6 +308,11 @@ def main(argv=None):
         # owner never declared readable.
         print(f"error: {ws_path}: {e}", file=sys.stderr)
         return 2
+    # The declared policy surface (if any) is fenced out of evidence: a SOURCE
+    # resolving into it is rejected (Story 13.61). A malformed policy block is
+    # not this validator's concern (stage-0 relays it); we only need the path.
+    policy_block, _perr = rws.get_policy_source(rws.read_lines(host), host)
+    policy_repo = (policy_block or {}).get("path") if policy_block else None
     text = sys.stdin.read() if args.factsheet == "-" else open(args.factsheet, encoding="utf-8").read()
 
     # Only the fact-sheet section: stop at the NEEDS-OWNER list (Story 3.3),
@@ -296,7 +324,7 @@ def main(argv=None):
         fs_lines.append(ln)
     entries = [ln[2:] for ln in fs_lines if ln.startswith("- ")]
     rejected = 0
-    for raw, reason in (validate_entry(e, host, sources) for e in entries):
+    for raw, reason in (validate_entry(e, host, sources, policy_repo) for e in entries):
         if reason is None:
             if not args.rejected:
                 print(f"VALID   {raw}")

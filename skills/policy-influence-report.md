@@ -21,10 +21,13 @@ only inputs are run state that already exists:
 ## Report shape (short — a page, not a dossier)
 
 1. **Policy-directed decisions** — one line each: the decision (article type,
-   claim/angle, a review emphasis), the seed that drove it (**verbatim quote +
-   `file:line@commit`** at the run pin), and the owner's ratification or
-   override (from the payload log; an override is itself a finding — declines
-   are data).
+   claim/angle, a review emphasis, or a **recalled recommended default** for an
+   editorial-judgment gap — SPEC-policy-editorial-direction CAP-6), the seed
+   that drove it (**verbatim quote + `file:line@commit`** at the run pin), and
+   the owner's ratification or override (from the payload log; an override is
+   itself a finding — declines are data). A **ratified** default is attributed
+   to its seed exactly like any other policy influence — the disposition in the
+   record is `ratified` (owner judgment), never a source-pointer grounding.
 2. **The generic-mode counterfactual** — what the run would have done unseeded,
    **read from the record, never invented**: the repo-grounded default the
    payload log shows was offered alongside the seed, the suppressed/unseeded
