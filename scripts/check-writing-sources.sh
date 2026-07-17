@@ -184,6 +184,83 @@ got=$($PY --root "$work/host" sources 2>/dev/null | head -1)
 [ -n "$got" ] && ok "inline include form still parses after #221 guard" \
   || err "inline include form broke"
 
+# 6c. Typed source entries (Story 13.49): `type: path` default, explicit
+#     types, unknown-type refusal, misplaced-key refusal, writer round-trip.
+mkdir -p "$work/host4/docs"; : > "$work/host4/docs/a.md"
+cat > "$work/host4/writing-sources.yaml" <<'YAML'
+sources:
+  - path: .
+    include: ["docs/**"]
+  - type: github-issues
+    labels: ["tanuki:*"]
+  - type: tanuki-den
+output:
+  drafts: out/
+YAML
+# Untyped {path, include} entries behave exactly as before (default typing):
+# file scope comes from path entries only; typed entries never widen it.
+files4=$($PY --root "$work/host4" files 2>/dev/null)
+[ "$(printf '%s\n' "$files4" | grep -c .)" -eq 1 ] && printf '%s' "$files4" | grep -q 'docs/a.md' \
+  && ok "typed entries never widen file scope (files = path sources only)" \
+  || err "files with typed entries returned: $files4"
+typed=$($PY --root "$work/host4" typed-sources 2>/dev/null)
+printf '%s' "$typed" | grep -q '"type": "path"' \
+  && printf '%s' "$typed" | grep -q '"type": "github-issues"' \
+  && printf '%s' "$typed" | grep -q '"tanuki:\*"' \
+  && printf '%s' "$typed" | grep -q '"type": "tanuki-den"' \
+  && ok "typed-sources reports all three types (labels carried)" \
+  || err "typed-sources output wrong: $typed"
+
+# Unknown type -> refused fail-closed (exit 5) with a per-key diagnostic.
+cat > "$work/host4/writing-sources.yaml" <<'YAML'
+sources:
+  - path: .
+  - type: rss-feed
+output:
+  drafts: out/
+YAML
+set +e; out=$($PY --root "$work/host4" sources 2>"$work/host4.err"); rc=$?; set -e
+[ "$rc" -eq 5 ] && [ -z "$out" ] && grep -q "unknown type" "$work/host4.err" \
+  && grep -q "valid types" "$work/host4.err" \
+  && ok "unknown type refused fail-closed with a per-key diagnostic (exit 5)" \
+  || err "unknown type: rc=$rc out='$out' err=$(cat "$work/host4.err" | tr '\n' ' ')"
+
+# Misplaced key (include on a non-path entry) -> refused with a per-key error.
+cat > "$work/host4/writing-sources.yaml" <<'YAML'
+sources:
+  - path: .
+  - type: github-issues
+    include: ["docs/**"]
+output:
+  drafts: out/
+YAML
+set +e; out=$($PY --root "$work/host4" files 2>"$work/host4.err"); rc=$?; set -e
+[ "$rc" -eq 5 ] && [ -z "$out" ] && grep -q 'only applies to `type: path`' "$work/host4.err" \
+  && ok "misplaced include on a typed entry refused (per-key diagnostic)" \
+  || err "misplaced key: rc=$rc err=$(cat "$work/host4.err" | tr '\n' ' ')"
+
+# Writers round-trip the type key (set-sources accepts typed entries).
+mkdir -p "$work/host5"
+printf '%s' '[{"path":"."},{"type":"github-issues","labels":["tanuki:*"]},{"type":"tanuki-den"}]' \
+  | $PY --root "$work/host5" set-sources >/dev/null 2>&1 \
+  && ok "set-sources accepts typed entries" || err "set-sources refused typed entries"
+rt=$($PY --root "$work/host5" typed-sources 2>/dev/null)
+printf '%s' "$rt" | grep -q '"type": "github-issues"' && printf '%s' "$rt" | grep -q '"type": "tanuki-den"' \
+  && ok "typed entries round-trip through the writer" \
+  || err "round-trip lost the type key: $rt"
+# Typed write-time validation is fail-closed too.
+set +e
+printf '%s' '[{"type":"tanuki-den","include":["x/**"]}]' | $PY --root "$work/host5" set-sources >/dev/null 2>"$work/host5.err"; rc=$?
+set -e
+[ "$rc" -eq 5 ] && grep -q 'only applies to' "$work/host5.err" \
+  && ok "writer refuses a misplaced key on a typed entry" \
+  || err "writer accepted a misplaced key (rc=$rc)"
+
+# The example documents all three types.
+has 'type: github-issues' "$EX" 'github-issues type documented in the example'
+has 'type: tanuki-den'    "$EX" 'tanuki-den type documented in the example'
+has 'den:'                "$EX" 'den pointer form documented in the example'
+
 # 7. Negative invariant: the resolver has no hardcoded 'drafts/' default path.
 if grep -F 'drafts/' "$RES" >/dev/null 2>&1; then
   err "resolver contains a literal 'drafts/' path (possible hardcoded default): $(grep -nF 'drafts/' "$RES" | head -2 | tr '\n' ' ')"

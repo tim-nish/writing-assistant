@@ -183,6 +183,13 @@ def validate_writing_sources(args, findings):
         cmd += ["--root", args.root]
     cmd += ["sources"]
     p = subprocess.run(cmd, capture_output=True, text=True)
+    if p.returncode == 5:
+        # SOURCES_MALFORMED (#221 / Story 13.49): relay the resolver's per-key
+        # diagnostics verbatim — unknown `type`, misplaced keys, block-style
+        # include — instead of the generic missing-file guidance.
+        for line in (p.stderr or p.stdout).strip().splitlines():
+            findings.append((SOURCES_FILE, "sources", line))
+        return
     if p.returncode != 0 or not p.stdout.strip():
         # The machine-global per-repo location (#211) — resolved by the path
         # resolver (the single owner of that layout), never composed here.

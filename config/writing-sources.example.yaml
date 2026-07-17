@@ -28,6 +28,19 @@ sources:
     # resolver refuses to run rather than silently ignore the allowlist and
     # widen scope to the whole tree.
 
+  # Entries carry an optional `type:` key (Story 13.49). `type: path` is the
+  # default — the two entries above are `path` sources and behave exactly as
+  # before. Non-file evidence is an explicit opt-in declaration; an unknown
+  # `type`, or a key that only applies to another type (`include` on a
+  # non-path entry, `labels` outside github-issues), is refused with a
+  # per-key error — never silently ignored.
+  #
+  # - type: github-issues                # harvest the HOST repo's issues (read-only).
+  #   labels: ["tanuki:*"]               # optional label filter (inline form, like include).
+  #   # Emitted facts carry the issue URL as their SOURCE pointer.
+  # - type: tanuki-den                   # harvest Tanuki's findings ledger (read-only).
+  #   # Emitted facts carry a `den:<ledger-id>@<run>` SOURCE pointer.
+
 output:
   # Draft + platform-variant output directory. Recommended: a directory in a
   # dedicated PRIVATE articles repository OUTSIDE the host repo — articles are

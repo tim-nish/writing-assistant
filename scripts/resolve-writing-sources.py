@@ -22,6 +22,17 @@ git repo the script errors rather than silently resolving against cwd):
 
   sources                   List declared source paths, each resolved against
                             the host-repo root (CAP-2: only these may be read).
+                            `type: path` entries only — non-file typed entries
+                            (Story 13.49) never widen the file read scope.
+
+  typed-sources             All declared entries with their `type` as JSON
+                            (Story 13.49). Entries carry an optional `type`
+                            key — `path` (default), `github-issues`
+                            (optional inline `labels:` filter), `tanuki-den`.
+                            Unknown types and keys that only apply to another
+                            type (e.g. `include` on `github-issues`) are
+                            refused fail-closed with per-key diagnostics
+                            (exit 5, same posture as #221).
 
   is-declared PATH          Exit 0 iff PATH lies inside a declared source root;
                             non-zero otherwise. This is the harvest read
@@ -64,6 +75,10 @@ git repo the script errors rather than silently resolving against cwd):
   set-sources               Declaratively REPLACE the `sources:` block from a
                             JSON array on stdin (SPEC-repo-onboarding CAP-2):
                             [{"path": ".", "include": ["docs/**"]}, ...].
+                            Typed entries round-trip (Story 13.49): an
+                            optional "type" key ("path" default,
+                            "github-issues" with optional "labels",
+                            "tanuki-den") is accepted and written back.
                             Emits the inline include form (#221). Comments
                             inside the old sources block do not survive the
                             replace (declarative semantics); comments outside
@@ -342,27 +357,62 @@ def set_policy_source(lines, path):
 
 
 def render_sources_block(specs):
-    """The canonical `sources:` block for [{'path': str, 'include': [str]}]
-    — always the inline include form (#221)."""
+    """The canonical `sources:` block for typed specs (Story 13.49) — always
+    the inline list form (#221). The default `type: path` is not emitted
+    (untyped entries stay byte-identical); non-path types are emitted as
+    `- type: …` entries."""
     out = ["sources:"]
     for s in specs:
-        out.append(f"  - path: {s['path']}")
-        if s.get("include"):
-            quoted = ", ".join(f'"{g}"' for g in s["include"])
-            out.append(f"    include: [{quoted}]")
+        t = s.get("type", "path")
+        if t == "path":
+            out.append(f"  - path: {s['path']}")
+            if s.get("include"):
+                quoted = ", ".join(f'"{g}"' for g in s["include"])
+                out.append(f"    include: [{quoted}]")
+        else:
+            out.append(f"  - type: {t}")
+            if s.get("labels"):
+                quoted = ", ".join(f'"{g}"' for g in s["labels"])
+                out.append(f"    labels: [{quoted}]")
     return out
 
 
 def validate_source_specs(specs):
-    """Fail-closed write-time validation for set-sources input. Returns a
-    list of error strings; empty means writable."""
+    """Fail-closed write-time validation for set-sources input (typed —
+    Story 13.49). Returns a list of error strings; empty means writable."""
     errors = []
     if not isinstance(specs, list) or not specs:
         return ["sources must be a non-empty JSON array of "
-                '{"path": str, "include": [str, ...]?} objects']
+                '{"type"?: "path"|"github-issues"|"tanuki-den", '
+                '"path": str, "include": [str, ...]?, "labels": [str, ...]?} '
+                "objects"]
     for i, s in enumerate(specs):
-        if not isinstance(s, dict) or not isinstance(s.get("path"), str) \
-                or not s["path"].strip():
+        if not isinstance(s, dict):
+            errors.append(f"sources[{i}]: not an object")
+            continue
+        t = s.get("type", "path")
+        if t not in VALID_SOURCE_TYPES:
+            errors.append(f"sources[{i}].type: unknown type {t!r} — valid "
+                          "types: " + ", ".join(VALID_SOURCE_TYPES))
+            continue
+        if t != "path":
+            for key in ("path", "include"):
+                if key in s:
+                    errors.append(f"sources[{i}].{key}: only applies to "
+                                  f"`type: path` entries")
+            if t == "tanuki-den" and "labels" in s:
+                errors.append(f"sources[{i}].labels: only applies to "
+                              "`type: github-issues` entries")
+            labels = s.get("labels", [])
+            if not isinstance(labels, list) or any(
+                    not isinstance(g, str) or not g.strip() for g in labels):
+                errors.append(f"sources[{i}].labels: must be a list of "
+                              "non-empty strings")
+            continue
+        if "labels" in s:
+            errors.append(f"sources[{i}].labels: only applies to "
+                          "`type: github-issues` entries")
+        if not isinstance(s.get("path"), str) or not s["path"].strip():
             errors.append(f"sources[{i}]: a non-empty string `path` is required")
             continue
         inc = s.get("include", [])
@@ -406,15 +456,52 @@ def set_sources(lines, specs):
     return lead + sep_before + block + sep_after + rest, True
 
 
-def get_sources(lines, root):
-    """Parse the sources list into [{'path': abs, 'include': [...]}].
+# Typed source entries (Story 13.49, SPEC-writing-assistant CAP-2 amendment):
+# `type: path` is the default — an untyped {path, include} entry behaves
+# byte-identically to before. Non-file evidence is an explicit opt-in.
+VALID_SOURCE_TYPES = ("path", "github-issues", "tanuki-den")
 
-    Absent `include` means the whole path is in scope. An `include:` line
-    that is present but not the supported inline form raises
-    MalformedSources (#221): degrading it to "no include" would silently
-    widen scope to the whole tree — the opposite of fail-closed.
+
+def _entry_key(cur, key, raw, lineno, errors):
+    """Record one `key: value` line of a sources entry. Inline-list keys
+    (`include`, `labels`) share the #221 rule: a non-inline form is an error,
+    never a silent fall-through."""
+    cur["keys"].add(key)
+    val = re.sub(r"\s+#.*$", "", raw).strip()
+    if key in ("path", "type"):
+        cur[key] = val.strip('"').strip("'")
+    elif key in ("include", "labels"):
+        m = re.match(r"^\[(.*)\]$", val)
+        if not m:
+            errors.append(
+                f"line {lineno}: unparseable {key}: {raw.strip()!r} — only the "
+                f'inline form is supported ({key}: ["a", "b"]); a block-style '
+                f"YAML list is not read, and falling through would silently "
+                f"widen scope (#221)")
+            return
+        items = [x.strip().strip('"').strip("'") for x in m.group(1).split(",")]
+        cur[key] = [x for x in items if x]
+    elif cur.get("type") not in (None, "path"):
+        # Typed non-path entries are fail-closed on unknown keys; untyped/path
+        # entries keep today's ignore-unknown-lines behavior (byte-identical).
+        errors.append(f"line {lineno}: unknown key {key!r} in a "
+                      f"`type: {cur['type']}` sources entry")
+
+
+def get_typed_sources(lines, root):
+    """Parse the sources list into typed entries (Story 13.49):
+
+      {'type': 'path', 'path': abs, 'include': [...]}
+      {'type': 'github-issues', 'labels': [...]}
+      {'type': 'tanuki-den'}
+
+    Fail-closed: an unknown `type`, a key that only applies to another type
+    (e.g. `include` on a `github-issues` entry), or a non-inline list form
+    (#221) raises MalformedSources with per-key diagnostics — same posture as
+    the block-style `include` hard error.
     """
-    result = []
+    entries = []
+    errors = []
     in_sources = False
     current = None
     for lineno, ln in enumerate(lines, 1):
@@ -425,24 +512,61 @@ def get_sources(lines, root):
             break  # left the sources block
         if not in_sources or ln.strip() == "" or ln.lstrip().startswith("#"):
             continue
-        m = re.match(r"^\s*-\s*path:\s*(.*?)\s*$", ln)
+        m = re.match(r"^\s*-\s+([A-Za-z][\w-]*):\s*(.*?)\s*$", ln)
         if m:
-            raw = re.sub(r"\s+#.*$", "", m.group(1)).strip().strip('"').strip("'")
-            current = {"path": os.path.realpath(os.path.join(root, raw)), "include": []}
-            result.append(current)
+            current = {"type": None, "path": None, "include": [], "labels": [],
+                       "keys": set(), "line": lineno}
+            entries.append(current)
+            _entry_key(current, m.group(1), m.group(2), lineno, errors)
             continue
-        m = re.match(r"^\s+include:\s*\[(.*)\]\s*(#.*)?$", ln)
+        m = re.match(r"^\s+([A-Za-z][\w-]*)\s*:\s*(.*?)\s*$", ln)
         if m and current is not None:
-            items = [x.strip().strip('"').strip("'") for x in m.group(1).split(",")]
-            current["include"] = [x for x in items if x]
+            _entry_key(current, m.group(1), m.group(2), lineno, errors)
             continue
-        if re.match(r"^\s+include\s*:", ln):
-            raise MalformedSources(
-                f"line {lineno}: unparseable include: {ln.strip()!r} — only the "
-                f'inline form is supported (include: ["docs/**", "README.md"]); '
-                f"a block-style YAML list is not read, and falling through would "
-                f"silently widen scope to the whole tree (#221)")
-    return result
+
+    for i, e in enumerate(entries):
+        t = e["type"] or "path"
+        tag = f"sources[{i}] (line {e['line']})"
+        if t not in VALID_SOURCE_TYPES:
+            errors.append(
+                f"{tag}: unknown type {t!r} — valid types: "
+                + ", ".join(VALID_SOURCE_TYPES))
+            continue
+        e["type"] = t
+        if t == "path":
+            if not e["path"]:
+                errors.append(f"{tag}: a `type: path` entry requires a `path:` key")
+                continue
+            if "labels" in e["keys"]:
+                errors.append(f"{tag}: `labels` only applies to "
+                              f"`type: github-issues` entries")
+            e["path"] = os.path.realpath(os.path.join(root, e["path"]))
+        else:
+            for key in ("path", "include"):
+                if key in e["keys"]:
+                    errors.append(
+                        f"{tag}: `{key}` only applies to `type: path` entries "
+                        f"— a `type: {t}` source reads no files")
+            if t == "tanuki-den" and "labels" in e["keys"]:
+                errors.append(f"{tag}: `labels` only applies to "
+                              f"`type: github-issues` entries")
+
+    if errors:
+        raise MalformedSources("\n".join(errors))
+    return entries
+
+
+def get_sources(lines, root):
+    """Parse the sources list into [{'path': abs, 'include': [...]}] —
+    the file-scope view: `type: path` entries only (the default type), so
+    every existing consumer (files / is-declared / harvest read boundary)
+    sees exactly the declared file scope. Typed non-file entries are
+    surfaced by get_typed_sources / the `typed-sources` subcommand.
+    Malformed configs raise MalformedSources (#221 / Story 13.49) — never a
+    silent fall-through.
+    """
+    return [{"path": e["path"], "include": e["include"]}
+            for e in get_typed_sources(lines, root) if e["type"] == "path"]
 
 
 def get_policy_source(lines, root):
@@ -672,6 +796,24 @@ def cmd_sources(args):
     return 0
 
 
+def cmd_typed_sources(args):
+    """All declared entries with their type, as JSON (Story 13.49) — the
+    reader for typed non-file sources (github-issues / tanuki-den harvest)."""
+    import json
+    root = host_root(args.root)
+    out = []
+    for e in get_typed_sources(read_lines(root), root):
+        if e["type"] == "path":
+            out.append({"type": "path", "path": e["path"],
+                        "include": e["include"]})
+        elif e["type"] == "github-issues":
+            out.append({"type": "github-issues", "labels": e["labels"]})
+        else:
+            out.append({"type": e["type"]})
+    print(json.dumps(out))
+    return 0
+
+
 def cmd_is_declared(args):
     root = host_root(args.root)
     target = os.path.join(root, args.path) if not os.path.isabs(args.path) else args.path
@@ -739,6 +881,7 @@ def main(argv=None):
     sp = sub.add_parser("set-draft-location", parents=[root_parent])
     sp.add_argument("path")
     sub.add_parser("sources", parents=[root_parent])
+    sub.add_parser("typed-sources", parents=[root_parent])
     sp = sub.add_parser("is-declared", parents=[root_parent])
     sp.add_argument("path")
     sub.add_parser("files", parents=[root_parent])
@@ -759,6 +902,7 @@ def main(argv=None):
             "draft-location": cmd_draft_location,
             "set-draft-location": cmd_set_draft_location,
             "sources": cmd_sources,
+            "typed-sources": cmd_typed_sources,
             "is-declared": cmd_is_declared,
             "files": cmd_files,
             "policy-source": cmd_policy_source,
