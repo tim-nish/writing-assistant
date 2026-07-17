@@ -38,7 +38,7 @@ n=$(grep -cE '^## Dimension [0-9]' "$RUBRIC")
 has 'deletion probe'                 "arc: section-level deletion probe"
 has 'topic sentence first'           "flow: topic-sentence-first"
 has 'orphan fact'                    "flow: no orphan facts"
-has 'introduced before'              "calibration: term-introduced-before-first-use"
+has 'term-introduced-at-or-before-first-use' "calibration: term-introduced-at-or-before-first-use (#305)"
 has 'sentence length'                "mechanics: sentence-length metric"
 has 'heading density'                "mechanics: heading density"
 has 'density'                        "mechanics: quote/sourced-claim density"

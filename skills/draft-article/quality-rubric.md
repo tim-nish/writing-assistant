@@ -50,6 +50,16 @@ vocabulary**, not open-ended judgment: the drafting side and the gate apply the
 same written rule below, and a verdict carries the **complete** violation set —
 never one violation per pass.
 
+- **Operational check — term-introduced-at-or-before-first-use:** for each
+  registered term, find its first load-bearing use; an introduction (below) must
+  stand at or before it. A term used load-bearingly with no introduction is a
+  **fail**, naming the term and the line. *(Renamed from
+  term-introduced-**before**-first-use on 2026-07-17, #305: an inline appositive
+  gloss AT the point of use is now explicitly sufficient — the reader never meets
+  the term unexplained, and the old name implied a placement rule the rubric
+  never actually settled. That ambiguity is what four revision cycles kept
+  re-litigating.)*
+
 **Introduction contract — each form is explicitly sufficient or insufficient:**
 
 - **Sufficient:** a defining sentence or one-time gloss *preceding* the first
@@ -62,6 +72,22 @@ never one violation per pass.
   introduction before the diagram; a bare **expansion of an already-introduced
   base term** (e.g. "de-dup" → "de-duplication check") never re-promotes the
   term to unintroduced.
+
+**The gated inventory is a contract, not a convenience list (#305).** The scan
+gates exactly the vocabulary registered in
+[`internal-vocabulary.json`](internal-vocabulary.json) — so a `dim3: pass` means
+*nothing in the registered inventory was uncalibrated*, and the gate stamps
+`dim3_inventory` (version + counts) beside the verdict to keep that scope
+visible. **Registration is mandatory:** introducing a new internal stage name,
+framework ID, marker, diagram label, or pipeline term means registering it in
+the same change. `check-internal-vocabulary.sh` derives the families that have a
+canonical machine source — framework IDs (`FRAMEWORK_PRIORITY`), pipeline stage
+names (`next_stage` vocabulary), and the owner-facing markers — and **fails**
+when one is unregistered, so those cannot drift out of the gate unnoticed. Prose
+nouns have no such source: for them the inventory is the source of truth, and
+adding one is a reviewed edit. Bare words that collide with ordinary English are
+registered in their unambiguous compound form (`framework fill`, not `fill`),
+because a gate that flags ordinary prose is worse than the gap it closes.
 
 **Verdict rules:**
 
