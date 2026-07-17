@@ -8,9 +8,9 @@ relates:
   - ../spec-article-index/SPEC.md        # deferred index becomes a derived view over plans
   - ../spec-article-draft-pipeline/SPEC.md
 sources:
-  # Owner decisions 2026-07-17 (issue #310); policy consultation product-lab@91ec5c01
-  # (articles-repo schema is the API; artifacts live where the human works;
-  # seed→evidenced→outlined→drafted lifecycle — the plan is the `outlined` artifact).
+  # Owner decision record — 2026-07-17 (issue #310): storage, terminology, and
+  # the articles-repo boundary. Consulted positions are recorded there; the hub
+  # pointer stays private (publication boundary, #211).
 ---
 
 > Canonical contract. Skills and scripts reference this spec and never restate
