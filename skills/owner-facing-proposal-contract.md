@@ -88,3 +88,28 @@ This log is the meta-analysis substrate (SPEC-draft-article-ux CAP-2): a later
 nothing from the drafting context. The capture is the deliverable — no analysis
 tooling exists; the analysis is a prompt over run state. Resumed runs keep
 appending; nothing is overwritten or de-duplicated.
+
+## (g) Payloads are plain text (added 2026-07-17, #300/#307)
+
+The selection surface renders **no Markdown**. Formatting the surface cannot
+render is a lintable defect class at this boundary — the presentation-side
+sibling of the internal-vocabulary rule — because raw markers degrade exactly
+the context the contract exists to provide, and worst on the richest asks.
+
+**Allowed conventions** (survive a plain-text surface): indentation, `-` list
+dashes, quoting by indentation, CAPITALIZED words for emphasis, blank-line
+separation.
+
+**Forbidden markers** (never reach the owner): `**bold**` / `__underline__`,
+backtick code fences, `#` headings, `[text](url)` links. Emphasis is carried by
+wording or capitalization; a link is written as a bare path or URL.
+
+**Visual previews:** a visual proposal's preview is a **plain-text structural
+sketch** (elements, relations, emphasis — figure-spec style), never raw Mermaid
+or fenced source in the payload. The concrete Mermaid/table source is written
+to the run workspace and the payload shows its **path**, so the owner can open
+it rendered. Policy-seed quotes are presented under the same plain-text
+conventions, keeping their `file:line@commit` pointer.
+
+Enforcement lives at gate (e) — the validator rejects forbidden markers like a
+missing Effect line — never in prompt wording alone.

@@ -39,20 +39,40 @@ The article advances **one claim**, and every section advances it.
   that no surrounding sentence sets up or draws a consequence from — is a
   **fail**, naming its location.
 
-## Dimension 3 — Explanation calibration
+## Dimension 3 — Explanation calibration (deterministic; amended 2026-07-17, #305)
 
-Every **repo-internal term, project name, or acronym** is **introduced before
-its first load-bearing use**, calibrated to the audience the framework's **hook
-slot** names (the drafting-side counterpart of the cold read's missing-context
-check).
+Every **repo-internal term, project name, or acronym** is **introduced at or
+before its first load-bearing use**, calibrated to the audience the framework's
+**hook slot** names (the drafting-side counterpart of the cold read's
+missing-context check). This dimension is a **closed scan over repo
+vocabulary**, not open-ended judgment: the drafting side and the gate apply the
+same written rule below, and a verdict carries the **complete** violation set —
+never one violation per pass.
 
-- **Operational check — term-introduced-before-first-use:** for each such term,
-  find its first load-bearing use; a one-time gloss, expansion, or defining
-  sentence must precede it. A term used load-bearingly before it is introduced
-  is a **fail**, naming the term and the line.
-- Calibration is audience-relative: a term the stated audience already knows
-  needs no gloss; the check is *unintroduced-and-unknown-to-this-audience*, not
-  *every term*.
+**Introduction contract — each form is explicitly sufficient or insufficient:**
+
+- **Sufficient:** a defining sentence or one-time gloss *preceding* the first
+  load-bearing use; an **inline appositive gloss at the point of first
+  load-bearing use** (the reader never meets the term unexplained); an
+  abbreviation **expanded with its gloss** at first use.
+- **Insufficient / neutral:** a **heading** occurrence is neither an
+  introduction nor a load-bearing use — it triggers nothing and satisfies
+  nothing; a **diagram label** IS a load-bearing use and requires a prose
+  introduction before the diagram; a bare **expansion of an already-introduced
+  base term** (e.g. "de-dup" → "de-duplication check") never re-promotes the
+  term to unintroduced.
+
+**Verdict rules:**
+
+- The scan enumerates every repo-internal term and its first load-bearing use;
+  a verdict names **all** violations (term + line) in one pass. Re-running the
+  scan on unchanged text yields the identical verdict.
+- Calibration is audience-relative, entered **once as data**: terms the
+  ratified audience answer marks as known form a per-run allowlist and are
+  excluded from the scan — never re-judged per pass. The check is
+  *unintroduced-and-unknown-to-this-audience*, not *every term*.
+- After one revision addresses the complete reported set, a later verdict may
+  add a violation **only** for vocabulary the revision itself introduced.
 
 ## Dimension 4 — Readability mechanics (mechanical, zero tokens)
 

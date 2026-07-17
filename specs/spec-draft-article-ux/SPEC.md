@@ -53,7 +53,11 @@ discretion leaking into the owner-facing surface.
   options (e.g. pipeline flow / comparison / timeline / none needed), the
   fallback-ladder table-vs-diagram choice made here; (2) *source* — the
   concrete Mermaid/table/figure-spec for the chosen intent,
-  approve/modify/decline as today. Declining at step 1 skips step 2 and
+  approve/modify/decline as today; the payload's preview is a plain-text
+  structural sketch, with the concrete source written to the run workspace
+  and referenced by path (amended 2026-07-17, #307 — proposal-contract
+  section (g); raw fenced source never appears in the payload). Declining
+  at step 1 skips step 2 and
   omits the slot (no residue, unchanged). Opportunistic extras (≤2) follow
   the same two-step. Element-level sourcing rules (CAP-3 of
   SPEC-article-visuals) are unchanged.
@@ -79,4 +83,6 @@ discretion leaking into the owner-facing surface.
 - CAP-1 changes vocabulary only; the closed framework set, GATE slots, and
   slot contracts are untouched.
 - CAP-4's order applies to *presentation*; selection priority (NEEDS-OWNER
-  first, policy seeds, generic; GATE-slot tie-break; ≤5 cap) is unchanged.
+  first, policy seeds, generic; one slot reserved for the highest-priority
+  valid tension item when any exist — amended 2026-07-17, #302; GATE-slot
+  tie-break; ≤5 cap) is otherwise unchanged.

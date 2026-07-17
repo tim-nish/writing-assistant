@@ -86,6 +86,19 @@ python3 -c "print('---\nslug: w\naudience: en-practitioner\n---\n# t\n\n' + ' '.
 python3 "$DP" quality-gate --draft "$work/wall.md" | jget 'd["dimensions"]["dim4"]["verdict"]' | grep -q fail \
   && ok "a wall-of-text paragraph fails dim4 (mechanical)" || err "wall of text passed dim4"
 
+# #303 — an unparseable judge file is a distinct named error (exit 2), never a
+# per-dimension "no judge verdict" fail: format mismatch must be
+# distinguishable from a genuine rubric failure.
+printf 'dimension 1: pass\ndimension 2: pass\ndimension 3: pass\n' > "$work/judge-prose.txt"
+rc=0; errout=$(python3 "$DP" quality-gate --draft "$work/good.md" --map "$work/good-map.txt" --judge "$work/judge-prose.txt" 2>&1 >/dev/null) || rc=$?
+[ "$rc" -eq 2 ] && ok "prose-form judge verdicts exit 2 (unparseable), not a dimension fail" \
+  || err "prose-form judge verdicts exited $rc, expected 2"
+echo "$errout" | grep -q 'judge verdicts unparseable' && ok "unparseable-judge error is named" || err "unparseable-judge error not named"
+printf 'dim1: pass\ndim3: pass\n' > "$work/judge-missing.txt"
+rc=0; python3 "$DP" quality-gate --draft "$work/good.md" --map "$work/good-map.txt" --judge "$work/judge-missing.txt" >/dev/null 2>&1 || rc=$?
+[ "$rc" -eq 2 ] && ok "a judge file missing a dimension exits 2 (incomplete = unparseable)" \
+  || err "missing-dimension judge file exited $rc, expected 2"
+
 # Story 13.41 — audience presence is a stage-progression precondition: a draft
 # with an unfilled (or absent) `audience` fails the gate mechanically.
 sed 's/^audience:.*/audience: {audience}/' "$work/good.md" > "$work/noaud.md"

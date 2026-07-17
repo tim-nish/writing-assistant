@@ -33,15 +33,39 @@ owner arbitration) to visual content rather than inventing a parallel regime.
     is omitted entirely, never left as a placeholder.
   - **success:** A produced draft's visuals match the framework's declared
     slots; a draft with a declined slot contains no placeholder residue.
-- **CAP-2** (proposal, not insertion)
+- **CAP-2** (proposal, not insertion; amended 2026-07-17, #311)
   - **intent:** During framework fill, the pipeline proposes each slot visual
     — and at most 2 opportunistic extras — as an arbitratable item per
     SPEC-writing-assistant's owner-facing proposal contract: rationale,
     preview (Mermaid source, table, or figure spec), and choices stating
     their concrete effect on the article. The author approves, modifies, or
-    declines.
+    declines. When a ratified visual-set plan exists (CAP-2a), individual
+    proposals follow it.
   - **success:** No visual enters a draft without an explicit approval; every
     proposal shows rationale + preview + concrete-effect choices.
+- **CAP-2a** (visual-set planning; added 2026-07-17, #311 — owner-approved)
+  - **intent:** Before any individual visual proposal, the pipeline proposes
+    the article's visual set as a whole — one owner-ratified item under the
+    proposal contract — enumerating: **how many** visuals (0..cap; zero is a
+    valid plan, never padded), and per member its **communicative role** (what
+    part of the argument it carries), **required elements**
+    (nodes/relationships/rows the role demands), **format** (the CAP-4
+    table-vs-diagram rule and fallback ladder applied per member),
+    **placement** (framework slot or section), and **per-element evidence
+    pointers** (commit-pinned or interview-answer ids, per CAP-3; unsupported
+    elements route to `[VERIFY]`/NEEDS-OWNER). The plan recommends multiple
+    visuals only when distinct parts of the argument materially benefit —
+    the step makes the set deliberate, never larger. Total planned members ≤
+    the declared slot + 2 opportunistic extras (CAP-2's cap stands; the plan
+    proposes within it, never raises it). The owner ratifies, modifies
+    (add/remove/re-role members within the cap, without re-litigating
+    approved members), or declines; declining the whole plan degrades to the
+    per-slot flow, and a declined member leaves no placeholder residue.
+  - **success:** A run presents the set-level proposal before the first
+    individual visual proposal; a plan exceeding the cap is refused; a
+    zero-visual plan completes with no residue and no padding; per-visual
+    machinery downstream (CAP-2/3/4, the no-rendering constraint) is
+    observably unchanged.
 - **CAP-3** (sourced visuals)
   - **intent:** Every element of a proposed visual is source-pointed like a
     fact-sheet entry or the proposal carries `[VERIFY]`; unverifiable
