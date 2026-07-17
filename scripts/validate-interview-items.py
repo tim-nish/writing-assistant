@@ -39,6 +39,26 @@ Rejection classes (each has a fixture under fixtures/interview-items/):
       in the seed quote, the question adds no tension and is rejected.
   R5  `gap_type` outside the closed vocabulary.
 
+Recommended-default items (Story 13.59, SPEC-policy-editorial-direction CAP-6)
+carry an optional `recommended_default` — a policy-recalled position offered as
+a proposed default the owner ratifies (approve/modify/replace/skip), for an
+*editorial-judgment* gap only. It is a distinct shape from a tension seed and
+keeps `owner_answer` structurally empty at generation (R1 still applies). Its
+own rejection classes, distinct from R1/R5:
+
+  R6  a `recommended_default` on an INELIGIBLE gap type — a default is offered
+      only for the editorial-judgment classes (opinion, significance, surprise,
+      tradeoff, warning, audience); every other NEEDS-OWNER class (motivation,
+      retrospective, and by construction the factual/numerical/repository-state/
+      verification gaps that never become editorial-judgment items) is
+      ineligible and its default is rejected.
+  R7  a `recommended_default` on a TENSION-typed item — tension questions are
+      owner-only by nature (NFR15) and never carry a default.
+  R3  also covers a `recommended_default` that is not auditable: a missing
+      proposed-answer text, an empty recalled quote, or a pointer that is
+      unpinned or outside the structural whitelist — the recalled position must
+      resolve at its pin exactly like a seed (invariant 3, audited).
+
 Input: a JSON array of items (or {"items": [...]}) from a file argument or
 stdin (`-`). Output: silent + exit 0 when every item passes; else one
 `[<item id>] R<n>: <reason>` line per rejection on stderr and exit 1.
@@ -55,6 +75,14 @@ NEEDS_OWNER_TAXONOMY = {
 }
 TENSION_TYPES = {"contradiction", "ambiguity", "missing-rationale", "reversal-candidate"}
 GAP_TYPES = NEEDS_OWNER_TAXONOMY | TENSION_TYPES
+
+# The editorial-judgment classes eligible for a policy-recalled recommended
+# default (SPEC-policy-editorial-direction CAP-6, Story 13.59). A subset of the
+# NEEDS-OWNER taxonomy: `motivation` and `retrospective` are deliberately out,
+# and every tension type is out (owner-only, NFR15).
+ELIGIBLE_DEFAULT_TYPES = {
+    "opinion", "significance", "surprise", "tradeoff", "warning", "audience",
+}
 
 # The structural read whitelist, as a pointer grammar: only files the bounded
 # reader (read-policy-source.py) can have read are quotable, and every pointer
@@ -166,6 +194,34 @@ def validate_items(items):
                     and is_restatement(str(item["question"]), seed["quote"]):
                 rej("R4", "question merely restates its seed — confirmation is "
                           "not a gap type; ask the tension, not the quote")
+        # Recommended default (Story 13.59) — an optional, policy-recalled
+        # proposed answer for an editorial-judgment gap. Absent by default, so
+        # every existing item shape is byte-identical to before.
+        rd = item.get("recommended_default")
+        if rd is not None:
+            if gap_type in TENSION_TYPES:
+                rej("R7", f"a recommended default on tension type {gap_type!r} is "
+                          "rejected — tension questions are owner-only (NFR15) and "
+                          "never carry a default")
+            elif gap_type not in ELIGIBLE_DEFAULT_TYPES:
+                rej("R6", f"a recommended default on gap type {gap_type!r} is "
+                          "rejected — only editorial-judgment classes are eligible "
+                          f"({', '.join(sorted(ELIGIBLE_DEFAULT_TYPES))})")
+            # Auditability holds regardless of eligibility (invariant 3): the
+            # recalled position must carry a proposed answer, a quote, and a
+            # pinned whitelist pointer, or it is not offerable.
+            if not isinstance(rd, dict) or not str(rd.get("default", "")).strip():
+                rej("R3", "recommended_default has no proposed answer text — "
+                          "nothing for the owner to ratify")
+            else:
+                if not str(rd.get("quote", "")).strip():
+                    rej("R3", "recommended_default has no recalled quote — the "
+                              "proposed default is not auditable")
+                if not POINTER_RE.match(str(rd.get("pointer", "")) or ""):
+                    rej("R3", f"recommended_default pointer {rd.get('pointer')!r} is "
+                              "missing, unpinned, or outside the whitelist — a "
+                              "recalled position must resolve at its pin like a seed")
+
         if not str(item["question"]).strip() and not any(
                 r[0] == iid and r[1] == "R4" for r in rejections):
             rej("R5", "question is empty")

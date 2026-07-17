@@ -1,0 +1,11 @@
+[
+  {"id": "t9", "gap_type": "contradiction",
+   "seed": {"quote": "report trust must be enforced by a mechanism",
+            "pointer": "LESSONS.md:41@8f3c2d1e4a5b6c7d8e9f0a1b2c3d4e5f60718293"},
+   "recommended_default": {
+     "default": "keep the mechanism-over-prompt stance",
+     "quote": "report trust must be enforced by a mechanism",
+     "pointer": "LESSONS.md:41@8f3c2d1e4a5b6c7d8e9f0a1b2c3d4e5f60718293"},
+   "question": "Your draft argues prompt discipline suffices — what changed since the mechanism position?",
+   "owner_answer": ""}
+]

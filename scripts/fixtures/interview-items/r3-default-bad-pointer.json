@@ -1,0 +1,9 @@
+[
+  {"id": "d4", "gap_type": "warning", "seed": null,
+   "recommended_default": {
+     "default": "warn readers the seam is read-only and one-way",
+     "quote": "the seam never writes",
+     "pointer": "LESSONS.md:22"},
+   "question": "What caveat must a reader know before adopting this?",
+   "owner_answer": ""}
+]
