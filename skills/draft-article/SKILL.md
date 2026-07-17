@@ -608,19 +608,33 @@ for variants and review), one line per sentence keyed by paragraph/sentence
 position:
 
 ```
-P4.S2: derived <- fs-12, fs-14
-P4.S3: narration
-P4.S4: sourced <- fs-15
-P4.S5: verify            # sentence carries an inline [VERIFY] in the draft body
+P4.S2[L31]: derived <- fs-12, fs-14
+P4.S3[L32]: narration
+P4.S4[L33]: sourced <- fs-15
+P4.S5[L34]: verify       # sentence carries an inline [VERIFY] in the draft body
 ```
 
-Structurally validate it (each class's pointer contract) and write it to `$WS`:
+**Every position carries a line anchor — `[L<line>]` (#304).** It is the
+1-based physical line of the draft where that sentence starts. Without it, the
+isolated judge has to **re-derive** the `P{n}.S{n}` numbering by applying the
+skip rules (frontmatter, headings, blockquotes, mermaid, the pointer block);
+three judges did exactly that over one draft and each produced a *different*
+numbering, then returned confident verdicts about sentences that were not at
+the positions they named. The map is machine-generated and the draft is fixed
+at grading time, so make the judge **match**, never derive.
+
+Structurally validate it — pass `--draft` so the anchors are checked against
+the draft they claim to describe — and write it to `$WS`:
 
 ```
-python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py provenance --map <map> && cp <map> "$WS/provenance-map.txt"
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py provenance --map <map> --draft <draft> \
+  && cp <map> "$WS/provenance-map.txt"
 ```
 
-`sourced` carries ≥1 pointer, `derived` ≥2, `narration`/`verify` none.
+`sourced` carries ≥1 pointer, `derived` ≥2, `narration`/`verify` none. With
+`--draft`, a position with no anchor — or one resolving outside the draft or to
+a blank line — is a structural failure: a map a judge cannot locate is not
+gradeable.
 
 **Independent verify-provenance (Story 11.2, NFR13).** The map is then graded by
 `verify-provenance` — a **standalone** check that does **not** share this
@@ -631,8 +645,20 @@ the harness Task tool, never as an inline continuation of this context:
 
 ```
 python3 ${CLAUDE_PLUGIN_ROOT}/scripts/verify-provenance.py --map "$WS/provenance-map.txt" \
-  --fact-sheet "$WS/fact-sheet-ids.txt" --judge-findings "$WS/provenance-verdicts.txt"
+  --draft <draft> --fact-sheet "$WS/fact-sheet-ids.txt" \
+  --judge-findings "$WS/provenance-verdicts.txt"
 ```
+
+**Hand the judge anchored text, and have it echo what it graded (#304).** Build
+the judge's worklist with `--draft` so each position arrives with its anchored
+line verbatim — `P4.S3 [L32]: <the sentence>` — and instruct the judge to return
+`POS ~ "<the sentence it graded>": <reason>`. The echo is what makes a
+*mislocated* verdict detectable from the record alone: a judge that graded the
+wrong sentence still returns a confident finding, and `verify-provenance`
+discards it with a named `ANCHOR MISMATCH` instead of passing it through as a
+real defect. `POS: <reason>` (no echo) still parses; the mismatch check simply
+cannot run on it. This costs the judge nothing — it is quoting text it was
+already handed.
 
 It resolves every `derived` (and `sourced`) pointer against the declared
 fact-sheet entries **mechanically**, and consumes the **isolated judge
@@ -1045,7 +1071,7 @@ pipeline order. This is the authoritative flag list — consult it instead of
 | `interview` | 2 | Build the bounded gap-interview question set for the framework | `--framework` (req) `<state\|->` |
 | `answer` | 2 | Record one owner answer (single form), or validate a batch | `--id` `--disposition` `--text` `--pointer` (repeatable) `--batch` |
 | `journal` | 2 | Write the interview journal (triage record, Story 10.4) | `--interview` (req) `--answers` |
-| `provenance` | 3 | Parse + structurally validate the sidecar provenance map | `--map` `--count` |
+| `provenance` | 3 | Parse + structurally validate the sidecar provenance map | `--map` `--count` `--draft` |
 | `quality-gate` | 3→4 | The mandatory quality gate; non-zero exit blocks Stage 4 (Story 11.4) | `--draft` `--map` `--judge` |
 | `verify-markers` | 3/4 | Validate `[VERIFY: reason]` markers; `--count` prints the count (drive to 0) | `<draft\|->` `--count` |
 | `verify` | 4 | Build the owner verification worklist, one entry per marker | `<draft\|->` |

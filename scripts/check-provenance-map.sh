@@ -17,6 +17,8 @@ root=$(git rev-parse --show-toplevel 2>/dev/null) || {
 cd "$root"
 
 DP="$root/scripts/draft-pipeline.py"
+work=$(mktemp -d); trap 'rm -rf "$work"' EXIT
+work_anch_draft="$work/anch-draft.md"
 SKILL="skills/draft-article/SKILL.md"
 fail=0
 err() { printf 'FAIL: %s\n' "$1" >&2; fail=1; }
@@ -83,6 +85,40 @@ echo "$duperr" | grep -q 'duplicate position key' && ok "duplicate diagnostic is
 echo "$duperr" | grep -q 'P12.S2' && echo "$duperr" | grep -q '1' && echo "$duperr" | grep -q '3' && echo "$duperr" | grep -q '4' \
   && ok "diagnostic lists the key and all occurrence lines" \
   || err "diagnostic missing key or occurrence line numbers: $duperr"
+
+# --- #304: anchors are validated against the draft they claim to describe -------
+cat > "$work_anch_draft" <<'MD'
+---
+slug: t
+audience: en-practitioner
+---
+# T
+
+Structured discovery halved our token bill.
+The bench recorded a 2x drop.
+MD
+# With --draft, a position without an anchor is a structural failure: a judge
+# could not locate it without re-deriving the numbering.
+printf 'P1.S1: sourced <- fs-1\n' | python3 "$DP" provenance --map - --draft "$work_anch_draft" >/dev/null 2>&1 \
+  && err "an unanchored position passed --draft validation" \
+  || ok "an unanchored position fails when a draft is supplied (#304)"
+printf 'P1.S1[L7]: sourced <- fs-1\n' | python3 "$DP" provenance --map - --draft "$work_anch_draft" >/dev/null 2>&1 \
+  && ok "an anchored position resolving to a real line passes" || err "valid anchor rejected"
+printf 'P1.S1[L99]: sourced <- fs-1\n' | python3 "$DP" provenance --map - --draft "$work_anch_draft" >/dev/null 2>&1 \
+  && err "an out-of-range anchor passed" || ok "an anchor outside the draft fails"
+printf 'P1.S1[L6]: sourced <- fs-1\n' | python3 "$DP" provenance --map - --draft "$work_anch_draft" >/dev/null 2>&1 \
+  && err "an anchor on a blank line passed" || ok "an anchor pointing at a blank line fails"
+# Backward compatible: without --draft, unanchored maps parse exactly as before.
+prov 'P1.S1: sourced <- fs-15' >/dev/null 2>&1 \
+  && ok "unanchored maps still parse when no draft is supplied (compat)" \
+  || err "anchor grammar broke unanchored maps"
+
+grep -q 'P4.S2\[L31\]' "$SKILL" && grep -qi 'line anchor' "$SKILL" \
+  && ok "SKILL: the map format carries a line anchor per position (#304)" \
+  || err "SKILL does not document the [L<line>] anchor"
+grep -qi 'match.*never derive\|make the judge \*\*match\*\*' "$SKILL" \
+  && ok "SKILL: states the judge must match, not re-derive" \
+  || err "SKILL missing the match-not-derive rationale"
 
 # Sidecar map is written to the run workspace, not inline.
 grep -q 'draft-pipeline.py provenance' "$SKILL" && grep -q 'provenance-map' "$SKILL" \
