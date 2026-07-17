@@ -68,6 +68,44 @@ sources are declared, name the machine-global path where the file belongs
 in the host repo, #211), and point the owner at
 `config/writing-sources.example.yaml`. Never widen scope to compensate.
 
+## 2b. Declared non-file sources — `github-issues` (Story 13.50)
+
+Source entries carry an optional `type` (Story 13.49). Enumerate the typed
+entries with:
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-writing-sources.py typed-sources --root <host-repo>
+```
+
+A declared `github-issues` entry harvests the **host repo's own issue
+tracker** — dogfood findings and owner-filed lessons become fact-sheet
+evidence. The read is **read-only and one-way**: list issues (e.g. `gh issue
+list --state all --json number,title,url,labels,state,body`, run against the
+host repo); **nothing is ever written** to any issue — no comment, no label,
+no state change. When the entry declares `labels:` patterns (e.g.
+`"tanuki:*"`), keep **only** issues carrying at least one matching label
+(shell-glob match against the label name); an unfiltered entry reads all
+issues. Issues are the only thing this source reads — it never widens file
+scope.
+
+- **SOURCE is the issue URL** — the existing URL pointer form, one fact per
+  claim: `- CLAIM / https://github.com/<owner>/<repo>/issues/<n> / KIND`.
+- **Recurrence counts and owner dispositions are data, not judgments.** An
+  issue stating a recurrence count or an owner disposition
+  (accepted/dismissed) has those fields **quoted as data with the fact** —
+  e.g. `- finding X, recurrence 4, dismissed by owner / <issue-url> / event` —
+  never converted into a pipeline judgment and never used to amplify a
+  claim's significance.
+- **Routing:** a finding the owner already dispositioned is a sourced fact
+  (fact sheet, URL SOURCE). An **open or deferred** finding is not yet owner
+  knowledge the pipeline may assert — route it to **NEEDS-OWNER** like any
+  other unconfirmed candidate, so the gap interview raises it.
+- **Degrade, never fail:** with no `github-issues` entry declared, behavior
+  is unchanged. With one declared but the API unreachable (no `gh`, offline,
+  auth failure), log **one line** — `github-issues source skipped: <reason>`
+  — and continue with the declared file sources. This source never turns a
+  harvest into a failure.
+
 ## 3. Extract facts, each as `CLAIM / SOURCE / KIND`
 
 Read the in-scope files and extract facts. **Read every file you cite fresh with

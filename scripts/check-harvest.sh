@@ -41,6 +41,23 @@ has "output contract" "defines a fact-sheet output contract"
 has "source pointer" "every fact carries a source pointer"
 grep -q 'path:line\|path/to/file:line' "$SKILL" && ok "contract shows a file:line pointer" || err "no pointer example"
 
+# 4b. github-issues typed source (Story 13.50): declared opt-in, read-only,
+#     URL-sourced facts, data-not-judgment, degrade-never-fail.
+has "typed-sources" "enumerates typed entries via the resolver"
+has "github-issues" "documents the github-issues source"
+has "read-only and one-way" "issue read is read-only, one-way"
+has "nothing is ever written" "nothing is written to any issue"
+has "SOURCE is the issue URL" "issue facts carry the issue URL as SOURCE"
+has "quoted as data with the fact" "recurrence/disposition quoted as data"
+has "never used to amplify" "counts never amplify a claim"
+has "NEEDS-OWNER" "open/deferred findings route to NEEDS-OWNER"
+has "github-issues source skipped" "unreachable API degrades with one logged line"
+has "Degrade, never fail" "degrade is never a failure"
+# The stage-2 triage side of the rule lives in the draft skill (not inference).
+grep -qF "Story 13.50" "skills/draft-article/SKILL.md" \
+  && ok "stage-2 triage states the issue-fact grounding rule" \
+  || err "draft-article triage missing the issue-fact rule"
+
 # --- behavioral: the source-scope enumerator (the enforced boundary) --------
 work=$(mktemp -d); trap 'rm -rf "$work"' EXIT
 mkdir -p "$work/host/src" "$work/host/.git" \

@@ -365,6 +365,14 @@ Where a question triaged **open** is in fact groundable from a fact-sheet
 owner statement), present it as **recommended** instead — this recommendation
 pass is a **view over the harvest output**, introducing no new unsourced material.
 
+**Issue-sourced facts follow the same rule, stated here so it is never left to
+inference (Story 13.50):** a fact harvested from a `github-issues` source that
+carries an **owner disposition** (accepted/dismissed) is eligible grounding for
+a recommended answer **exactly like any harvest fact** — the disposition is a
+sourced owner statement. Open or deferred findings never reach the fact sheet
+(harvest routes them to NEEDS-OWNER), so they surface as confirmed gaps here,
+not as grounding.
+
 Validated policy items join the candidate set as **asked** questions
 (`outcome: open`, `rationale: policy-seed`, their `seed` carried through): a
 tension between the material and a recorded position is owner-only by nature,
