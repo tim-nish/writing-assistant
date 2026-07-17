@@ -1,9 +1,9 @@
 [
   {"id": "t1", "gap_type": "contradiction",
-   "seed": {"quote": "\"AI generates full articles by combining 4-5 KUs\": rejected as generate-then-filter; output coherent but insight-free.",
-            "pointer": "topics/articles.md:36@91ec5c01e4a5b6c7d8e9f0a1b2c3d4e5f6071829",
-            "companion": {"quote": "Seed -> agent-evidence-assembly -> genre-template outline; the human writes only the opinionated/quotable paragraphs.",
-                          "pointer": "topics/articles.md:32@91ec5c01e4a5b6c7d8e9f0a1b2c3d4e5f6071829"}},
-   "question": "Your recorded pipeline puts the judgment gate at the interview, which the rejected pattern lacked entirely — does that boundary still hold when a run assembles seventeen facts before the gate, or does volume alone move a run toward the pattern you declined?",
+   "seed": {"quote": "\"the agent drafts a whole post by stitching several notes together\": declined — fluent output, no argument",
+            "pointer": "topics/example-topic.md:12@8f3c2d1e4a5b6c7d8e9f0a1b2c3d4e5f60718293",
+            "companion": {"quote": "Notes are assembled by the tool; the human supplies the argument and writes the quotable lines.",
+                          "pointer": "topics/example-topic.md:8@8f3c2d1e4a5b6c7d8e9f0a1b2c3d4e5f60718293"}},
+   "question": "Your recorded flow puts the judgment gate after assembly, which the declined pattern never had — does that boundary still hold when a run assembles far more material before the gate, or does volume alone move it toward what you declined?",
    "owner_answer": ""}
 ]

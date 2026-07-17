@@ -1,7 +1,7 @@
 [
   {"id": "t2", "gap_type": "reversal-candidate",
-   "seed": {"quote": "prose generation demoted to non-goal",
-            "pointer": "GLOSSARY.md:168@91ec5c01e4a5b6c7d8e9f0a1b2c3d4e5f6071829"},
-   "question": "This position was recorded before the drafting pipeline gained its readability rubric, and the pipeline now generates prose and gates it on that rubric — does the recorded non-goal still hold, or has it been overtaken?",
+   "seed": {"quote": "long-form output is out of scope for the toolchain",
+            "pointer": "GLOSSARY.md:23@8f3c2d1e4a5b6c7d8e9f0a1b2c3d4e5f60718293"},
+   "question": "This entry was recorded before the toolchain grew its readability gate, and it now produces long-form output and grades it — does the recorded scope still hold, or has it been overtaken?",
    "owner_answer": ""}
 ]
