@@ -394,8 +394,10 @@ The surviving (non-suppressed) questions are returned as `questions`, and are:
 Present a policy-seeded question under the same proposal contract as every
 other: its **Why** context is the seed — the verbatim quote plus its
 `file:line@commit` pointer — so the owner sees exactly which recorded position
-the question probes. Its primary input is bullet free-text, like any open
-question.
+the question probes. The quote is presented under the contract's **section-(g)
+plain-text conventions** (quoting by indentation, no fencing or emphasis
+markers; Story 13.48), keeping its `file:line@commit` pointer. Its primary
+input is bullet free-text, like any open question.
 
 **Presentation order is contract, not discretion (SPEC-draft-article-ux CAP-4,
 Story 13.30).** Ask the surviving questions in the pinned order the `interview`
@@ -723,11 +725,24 @@ residue (unchanged decline semantics).
 - **where** it lands in the outline (the framework slot, or the section an
   opportunistic visual would sit in);
 - **why** it is proposed (the rationale, now anchored to the approved intent);
-- a **preview** — the actual **Mermaid source**, **table**, or **figure spec** the
-  owner is approving;
-- **choices whose labels state their concrete effect** — *approve* → "insert this
-  visual", *modify* → "revise the source, then insert", *decline* → "omit the
-  visual; the slot leaves no `[Figure: …]` residue".
+- a **preview** — a **plain-text structural sketch** (elements, relations,
+  emphasis — figure-spec style; contract (g), Story 13.48), never raw Mermaid
+  or fenced source in the payload. Write the concrete **Mermaid/table source**
+  the owner is approving to the **run workspace** (`$WS/visuals/<slot>.mmd` or
+  `.md`) first, and show that **path** in the payload so the owner can open it
+  rendered;
+- **choices whose labels state their concrete effect** — *approve* → "insert
+  the source at the shown workspace path, exactly as written", *modify* →
+  "revise the source, then insert", *decline* → "omit the visual; the slot
+  leaves no `[Figure: …]` residue".
+
+**On approval, stage 3 inserts the workspace file's content exactly as
+written** — the sketch is presentation-only and is never re-derived into the
+draft; what the owner approved (the file at the shown path) is what lands.
+Visual-proposal payloads pass the contract-(e) validator **without
+exemption** — the plain-text marker gate (Story 13.47) applies to this surface
+like every other; the workspace path is what keeps fenced source out of the
+payload.
 
 **Insert nothing without explicit owner approval.** Opportunistic suggestions are
 **capped at 2 per draft** — the declared slot plus at most two extras, never

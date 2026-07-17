@@ -2,7 +2,8 @@
 # check-visual-proposals.sh — verify visuals are PROPOSED, not inserted, under the
 # owner-facing proposal contract (Story 8.2, SPEC-article-visuals CAP-2): each
 # framework slot plus up to 2 opportunistic extras is proposed with rationale, a
-# preview (Mermaid / table / figure spec), and concrete-effect choices; nothing is
+# preview (a plain-text structural sketch; concrete source in the run workspace,
+# referenced by path — Story 13.48), and concrete-effect choices; nothing is
 # inserted without explicit approval; opportunistic visuals are capped at 2.
 # POSIX shell.
 
@@ -32,8 +33,13 @@ hasin "$sec" 'owner-facing-proposal-contract' "proposals follow the owner-facing
 hasin "$sec" 'declared visual slot'           "proposes the framework's declared slot (Story 8.1)"
 hasin "$sec" 'rationale\|why.*proposed'       "proposal shows a rationale"
 hasin "$sec" 'preview'                        "proposal shows a preview"
-hasin "$sec" 'Mermaid'                        "preview may be Mermaid source"
-hasin "$sec" 'figure spec'                    "preview may be a figure spec"
+hasin "$sec" 'plain-text structural sketch'   "preview is a plain-text structural sketch (Story 13.48)"
+hasin "$sec" 'never raw Mermaid'              "raw/fenced Mermaid never appears in the payload"
+hasin "$sec" 'run workspace'                  "concrete source is written to the run workspace"
+hasin "$sec" 'path.*in the payload\|show.*path' "payload references the source by workspace path"
+hasin "$sec" 'exactly as written'             "approved source is used exactly as written (sketch never re-derived)"
+hasin "$sec" 'exemption'                      "visual payloads pass the plain-text validator without exemption"
+hasin "$sec" 'figure-spec\|figure spec'       "sketch is figure-spec style (elements, relations, emphasis)"
 hasin "$sec" 'concrete effect'               "choices state their concrete effect"
 hasin "$sec" 'never insert\|Insert nothing\|without explicit' "inserts nothing without approval"
 hasin "$sec" 'capped at 2\|at most two'       "opportunistic visuals capped at 2"
@@ -46,6 +52,18 @@ hasin "$sec" 'draft-grounded'                  "intent options are draft-grounde
 hasin "$sec" 'table-vs-diagram\|table over a diagram' "table-vs-diagram decided at the intent step"
 hasin "$sec" 'skips step 2\|skip step 2'       "declining at step 1 skips step 2"
 hasin "$sec" 'same two-step'                   "opportunistic extras follow the same two-step"
+
+# Story 13.48: a conforming step-2 payload (plain-text sketch + workspace path)
+# passes the contract-(e)/(g) validator; raw fenced Mermaid in the payload blocks.
+V="scripts/validate-proposal-payload.py"
+SKETCH='{"items":[{"where":"Section 3 (Architecture) - declared visual slot","why":"the pipeline stages and their order are argued in prose but never shown","choices":[{"label":"approve","effect":"insert the source at ws/visuals/architecture.mmd exactly as written"},{"label":"decline","effect":"omit the visual; the slot leaves no residue"}],"preview":"Sketch: boxes for harvest, draft, review; arrows left to right;\nemphasis on the gate between draft and review.\nSource: ws/visuals/architecture.mmd"}]}'
+printf '%s' "$SKETCH" | python3 "$V" >/dev/null 2>&1 \
+  && ok "plain-text sketch + workspace path payload is presentable" \
+  || err "conforming sketch payload was blocked"
+FENCED='{"items":[{"where":"Section 3","why":"y","choices":[{"label":"a","effect":"insert it"}],"preview":"```mermaid\ngraph LR; A-->B\n```"}]}'
+printf '%s' "$FENCED" | python3 "$V" >/dev/null 2>&1 \
+  && err "raw fenced Mermaid payload was NOT blocked" \
+  || ok "raw fenced Mermaid in the payload is blocked (no exemption)"
 
 if [ "$fail" -eq 0 ]; then
   printf '\nAll visual-proposal checks passed.\n'; exit 0
