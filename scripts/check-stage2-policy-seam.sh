@@ -153,6 +153,24 @@ grep -qi 'whole-surface authoring' "specs/spec-policy-source-seam/SPEC.md" \
 grep -q 'companion' "specs/spec-policy-source-seam/seam-formats.md" \
   && ok "seam-formats: seed.companion documented" || err "seam-formats missing seed.companion"
 
+# --- 7. #306 — a seed older than the material it contradicts is STALE, not live ----
+grep -qi 'Stale seed, not a live tension' "$SKILL" \
+  && ok "SKILL: staleness is distinguished from a live tension" \
+  || err "SKILL missing the stale-seed rule (#306)"
+grep -qi 'confirm or update' "$SKILL" \
+  && grep -qi 'reversal-candidate' "$SKILL" \
+  && ok "SKILL: a stale seed routes to reversal-candidate, asking confirm-or-update" \
+  || err "SKILL missing the staleness routing (#306)"
+grep -qi 'updated:' "$SKILL" && grep -qi "state:" "$SKILL" \
+  && ok "SKILL: staleness is decided from inputs the run already holds" \
+  || err "SKILL missing the existing-inputs rule (#306)"
+grep -qi 'proposes an update, not a resolution' "$SKILL" \
+  && ok "SKILL: a staleness answer stages a policy-update proposal, not a resolution" \
+  || err "SKILL missing the staging framing for staleness (#306)"
+grep -qi 'staleness routing' "specs/spec-policy-source-seam/SPEC.md" \
+  && ok "seam SPEC: staleness routing is contract (CAP-3)" \
+  || err "seam SPEC missing the staleness-routing rule"
+
 if [ "$fail" -eq 0 ]; then
   printf '\nAll stage-2 policy-seam checks passed.\n'; exit 0
 else

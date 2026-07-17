@@ -291,6 +291,20 @@ dependency; no exit code here may abort the run**:
   manufactured tension: it spends an owner-gate slot on nothing, and an answer
   to it contributes a "resolution" to a conflict that never existed.
 
+  **Stale seed, not a live tension (#306).** Before raising a conflict, compare
+  *when the seed was recorded* against *the material it appears to contradict*.
+  The inputs are already in hand — the surface's `updated:` dates and `state:`
+  lines, and the run's pin. When the seed **predates** the material (a glossary
+  entry updated before the behavior it describes matured), the honest reading is
+  a **stale recorded position**, not a live contradiction: route it to
+  `gap_type: reversal-candidate` and ask the owner to **confirm or update the
+  recorded position** — never ask them to adjudicate a conflict as if it were
+  live. Nothing else about the seam changes: same bounded read, same pin, same
+  proposal-only contribute-back. Manufactured tension is self-reinforcing — an
+  owner who answers a stale-seed question as though it were live contributes a
+  "resolution" to a conflict that was an artifact of staleness, so the routing
+  decision is what keeps the recall surface honest.
+
   **The line the discriminator usually turns on:** *harvest is evidence
   assembly; the interview is the judgment gate.* Assembling many source-pointed
   facts is not the same act as generating prose from them — the owner's answers
@@ -505,7 +519,16 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py staging-candidates \
 
 Each block mirrors the policy hub's staging-area frontmatter (`slug, created,
 source_repo, perishable, tags`) followed by the question and the owner's
-decision in full sentences (seam-formats.md §3). **This is where the tool
+decision in full sentences (seam-formats.md §3).
+
+**A staleness-routed item proposes an update, not a resolution (#306).** When
+the answered item was a `reversal-candidate` raised because its seed predated
+the material (above), the block's question and decision are framed as a
+**policy-update proposal for the stale line** — "this recorded position is out
+of date; here is what now holds" — never as the resolution of a live tension.
+The distinction matters downstream: the owner is being handed a candidate
+*correction* to a recorded position, and a block that framed it as a resolved
+conflict would record a dispute that never existed. **This is where the tool
 stops**: the blocks land in the run workspace only — the owner copies accepted
 ones into the hub's staging area by hand, and nothing is ever written under
 `policy_source.path`. A run with no answered tension questions emits nothing —
