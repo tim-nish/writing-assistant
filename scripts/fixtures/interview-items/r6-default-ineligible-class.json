@@ -1,0 +1,8 @@
+[
+  {"id": "d3", "gap_type": "motivation", "seed": null,
+   "recommended_default": {
+     "default": "because the manual pipeline kept losing decisions",
+     "quote": "the tool exists to stop stranding editorial decisions",
+     "pointer": "LESSONS.md:9@8f3c2d1e4a5b6c7d8e9f0a1b2c3d4e5f60718293"},
+   "question": "Why did you build this?", "owner_answer": ""}
+]

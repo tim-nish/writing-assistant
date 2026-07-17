@@ -64,6 +64,29 @@ n=$(printf '%s\n' "$msg" | grep -c 'R3:' || true)
 [ "$n" -eq 2 ] && ok "R3 catches out-of-whitelist AND unpinned pointers" \
   || err "R3 expected 2 rejections, got $n"
 
+# --- 2b. Recommended-default items (Story 13.59, CAP-6) ------------------------
+# A valid default on eligible editorial-judgment classes passes silently; the
+# item stays R1-clean (owner_answer empty at generation).
+set +e; out=$(python3 "$VAL" "$FIX/valid-recommended-default.json" 2>&1); rc=$?; set -e
+[ "$rc" -eq 0 ] && [ -z "$out" ] \
+  && ok "recommended default on eligible classes (audience, significance) passes" \
+  || err "valid-recommended-default: rc=$rc out='$out'"
+# Distinct rejection classes for an ineligible-class and a tension-item default.
+expect r6-default-ineligible-class.json R6 "default on an ineligible gap class"
+expect r7-default-on-tension.json       R7 "default on a tension type (owner-only)"
+expect r3-default-bad-pointer.json      R3 "recommended_default unpinned pointer"
+# A recommended default never smuggles a pre-decided answer past R1.
+set +e; msg=$(python3 - "$FIX/valid-recommended-default.json" <<'PY' 2>&1 >/dev/null
+import json,sys,subprocess
+items=json.load(open(sys.argv[1])); items[0]["owner_answer"]="solo devs"
+p=subprocess.run(["python3","scripts/validate-interview-items.py","-"],input=json.dumps(items),
+                 capture_output=True,text=True); sys.stderr.write(p.stderr); sys.exit(p.returncode)
+PY
+); rc=$?; set -e
+[ "$rc" -eq 1 ] && printf '%s' "$msg" | grep -q 'R1:' \
+  && ok "a recommended-default item still fails R1 if owner_answer is pre-filled" \
+  || err "recommended-default + pre-filled owner_answer: rc=$rc msg='$msg'"
+
 # --- 3. stdin form -------------------------------------------------------------
 set +e; printf '[]' | python3 "$VAL" - >/dev/null 2>&1; rc=$?; set -e
 [ "$rc" -eq 0 ] && ok "empty set from stdin passes" || err "stdin form rc=$rc"
