@@ -164,7 +164,7 @@ state = {"stage": "consume",
          "fact_sheet": [{"kind": "number", "claim": "the bench recorded a 2x drop"}],
          "needs_owner": [{"topic": t, "candidate": f"owner input on {t}",
                           "reason": "owner's opinion"} for t in topics]}
-sha = "91ec5c01e4a5b6c7d8e9f0a1b2c3d4e5f6071829"
+sha = "8f3c2d1e4a5b6c7d8e9f0a1b2c3d4e5f60718293"
 seeds = [("contradiction", "rejected as generate-then-filter",
           "Your pipeline assembles many facts before any prose exists — where does the judgment gate sit relative to the pattern you declined?"),
          ("reversal-candidate", "prose generation demoted to non-goal",

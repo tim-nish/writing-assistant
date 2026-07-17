@@ -3,7 +3,7 @@ id: SPEC-policy-realignment
 companions: []
 sources:
   # Policy-alignment review of this repo's specs/docs against the owner's
-  # pinned recall surface (pin 91ec5c01ac6f, 2026-07-16). Ratifying owner
+  # pinned recall surface (owner decision record — 2026-07-16). Ratifying owner
   # decision records are held in the owner's private knowledge hub,
   # retrievable by date + title. Mechanism public, provenance private.
 ---
@@ -30,7 +30,7 @@ companion file describing removed config keys, and two files predate the
 publication-boundary discipline the repo itself later ratified. Per the
 owner's recorded position that a spec must carry its own policy so
 implementation runs clean ("check policy where the decision is made";
-LESSONS.md:28@91ec5c01ac6f), these gaps are spec defects, not implementation
+owner lesson, recorded 2026-07-16), these gaps are spec defects, not implementation
 bugs.
 
 ## Findings (ranked)
@@ -97,7 +97,7 @@ bugs.
   repo'); owner-specific paths appear only in generated private config, never
   in repo files." Backed by the owner's publication-boundary position
   (repo boundaries follow publication boundaries;
-  LESSONS.md:53@91ec5c01ac6f) and the ratified precedent that the sibling
+  owner lesson, recorded 2026-07-16) and the ratified precedent that the sibling
   dogfood tool genericized the identical seam for publication (neutral
   defaults in repo files, the owner's real pointer in private machine-local
   config).
@@ -132,7 +132,7 @@ bugs.
   named configuration error; the companion contradicts both the ratified
   spec and shipped behavior. The owner's recorded position is that a copy
   drifting in content is exactly why pointers beat copies
-  (LESSONS.md:14@91ec5c01ac6f) — where the format must be restated, it must
+  (owner lesson, recorded 2026-07-16) — where the format must be restated, it must
   be restated current.
 - **amendment:** update seam-formats §1 to the path-only block plus the
   per-run topic-selection pointer (SPEC-policy-topic-at-draft CAP-2), fix
@@ -165,7 +165,7 @@ bugs.
   type is chosen by intent label; framework IDs "never appear in an
   owner-facing question, proposal, or summary"; the ID form is the
   internal/expert alias. Internal vocabulary reaching the user surface is a
-  lintable defect class (LESSONS.md:26@91ec5c01ac6f).
+  lintable defect class (owner lesson, recorded 2026-07-16).
 - **issue:** the README is an owner-facing surface; it leads with the
   internal form. (Specs, `pipeline-stages.md`, and
   `docs/article-frameworks/README.md` may keep IDs — they are the internal

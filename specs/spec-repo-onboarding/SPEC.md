@@ -79,10 +79,10 @@ degraded interview when `policy_source` was never considered.
   discoverability only; it adds no run-time prompt, warning, or requirement.
 - **C3 (agent-fed gate):** every value is proposed by the tool and approved
   by the human — the human is never asked to author the hardest input
-  (evidence-gate-must-be-agent-fed, LESSONS.md:44@173588733677).
+  (evidence-gate-must-be-agent-fed — owner lesson, recorded 2026-07-15).
 - **C4 (config not code):** the skill adds zero repo-specific assumptions to
   code; everything repo-specific lands in the declaration file
-  (portable-plugin-config-not-code, LESSONS.md:30@173588733677).
+  (portable-plugin-config-not-code — owner lesson, recorded 2026-07-15).
 - **C5 (one-time, not ceremony):** `setup` is a once-per-repo bootstrap; it
   is never required on subsequent runs and never becomes a recurring
   invocation step (respects the pull-ceremony decline,

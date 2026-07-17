@@ -11,7 +11,7 @@ evidence pair replacing the suggested fix — this pass proposes no diffs:
   article:  "papers proves pull-based agent commands are the durable pattern."
             (drafts/intro.md:41)
   policy:   "Agent workflows must be push-based — scheduled, headless, …"
-            (LESSONS.md:39@6357d9f…)
+            (LESSONS.md:39@8f3c2d1…)
   issue: the draft asserts the opposite of the recorded push-based position.
 ```
 
@@ -34,7 +34,7 @@ Same grammar as the interview seam's (seam `seam-formats.md` §4), mapping
 checked policy lines to findings instead of questions:
 
 ```
-consulted: policy-hub@6357d9f… — LESSONS.md:39 → finding 1; GLOSSARY.md:123 → (no conflict)
+consulted: policy-hub@8f3c2d1… — LESSONS.md:39 → finding 1; GLOSSARY.md:123 → (no conflict)
 ```
 
 Skipped-pass runs emit `consulted: none (policy_source unset)` or
