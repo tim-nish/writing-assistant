@@ -937,7 +937,18 @@ def _project_variant(fields, body, profile, owner_values):
 
 
 def _git_toplevel():
-    """realpath of the git toplevel of cwd, or None (mirrors the resolvers)."""
+    """realpath of the git toplevel of cwd, or None.
+
+    The None return is INTENTIONAL and deliberately unlike the mirrored
+    resolvers' exit-2 contract (#309, reconciled 2026-07-17). It has exactly one
+    caller: the `--create-out` guard, which asks "is this output directory
+    inside the host repo?" to decide whether writing there needs explicit
+    consent. Outside a git repo the honest answer is "not inside the host", and
+    the guard then demands consent — the safe branch. Exiting 2 there would
+    abort a legitimate run over a question the guard is allowed to answer
+    conservatively. It is NOT a host-root resolver and must not be used as one:
+    resolution goes through resolve-paths.host_root, which fails closed.
+    """
     r = subprocess.run(["git", "rev-parse", "--show-toplevel"],
                        capture_output=True, text=True)
     top = r.stdout.strip()
@@ -1929,7 +1940,8 @@ def cmd_consume(args):
 
 
 def cmd_start(args):
-    state, code = _run_state(args.framework, args.sources, args.root)
+    _rp = _load("resolve-paths.py")
+    state, code = _run_state(args.framework, args.sources, _rp.host_root(args.root))
     if state is None:
         return code
     print(json.dumps(state, indent=2))
@@ -2069,7 +2081,13 @@ def _entry_gate_ok(key, framework_file, root):
     # precondition ("GATE (entry) — ... the project has a tagged release ...").
     if key == "f1" and "GATE (entry)" in head and "tagged release" in head:
         try:
-            r = subprocess.run(["git", "tag"], cwd=(root or None),
+            # `cwd=root` — never `root or None` (#309). Falling back to None ran
+            # `git tag` against the RAW PROCESS CWD while workspace and config
+            # resolution used the resolved toplevel, so invoked from a
+            # subdirectory (or with cwd outside the repo) the gate could check a
+            # different directory than the run was keyed to. Callers resolve the
+            # root before calling; one root per run, no side channel.
+            r = subprocess.run(["git", "tag"], cwd=root,
                                capture_output=True, text=True)
             has_tag = r.returncode == 0 and r.stdout.strip() != ""
         except OSError:
@@ -2087,6 +2105,9 @@ def _entry_gate_ok(key, framework_file, root):
 
 
 def _run_state(framework, sources, root=None):
+    # `root` MUST already be resolved (resolve-paths host_root) — the entry gate
+    # below runs git against it, and a raw --root string or None would reopen
+    # the side channel #309 closed. Callers resolve once, then pass it down.
     """Build the stage-0 run-state (framework + classified sources), or return
     (None, exit_code) on a framework error — shared by `start` and `stage0`."""
     key = resolve_framework(framework)
@@ -2133,17 +2154,19 @@ def cmd_stage0(args):
     rc = subprocess.run(cmd).returncode
     if rc != 0:
         return rc
+    # ONE resolution for the whole of stage 0 (#309): the entry gate, the
+    # target line, and the workspace all key to this same value. Resolving
+    # twice would be two chances to disagree.
+    rp = _load("resolve-paths.py")
+    root = rp.host_root(args.root)
     # 2. Framework check + entry-gate precondition (before minting a workspace).
-    run_state, code = _run_state(args.framework, args.sources, args.root)
+    run_state, code = _run_state(args.framework, args.sources, root)
     if run_state is None:
         return code
     # 3. Workspace autostart (mint or resume).
-    rp = _load("resolve-paths.py")
-    root = rp.host_root(args.root)
     # The resolved target rides in stage 0's output so the run's first
     # owner-visible line can name the repository it is about to operate on —
     # before scope is read, a workspace is minted, or a token is spent (#309).
-    # One root per run: everything below keys to this same value.
     out = {"config_ok": True, "target": root, "run_state": run_state}
     out.update(_autostart(root))
     print(json.dumps(out, indent=2))
