@@ -1,0 +1,15 @@
+[
+  {"id": "rc1", "gap_type": "reconciliation",
+   "seed": {"quote": "Website stays independent — reference records only.",
+            "pointer": "topics/articles.md:17@cb43caf4a5b6c7d8e9f0a1b2c3d4e5f607182931"},
+   "positions": [
+     {"quote": "Website stays independent — reference records only.",
+      "pointer": "topics/articles.md:17@cb43caf4a5b6c7d8e9f0a1b2c3d4e5f607182931",
+      "authority": "policy"},
+     {"quote": "syndication.policy.en.mode: canonical",
+      "pointer": "syndication.policy.en.mode@1f2e3d4c5b6a",
+      "authority": "config"}
+   ],
+   "question": "Which position governs the EN topology — the recorded records-only line or the canonical config?",
+   "owner_answer": ""}
+]

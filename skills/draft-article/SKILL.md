@@ -398,13 +398,61 @@ dependency; no exit code here may abort the run**:
   halt and report it like any CAP-5 finding (this cannot happen after a clean
   `stage0`).
 
+### Policy-result classification — CAP-7, before any owner question (Story 13.75)
+
+After authoring the policy items and **before** running `interview`, classify
+the served policy result against the authoritative user config
+(SPEC-policy-source-seam CAP-7, added 2026-07-18, #365). This is a
+**mechanical pre-step** — a deterministic pass over a declarative
+comparable-subjects table, never an LLM judgment:
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py classify-policy \
+  --surface "$WS/policy-surface.txt" --root "$HOST" \
+  --items "$WS/policy-items.json" > "$WS/policy-classified.json"
+```
+
+Every candidate subject lands in exactly one of CAP-7's four classes —
+`determined` / `constrained` / `open` / `conflict` (the first two are
+structurally present in the output and empty until the subject table grows;
+the shipped detector covers the EN-topology regression as `conflict`). Pass
+the output's `interview_items` array (reconciliation items first, then the
+open pass-throughs) as the `--items` file below, and carry its
+`journal_records` into the run record. Three contracts hold:
+
+- **A conflict subject is presented ONLY as the emitted reconciliation
+  question** — a `gap_type: reconciliation` item whose `positions` array
+  carries every disagreeing side (`{quote, pointer, authority ∈
+  policy|config|repo}`; seam-formats.md §2) — **never as an ordinary
+  content-preference question whose candidates smuggle the conflict in**. The
+  classifier marks the original tension item `superseded_by_reconciliation`
+  and drops it from the pass-through; do not re-add it. (This is the
+  2026-07-18 regression: a policy-incompatible records-only answer was
+  offered as an ordinary candidate, selected, and shipped unreconciled
+  against `syndication.policy` EN-canonical config.)
+- **Owner judgment is never pre-decided — the structural exemption.** An item
+  whose gap_type is a judgment class (`opinion`, `significance`, `surprise`,
+  `tradeoff`, `warning`, `audience`, `motivation`, `retrospective`) always
+  classifies `open` and passes through untouched, even when its text matches
+  a conflict subject: for judgment questions the "questions only" rule stands
+  whole and no class other than open/conflict may apply.
+- **An owner answer that reverses a served ratified line is a proposed policy
+  change, not policy.** It routes to the staging-candidate emitter (below) as
+  a config↔policy reconciliation decision, and is **never treated as current
+  policy by later stages of the same run** — the plan-side conformance gate
+  that enforces this at draft time is Story 13.76's, not this step's.
+
 Then select the interview questions from the stage-1 state (with policy items
 when the probe produced them):
 
 ```
 python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py interview --framework <F> \
-  [--items "$WS/policy-items.json"] <state>
+  [--items "$WS/policy-classified-items.json"] <state>
 ```
+
+(where `policy-classified-items.json` is the classifier output's
+`interview_items` array; on a run with no policy items at all, skip
+`classify-policy` and `--items` alike)
 
 **Three-outcome triage over the harvest output (Story 10.2).** Every candidate
 question is triaged against the harvest output **only** — the fact sheet and the
@@ -458,7 +506,10 @@ The surviving (non-suppressed) questions are returned as `questions`, and are:
   for — and the loss is silent: the editorial anchor falls back to a routine
   slot answer (`policy_seeded: false`) and contribute-back emits an empty file.
   With no valid tension item, selection is exactly as before — no slot is held
-  open and nothing is padded;
+  open and nothing is padded. A **reconciliation item counts as a
+  tension-priority item** here (Story 13.75): it ranks at least as high as a
+  policy-seeded tension question for both the priority order and the reserved
+  slot, and its `positions` ride into the journal like a seed does;
 - **at most 5**, and **zero** when harvest already covers everything — never
   padded to five.
 
@@ -661,6 +712,15 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py staging-candidates \
 Each block mirrors the policy hub's staging-area frontmatter (`slug, created,
 source_repo, perishable, tags`) followed by the question and the owner's
 decision in full sentences (seam-formats.md §3).
+
+**An answered reconciliation question emits a config↔policy reconciliation
+block (Story 13.75, CAP-7).** When the owner answered a `reconciliation` item
+(dispositions `answered`/`modified`/`replaced`), the emitter frames its block
+as the **config↔policy reconciliation decision**, citing every position it
+decided between (the served line at the pin, the config key at its
+configVersion). The owner's answer is a **proposed policy change** for
+whichever record lost — it is never treated as current policy by this run's
+later stages (the plan-gate enforcement is Story 13.76's).
 
 **A staleness-routed item proposes an update, not a resolution (#306).** When
 the answered item was a `reversal-candidate` raised because its seed predated

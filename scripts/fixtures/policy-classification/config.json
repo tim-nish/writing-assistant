@@ -1,0 +1,8 @@
+{
+  "syndication": {
+    "policy": {
+      "en": {"mode": "canonical", "variants": ["devto"]},
+      "ja": {"mode": "source", "variants": []}
+    }
+  }
+}
