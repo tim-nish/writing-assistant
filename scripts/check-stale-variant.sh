@@ -51,7 +51,8 @@ A claim.
 EOF
 mkdir -p "$work/o"
 
-emit() { python3 "$DP" variants "$work/draft.md" --config-json "$work/cfg.json" \
+emit() { python3 "$DP" variants "$work/draft.md" --allow-external-draft \
+           --config-json "$work/cfg.json" \
            --root "$work/host" --out "$work/o" --platforms devto >/dev/null; }
 staleness() { python3 "$DP" variant-staleness "$work/draft.md" --out "$work/o" --root "$work/host"; }
 

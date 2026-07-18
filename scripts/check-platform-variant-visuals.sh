@@ -81,7 +81,8 @@ mkdir -p "$work/o"
 
 # 2. Profile-driven mechanism — html-comment-blocked (dev.to): the emitter wraps
 #    the Mermaid block and raises a render blocker.
-out=$(python3 "$DP" variants "$work/en.md" --config-json "$work/cfg-en.json" \
+out=$(python3 "$DP" variants "$work/en.md" --allow-external-draft \
+        --config-json "$work/cfg-en.json" \
         --root "$work/host" --out "$work/o" --platforms devto)
 printf '%s' "$out" | python3 -c '
 import json,sys; d=json.load(sys.stdin)
@@ -94,7 +95,8 @@ grep -q '<!-- render blocker' "$work/o/p.devto.md" \
 
 # 3. Profile-driven mechanism — mermaid-embedded (Zenn): the emitter leaves the
 #    Mermaid block inline and raises no blocker.
-out=$(python3 "$DP" variants "$work/ja.md" --config-json "$work/cfg-ja.json" \
+out=$(python3 "$DP" variants "$work/ja.md" --allow-external-draft \
+        --config-json "$work/cfg-ja.json" \
         --root "$work/host" --out "$work/o" --platforms zenn)
 printf '%s' "$out" | python3 -c '
 import json,sys; d=json.load(sys.stdin)
@@ -103,12 +105,14 @@ assert "render_blockers" not in d, d' \
 grep -q '```mermaid' "$work/o/p.zenn.md" \
   && ok "mermaid-embedded profile → Mermaid left inline" || err "Mermaid not left inline"
 
-# 4. The SKILL still documents the ratified per-platform behavior (unchanged).
-sec=$(awk '/^### Visual rendering per platform/{f=1} f && /^#{2,3} / && !/Visual rendering per platform/{exit} f{print}' "$SKILL")
+# 4. The standalone variants skill file (Story 13.69) still documents the
+#    ratified per-platform behavior (unchanged contract, moved carrier).
+VARIANTS="skills/draft-article/variants.md"
+sec=$(awk '/^## Visual rendering per platform/{f=1} f && /^#{1,3} / && !/Visual rendering per platform/{exit} f{print}' "$VARIANTS")
 printf '%s\n' "$sec" | grep -qi 'Zenn' && printf '%s\n' "$sec" | grep -qi 'embeds.*Mermaid' \
-  && ok "SKILL documents Zenn embeds Mermaid natively" || err "SKILL Zenn behavior missing"
+  && ok "variants.md documents Zenn embeds Mermaid natively" || err "variants.md Zenn behavior missing"
 printf '%s\n' "$sec" | grep -qi 'dev.to' && printf '%s\n' "$sec" | grep -qi 'HTML comment' \
-  && ok "SKILL documents dev.to HTML-comment + blocker" || err "SKILL dev.to behavior missing"
+  && ok "variants.md documents dev.to HTML-comment + blocker" || err "variants.md dev.to behavior missing"
 
 if [ "$fail" -eq 0 ]; then
   printf '\nAll platform-variant-visual checks passed.\n'; exit 0

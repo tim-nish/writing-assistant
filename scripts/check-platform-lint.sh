@@ -58,7 +58,7 @@ mkdir -p "$work/o"
 
 # 1. Validator convergence (#206/NFR18): a variant the pipeline emits passes its
 #    own lint — the packaging step and the lint read the same profile values.
-python3 "$DP" variants "$work/en.md" --config-json "$work/cfg.json" \
+python3 "$DP" variants "$work/en.md" --allow-external-draft --config-json "$work/cfg.json" \
   --root "$work/host" --out "$work/o" --platforms devto >/dev/null
 if python3 "$LINT" "$work/o/retry-storms.devto.md" --root "$work/host" --ws "$work" >/dev/null 2>&1; then
   ok "a pipeline-emitted variant passes its own lint (validator convergence)"

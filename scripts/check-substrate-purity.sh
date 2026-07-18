@@ -44,14 +44,14 @@ else
   ok "the profile machinery is generic (no hardcoded platform)"
 fi
 
-# 3. The substrate skill sections (everything BEFORE `## Stage 5`) name no
-#    platform — Stage 5 alone may reference platforms in prose.
-substrate=$(awk '/^## Stage 5 — platform-ready variants/{exit} {print}' "$SKILL")
-if printf '%s\n' "$substrate" | grep -niE "$PAT" >/dev/null 2>&1; then
-  err "platform identifiers in the substrate skill sections (before Stage 5):"
-  printf '%s\n' "$substrate" | grep -niE "$PAT" >&2
+# 3. The draft-flow skill names no platform anywhere (Story 13.69: variant
+#    emission moved to the standalone variants.md, which alone may reference
+#    platforms in prose).
+if grep -niE "$PAT" "$SKILL" >/dev/null 2>&1; then
+  err "platform identifiers in the draft-flow skill (they belong in variants.md):"
+  grep -niE "$PAT" "$SKILL" >&2
 else
-  ok "substrate skill sections (stages 0–4) name no platform"
+  ok "draft-flow skill (stages 0–4 + completion) names no platform"
 fi
 
 # 4. "Add a fresh platform" gate — a synthetic third platform emits with ZERO
@@ -98,7 +98,8 @@ topics: [a, b]
 Prose.
 EOF
 mkdir -p "$work/o"
-out=$(python3 "$DP" variants "$work/draft.md" --config-json "$work/cfg.json" \
+out=$(python3 "$DP" variants "$work/draft.md" --allow-external-draft \
+        --config-json "$work/cfg.json" \
         --root "$work/host" --out "$work/o" --platforms hashnode)
 printf '%s' "$out" | python3 -c '
 import json,sys; d=json.load(sys.stdin)

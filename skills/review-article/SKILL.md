@@ -51,13 +51,24 @@ review article [<host-repo> | <draft>]
 - **draft** — a direct path to a framework-complete draft: the expert bypass,
   unchanged (the unit of review is a filled draft, never an outline or idea).
 
-After arbitration completes, checkpoint the review so the picker's status
-column can say "reviewed" on later runs:
+After arbitration completes, how the run closes depends on whether the round
+applied any accepted finding:
 
-```
-printf '%s' '{"next_stage": "done", "reviewed": true, "stage": "review"}' | \
-  python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py checkpoint --ws "$WS" -
-```
+- **Zero applied edits** (every finding rejected): no re-entry work runs — the
+  draft, its provenance map, and any emitted variants are unchanged and no
+  stale marking occurs. Checkpoint the review by hand so the picker's status
+  column can say "reviewed" on later runs:
+
+  ```
+  printf '%s' '{"next_stage": "done", "reviewed": true, "stage": "review"}' | \
+    python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py checkpoint --ws "$WS" -
+  ```
+
+- **≥1 applied edit**: the edited draft re-enters the gate regime — follow
+  *Post-arbitration re-entry* below. The `review-reentry` subcommand writes
+  the done/reviewed checkpoint itself; **never hand-write the checkpoint after
+  edits** — the subcommand refuses to checkpoint over an invalid provenance
+  map, and hand-writing would bypass exactly that refusal (#362).
 
 (Only when the draft came from a run workspace; a direct-path review of an
 external draft has no workspace to mark.)
@@ -664,6 +675,61 @@ and **prose** run on a **Sonnet-class model with repo access** so claims are
 checked against the sources; **cold read** runs on **any cheap model, context-free
 by design**. The second cycle, if triggered, uses the same routing.
 
+## Post-arbitration re-entry (rounds that applied edits)
+
+An arbitration round that applied **≥1 accepted finding** does not end at the
+edit — the edited draft **re-enters the provenance/quality regime** before
+anything is reported done (SPEC-article-review, "Post-arbitration re-entry"
+constraint, 2026-07-18; origin #362: a run shipped 5 anchors dangling on blank
+lines under a done/reviewed checkpoint, unclassified review-authored sentences,
+and an auto re-emitted variant). Run these steps **in order** after applying
+the accepted findings:
+
+1. **Rebuild the provenance map for the edited draft.** Every sentence of the
+   edited draft is classified — **review-authored sentences (wording an
+   applied fix introduced) are classified like any other sentence** (sourced /
+   derived / narration / verify), so the zero-unmarked-claims guarantee
+   survives review. Every position carries a line anchor (`P1.S1[L7]`) into
+   the edited draft.
+2. **Re-run verify-provenance with a FRESH isolated judge** on the rebuilt map
+   and the edited draft. The fail-closed attestation (Story 13.67) binds a
+   verdicts file to the draft's content hash — the pre-edit judge's
+   attestation no longer matches the edited draft, so **a fresh judge run is
+   the only way back to PASS**; re-presenting the old verdicts fails closed.
+3. **Re-run the quality gate's mechanical dimensions** when a
+   **rubric-mapped** finding was applied (`draft-pipeline.py quality-gate
+   --draft <edited> --map <rebuilt>` — mechanical dims only; the dim1-2 judge
+   verdicts are not re-bought). Any failure from step 2 or 3 surfaces as a
+   **publish blocker**, never silently.
+4. **Invoke the re-entry gate**, which persists the reviewed canonical (the
+   same write path and emission-trailer convention as the draft flow's
+   `complete` gate), structurally validates the rebuilt map against the edited
+   draft, reports the required scoped checks, marks existing variants stale,
+   and writes the `done/reviewed` checkpoint — **refusing (non-zero, no
+   checkpoint) when the map is invalid**:
+
+   ```
+   python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py review-reentry \
+     --draft <edited-draft> --map <rebuilt-map> --slug <slug> \
+     --root <host-repo> --ws "$WS" --applied <n> [--rubric-applied]
+   ```
+
+   Pass `--rubric-applied` when a rubric-mapped finding was applied. With
+   `--applied 0` the command is a strict no-op — but a zero-edit round should
+   use the hand-written checkpoint above and skip this section entirely.
+5. **STOP. Review never emits or re-emits a variant** (SPEC-platform-variants
+   CAP-3). Existing variant files stay untouched on disk; the staleness check
+   inside `review-reentry` reports them stale, and the completion summary
+   lists them under **publish blockers** with the re-emission path. Re-emission
+   is a **fresh, explicit owner publish decision** through the standalone
+   variants flow (`skills/draft-article/variants.md`):
+
+   ```
+   python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py variants --slug <slug>
+   ```
+
+A run that skips any of these steps may not report the draft "publishable".
+
 ## Completion summary
 
 End every review run with the shared
@@ -696,3 +762,10 @@ bucket includes a **reading-time estimate**:
 ```
 python3 ${CLAUDE_PLUGIN_ROOT}/scripts/reading-time.py --language <en|ja> <draft>
 ```
+
+**Stale variants (rounds that applied edits).** When the re-entry gate ran,
+list its `stale_variants` under **publish blockers**, each with the re-emission
+path: `variants --slug <slug>` (the standalone flow,
+`skills/draft-article/variants.md`) — re-emission is the **owner's fresh
+explicit publish decision**, never something review performs. The review run
+emitted no variant; it never does.
