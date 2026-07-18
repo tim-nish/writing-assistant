@@ -478,6 +478,9 @@ review:
 - **11 / 12** (path missing / not a git repo) — the reader printed exactly one
   `policy_source unavailable: <reason>` line; **relay that one line once**,
   skip the pass, continue. Keep the reason for the `consulted:` line.
+- **13** (named gateway tool-surface gap — Story 13.72) — same as 11/12: the
+  reader printed one `policy tool-surface gap: <reason>` line; relay it once,
+  skip the pass, continue. Keep the reason for the `consulted:` line.
 - **4** (malformed block) — a stage-0 configuration error slipped through;
   halt and report it like any CAP-5 finding.
 

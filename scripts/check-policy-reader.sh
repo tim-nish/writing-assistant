@@ -1,13 +1,17 @@
 #!/usr/bin/env sh
-# check-policy-reader.sh — verify the bounded, pinned, read-only policy reader
-# (Story 14.2, SPEC-policy-source-seam CAP-2). POSIX shell + stdlib Python only.
+# check-policy-reader.sh — verify the gateway-backed policy reader (Story
+# 13.72, SPEC-policy-source-seam CAP-2 as amended 2026-07-18: served
+# transport, same CLI contract). POSIX shell + stdlib Python only.
 #
-# Covers: the code whitelist (GLOSSARY + LESSONS + ≤2 track-matched topics);
-# refusal of q_a/ and any other out-of-whitelist path (exit 5, by code);
-# symlink-escape candidates never become readable; the product-lab@<commit>
-# pin; the distinct unavailable exit codes (10 unset / 11 missing path /
-# 12 not a git repo) with exactly one stderr line; and read-only-ness (no
-# file under the policy path created or modified by a read).
+# Covers: the identical CLI contract (pin line, `=== FILE @ sha` sections,
+# `N: text` lines) now composed entirely from gateway MCP payloads via the
+# WRITING_ASSISTANT_GATEWAY_CMD test seam (stub server under fixtures/);
+# ZERO filesystem reads under any hub path (the fixture hub path never
+# exists, and the reader still serves); the code whitelist and exit-5
+# refusals unchanged; served misses as answers (exit 0), distinguishable
+# from unavailability; exit 11 one-liner when the gateway is unreachable
+# (old 12 collapses into it); exit 13 for the named tool-surface gaps
+# (list-topics enumeration, whole-GLOSSARY read); 10/4 unchanged.
 
 set -eu
 
@@ -17,7 +21,9 @@ root=$(git rev-parse --show-toplevel 2>/dev/null) || {
 cd "$root"
 
 RDR="scripts/read-policy-source.py"
+STUB="scripts/fixtures/policy-gateway-stub.py"
 PY="python3 $root/$RDR"
+SHA=8f3c2d1e4a5b6c7d8e9f0a1b2c3d4e5f60718293
 
 fail=0
 err() { printf 'FAIL: %s\n' "$1" >&2; fail=1; }
@@ -25,23 +31,34 @@ ok()  { printf 'ok:   %s\n' "$1"; }
 
 python3 -c "import py_compile; py_compile.compile('$root/$RDR', doraise=True)" 2>/dev/null \
   && ok "reader compiles" || { err "reader syntax error"; printf '\nFAILED.\n' >&2; exit 1; }
+python3 -c "import py_compile; py_compile.compile('$root/$STUB', doraise=True)" 2>/dev/null \
+  && ok "gateway stub compiles" || { err "stub syntax error"; printf '\nFAILED.\n' >&2; exit 1; }
 
 work=$(mktemp -d); trap 'rm -rf "$work"' EXIT
 
-# --- fixture: a policy repo with recall surface + q_a/ ------------------------
-plab="$work/product-lab"
-mkdir -p "$plab/topics" "$plab/q_a"
-printf '# Glossary\n\nwriting-assistant: the article engine.\n' > "$plab/GLOSSARY.md"
-printf '# Lessons\n\nreport-trust-is-structural: enforce by mechanism.\n' > "$plab/LESSONS.md"
-printf '# eval-alpha\n' > "$plab/topics/eval-alpha.md"
-printf '# eval-beta\n'  > "$plab/topics/eval-beta.md"
-printf '# eval-gamma\n' > "$plab/topics/eval-gamma.md"
-printf '# unrelated\n'  > "$plab/topics/unrelated.md"
-printf 'SECRET: never readable\n' > "$plab/q_a/secret.md"
-git -C "$plab" init -q
-git -C "$plab" -c user.email=t@t -c user.name=t add -A
-git -C "$plab" -c user.email=t@t -c user.name=t commit -qm init
-sha=$(git -C "$plab" rev-parse HEAD)
+# --- fixture: gateway-served content; the hub path NEVER exists on disk -------
+# The policy_source.path points at a directory that does not exist. Every
+# passing read below is therefore proof of zero hub filesystem reads: there is
+# nothing to read — all content arrives from the stub gateway.
+cat > "$work/fixture.json" <<JSON
+{
+  "pin": "product-lab@$SHA",
+  "lessons": [
+    ["LESSONS.md", 3, "report-trust-is-structural: enforce by mechanism. #ops"],
+    ["LESSONS.md", 4, "consult-first: surface the miss with the question. #seam"],
+    ["LESSONS.md", 7, "run-budget: wall-clock exemptions are explicit. #ops"]
+  ],
+  "topics": {
+    "eval-alpha": [
+      ["topics/eval-alpha.md", 1, "# eval-alpha"],
+      ["topics/eval-alpha.md", 2, "decision: alpha holds."]
+    ],
+    "unrelated": [
+      ["topics/unrelated.md", 1, "# unrelated"]
+    ]
+  }
+}
+JSON
 
 host="$work/host"
 mkdir -p "$host"
@@ -51,37 +68,48 @@ sources:
 output:
   drafts: articles/drafts/
 policy_source:
-  path: ../product-lab
+  path: ../no-such-hub
 YAML
+[ ! -e "$work/no-such-hub" ] || err "fixture hub path unexpectedly exists"
 
-# --- 1. Whitelist: base files only (topics arrive per-run via --topics; the
-#        per-repo track/topics config keys were removed, Story 13.36) ---------
+WRITING_ASSISTANT_GATEWAY_CMD="python3 $root/$STUB $work/fixture.json"
+export WRITING_ASSISTANT_GATEWAY_CMD
+
+# --- 1. Whitelist: static allowlist, no gateway, no filesystem ----------------
 wl=$($PY --root "$host" whitelist)
 echo "$wl" | grep -qx 'GLOSSARY.md' && echo "$wl" | grep -qx 'LESSONS.md' \
-  && ok "whitelist includes GLOSSARY.md and LESSONS.md" \
+  && ok "whitelist names GLOSSARY.md and LESSONS.md" \
   || err "whitelist missing base files: $wl"
-[ "$(echo "$wl" | grep -c '^topics/' || true)" -eq 0 ] \
-  && ok "no per-run selection: no topic entries (config keys removed)" \
-  || err "unexpected topic entries without --topics: $wl"
 echo "$wl" | grep -q 'q_a' && err "whitelist leaked a q_a path" || ok "no q_a path in whitelist"
 
-# --- 2. Pin ---------------------------------------------------------------------
+# --- 2. Pin: gateway payload verbatim ----------------------------------------
 got=$($PY --root "$host" pin)
-[ "$got" = "product-lab@$sha" ] && ok "pin is product-lab@<rev-parse HEAD>" \
-  || err "pin was '$got', expected product-lab@$sha"
+[ "$got" = "product-lab@$SHA" ] && ok "pin is the gateway's pin, verbatim" \
+  || err "pin was '$got', expected product-lab@$SHA"
 
-# --- 3. Read: pin header + per-file pinned, line-numbered sections ---------------
-out=$($PY --root "$host" read)
-echo "$out" | head -1 | grep -qx "pin: product-lab@$sha" && ok "read leads with the pin" \
+# --- 3. Read: pin header + pinned, line-numbered sections from payloads -------
+out=$($PY --root "$host" read --only LESSONS.md)
+echo "$out" | head -1 | grep -qx "pin: product-lab@$SHA" && ok "read leads with the pin" \
   || err "read did not lead with the pin"
-echo "$out" | grep -qx "=== GLOSSARY.md @ $sha" && ok "file sections carry the same pin" \
-  || err "GLOSSARY section header missing/unpinned"
-echo "$out" | grep -q '^3: writing-assistant: the article engine.' \
-  && ok "content is line-numbered (file:line@commit quotable)" \
-  || err "line numbering missing"
-echo "$out" | grep -q 'SECRET' && err "read leaked q_a content" || ok "read emitted no q_a content"
+echo "$out" | grep -qx "=== LESSONS.md @ $SHA" && ok "file sections carry the pin's sha" \
+  || err "LESSONS section header missing/unpinned"
+echo "$out" | grep -qx '3: report-trust-is-structural: enforce by mechanism. #ops' \
+  && ok "content keeps the gateway's true line numbers (file:line@commit quotable)" \
+  || err "line numbering missing or rewritten"
+echo "$out" | grep -qx '7: run-budget: wall-clock exemptions are explicit. #ops' \
+  && ok "non-consecutive served lines pass through at their own numbers" \
+  || err "served line 7 lost"
 
-# --- 4. Refusal by code: q_a/, arbitrary paths ------------------------------------
+# --- 4. Per-run topic selection via the gateway (Story 13.35 semantics) -------
+rt=$($PY --root "$host" read --topics eval-alpha.md --only LESSONS.md topics/eval-alpha.md)
+printf '%s\n' "$rt" | grep -qx "=== topics/eval-alpha.md @ $SHA" \
+  && printf '%s\n' "$rt" | grep -qx '2: decision: alpha holds.' \
+  && ok "read --topics serves the whole selected topic thread from the gateway" \
+  || err "topic thread not served: $rt"
+printf '%s' "$rt" | grep -q 'unrelated' && err "unselected topic leaked" \
+  || ok "only the per-run selection is served"
+
+# --- 5. Refusal by code: unchanged (exit 5), before any gateway call ----------
 set +e; msg=$($PY --root "$host" read --only q_a/secret.md 2>&1 >/dev/null); rc=$?; set -e
 [ "$rc" -eq 5 ] && printf '%s' "$msg" | grep -q 'refused' \
   && ok "q_a/ read refused (exit 5), regardless of arguments" \
@@ -89,100 +117,100 @@ set +e; msg=$($PY --root "$host" read --only q_a/secret.md 2>&1 >/dev/null); rc=
 set +e; $PY --root "$host" read --only ../../etc/hostname >/dev/null 2>&1; rc=$?; set -e
 [ "$rc" -eq 5 ] && ok "path traversal refused (exit 5)" || err "traversal rc=$rc"
 set +e; $PY --root "$host" read --only topics/unrelated.md >/dev/null 2>&1; rc=$?; set -e
-[ "$rc" -eq 5 ] && ok "existing but non-matched topic refused (whitelist, not existence)" \
-  || err "non-matched topic rc=$rc"
+[ "$rc" -eq 5 ] && ok "topic outside the per-run selection refused (whitelist, not existence)" \
+  || err "non-selected topic rc=$rc"
+set +e; $PY --root "$host" read --topics a.md b.md c.md >/dev/null 2>&1; rc=$?; set -e
+[ "$rc" -eq 5 ] && ok "read --topics refuses >2 files (exit 5, cap code-enforced)" || err "cap not enforced: rc=$rc"
+set +e; $PY --root "$host" read --topics ../q_a/secret.md >/dev/null 2>&1; rc=$?; set -e
+[ "$rc" -eq 5 ] && ok "read --topics refuses a non-basename (exit 5)" || err "non-basename accepted: rc=$rc"
 
-# --- 5. Symlink escape never becomes readable --------------------------------------
-mkdir -p "$work/outside"; printf 'OUTSIDE\n' > "$work/outside/leak.md"
-ln -s "$work/outside/leak.md" "$plab/topics/evil.md"
-out=$($PY --root "$host" read --topics evil.md)
-echo "$out" | grep -q 'OUTSIDE' && err "symlink escape leaked content" \
-  || ok "symlink escaping the policy root is not readable"
-echo "$out" | grep -q '^absent: topics/evil.md' && ok "escape reported as absent, not followed" \
-  || err "escape not reported"
-rm "$plab/topics/evil.md"
-
-# --- 6. Leftover config keys are refused, not silently applied (Story 13.36) --
-cat > "$host/writing-sources.yaml" <<'YAML'
-sources:
-  - path: .
-policy_source:
-  path: ../product-lab
-  track: eval
-YAML
+# --- 6. Named tool-surface gaps: exit 13, one line, never a file read ---------
+set +e; msg=$($PY --root "$host" list-topics 2>&1 >/dev/null); rc=$?; set -e
+[ "$rc" -eq 13 ] && [ "$(printf '%s\n' "$msg" | wc -l)" -eq 1 ] \
+  && printf '%s' "$msg" | grep -q 'cannot enumerate topics' \
+  && ok "list-topics: exit 13, one line naming the enumeration gap" \
+  || err "list-topics gap: rc=$rc msg='$msg'"
 set +e; msg=$($PY --root "$host" read 2>&1 >/dev/null); rc=$?; set -e
-[ "$rc" -eq 4 ] && printf '%s' "$msg" | grep -q 'policy_source.track' \
-  && ok "leftover track key: reader refuses (exit 4), never silently applies it" \
-  || err "leftover track: rc=$rc msg='$msg'"
-cat > "$host/writing-sources.yaml" <<'YAML'
-sources:
-  - path: .
-policy_source:
-  path: ../product-lab
-YAML
-wl=$($PY --root "$host" whitelist)
-[ "$(echo "$wl" | grep -c '^topics/')" -eq 0 ] \
-  && ok "path-only block: GLOSSARY + LESSONS only (still a valid run)" \
-  || err "expected no topics: $wl"
+[ "$rc" -eq 13 ] && [ "$(printf '%s\n' "$msg" | wc -l)" -eq 1 ] \
+  && printf '%s' "$msg" | grep -q 'GLOSSARY.md whole' \
+  && ok "read incl. GLOSSARY.md: exit 13, one line naming the whole-file gap" \
+  || err "whole-GLOSSARY gap: rc=$rc msg='$msg'"
 
-# --- 7. Distinct unavailable statuses, one stderr line each -------------------------
+# --- 7. Served miss: an answer under the pin (exit 0), not unavailability -----
+cat > "$work/miss-fixture.json" <<JSON
+{"pin": "product-lab@$SHA", "lessons": [], "topics": {}}
+JSON
+set +e
+mout=$(WRITING_ASSISTANT_GATEWAY_CMD="python3 $root/$STUB $work/miss-fixture.json" \
+       $PY --root "$host" read --only LESSONS.md 2>"$work/miss.err"); rc=$?
+set -e
+[ "$rc" -eq 0 ] && echo "$mout" | head -1 | grep -qx "pin: product-lab@$SHA" \
+  && echo "$mout" | grep -qx 'miss: LESSONS.md' \
+  && [ ! -s "$work/miss.err" ] \
+  && ok "gateway miss: exit 0, pin + 'miss: FILE' — a served answer" \
+  || err "miss handling: rc=$rc out='$mout'"
+
+# --- 8. Gateway unreachable: exit 11, exactly one unavailable line ------------
+set +e
+msg=$(WRITING_ASSISTANT_GATEWAY_CMD="$work/no-such-gateway-binary" \
+      $PY --root "$host" pin 2>&1 >/dev/null); rc=$?
+set -e
+[ "$rc" -eq 11 ] && [ "$(printf '%s\n' "$msg" | wc -l)" -eq 1 ] \
+  && printf '%s' "$msg" | grep -q 'policy_source unavailable: gateway unreachable' \
+  && ok "unreachable gateway: exit 11, one 'gateway unreachable' line" \
+  || err "unreachable: rc=$rc msg='$msg'"
+set +e
+msg=$(WRITING_ASSISTANT_GATEWAY_CMD="false" \
+      $PY --root "$host" read --only LESSONS.md 2>&1 >/dev/null); rc=$?
+set -e
+[ "$rc" -eq 11 ] && printf '%s' "$msg" | grep -q 'gateway unreachable' \
+  && ok "gateway dies mid-session: exit 11, never a partial/hung read" \
+  || err "dead gateway: rc=$rc msg='$msg'"
+
+# --- 9. Unset (10) / malformed (4): unchanged; old 12 case now serves ---------
 mkdir -p "$work/unset"; printf 'sources:\n  - path: .\n' > "$work/unset/writing-sources.yaml"
 set +e; msg=$($PY --root "$work/unset" pin 2>&1 >/dev/null); rc=$?; set -e
 [ "$rc" -eq 10 ] && [ "$(printf '%s\n' "$msg" | wc -l)" -eq 1 ] \
   && printf '%s' "$msg" | grep -q 'policy_source unavailable' \
   && ok "unset block: exit 10, one unavailable line" || err "unset: rc=$rc msg='$msg'"
 
-mkdir -p "$work/ghost"
-printf 'sources:\n  - path: .\npolicy_source:\n  path: ../nowhere\n' > "$work/ghost/writing-sources.yaml"
-set +e; msg=$($PY --root "$work/ghost" pin 2>&1 >/dev/null); rc=$?; set -e
-[ "$rc" -eq 11 ] && [ "$(printf '%s\n' "$msg" | wc -l)" -eq 1 ] \
-  && ok "missing path: exit 11, one unavailable line" || err "missing path: rc=$rc msg='$msg'"
-
-mkdir -p "$work/notgit/plaindir"
-printf 'sources:\n  - path: .\npolicy_source:\n  path: ../notgit-plab\n' > "$work/notgit/writing-sources.yaml"
-mkdir -p "$work/notgit-plab"; printf 'x\n' > "$work/notgit-plab/GLOSSARY.md"
-set +e; msg=$($PY --root "$work/notgit" pin 2>&1 >/dev/null); rc=$?; set -e
-[ "$rc" -eq 12 ] && [ "$(printf '%s\n' "$msg" | wc -l)" -eq 1 ] \
-  && ok "not a git repo: exit 12, one unavailable line" || err "not-git: rc=$rc msg='$msg'"
-
-# --- 8. Read-only: a read changes nothing under the policy path ---------------------
 cat > "$host/writing-sources.yaml" <<'YAML'
 sources:
   - path: .
 policy_source:
-  path: ../product-lab
+  path: ../no-such-hub
+  track: eval
 YAML
-sleep 1  # ensure mtime granularity
+set +e; msg=$($PY --root "$host" read --only LESSONS.md 2>&1 >/dev/null); rc=$?; set -e
+[ "$rc" -eq 4 ] && printf '%s' "$msg" | grep -q 'policy_source.track' \
+  && ok "leftover track key: reader refuses (exit 4), never silently applies it" \
+  || err "leftover track: rc=$rc msg='$msg'"
+
+# Old exit-12 case (path exists, not a git repo): the path key is ignored
+# entirely — the gateway serves regardless. 12 is never emitted.
+mkdir -p "$work/plain-dir"; printf 'x\n' > "$work/plain-dir/GLOSSARY.md"
+cat > "$host/writing-sources.yaml" <<'YAML'
+sources:
+  - path: .
+policy_source:
+  path: ../plain-dir
+YAML
+got=$($PY --root "$host" pin)
+[ "$got" = "product-lab@$SHA" ] \
+  && ok "non-git path key: ignored — served via the gateway (12 collapsed, never emitted)" \
+  || err "non-git path: got '$got'"
+
+# --- 10. Zero hub reads, read-only: nothing under any local path is touched ---
+sleep 1  # mtime granularity
 stamp="$work/stamp"; touch "$stamp"
-$PY --root "$host" read >/dev/null
+$PY --root "$host" read --only LESSONS.md >/dev/null
 $PY --root "$host" whitelist >/dev/null
-changed=$(find "$plab" -newer "$stamp" -type f | wc -l)
-[ "$changed" -eq 0 ] && ok "read-only: no file under the policy path created or modified" \
-  || err "reader touched $changed file(s) under the policy path"
-
-# --- Per-run topic selection (Story 13.35, SPEC-policy-topic-at-draft CAP-2) --
-# list-topics: names only, never content.
-lt=$($PY --root "$host" list-topics)
-printf '%s\n' "$lt" | grep -qx 'unrelated.md' && printf '%s\n' "$lt" | grep -qx 'eval-gamma.md' \
-  && ok "list-topics lists every topics/*.md basename" || err "list-topics incomplete: $lt"
-printf '%s' "$lt" | grep -q '#' && err "list-topics leaked file content" \
-  || ok "list-topics prints names only (no content)"
-
-# read --topics BUILDS the whitelist (overrides config track), still capped.
-rt=$($PY --root "$host" read --topics unrelated.md)
-printf '%s' "$rt" | grep -q '=== topics/unrelated.md' \
-  && ok "read --topics reads the per-run selection (config track overridden)" \
-  || err "read --topics did not read the selected topic"
-printf '%s' "$rt" | grep -q 'eval-alpha' && err "config-track topic leaked into a --topics read" \
-  || ok "read --topics excludes the config-track topics"
-printf '%s' "$rt" | grep -q '=== GLOSSARY.md' && ok "GLOSSARY + LESSONS still always read" \
-  || err "base files missing from --topics read"
-
-# Cap and basename rules enforced in code (exit 5).
-set +e; $PY --root "$host" read --topics eval-alpha.md eval-beta.md eval-gamma.md >/dev/null 2>&1; rc=$?; set -e
-[ "$rc" -eq 5 ] && ok "read --topics refuses >2 files (exit 5, cap code-enforced)" || err "cap not enforced: rc=$rc"
-set +e; $PY --root "$host" read --topics ../q_a/secret.md >/dev/null 2>&1; rc=$?; set -e
-[ "$rc" -eq 5 ] && ok "read --topics refuses a non-basename (exit 5)" || err "non-basename accepted: rc=$rc"
+changed=$(find "$work/plain-dir" -newer "$stamp" -type f | wc -l)
+[ "$changed" -eq 0 ] && ok "read-only: no file under the declared path created or modified" \
+  || err "reader touched $changed file(s) under the declared path"
+grep -rqn 'policy_repo\|rev-parse\|glob.glob\|os.path.isdir' "$root/$RDR" \
+  && err "reader still carries direct-filesystem policy code" \
+  || ok "no direct-filesystem policy code paths remain in the reader"
 
 if [ "$fail" -eq 0 ]; then
   printf '\nAll policy-reader checks passed.\n'; exit 0

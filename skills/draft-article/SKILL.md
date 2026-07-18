@@ -310,6 +310,10 @@ files is a **per-article decision made now, not a per-repo config**
    python3 ${CLAUDE_PLUGIN_ROOT}/scripts/read-policy-source.py --root "$HOST" list-topics
    ```
 
+   If this exits **13** (`gateway cannot enumerate topics` — a named
+   tool-surface gap, Story 13.72), ask the owner for the topic names under
+   the proposal contract instead; the ≤2 cap is unchanged.
+
 2. **Propose ≤2 topics for THIS article** under the proposal contract: draft
    the recommendation from the chosen article intent and the host repo (e.g.
    an evaluation-methodology article from a benchmark repo → the
@@ -385,6 +389,9 @@ dependency; no exit code here may abort the run**:
   continue with the generic interview. Do not retry, do not warn again — one
   line, then generic mode. Keep the reason: the journal's `consulted:` line
   records it (`--policy-note`).
+- **13** (named gateway tool-surface gap — Story 13.72) — treat exactly like
+  11/12: the reader printed one `policy tool-surface gap: <reason>` line;
+  relay it once, continue generic, record it via `--policy-note`.
 - **4** (malformed block) — a stage-0 configuration error slipped through;
   halt and report it like any CAP-5 finding (this cannot happen after a clean
   `stage0`).
