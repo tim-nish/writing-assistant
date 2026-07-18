@@ -35,3 +35,37 @@ The rubric dimensions a **blocker** may name are exactly the four in
 narrative arc, paragraph flow, explanation calibration, readability mechanics.
 A structure/prose finding that maps to one of these is **blocker-eligible**
 (Story 12.2); one that does not is at most **should**.
+
+## Finding class — writing-problem vs missing-input (Story 13.62)
+
+Orthogonal to severity, every finding carries a **class** that says what can
+repair it (SPEC-article-review):
+
+- **writing-problem** (the default, unmarked) — fixable in the draft: a cut, a
+  reorder, a clarity edit. It carries a `Fix: {suggestion}` field, exactly as
+  above.
+- **missing-input** — the draft lacks *source material* (insufficient
+  evidence, a missing example/episode, an unsupported narrative claim) that
+  prose editing cannot manufacture. It is marked `[missing-input]` after its
+  severity, and instead of `Fix:` it names an **upstream remediation** — one
+  of exactly two forms:
+  - `Upstream: re-harvest {scoped target}` — a narrowed source set to harvest;
+  - `Upstream: ask {one bounded owner question}` — a single elicitation.
+
+  A missing-input finding is **blocker-eligible**: an unrepaired one blocks the
+  "publishable" verdict, exactly as a rubric or configuration blocker does. It
+  routes to the pipeline's bounded missing-input repair hop
+  (SPEC-article-draft-pipeline), never to a prose fix.
+
+Finding format by class:
+
+```
+writing-problem:  - [severity] {location}: {issue}. Why {severity}: {criterion}. Fix: {suggestion}.
+missing-input:    - [severity] [missing-input] {location}: {issue}. Why {severity}: {criterion}. Upstream: re-harvest {target} | ask {question}.
+```
+
+The two shapes are mutually exclusive and mechanically checked
+(`validate-review-findings.py`): a `[missing-input]` finding carrying only a
+prose `Fix:`, or a writing-problem finding carrying an `Upstream:`, is a
+**contract violation** — the review pass that raised the finding owns the
+classification (isolation), never the drafting agent.

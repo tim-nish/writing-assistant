@@ -96,6 +96,27 @@ Run `lint-article` (pass 1 below) on the result before spending a model pass.
 
 ## Owner-facing proposals
 
+**Finding class — writing-problem vs missing-input (Story 13.62).** Orthogonal
+to severity, each structure/prose/cold-read finding is classified by what can
+repair it. A **writing-problem** finding is fixable in the draft and carries a
+`Fix:`; a **missing-input** finding diagnoses a source-material gap prose
+cannot fill, is marked `[missing-input]`, and names an **upstream remediation**
+(`Upstream: re-harvest <target>` or `Upstream: ask <question>`) instead of a
+prose fix — it is blocker-eligible and routes to the bounded missing-input
+repair hop (SPEC-article-draft-pipeline), never a prose edit. The exact formats
+and criteria live in
+[`review-prompts.md`](review-prompts.md). Validate an assembled findings block
+against the class contract before arbitration — the two shapes are mutually
+exclusive:
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/validate-review-findings.py <findings-block>
+```
+
+A non-zero exit means a finding mixed the shapes (a `[missing-input]` with only
+a prose `Fix:`, or a writing-problem carrying an `Upstream:`) — the review pass
+that raised it owns the classification; re-author and re-validate.
+
 Arbitration hands each finding to the owner to accept or reject; that
 presentation follows the shared
 [**owner-facing proposal contract**](../owner-facing-proposal-contract.md)
