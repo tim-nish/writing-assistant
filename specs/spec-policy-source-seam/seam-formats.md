@@ -70,6 +70,24 @@ Validator rejection classes (each a seeded test fixture):
 | R4 | seeded question that restates its seed (confirmation-shaped) | tension, not confirmation |
 | R5 | `gap_type` outside the taxonomy | closed vocabulary |
 
+### Reconciliation item (added 2026-07-18, #365 — SPEC CAP-7 `conflict` class)
+
+A `conflict`-classified question is a **reconciliation item**: `gap_type:
+"reconciliation"`, and instead of a single `seed` it carries a `positions`
+array — **every** disagreeing position, each `{quote, pointer, authority}`
+where `authority` ∈ {`policy` (a served line, `file:line@commit` at the run's
+pin), `config` (an authoritative user-config key, cited by key path +
+configVersion), `repo` (a host-repo fact, harvest pointer convention)}. The
+question asks the owner to **reconcile the disagreement** — it never presents
+the conflicting positions as ordinary content-preference candidates.
+`owner_answer` is structurally empty at generation (R1 applies). Additional
+rejection classes:
+
+| # | Rejects | Guards |
+|---|---|---|
+| R8 | a `reconciliation` item with <2 positions, or any position missing its pointer/authority | a conflict needs both sides, auditable |
+| R9 | a `conflict`-classified subject presented as any other item type | the reconciliation gate cannot be bypassed by re-typing |
+
 ## 3. Staging-candidate block (run output, proposal-only)
 
 Emitted when an interview answer contains a durable decision or reversal;

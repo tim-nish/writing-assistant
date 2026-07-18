@@ -43,7 +43,11 @@ naming; "skeleton" appears nowhere.
   - **success:** A completed run leaves exactly one schema-conforming plan
     beside its draft; regenerating it from the same run artifacts is
     byte-identical; no prompt was shown to produce it.
-- **CAP-2** (schema-enforced writer)
+- **CAP-2** (schema-enforced writer; amended 2026-07-18, #363: the optional
+  field set gains `audience_id` — the stable machine-readable audience
+  compatibility identifier declared at draft time and stored in both the plan
+  and the canonical draft (SPEC-platform-variants CAP-4); it never replaces
+  the free-text `audience` and is never re-inferred downstream)
   - **intent:** The plan writer validates fail-closed with per-key
     diagnostics (same posture as the sanctioned config writers): `kind:
     article-plan` present and constant; `slug` equals the filename stem;
@@ -66,6 +70,24 @@ naming; "skeleton" appears nowhere.
   - **success:** A run over a repo with prior plans presents plan-grounded
     proposals the owner can decline with zero friction; a declined proposal
     leaves no residue.
+
+- **CAP-4** (policy-conformance gate; added 2026-07-18, #365)
+  - **intent:** After the plan is generated, every **policy-seeded decision**
+    it records is validated against the **same pinned policy result** the run
+    consulted (the seam's served surface at the run's pin, SPEC-policy-source-seam
+    CAP-7) **and** the authoritative user config. The plan records the
+    consulted **pin and configVersion**, and a **conformance status** —
+    `conformant` / `open` / `conflict` / `stale` (`stale`: the pin or
+    configVersion has moved since consultation and a consulted line changed).
+    A decision that reverses a served ratified line is conformant **only as a
+    proposed policy change** (its staging candidate exists, CAP-4 of the seam
+    spec) — never by treating the reversal as current policy. The gate writes
+    nothing to the policy hub.
+  - **success:** Replaying the 2026-07-18 run yields a plan whose status is
+    `conflict` (records-only anchor vs `syndication.policy` EN-canonical) —
+    the contradiction is machine-visible in the plan instead of shipping
+    silently; a plan whose consulted pin moved re-validates to `stale`;
+    fixtures cover all four statuses.
 
 ## Constraints
 

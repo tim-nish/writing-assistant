@@ -764,6 +764,25 @@ real defect. `POS: <reason>` (no echo) still parses; the mismatch check simply
 cannot run on it. This costs the judge nothing — it is quoting text it was
 already handed.
 
+**The judge's verdicts file opens with a fail-closed attestation (Story 13.67,
+#364) — instruct the judge verbatim.** The `--list-narration`/`--list-derived`
+hand-off (with `--draft`) begins with the exact header lines the judge must
+echo unmodified at the top of `$WS/provenance-verdicts.txt`:
+
+```
+attestation: draft-sha256=<hex64>
+graded: <the comma-separated positions from the hand-off>
+```
+
+(both listings' `graded:` lines are echoed — the tool unions them), followed by
+its failure verdicts, or by nothing when it found no violation. The attestation
+binds the verdicts to this draft version and this worklist: `verify-provenance`
+**fails closed (exit 3, "not judged")** on a comment-only or free-form file, a
+graded set that does not cover every narration/derived position, an unknown
+position, or a draft-hash mismatch — so an orchestrator-authored "all pass"
+note can never substitute for a judge run, and "never judged" is mechanically
+distinguishable from "judged clean".
+
 It resolves every `derived` (and `sourced`) pointer against the declared
 fact-sheet entries **mechanically**, and consumes the **isolated judge
 subagent's** verdicts for the semantic tests — a `narration` sentence that asserts
@@ -772,8 +791,12 @@ a checkable proposition **fails the falsifiability test** (a gate failure), and 
 **Spawn a cheap-tier judge subagent** and hand it *only* the sentences
 `--list-narration` / `--list-derived` surface **plus the fact-sheet entries they
 cite** — never the drafting rationale, the interview, or your reasons for each
-classification. The subagent writes its pass/fail verdicts to
-`$WS/provenance-verdicts.txt`, which the command consumes. A clean map passes
+classification. The subagent writes its attestation + verdicts to
+`$WS/provenance-verdicts.txt`, which the command consumes. **Every revision
+cycle re-spawns the judge**: after any edit to the draft or map, the old
+attestation's draft hash no longer matches, so a fresh isolated judge run is
+the only way back to PASS — the drafting context never authors or amends the
+verdicts file. A clean map passes
 with no findings; any finding blocks stage progression. (These judge spawns cost
 turns against the pipeline budget — see #118's durability/resume constraint.)
 

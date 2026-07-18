@@ -40,7 +40,9 @@ degraded interview when `policy_source` was never considered.
      each value for approval — a `sources` list with an `include:` allowlist
      proposal (article material in, tool/editor/build dirs out), an
      `output.drafts` recommendation (external private articles repo), and an
-     explicit `policy_source` offer (path + track proposal) with a one-line
+     explicit `policy_source` offer (**a presence toggle — amended 2026-07-18,
+     #366: setup proposes `enabled: true`, never a filesystem path; the
+     gateway MCP registration is the integration**) with a one-line
      statement of the consequence of declining: "interview runs generic; no
      policy-seeded questions." The user approves/edits choices in the UI;
      the user never opens the file.
@@ -48,8 +50,11 @@ degraded interview when `policy_source` was never considered.
      the skill never free-hands YAML.
   4. Verify before finishing: `validate-config` exit 0; `files` resolves a
      non-empty scope (or the user explicitly accepted an empty one);
-     when `policy_source` was declared, `read-policy-source.py pin` and
-     `whitelist` succeed. Report a completion summary naming the config path
+     when `policy_source` was declared, the reader's `pin` and `whitelist`
+     succeed **through the gateway** (amended 2026-07-18, #366 — a
+     setup-time gateway health check, never a hub filesystem read; an
+     unusable gateway is a setup-time finding even though at run time it
+     only degrades). Report a completion summary naming the config path
      and the resolved read scope. After a clean finish, `draft-article` runs
      with no manual file edit.
 - **CAP-2 — config writers.** Extend `resolve-writing-sources.py` with
