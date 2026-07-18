@@ -93,10 +93,12 @@ grep -q 'reading-time.py' "$HARVEST" \
   && err "harvest should NOT invoke reading-time (no article body)" \
   || ok "harvest does not invoke reading-time"
 
-# 5. Draft SKILL wires the budget-triage/partial-progress reporting (Story 13.7).
-grep -qi 'budget-triage signal before hard failure' "$DRAFT" \
-  && grep -qi 'last completed stage and the resume path' "$DRAFT" \
-  && ok "draft SKILL surfaces budget-triage + partial-progress reporting" \
+# 5. Draft SKILL wires the budget-triage/partial-progress reporting (Story
+# 13.7; hardened to an orderly stop by Story 13.85).
+grep -qi 'budget-triage signal fires' "$DRAFT" \
+  && grep -qi 'orderly stop' "$DRAFT" \
+  && grep -qi 'informational notes' "$DRAFT" \
+  && ok "draft SKILL surfaces the orderly stop + partial-progress reporting" \
   || err "draft SKILL missing budget-triage/partial-progress wiring"
 
 # 6. Editor's assessment leads the review summary (Story 13.33, SPEC-review-ux CAP-4).

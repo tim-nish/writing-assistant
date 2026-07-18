@@ -1487,15 +1487,34 @@ the `publish_blocker` payload — the conflicting **positions with pointers**, o
 the moved pin/configVersion — plus the **resume path** (the block checkpoint;
 resume re-presents the reconciliation question).
 
-**Partial progress and the turn budget (Story 13.7).** The turn/compute budget is
-a real ceiling. As a stage nears it,
-**surface a budget-triage signal before hard failure** so the run can be
-checkpointed (Story 13.5) and resumed rather than lost at `error_max_turns`.
-When a run stops short or is resumed, the
-completion summary reports the **last completed stage and the resume path** under
-informational notes — read from `draft-pipeline.py resume --ws "$WS"` — per the
-shared completion-summary contract; a partial run is recoverable, never a silent
-loss.
+**Partial progress and the turn budget — the signal is an orderly stop, not an
+advisory (Story 13.7; hardened by Story 13.85, #388).** The turn/compute
+budget is a real ceiling. When a stage's budget-triage signal fires (a bounded
+repair loop breached, or the invocation is visibly near its ceiling), do not
+push on to hard failure — **stop in order**:
+
+1. **Finish only the unit in progress** — never start a new source, section,
+   or repair pass after the signal;
+2. **persist at that boundary** — the sub-stage recording (Stories
+   13.83/13.84) or, at a stage edge, the normal stage checkpoint — passing
+   the partial-progress note on the final recording:
+
+   ```
+   python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py progress --ws "$WS" --stage <stage> --done <unit> \
+     --stop-note "stopped at <boundary>; remaining: <what's left>"
+   ```
+
+3. **exit clean** — end the invocation with a short message naming the
+   boundary reached and the resume path (autostart continues the run). A
+   clean stop is a **normal end of an invocation**, distinguishable from
+   failure; `error_max_turns` or a wall-timeout is a defect of this stop
+   mechanism, never the expected end of an over-budget run.
+
+On resume, `autostart`/`resume` return the recorded `budget_stop` note —
+relay it in the completion summary's **informational notes** (last completed
+boundary + resume path, per the shared completion-summary contract); the next
+recording without a stop-note clears it. A partial run is recoverable, never
+a silent loss.
 
 ## Platform variants — a separate post-review invocation
 
@@ -1535,7 +1554,7 @@ their reference lives in [`variants.md`](variants.md).
 | `autostart` | 0 | Resume the newest in-progress run, else mint a fresh workspace (Story 13.12) | `--root` |
 | `checkpoint` | durability | Persist a completed stage's state to `<ws>/checkpoint.json` (Story 13.5) | `--ws` (req) `<state\|->` |
 | `resume` | durability | Report where to resume a run from its workspace checkpoint | `--ws` (req) |
-| `progress` | durability | Record sub-stage progress (completed units inside a long stage) into the checkpoint (Story 13.83) | `--ws` (req) `--stage` (req) `--done` (req, 1+) |
+| `progress` | durability | Record sub-stage progress (completed units inside a long stage) into the checkpoint (Story 13.83); with `--stop-note`, records an orderly budget stop (Story 13.85) | `--ws` (req) `--stage` (req) `--done` (req, 1+) `--stop-note` |
 | `consume` | 1 | Ingest the harvest fact-sheet document into pipeline state | `<harvest-doc\|->` |
 | `interview` | 2 | Build the bounded gap-interview question set for the framework | `--framework` (req) `<state\|->` |
 | `answer` | 2 | Record one owner answer (single form), or validate a batch | `--id` `--disposition` `--text` `--pointer` (repeatable) `--batch` |

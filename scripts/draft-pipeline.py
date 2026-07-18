@@ -2833,11 +2833,26 @@ def cmd_progress(args):
     done = state.setdefault("progress", {}).setdefault(args.stage, {}).setdefault("done", [])
     added = [d for d in args.done if d not in done]
     done.extend(added)
+    if args.stop_note:
+        # Orderly budget stop (Story 13.85, #388): the stage persisted at this
+        # boundary and exits clean. The note is the CAP-6 partial-progress
+        # record — the resumed invocation (and its completion summary) relays
+        # it. Cleared like the rest of sub-stage state by the stage's normal
+        # completion checkpoint.
+        state["budget_stop"] = {"stage": args.stage, "note": args.stop_note}
+    else:
+        # A recording without a stop-note means the run is working again —
+        # a stale stop note from the previous invocation no longer describes
+        # the checkpoint and is dropped.
+        state.pop("budget_stop", None)
     tmp = path + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(state, f, indent=2)
     os.replace(tmp, path)
-    print(json.dumps({"stage": args.stage, "done": done, "added": added}))
+    out = {"stage": args.stage, "done": done, "added": added}
+    if args.stop_note:
+        out["budget_stop"] = state["budget_stop"]
+    print(json.dumps(out))
     return 0
 
 
@@ -3353,6 +3368,10 @@ def main(argv=None):
     sp.add_argument("--done", required=True, nargs="+",
                     help="completed unit id(s) — e.g. source names or section slugs; "
                          "idempotent, batchable in one call")
+    sp.add_argument("--stop-note", metavar="TEXT",
+                    help="record an orderly budget stop at this boundary (Story 13.85): "
+                         "the partial-progress note the resumed run relays — pass it on "
+                         "the final recording before a clean exit")
     sp = sub.add_parser("complete", help="finish the run through the dual-product completion gate (Story 13.68)")
     sp.add_argument("--draft", required=True, help="the workspace draft to persist as the canonical, or - for stdin")
     sp.add_argument("--slug", required=True, help="the article slug — names both products (<slug>.md)")

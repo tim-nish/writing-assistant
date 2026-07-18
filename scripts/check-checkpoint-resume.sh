@@ -125,6 +125,37 @@ printf '{"stage":"provenance","next_stage":"quality-gate"}' | python3 "$DP" chec
 python3 "$DP" resume --ws "$WS3" | grep -q '"progress"' \
   && err "stage-3 completion did not clear fill progress" || ok "fill: stage completion clears section progress"
 
+# --- Orderly budget stop (Story 13.85, #388) --------------------------------
+WS4="$work/ws4"; mkdir -p "$WS4"
+printf '{"stage":"start","next_stage":"harvest","run_state":{"framework":"F2"}}' | python3 "$DP" checkpoint --ws "$WS4" - >/dev/null
+python3 "$DP" progress --ws "$WS4" --stage harvest --done srcA \
+  --stop-note "stopped after srcA; remaining: srcB srcC" | grep -q '"budget_stop"' \
+  && ok "stop: final recording carries the budget_stop note" || err "stop-note not recorded"
+out=$(python3 "$DP" resume --ws "$WS4")
+echo "$out" | jget 'd["budget_stop"]["note"]' | grep -q 'remaining: srcB' \
+  && ok "stop: resume returns the partial-progress note" || err "resume missing budget_stop"
+echo "$out" | jget 'd["budget_stop"]["stage"]' | grep -q harvest \
+  && ok "stop: note names the stopped stage" || err "budget_stop missing stage"
+# The next recording without a stop-note clears the stale note (run resumed work).
+python3 "$DP" progress --ws "$WS4" --stage harvest --done srcB >/dev/null
+python3 "$DP" resume --ws "$WS4" | grep -q '"budget_stop"' \
+  && err "stale budget_stop survived a working recording" || ok "stop: next working recording clears the note"
+# Stage completion clears it too (with the rest of sub-stage state).
+python3 "$DP" progress --ws "$WS4" --stage harvest --done srcC --stop-note "again" >/dev/null
+printf '{"stage":"consume","next_stage":"interview"}' | python3 "$DP" checkpoint --ws "$WS4" - >/dev/null
+python3 "$DP" resume --ws "$WS4" | grep -q '"budget_stop"' \
+  && err "budget_stop survived stage completion" || ok "stop: stage completion clears the note"
+
+# SKILL wires the orderly stop; summary relays the note.
+grep -q 'orderly stop, not an' "$SKILL" && grep -q 'stop-note' "$SKILL" \
+  && ok "SKILL turns the budget signal into an orderly stop (13.85)" || err "SKILL missing orderly-stop contract"
+grep -q 'never start a new source, section,' "$SKILL" \
+  && ok "SKILL forbids new units after the signal" || err "SKILL missing no-new-unit rule"
+grep -q 'defect of this stop' "$SKILL" \
+  && ok "SKILL: error_max_turns is a stop-mechanism defect, not a normal end" || err "SKILL missing defect framing"
+grep -q 'budget_stop' skills/completion-summary.md \
+  && ok "completion summary relays the budget_stop note" || err "completion summary missing budget_stop"
+
 # SKILL wires per-section fill recording (13.84): unit = section + provenance.
 grep -q 'Per-section progress recording' "$SKILL" && grep -q 'stage fill' "$SKILL" \
   && ok "SKILL documents per-section fill recording (13.84)" || err "SKILL missing fill progress contract"
