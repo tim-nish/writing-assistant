@@ -7,10 +7,12 @@ The CLI contract is unchanged from the filesystem-era reader — same
 subcommands, flags, output shapes, and `file:line@commit` evidence grammar —
 but every byte of policy content now arrives over MCP `tools/call` requests to
 the tsurezure-gateway stdio server (consumer `writing-assistant`). The reader
-opens ZERO files under any hub path: it does not know the hub path, never
-joins `policy_source.path` into the filesystem, and never runs `git -C <hub>`.
-The gateway resolves the hub from its own config; the pin and every citation
-are passed through from gateway payloads verbatim.
+opens ZERO files under any hub path: it does not know the hub path — the
+`policy_source` config block is a presence toggle (`enabled: true`, Story
+13.73/#366; the retired `path` key is a relayed configuration error) — and it
+never runs `git -C <hub>`. The gateway resolves the hub from its own operator
+config; the pin and every citation are passed through from gateway payloads
+verbatim.
 
 The read scope is unchanged and still code-bounded:
 
@@ -58,9 +60,12 @@ Exit codes — the caller keys graceful degradation (CAP-6) off these:
 
   0   success (including served misses)
   2   usage / host-root resolution errors
-  4   policy_source block malformed (resolver's report relayed verbatim)
+  4   policy_source block malformed OR carrying a retired key (`path` — 13.73;
+      `track`/`topics` — 13.36): the resolver's report, migration notice
+      included, is relayed verbatim; a retired key is never silently honored
   5   REFUSED: a requested path is outside the code whitelist
-  10  unavailable: policy_source not declared        (degrade: generic mode, silent)
+  10  unavailable: policy_source not declared / `enabled` falsy
+                                                    (degrade: generic mode, silent)
   11  unavailable: gateway unreachable / transport error / timeout
       (degrade: generic mode, log once; the old 11/12 path-vs-git distinction
       collapses here — 12 is never emitted, though callers still accept it)
@@ -123,11 +128,10 @@ RWS = _load_rws()
 
 
 def resolve_policy_source(root):
-    """The declared policy_source block via the one config parse path.
-
-    Only the unset/malformed distinction is consumed here (exit 10 vs 4). The
-    block's `path` value — which may still exist until Story 13.73 removes it —
-    is IGNORED entirely: it is never joined into the filesystem.
+    """The declared policy_source presence toggle via the one config parse
+    path (Story 13.73: block = {"enabled": bool} — no hub path exists in
+    consumer config; a leftover retired `path` key is a relayed configuration
+    error, exit 4, migration notice included, never silently honored).
 
     Returns (block, None) or (None, (exit_code, reason))."""
     block, errors = RWS.get_policy_source(RWS.read_lines(root), root)
@@ -137,6 +141,9 @@ def resolve_policy_source(root):
         for key, msg in errors:
             sys.stderr.write(f"[{RWS.SOURCES_FILE}] {key}: {msg}\n")
         return None, (MALFORMED, "policy_source block is malformed (see stage-0 validation)")
+    if not block["enabled"]:
+        return None, (UNAVAIL_UNSET,
+                      "policy_source disabled (enabled: false) in writing-sources.yaml")
     return block, None
 
 

@@ -475,10 +475,12 @@ review:
 - **0** — run the pass as above.
 - **10** (`policy_source` unset) — skip the pass **silently**; every other
   pass runs unchanged.
-- **11 / 12** (path missing / not a git repo) — the reader printed exactly one
-  `policy_source unavailable: <reason>` line; **relay that one line once**,
+- **10** is also what an `enabled: false` toggle produces — same silent skip.
+- **11** (toggle present, gateway unavailable — unreachable, transport error,
+  or timeout; the retired exit 12 collapses here) — the reader printed exactly
+  one `policy_source unavailable: <reason>` line; **relay that one line once**,
   skip the pass, continue. Keep the reason for the `consulted:` line.
-- **13** (named gateway tool-surface gap — Story 13.72) — same as 11/12: the
+- **13** (named gateway tool-surface gap — Story 13.72) — same as 11: the
   reader printed one `policy tool-surface gap: <reason>` line; relay it once,
   skip the pass, continue. Keep the reason for the `consulted:` line.
 - **4** (malformed block) — a stage-0 configuration error slipped through;
@@ -632,7 +634,8 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py staging-candidates \
 An **unarbitrated or open policy finding never blocks "publishable"** —
 criterion `policy-contradiction` is never blocker alone (a flagged reversal
 may be correct); escalation is a per-finding owner call inside the round, and
-nothing under `policy_source.path` is ever created or modified.
+nothing in the policy hub is ever created or modified (the consumer holds no
+hub path at all — Story 13.73; the gateway serves read-only).
 
 **Rubric-mapped findings are blocker-eligible (Story 12.2).** A structure or
 prose finding that **maps to a quality-rubric dimension** (Epic 11: narrative

@@ -46,31 +46,36 @@ git repo the script errors rather than silently resolving against cwd):
                             or a non-existent declared path yields nothing.
 
   policy-source             Print the optional `policy_source` block as JSON:
-                            {"declared": false} when absent (exit 0 — absence
-                            is not an error), else {"declared": true, "path":
-                            <abs>}. A malformed block (missing/empty path, or a
-                            leftover `track:`/`topics:` key — removed by Story
-                            13.36, SPEC-policy-topic-at-draft CAP-3: topics are
-                            chosen per-article at draft time) exits 4 with
-                            per-key errors naming the fix — the stage-0
-                            validator relays them. Whether the path is
-                            USABLE (exists, readable, a git repo) is
-                            deliberately not checked here: an unusable path is
-                            a read-time degradation, never a config error.
+                            {"declared": false} when absent or `enabled: false`
+                            (exit 0 — absence is not an error), else
+                            {"declared": true}. NO path is ever reported
+                            (Story 13.73, #366): the block is a presence
+                            toggle — the consumer holds no hub filesystem
+                            location; the gateway's operator config owns it.
+                            A malformed block — an unreadable `enabled` value,
+                            the RETIRED `path` key (13.73), or a leftover
+                            `track:`/`topics:` key (removed by Story 13.36,
+                            SPEC-policy-topic-at-draft CAP-3) — exits 4 with
+                            per-key errors naming the fix (migration notice
+                            included) — the stage-0 validator relays them.
+                            Whether the GATEWAY is usable is deliberately not
+                            checked here: an unreachable gateway is a
+                            read-time degradation, never a config error.
 
-  set-policy-source PATH    Write the `policy_source` block back into
-                            writing-sources.yaml (SPEC-repo-onboarding CAP-2),
-                            with the same contract as set-draft-location:
-                            comment-preserving line surgery, idempotent,
-                            machine-global destination, legacy-file migration.
-                            Path-only (Story 13.36): the `--track`/`--topics`
-                            flags were removed with the config keys. The result
-                            is validated BEFORE writing — a write that would
-                            leave a malformed block (e.g. a leftover removed
-                            key) exits 4 and touches nothing. Usability of
-                            PATH is deliberately not checked (read-time
-                            degradation, never a config error). Prints the new
-                            block as JSON (the policy-source format).
+  set-policy-source [--disable]
+                            Write the presence toggle (`policy_source:` +
+                            `enabled: true`) into writing-sources.yaml
+                            (SPEC-repo-onboarding CAP-2; re-shaped by Story
+                            13.73 — the PATH argument was retired with the
+                            config key). Declarative block replace: a legacy
+                            block (`path:` / `track:` / `topics:`) is REPLACED
+                            whole by the toggle — this is the sanctioned
+                            migration path (#366). Comments outside the block
+                            survive; idempotent; machine-global destination;
+                            legacy-file migration. The result is validated
+                            BEFORE writing. `--disable` removes the block
+                            entirely (same semantics as never declaring it).
+                            Prints {"declared": true|false}.
 
   set-sources               Declaratively REPLACE the `sources:` block from a
                             JSON array on stdin (SPEC-repo-onboarding CAP-2):
@@ -312,48 +317,31 @@ def _block_span(lines, header_re):
     return start, end
 
 
-def set_policy_source(lines, path):
-    """Return (new_lines, changed). Per-key line surgery like
-    set_output_drafts: `path` is set, other lines keep their existing form
-    (comments and ordering survive); an absent block is appended whole —
-    path-only since Story 13.36 (topic selection moved to draft time; the
-    `--track`/`--topics` flags were removed with the config keys). Callers
-    validate the RESULT via get_policy_source before writing — a leftover
-    `track:`/`topics:` line therefore refuses the write with the removed-key
-    error until the owner deletes it."""
+def set_policy_source(lines, enabled=True):
+    """Return (new_lines, changed). Declarative replace of the whole
+    `policy_source` block with the presence toggle (Story 13.73, #366:
+    `enabled: true` — the consumer holds no hub filesystem path; the
+    gateway's operator config owns the hub location). Like set_sources,
+    comments INSIDE the old block do not survive the replace (declarative
+    semantics — deliberately so: this is also the sanctioned migration path
+    for a legacy `path:` / `track:` / `topics:` block); comments outside it
+    do. With enabled=False the block is removed entirely (same semantics as
+    never declaring it)."""
+    block = ["policy_source:", "  enabled: true"] if enabled else []
     start, end = _block_span(lines, r"^policy_source:\s*(#.*)?$")
     if start is None:
+        if not enabled:
+            return lines, False
         tail = []
         if lines and lines[-1].strip() != "":
             tail.append("")
-        tail.append("policy_source:")
-        tail.append(f"  path: {path}")
-        return lines + tail, True
-
-    new = list(lines)
-    changed = False
-
-    def _set_key(key, value_line):
-        """Replace the block's `key:` line, or insert one at the block end."""
-        nonlocal new, changed, end
-        for j in range(start + 1, end):
-            m = re.match(rf"^(\s+){key}:\s*.*$", new[j])
-            if m:
-                candidate = f"{m.group(1)}{key}: {value_line}"
-                if new[j] != candidate:
-                    new[j] = candidate
-                    changed = True
-                return
-        # key absent: insert at the end of the block, before trailing blanks
-        k = end
-        while k > start + 1 and new[k - 1].strip() == "":
-            k -= 1
-        new.insert(k, f"  {key}: {value_line}")
-        end += 1
-        changed = True
-
-    _set_key("path", path)
-    return new, changed
+        return lines + tail + block, True
+    # keep trailing blank separation as-is: replace header..last content
+    last = end
+    while last > start + 1 and lines[last - 1].strip() == "":
+        last -= 1
+    new = lines[:start] + block + lines[last:]
+    return new, new != lines
 
 
 def render_sources_block(specs):
@@ -570,13 +558,16 @@ def get_sources(lines, root):
 
 
 def get_policy_source(lines, root):
-    """Parse the optional `policy_source` block.
+    """Parse the optional `policy_source` block (presence toggle — Story
+    13.73, #366).
 
     Returns (None, []) when the block is absent, else (block, errors) where
-    block = {"path": abs-or-None} and
-    errors is a list of (key, message) pairs for a malformed block. Usability
-    of the path (exists / readable / git repo) is not checked here.
-    """
+    block = {"enabled": bool-or-None} and errors is a list of (key, message)
+    pairs for a malformed block. The RETIRED `path` key (13.73) and the
+    removed `track`/`topics` keys (13.36) are named configuration errors
+    carrying a migration notice — NEVER silently honored. Whether the
+    gateway is usable is deliberately not checked here: an unreachable
+    gateway is a read-time degradation, never a config error."""
     start = None
     for i, ln in enumerate(lines):
         if re.match(r"^policy_source:\s*(#.*)?$", ln):
@@ -588,7 +579,7 @@ def get_policy_source(lines, root):
     def _val(raw):
         return re.sub(r"\s+#.*$", "", raw).strip().strip('"').strip("'")
 
-    block = {"path": None}
+    block = {"enabled": None}
     errors = []
     j = start + 1
     while j < len(lines):
@@ -598,10 +589,30 @@ def get_policy_source(lines, root):
             continue
         if _indent(ln) == 0:
             break  # left the block
-        m = re.match(r"^\s+path:\s*(.*)$", ln)
+        m = re.match(r"^\s+enabled:\s*(.*)$", ln)
         if m:
-            raw = _val(m.group(1))
-            block["path"] = os.path.realpath(os.path.join(root, raw)) if raw else None
+            raw = _val(m.group(1)).lower()
+            if raw in ("true", "yes", "on"):
+                block["enabled"] = True
+            elif raw in ("false", "no", "off"):
+                block["enabled"] = False
+            else:
+                errors.append(("policy_source.enabled",
+                               f"unreadable value {raw!r} — the presence toggle "
+                               "takes `true` or `false` (#366)."))
+            continue
+        # `path:` is RETIRED (Story 13.73, #366): the consumer holds no hub
+        # filesystem location — the gateway's operator config owns it. A
+        # leftover key is a named configuration error with a migration
+        # notice — never silently honored.
+        if re.match(r"^\s+path:", ln):
+            errors.append(("policy_source.path",
+                           "retired (#366): the consumer holds no hub path — "
+                           "replace the block with `policy_source:` + "
+                           "`enabled: true` (the gateway owns the hub "
+                           "location). Fix: run `resolve-writing-sources.py "
+                           "set-policy-source --root <host-repo>` (no path "
+                           "argument) to migrate, or delete this line."))
             continue
         # `track:` / `topics:` were REMOVED (Story 13.36, SPEC-policy-topic-at-
         # draft CAP-3): topic context is a per-article decision made in
@@ -616,10 +627,11 @@ def get_policy_source(lines, root):
                            "writing-sources.yaml."))
             continue
 
-    if block["path"] is None:
-        errors.append(("policy_source.path",
-                       "required when policy_source is declared. Fix: set it to "
-                       "the local product-lab checkout (a plain path; no URL)."))
+    if block["enabled"] is None and not errors:
+        errors.append(("policy_source.enabled",
+                       "required when policy_source is declared (presence "
+                       "toggle, #366). Fix: set `enabled: true` — the gateway "
+                       "owns the hub location."))
     return block, errors
 
 
@@ -753,16 +765,23 @@ def cmd_set_policy_source(args):
     import json
     root = host_root(args.root)
     lines = read_lines(root)
-    new_lines, changed = set_policy_source(lines, args.path)
+    enabled = not args.disable
+    new_lines, changed = set_policy_source(lines, enabled=enabled)
     # Validate the RESULT before any write — a malformed block never lands.
     block, errors = get_policy_source(new_lines, root)
-    if block is None or errors:
+    if enabled and (block is None or errors or not block["enabled"]):
         for key, msg in errors or [("policy_source", "block failed to parse after surgery")]:
             sys.stderr.write(f"[{SOURCES_FILE}] {key}: {msg}\n")
         sys.stderr.write("refused: nothing was written\n")
         return POLICY_MALFORMED
-    _write_back(root, new_lines, changed, "policy_source")
-    print(json.dumps({"declared": True, "path": block["path"]}))
+    if not enabled and (block is not None or errors):
+        sys.stderr.write(f"[{SOURCES_FILE}] policy_source: block survived removal surgery\n"
+                         "refused: nothing was written\n")
+        return POLICY_MALFORMED
+    # --disable with no config file at all: nothing to remove, create nothing.
+    if not (args.disable and not changed and sources_path(root)[1] == "none"):
+        _write_back(root, new_lines, changed, "policy_source")
+    print(json.dumps({"declared": enabled}))
     return 0
 
 
@@ -862,7 +881,7 @@ def cmd_policy_source(args):
         for key, msg in errors:
             sys.stderr.write(f"[{SOURCES_FILE}] {key}: {msg}\n")
         return POLICY_MALFORMED
-    print(json.dumps({"declared": True, "path": block["path"]}))
+    print(json.dumps({"declared": bool(block["enabled"])}))
     return 0
 
 
@@ -887,7 +906,11 @@ def main(argv=None):
     sub.add_parser("files", parents=[root_parent])
     sub.add_parser("policy-source", parents=[root_parent])
     sp = sub.add_parser("set-policy-source", parents=[root_parent])
-    sp.add_argument("path")
+    # No positional PATH (Story 13.73, #366): the block is a presence toggle;
+    # the consumer never holds the hub's filesystem location.
+    sp.add_argument("--disable", action="store_true",
+                    help="remove the policy_source block entirely "
+                         "(same semantics as never declaring it)")
     sub.add_parser("set-sources", parents=[root_parent])
     args = p.parse_args(argv)
     if not hasattr(args, "root"):

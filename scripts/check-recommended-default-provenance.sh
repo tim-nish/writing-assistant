@@ -25,39 +25,39 @@ ok()  { printf 'ok:   %s\n' "$1"; }
 work=$(mktemp -d); trap 'rm -rf "$work"' EXIT
 XDG_CONFIG_HOME="$work/xdg"; export XDG_CONFIG_HOME
 
-# A host repo whose declared harvest scope ALSO includes the policy repo — the
-# only way a policy line could reach a fact sheet as a resolvable SOURCE. The
-# fence must reject it anyway.
+# A host repo with the policy seam ENABLED (Story 13.73: presence toggle —
+# the consumer holds no hub path). The no-facts invariant is now STRUCTURAL:
+# policy content arrives only through the gateway seam, whose cites are
+# hub-relative `file:line@<hub-sha>` pointers that cannot resolve in the
+# declared host scope — a policy line has no resolvable SOURCE form.
 h="$work/host"; mkdir -p "$h"; git -C "$h" init -q
 printf 'intro\nThroughput doubled under load\n' > "$h/notes.md"
 git -C "$h" add notes.md; git -C "$h" -c user.email=t@e -c user.name=t commit -q -m init
 sha=$(git -C "$h" rev-parse HEAD)
 
-pol="$work/policy"; mkdir -p "$pol"; git -C "$pol" init -q
-printf 'the channel speaks to solo builders\nreproducibility is the feature\n' > "$pol/LESSONS.md"
-git -C "$pol" add LESSONS.md; git -C "$pol" -c user.email=t@e -c user.name=t commit -q -m pol
-psha=$(git -C "$pol" rev-parse HEAD)
+# A hub commit sha that exists nowhere in the declared scope — the shape of
+# every gateway cite (the pin is the HUB's commit, not a host commit).
+psha=1111111111111111111111111111111111111111
 
-# Declare BOTH the host and the policy repo as harvest sources, and declare the
-# policy repo as the policy_source.
 python3 "$root/scripts/resolve-writing-sources.py" --root "$h" set-sources >/dev/null 2>&1 <<JSON
-[{"path": "."}, {"path": "../policy"}]
+[{"path": "."}]
 JSON
-python3 "$root/scripts/resolve-writing-sources.py" --root "$h" set-policy-source "$pol" >/dev/null 2>&1
+python3 "$root/scripts/resolve-writing-sources.py" --root "$h" set-policy-source >/dev/null 2>&1
 
 emit() { printf '%s\n' "$1" > "$work/fs.md"; }
 reason() { python3 "$root/$VAL" "$work/fs.md" --root "$h" 2>&1; }
 V() { python3 "$root/$VAL" "$work/fs.md" --root "$h" >/dev/null 2>&1; }
 
-# AC1 — a claim grounded in a policy line is rejected (fence), exactly as an
-# article-plan pointer is; a real repository source in the same run still passes.
-emit "- Channel is for solo builders / ../policy/LESSONS.md:1@$psha / decision"
-reason | grep -qi 'policy surface is never harvest evidence\|policy_source' \
-  && ok "AC1: a fact-sheet SOURCE into the policy repo is rejected (no-facts fence)" \
-  || err "policy-line SOURCE accepted as evidence"
+# AC1 — a claim grounded in a policy line is rejected: a seam cite
+# (hub-relative path @ hub sha) does not resolve in the declared host scope,
+# so a policy line never grounds a claim; a real repository source in the
+# same run still passes.
+emit "- Channel is for solo builders / LESSONS.md:1@$psha / decision"
+V && err "policy-line SOURCE (seam cite) accepted as evidence" \
+  || ok "AC1: a seam-cited policy line is rejected (unresolvable in host scope — no-facts)"
 emit "- Throughput doubled under load / notes.md:2@$sha / result"
-V && ok "AC1: a genuine repository SOURCE still validates (fence is policy-scoped)" \
-  || err "the fence rejected legitimate repository evidence"
+V && ok "AC1: a genuine repository SOURCE still validates (rejection is scope-driven)" \
+  || err "legitimate repository evidence rejected"
 
 # AC2 — audit isolation: a recalled position is never a fact-sheet entry. With
 # no policy_source declared, behavior is unchanged (regression guard).
