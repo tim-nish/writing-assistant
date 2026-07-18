@@ -211,6 +211,15 @@ re-runs the gate. Bounds:
   unmarked claims would otherwise re-enter. A revision that fixes flow by
   inventing a transition-claim fails provenance, not quality; the deadlock
   is broken by D1's classes, not by relaxing either gate.
+- The **second** rubric cycle is a bounded **delta re-check**, not a fresh
+  full-artifact re-judge (added 2026-07-18, #349). The mechanical dimensions
+  (3–4) re-run in full — deterministic, no drift — but the single-pass dim1–2
+  judge is scoped to *verify cycle-1's failing locations were addressed*, and
+  may not raise a new interpretive dim1–2 finding; a genuinely new second-cycle
+  problem is actionable only when a mechanical dimension flags it. This stops
+  the observed oscillation (splitting a sentence for dim4 re-triggering dim1/2)
+  without informing the judge: it receives cycle-1's failing *locations* as
+  scope, never prior verdicts as context — the D3 isolation invariant holds.
 
 ---
 
