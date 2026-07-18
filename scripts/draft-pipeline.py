@@ -176,6 +176,10 @@ VERIFY_CANONICAL = re.compile(r"^\[VERIFY: [^\]]+\]$")
 # "A section needing more than one rewrite routes back to a new interview
 # question, never into open-ended editing.").
 REWRITE_BUDGET = 1
+# The shared revision bound (CAP-7 / #349 / #348): rewrites, quality-gate
+# revisions, AND missing-input repair hops all count against these two cycles;
+# past it, the unresolved item is a publish blocker, never a third attempt.
+TWO_CYCLE_BOUND = 2
 
 
 # Stage-3 sidecar provenance map (Story 11.1; `docs/harness-architecture.md` D1).
@@ -795,11 +799,35 @@ def cmd_repair_hop(args):
       ask <one bounded question>   -> re-enter the interview with one question
 
     This is the ONLY backward edge to harvest/interview beyond the rewrite
-    route. The two-cycle bound and publish-blocker are enforced by the cycle
-    accounting (Story 13.64), not here; this command emits the hop action and
-    the stage to re-enter.
+    route. It counts against the SAME two-cycle bound as rewrites and gate
+    revisions (Story 13.64): `--cycle` is the number of cycles already spent on
+    this draft. When the cap is reached, no third hop is taken — the
+    unrepaired missing-input finding becomes a PUBLISH BLOCKER instead, exactly
+    as an unresolved rubric/config blocker forces "not publishable".
     """
+    if args.cycle < 0:
+        sys.stderr.write("error: --cycle must be >= 0\n")
+        return 2
     remediation = args.upstream.strip()
+    # Cap: the hop shares the two-cycle bound. At the cap, no third hop —
+    # surface the unrepaired gap as a publish blocker (Story 13.64).
+    if args.cycle >= TWO_CYCLE_BOUND:
+        out = {
+            "stage": "repair-hop",
+            "action": "publish-blocker",
+            "publishable": False,
+            "cycle": args.cycle,
+            "cap": TWO_CYCLE_BOUND,
+            "blocker": f"unrepaired missing-input finding ({remediation})",
+            "reason": (f"missing-input gap still unrepaired after "
+                       f"{TWO_CYCLE_BOUND} cycles — the shared bound forbids a "
+                       "third hop; route to the completion summary's "
+                       "publish-blocker bucket (CAP-6), never a further hop"),
+        }
+        print(json.dumps(out, indent=2))
+        return 0
+    m = re.match(r"^(?:Upstream:\s*)?re-harvest\s+(?P<target>\S.*)$",
+                 remediation, re.IGNORECASE)
     m = re.match(r"^(?:Upstream:\s*)?re-harvest\s+(?P<target>\S.*)$",
                  remediation, re.IGNORECASE)
     if m:
@@ -809,6 +837,8 @@ def cmd_repair_hop(args):
             "action": "re-harvest",
             "scope": target,
             "next_stage": "harvest",
+            "cycle": args.cycle + 1,
+            "cap": TWO_CYCLE_BOUND,
             "note": ("re-harvest the scoped target only (declared-scope boundary "
                      "and pin rules unchanged); new facts are pinned like any "
                      "Stage-1 fact, and a policy line never becomes a SOURCE"),
@@ -823,6 +853,8 @@ def cmd_repair_hop(args):
             "stage": "repair-hop",
             "action": "elicit",
             "next_stage": "interview",
+            "cycle": args.cycle + 1,
+            "cap": TWO_CYCLE_BOUND,
             "question": {
                 "id": "repair-hop",
                 "text": f"{question}?" if not question.endswith("?") else question,
@@ -2337,6 +2369,10 @@ def main(argv=None):
     sp.add_argument("--upstream", required=True,
                     help="a missing-input finding's Upstream: remediation "
                          "(`re-harvest <target>` or `ask <question>`)")
+    sp.add_argument("--cycle", type=int, default=0,
+                    help="cycles already spent on this draft (rewrites + gate "
+                         "revisions + prior hops); at the two-cycle cap the hop "
+                         "becomes a publish blocker (Story 13.64)")
     sp = sub.add_parser("variants")
     sp.add_argument("draft", nargs="?", default="-", help="verified draft, or - for stdin")
     sp.add_argument("--config-json", help="resolved config as JSON (FILE or - for stdin)")
