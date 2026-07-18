@@ -62,6 +62,7 @@ date: 2026-07-09
 mode: canonical
 language: en
 audience: en-practitioner
+audience_id: en-practitioner
 summary: >
   How an innocuous retry policy tripled load and what we changed.
 topics: [llm-ops, reliability]
@@ -115,6 +116,7 @@ date: 2026-07-09
 mode: external
 language: ja
 audience: ja-practitioner
+audience_id: ja-practitioner
 summary: 本文の要約。
 topics: [llm-ops]
 related: { projects: [], publications: [], products: [] }
@@ -248,10 +250,10 @@ python3 "$DP" variants "$work/en.md" --config-json "$work/cfg-both.json" \
   || { grep -q 'not configured' "$work/e_bad" && ok "unconfigured platform choice rejected" \
        || err "unconfigured-choice message wrong"; }
 
-# 9. Story 16.5 — deterministic lede-retarget trigger (declared-field comparison).
-#    The EN draft (audience en-practitioner, language en) matches the dev.to
-#    profile → no proposal; it differs from the Zenn profile (ja-practitioner,
-#    ja) → exactly one lede proposal (です/ます register).
+# 9. Story 16.5 (amended 13.71) — deterministic lede-retarget trigger over
+#    audience_id/language/register. The EN draft (audience_id en-practitioner,
+#    language en) matches the dev.to profile → no proposal; it differs from the
+#    Zenn profile (ja-practitioner, ja) → exactly one lede proposal (です/ます).
 rm -rf "$work/e9"
 out=$(python3 "$DP" variants "$work/en.md" --config-json "$work/cfg-both.json" \
         --root "$work/host" --out "$work/e9" --platforms all)
@@ -278,6 +280,47 @@ python3 "$DP" variants "$work/noaud.md" --config-json "$work/cfg.json" \
   || { grep -q 'no resolved `audience`' "$work/e_aud" \
        && ok "unfilled audience is a hard stop (presence enforced)" \
        || err "audience-presence message wrong: $(cat "$work/e_aud")"; }
+
+# --- Story 13.71 (#363): audience_id compatibility trigger ---
+# 9d. Free-text named reader + matching audience_id → pure packaging (the
+#     2026-07-18 spurious-touchpoint case is dead: free text is never compared).
+sed 's/^audience:.*/audience: Solo technical builders with low visibility/' "$work/en.md" > "$work/freetext.md"
+rm -rf "$work/e9d"
+out=$(python3 "$DP" variants "$work/freetext.md" --config-json "$work/cfg.json" \
+        --root "$work/host" --out "$work/e9d" --platforms devto)
+printf '%s' "$out" | python3 -c '
+import json,sys; d=json.load(sys.stdin)
+assert d["emitted"][0]["lede_retarget"] is False, d
+assert not d.get("lede_proposals"), d' \
+  && ok "free-text named reader with matching audience_id fires no touchpoint (13.71)" \
+  || err "same-reader emission still fired the lede trigger"
+
+# 9e. audience_id is stripped from emitted variants like audience.
+grep -q '^audience_id:' "$work/e9d/retry-storms.devto.md" \
+  && err "audience_id leaked into the emitted variant" \
+  || ok "audience_id is stripped from emitted variant frontmatter (13.71)"
+
+# 9f. A draft with an unfilled audience_id is a hard stop (never re-inferred).
+sed 's/^audience_id:.*/audience_id: {audience_id}/' "$work/en.md" > "$work/noaudid.md"
+python3 "$DP" variants "$work/noaudid.md" --config-json "$work/cfg.json" \
+  --root "$work/host" --out "$work/e9" --platforms devto >/dev/null 2>"$work/e_audid" \
+  && err "a draft with an unfilled audience_id was accepted" \
+  || { grep -q 'no resolved `audience_id`' "$work/e_audid" \
+       && ok "unfilled audience_id is a hard stop — never inferred at emission (13.71)" \
+       || err "audience_id-presence message wrong: $(cat "$work/e_audid")"; }
+
+# 9g. Register is the third compared field: a declared register delta at the
+#     same audience_id/language still fires exactly one proposal.
+sed 's/^audience_id:.*/audience_id: en-practitioner\nregister: です\/ます/' "$work/en.md" > "$work/reg.md"
+rm -rf "$work/e9g"
+out=$(python3 "$DP" variants "$work/reg.md" --config-json "$work/cfg.json" \
+        --root "$work/host" --out "$work/e9g" --platforms devto)
+printf '%s' "$out" | python3 -c '
+import json,sys; d=json.load(sys.stdin)
+assert d["emitted"][0]["lede_retarget"] is True, d
+assert len(d.get("lede_proposals",[]))==1, d' \
+  && ok "register delta alone fires the trigger (13.71)" \
+  || err "register comparison not part of the trigger"
 
 if [ "$fail" -eq 0 ]; then
   printf '\nAll stage-5 variant checks passed.\n'; exit 0

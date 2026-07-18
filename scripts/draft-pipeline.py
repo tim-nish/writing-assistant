@@ -684,11 +684,21 @@ def cmd_quality_gate(args):
     except SystemExit:
         fields = {}
     aud = fields.get("audience")
+    aud_id = fields.get("audience_id")
     if not aud or aud == "{audience}":
         results["audience"] = ("fail",
                                "frontmatter `audience` missing or unfilled — set the named "
                                "reader at stage-3 fill (from the interview's audience answer, "
                                "the backlog item, or the draft-start declaration)")
+    elif not aud_id or aud_id == "{audience_id}":
+        # Story 13.71 (#363): the machine-readable compatibility identifier is
+        # declared at draft time alongside the named reader — never inferred
+        # downstream, so its absence is a gate failure exactly like audience's.
+        results["audience"] = ("fail",
+                               "frontmatter `audience_id` missing or unfilled — declare the "
+                               "audience compatibility identifier (from the installed "
+                               "profiles' audience vocabulary) with the audience answer at "
+                               "stage-3 fill")
     else:
         results["audience"] = ("pass", "")
 
@@ -1184,6 +1194,20 @@ def cmd_variants(args):
             "pipeline-internal audience field (the named reader) must be filled "
             "before variants — set it at draft time.\n")
         return 1
+    # Story 13.71 (#363): the trigger compares the STABLE machine-readable
+    # `audience_id` (declared at draft time from the installed profiles'
+    # audience vocabulary), never the free-text named reader — free-text vs
+    # profile slug can never be equal, which made the no-touchpoint branch
+    # unreachable. audience_id is never re-inferred here: absent means a
+    # presence-validation failure, not a guess.
+    draft_audience_id = fields.get("audience_id")
+    if not draft_audience_id or draft_audience_id == "{audience_id}":
+        sys.stderr.write(
+            "error: draft frontmatter has no resolved `audience_id`; the "
+            "pipeline-internal audience compatibility identifier (chosen from "
+            "the installed profiles' audience vocabulary) must be declared at "
+            "draft time — it is never inferred at emission.\n")
+        return 1
 
     # The canonical draft's content hash is recorded with every emitted variant
     # (embedded + reported) so stale-variant detection (Story 16.7) can tell when
@@ -1237,15 +1261,23 @@ def cmd_variants(args):
                 f"Add `{name}.yaml` under {pdir} "
                 "(see config/platform-profiles/*.example.yaml).\n")
             return 1
-        # Lede-retarget trigger (Story 16.5): a DETERMINISTIC comparison of the
-        # declared `audience`/`language` — draft vs profile. Inequality on either
-        # calls for exactly one judgment step (re-targeting the lede/framing to
-        # the profile's named reader; です/ます for `ja`), presented to the owner
-        # as a proposal — the variant's only owner touchpoint. Equality means
-        # pure packaging, no proposal. The trigger is never agent judgment over
-        # content, and there is no `lede_retarget` profile override field.
-        retarget = (draft_audience != profile.get("audience")
-                    or lang != profile.get("language"))
+        # Lede-retarget trigger (Story 16.5; amended Story 13.71/#363): a
+        # DETERMINISTIC comparison of the declared `audience_id`/`language`/
+        # `register` — draft vs profile. Inequality on any calls for exactly
+        # one judgment step (re-targeting the lede/framing to the profile's
+        # named reader; です/ます for `ja`), presented to the owner as a
+        # proposal — the variant's only owner touchpoint. Equality on all
+        # three means pure packaging, no proposal. The trigger is never agent
+        # judgment over content, and there is no `lede_retarget` profile
+        # override field. Register defaults from language when undeclared
+        # (`ja` implies です/ます), on both sides identically.
+        def _register(explicit, language):
+            return explicit or ("です/ます" if language == "ja" else None)
+        draft_register = _register(fields.get("register"), lang)
+        profile_register = _register(profile.get("register"), profile.get("language"))
+        retarget = (draft_audience_id != profile.get("audience")
+                    or lang != profile.get("language")
+                    or draft_register != profile_register)
         content, blocked = _project_variant(fields, body, profile,
                                             owner_variants.get(name, {}))
         # Emission metadata: the canonical draft's hash rides with the variant
@@ -1269,10 +1301,13 @@ def cmd_variants(args):
             # owner-facing proposal contract. The script only fires the trigger.
             lede_proposals.append({
                 "platform": name, "path": path,
-                "draft_audience": draft_audience, "draft_language": lang,
+                "draft_audience": draft_audience,
+                "draft_audience_id": draft_audience_id,
+                "draft_language": lang,
+                "draft_register": draft_register,
                 "profile_audience": profile.get("audience"),
                 "profile_language": profile.get("language"),
-                "register": "です/ます" if profile.get("language") == "ja" else None,
+                "register": profile_register,
             })
 
     out = {
