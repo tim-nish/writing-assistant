@@ -231,6 +231,27 @@ specific workspace's checkpoint directly when you need it:
 python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py resume --ws "$WS"
 ```
 
+**Sub-stage progress inside long stages (Story 13.83, #388).** The stage-level
+checkpoint alone is not enough for the long stages: an evidence-heavy run that
+dies *mid-stage* would replay the whole stage every invocation and never
+converge. So the long stages also record **sub-stage progress** — one call per
+completed unit of work (batchable):
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py progress --ws "$WS" --stage harvest --done <source> [<source> …]
+```
+
+The upsert merges `progress.<stage>.done` into the existing checkpoint
+(preserving `run_state` and stage state), is idempotent per unit, and refuses
+a stage the run has already completed. **Record a unit only after its
+artifacts are durably written** — the recording IS the boundary, so a
+half-written unit is never marked done. On resume, `autostart`/`resume` return
+the `progress` object with the rest of the state: **skip the units it lists**
+and continue from the first unrecorded one. A stage's normal completion
+checkpoint overwrites the file, clearing its sub-stage progress. Stage 1
+records per pinned-source batch (the harvest skill states the exact contract
+at its write site).
+
 **Mark the run done on completion — through the completion gate (Story 13.68).**
 When the pipeline finishes, run the `complete` subcommand. It is the **only
 sanctioned way to finish a draft run** — never hand-write the final
@@ -1488,6 +1509,7 @@ their reference lives in [`variants.md`](variants.md).
 | `autostart` | 0 | Resume the newest in-progress run, else mint a fresh workspace (Story 13.12) | `--root` |
 | `checkpoint` | durability | Persist a completed stage's state to `<ws>/checkpoint.json` (Story 13.5) | `--ws` (req) `<state\|->` |
 | `resume` | durability | Report where to resume a run from its workspace checkpoint | `--ws` (req) |
+| `progress` | durability | Record sub-stage progress (completed units inside a long stage) into the checkpoint (Story 13.83) | `--ws` (req) `--stage` (req) `--done` (req, 1+) |
 | `consume` | 1 | Ingest the harvest fact-sheet document into pipeline state | `<harvest-doc\|->` |
 | `interview` | 2 | Build the bounded gap-interview question set for the framework | `--framework` (req) `<state\|->` |
 | `answer` | 2 | Record one owner answer (single form), or validate a batch | `--id` `--disposition` `--text` `--pointer` (repeatable) `--batch` |
