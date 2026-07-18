@@ -979,6 +979,21 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py quality-gate \
    **both** the quality gate **and** `verify-provenance` — readability revision
    is exactly where an unmarked claim would re-enter, so both gates run every
    cycle.
+   - **The second cycle is a bounded delta re-check (#349, Story 13.65).** Pass
+     `--cycle 2 --prior-locations "<cycle-1 dim1/dim2 failing locations>"`. The
+     mechanical dims (3–4) re-run in full — they can raise a new finding — but a
+     dim1/dim2 judge `fail` at a location cycle 1 never flagged is **suppressed
+     as interpretive drift**, so revision converges instead of the judge naming
+     a fresh 5-finding set each round. **Isolation is preserved**: hand the
+     cycle-2 judge cycle-1's failing **locations** as its scope, never prior
+     verdicts — spawn it in a fresh subagent as always. The gate output records
+     what it suppressed under `delta_recheck` for the audit trail.
+
+     ```
+     python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py quality-gate \
+       --draft <draft> --map "$WS/provenance-map.txt" --judge "$WS/rubric-verdicts.txt" \
+       --cycle 2 --prior-locations "Section 2, para 3; Section 4"
+     ```
 2. **At most 2 revision cycles.** If the gate still fails after two, the failure
    is surfaced as a **publish blocker** in the completion summary (FR20 bucket)
    naming the **failing dimensions and locations** — never silently retried,

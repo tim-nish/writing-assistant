@@ -551,6 +551,19 @@ def _dimension4(draft_text, prov_entries):
     return fails
 
 
+def _loc_set(s):
+    """Normalize a locations string (judge `[locations]` or --prior-locations)
+    into a comparable set: split on `;`/`[`/`]`, drop brackets, lowercase,
+    strip. Used by the second-cycle delta re-check to test whether a cycle-2
+    dim1/dim2 failure overlaps cycle-1's failing locations (#349)."""
+    if not s:
+        return set()
+    if isinstance(s, (list, tuple)):
+        s = ";".join(s)
+    parts = re.split(r"[;\[\]]", str(s))
+    return {p.strip().lower() for p in parts if p.strip()}
+
+
 def cmd_quality_gate(args):
     """Stage 3→4 quality gate (Story 11.4). Dimensions 3 and 4 are mechanical
     here; dimensions 1–2 come from the single-pass judge's verdicts (--judge, a
@@ -614,6 +627,30 @@ def cmd_quality_gate(args):
         verdict, locations = judged.get(dim, ("fail", "no judge verdict"))
         results[dim] = (verdict, "" if verdict == "pass" else locations)
 
+    # Second-cycle DELTA re-check (#349, Story 13.65). On cycle 2, the dim1–2
+    # LLM judge is scoped to VERIFY that cycle-1's failing locations were
+    # addressed — it may NOT introduce a NEW interpretive dim1–2 finding. A
+    # cycle-2 dim1/dim2 `fail` whose locations do not overlap cycle-1's failing
+    # locations is interpretive drift (the observed oscillation), suppressed to
+    # `pass` so revision converges. Mechanical dims (3/4) and audience re-run in
+    # full below and CAN raise new findings. Isolation (NFR13) is preserved by
+    # the orchestrator: it hands the judge cycle-1's LOCATIONS as scope, never
+    # prior verdicts — this command only enforces the delta arithmetic.
+    delta_suppressed = []
+    if getattr(args, "cycle", 1) >= 2:  # the second/delta cycle (the two-cycle bound)
+        prior = _loc_set(getattr(args, "prior_locations", None))
+        if prior:
+            for dim in ("dim1", "dim2"):
+                v, loc = results[dim]
+                if v != "fail":
+                    continue
+                this_locs = _loc_set(loc)
+                if this_locs and not (this_locs & prior):
+                    # a fresh interpretive finding at a location cycle 1 never
+                    # flagged — not actionable on the delta re-check
+                    results[dim] = ("pass", "")
+                    delta_suppressed.append({"dimension": dim, "locations": loc})
+
     # Dimension 3: mechanical, exhaustive, deterministic (#305).
     known = []
     for a in (getattr(args, "audience_known", None) or []):
@@ -661,6 +698,19 @@ def cmd_quality_gate(args):
            "failing_dimensions": failing}
     if vocab_stamp:
         out["dim3_inventory"] = vocab_stamp
+    # Delta re-check accounting (#349): what the second cycle suppressed as a
+    # fresh interpretive dim1/dim2 finding (not in cycle-1's locations), so the
+    # convergence decision is auditable from the gate output alone.
+    if delta_suppressed:
+        out["cycle"] = getattr(args, "cycle", 1)
+        out["delta_recheck"] = {
+            "suppressed_new_interpretive": delta_suppressed,
+            "note": ("second cycle is a delta re-check: a dim1/dim2 fail at a "
+                     "location cycle 1 never flagged is not actionable (only a "
+                     "mechanical dim may raise a new finding); isolation is "
+                     "preserved — the judge received cycle-1 locations as scope, "
+                     "not prior verdicts"),
+        }
     # The judge's dim3 opinion, when it offered one, rides along as an advisory
     # for the completion summary's informational bucket — never a gate verdict
     # (#305). It is recorded, not obeyed.
@@ -2356,6 +2406,13 @@ def main(argv=None):
                     help="comma-separated repo-internal terms the ratified audience already "
                          "knows; excluded from the dim3 scan (repeatable). Audience judgment "
                          "enters once, as owner-ratified data — never re-judged per pass")
+    sp.add_argument("--cycle", type=int, default=1,
+                    help="revision cycle (1 = first gate; 2 = the second/delta re-check, "
+                         "#349). On cycle 2 the dim1-2 judge is scoped to cycle-1's failing "
+                         "locations and may not raise a new interpretive finding")
+    sp.add_argument("--prior-locations", metavar="LOCS",
+                    help="cycle-1's failing dim1/dim2 locations (`;`-separated); on cycle 2, a "
+                         "dim1/dim2 fail outside these is suppressed as interpretive drift")
     sp = sub.add_parser("verify-markers")
     sp.add_argument("draft", nargs="?", default="-", help="draft file, or - for stdin")
     sp.add_argument("--count", action="store_true", help="print the count of well-formed markers")
