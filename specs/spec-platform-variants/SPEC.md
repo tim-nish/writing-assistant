@@ -12,6 +12,12 @@ sources:
 > (platform-ready variants) into a full stage contract. Where the two disagree,
 > this spec wins for the variant stage; CAP-4's one-line promise remains the
 > pipeline-level summary. Source documents in frontmatter are traceability only.
+> **Amended 2026-07-18 (triage, #361/#362)**: the projection substrate is the
+> **persisted** canonical (`drafts/{slug}.md` at `output.drafts`), never a
+> run-workspace intermediate; emission is a **separate post-review invocation**,
+> never offered inline during the draft flow; and **review never re-emits** — a
+> post-review canonical change marks existing variants stale (CAP-6), and
+> re-emission is a fresh explicit publish decision.
 
 # Platform Variants
 
@@ -61,32 +67,46 @@ per publish decision.**
     intent/packaging split is unrepresentable in a profile, not conventional
     (ratified 2026-07-16, Epic 16 story review; transcribed per
     SPEC-policy-realignment F5; implemented in Story 16.2).
-- **CAP-3 (emission is per publish decision)**
+- **CAP-3 (emission is per publish decision)** (amended 2026-07-18, #361/#362)
   - **intent:** Variants are emitted on an explicit owner choice, presented
-    in-conversation per the CAP-6 interaction contract (#226) — e.g. after the
-    canonical draft passes the quality gate: "emit dev.to variant / emit Zenn
-    variant / both / stop here." The pipeline never auto-emits all configured
-    platforms.
+    in-conversation per the CAP-6 interaction contract (#226) — in a **separate
+    post-review invocation** consuming the persisted, reviewed canonical: "emit
+    dev.to variant / emit Zenn variant / both / stop here." The choice is never
+    offered inline during the draft flow, the pipeline never auto-emits all
+    configured platforms, and **no stage re-emits a variant implicitly** — when
+    the canonical changes after emission (e.g. review-applied edits), existing
+    variants are marked stale (CAP-6) and re-emission waits for a fresh explicit
+    publish decision.
   - **success:** A run whose owner publishes only on dev.to this week leaves no
     Zenn file anywhere; the choice and its outcome appear in the completion
-    summary.
+    summary; a review run that edits the canonical leaves the variant files
+    untouched and the staleness check reporting them stale.
 - **CAP-4 (variant projection, with one bounded judgment step)**
   - **intent:** A variant is a projection of the canonical draft: claims, evidence,
     provenance, and section structure are carried over unchanged — a variant never
     introduces a claim the canonical draft (and its provenance map) does not
     contain. Whether a variant gets the single judgment step is a **deterministic
     comparison of declared fields** (OQ1 resolution — owner decision record
-    2026-07-16, lede-retarget trigger): the canonical draft's
-    frontmatter declares its `audience` and `language`; the profile declares its
-    own; inequality on either triggers exactly one judgment step. `audience` is
-    a **required pipeline-internal frontmatter field**: populated from the
-    backlog item's named reader at draft time (a backlog-less draft declares it
-    at draft start), validated for presence by stage-0/the quality gate, and
+    2026-07-16, lede-retarget trigger; **amended 2026-07-18, #363** — the
+    free-text-vs-slug comparison made the no-touchpoint branch unreachable):
+    the canonical draft's frontmatter declares its `audience_id`, `language`,
+    and `register`; the profile declares its own; **the trigger compares
+    `audience_id`, `language`, and `register` deterministically** — inequality
+    on any triggers exactly one judgment step. `audience_id` is a **stable,
+    machine-readable compatibility identifier** drawn from the installed
+    profiles' audience vocabulary, declared by the owner at draft time (with
+    the backlog/draft-start audience answer) and stored in **both** the
+    article plan and the canonical draft; it is **never re-inferred at
+    emission** and it **never replaces** the owner-authored free-text
+    `audience` (the named reader), which continues to serve prose, the
+    quality gate, and judges unchanged. Both fields are pipeline-internal:
+    populated at draft time (a backlog-less draft declares them at draft
+    start), validated for presence by stage-0/the quality gate, and
     **stripped by variant packaging** — published variant frontmatter and the
-    user-config site schema never carry it. The judgment step is **re-targeting
+    user-config site schema never carry them. The judgment step is **re-targeting
     the lede and framing to the profile's named reader** (for Zenn/JA: the named
-    JP reader, です/ます register); equality on both fields means pure packaging
-    with no proposal. The trigger is never agent judgment over content. This
+    JP reader, です/ます register); equality on all three compared fields means
+    pure packaging with no proposal. The trigger is never agent judgment over content. This
     re-targeted material is presented to the owner as a proposal under the
     owner-facing proposal contract (approve / modify / replace), inside the
     existing ≤10-minute attention budget — it is the variant's only owner
@@ -95,7 +115,8 @@ per publish decision.**
     in frontmatter/packaging, language surface, and the re-targeted lede/framing;
     `verify-provenance` run on the variant finds no claim absent from the
     canonical provenance map; the owner saw at most one proposal per variant —
-    exactly one iff `audience`/`language` mismatched, zero otherwise.
+    exactly one iff `audience_id`/`language`/`register` mismatched, zero
+    otherwise (a same-reader EN→dev.to emission fires no touchpoint).
 - **CAP-5 (variant checks are lint-sized, never a second review)**
   - **intent:** The full review (SPEC-article-review) and the quality gate (CAP-7)
     run on the canonical draft only. An emitted variant gets a **mechanical
