@@ -65,6 +65,7 @@ mkdir -p "$ppdir"
 cat > "$ppdir/hashnode.yaml" <<'EOF'
 platform: hashnode
 audience: en-practitioner
+audience_id: en-practitioner
 language: en
 packaging:
   frontmatter: [title, tags]
@@ -88,6 +89,7 @@ date: 2026-07-09
 mode: canonical
 language: en
 audience: en-practitioner
+audience_id: en-practitioner
 summary: s
 topics: [a, b]
 ---

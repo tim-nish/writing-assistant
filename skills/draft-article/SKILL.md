@@ -227,7 +227,8 @@ rule).** When `stage0`/`autostart` resumes a run (`"resumed": true`) whose
 `next_stage` is `verify` or `variants` — i.e. a filled draft already exists among
 the intermediates — confirm that draft carries a **resolved `audience`** before
 continuing (a run checkpointed before the audience precondition existed may lack
-it). If it is missing or still `{audience}`, fill it per the Stage-3 rule and
+it). If it is missing or still `{audience}` (or `audience_id` is missing or
+still `{audience_id}` — Story 13.71), fill both per the Stage-3 rule and
 re-run the quality gate; the variant stage's hard stop remains the mechanical
 backstop either way.
 
@@ -675,15 +676,21 @@ so a schema change propagates without editing the fill:
 python3 ${CLAUDE_PLUGIN_ROOT}/scripts/render-frontmatter.py --language <en|ja>
 ```
 
-**Fill `audience` here (Story 13.41 — this is where the field is born).** The
-skeleton carries a pipeline-internal `audience: {audience}` slot: replace it with
-the **one named reader** — from the interview's audience answer (q5) when one was
-given, from the backlog item's declared audience when drafting from the backlog,
-or from the owner's draft-start declaration otherwise. Never leave the `{audience}`
-placeholder: the stage 3→4 quality gate fails on it (a stage-progression
-precondition), and the variant stage hard-stops as backstop. The field is
-pipeline-internal — variant packaging strips it, and it never enters the site
-schema.
+**Fill `audience` and `audience_id` here (Stories 13.41 and 13.71 — this is
+where both fields are born).** The skeleton carries pipeline-internal
+`audience: {audience}` and `audience_id: {audience_id}` slots. Replace
+`audience` with the **one named reader** — from the interview's audience answer
+(q5) when one was given, from the backlog item's declared audience when
+drafting from the backlog, or from the owner's draft-start declaration
+otherwise. Replace `audience_id` with the **stable compatibility identifier**
+the owner selected with that same audience answer, **chosen from the installed
+platform profiles' audience vocabulary** (list the profiles' `audience` values
+and have the owner pick the matching id at the audience declaration — e.g.
+`en-practitioner`); it never replaces the free-text named reader and is
+**never re-inferred at emission**. Never leave either placeholder: the stage
+3→4 quality gate fails on both (a stage-progression precondition), and the
+variant stage hard-stops as backstop. Both fields are pipeline-internal —
+variant packaging strips them, and they never enter the site schema.
 
 **Provenance — every sentence is one of three classes (Story 11.1;
 `docs/harness-architecture.md` D1).** Synthesis is legal without abandoning the
@@ -1153,19 +1160,23 @@ picks only one platform leaves no file for the others, anywhere).
 
 - **Precondition:** the draft carries **zero `[VERIFY]` markers** — Stage 4 must
   be complete. Any unresolved marker aborts the stage. The draft must also
-  declare a resolved `audience` (the named reader) — an unfilled one is a hard
-  stop.
-- **Lede re-targeting proposal (Story 16.5), the variant's only owner
-  touchpoint.** For each emitted variant the pipeline fires a **deterministic
-  trigger** — it compares the draft's declared `audience`/`language` against the
-  profile's. When they **differ** (e.g. a Zenn/JA profile for an EN draft) the
+  declare a resolved `audience` (the named reader) and `audience_id` (the
+  compatibility identifier, Story 13.71) — an unfilled one is a hard stop.
+- **Lede re-targeting proposal (Story 16.5; trigger amended by Story 13.71),
+  the variant's only owner touchpoint.** For each emitted variant the pipeline
+  fires a **deterministic trigger** — it compares the draft's declared
+  **`audience_id`, `language`, and `register`** against the profile's (register
+  defaults from language on both sides: `ja` implies です/ます; the free-text
+  `audience` named reader is never compared — Story 13.71). When any of the
+  three **differ** (e.g. a Zenn/JA profile for an EN draft) the
   variant carries `lede_retarget: true` and a `lede_proposals` entry. Perform
   **exactly one** judgment step for it: re-target the lede and framing to the
   profile's named reader (です/ます register for `ja`) **without introducing any
   claim absent from the canonical draft**, and present it under the
   [owner-facing proposal contract](../owner-facing-proposal-contract.md)
-  (approve / modify / replace). When audience and language **match**, emission is
-  pure packaging — **no proposal, no touchpoint**. The trigger is never your
+  (approve / modify / replace). When all three **match**, emission is
+  pure packaging — **no proposal, no touchpoint** (a same-reader EN→dev.to
+  emission fires nothing). The trigger is never your
   judgment over content; there is no `lede_retarget` profile field.
 - **Emission metadata:** each emitted variant carries the canonical draft's
   content hash (a trailing `canonical-sha256` comment) so a later run can flag a

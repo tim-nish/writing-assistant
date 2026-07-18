@@ -54,6 +54,7 @@ status: outlined
 run_id: 20260717T135459-737958
 pin: writing-assistant@$sha
 audience: solo developers shipping their own tools
+audience_id: en-practitioner
 policy_seeded: true
 seed: topics/articles.md:36@$sha
 ---

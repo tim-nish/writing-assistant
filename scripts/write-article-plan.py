@@ -22,7 +22,7 @@ Frontmatter contract (issue #310, owner-set 2026-07-17):
   REQUIRED  kind (constant `article-plan`), slug (== filename stem), intent,
             claim, status (outlined|drafted|superseded), run_id,
             pin (`<source-repo>@<commit>`)
-  OPTIONAL  audience, policy_seeded, seed (required iff policy_seeded), relates
+  OPTIONAL  audience, audience_id, policy_seeded, seed (required iff policy_seeded), relates
   FORBIDDEN everything the canonical draft or its variants own (title, summary,
             topics, language, published, variants_emitted, canonical_url),
             machine-state content (checkpoint, journal, provenance-map data),
@@ -72,7 +72,7 @@ PLAN_DIR = "plans"
 REFUSED = 4  # schema violation — nothing is written
 
 REQUIRED_KEYS = ("kind", "slug", "intent", "claim", "status", "run_id", "pin")
-OPTIONAL_KEYS = ("audience", "policy_seeded", "seed", "relates")
+OPTIONAL_KEYS = ("audience", "audience_id", "policy_seeded", "seed", "relates")
 PLAN_STATUSES = ("outlined", "drafted", "superseded")
 
 # Fields the canonical draft or its variants own — a plan restating one forks

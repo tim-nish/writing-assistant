@@ -37,6 +37,7 @@ slug: t
 title: The one claim
 language: en
 audience: en-practitioner
+audience_id: en-practitioner
 ---
 # The one claim
 
@@ -82,7 +83,7 @@ python3 "$DP" quality-gate --draft "$work/good.md" --map "$work/stitch-map.txt" 
   && err "stitched fact sheet reached stage 4" || ok "stitched fact sheet does not reach stage 4 unrevised"
 
 # A wall-of-text paragraph fails dim4 mechanically (no judge needed).
-python3 -c "print('---\nslug: w\naudience: en-practitioner\n---\n# t\n\n' + ' '.join('word%d'%i for i in range(200)) + '.')" > "$work/wall.md"
+python3 -c "print('---\nslug: w\naudience: en-practitioner\naudience_id: en-practitioner\n---\n# t\n\n' + ' '.join('word%d'%i for i in range(200)) + '.')" > "$work/wall.md"
 python3 "$DP" quality-gate --draft "$work/wall.md" | jget 'd["dimensions"]["dim4"]["verdict"]' | grep -q fail \
   && ok "a wall-of-text paragraph fails dim4 (mechanical)" || err "wall of text passed dim4"
 
@@ -119,6 +120,7 @@ cat > "$work/vocab.md" <<'MD'
 ---
 slug: v
 audience: en-practitioner
+audience_id: en-practitioner
 ---
 # T
 
@@ -148,6 +150,7 @@ cat > "$work/vocab-fixed.md" <<'MD'
 ---
 slug: v
 audience: en-practitioner
+audience_id: en-practitioner
 ---
 # T
 
@@ -163,7 +166,7 @@ python3 "$DP" quality-gate --draft "$work/vocab-fixed.md" | jget 'd["dimensions"
 # introduces it straddle a line break. A line-based scan calls the gloss absent
 # and manufactures a false violation. Asserted explicitly (not only via the
 # convergence case) so unwrapping that fixture can never silently drop it.
-printf -- '---\nslug: w\naudience: en-practitioner\n---\n# T\n\nThe fact\nsheet, the list of gathered claims, fed Stage 3 — the framework-fill\nstep — without any trouble.\n' > "$work/wrapped.md"
+printf -- '---\nslug: w\naudience: en-practitioner\naudience_id: en-practitioner\n---\n# T\n\nThe fact\nsheet, the list of gathered claims, fed Stage 3 — the framework-fill\nstep — without any trouble.\n' > "$work/wrapped.md"
 python3 "$DP" quality-gate --draft "$work/wrapped.md" | jget 'd["dimensions"]["dim3"]["verdict"]' | grep -q pass \
   && ok "a gloss wrapped across a line break still introduces its term (no false violation)" \
   || err "wrapped gloss manufactured a false dim3 violation"
@@ -174,6 +177,7 @@ cat > "$work/dedup.md" <<'MD'
 ---
 slug: d
 audience: en-practitioner
+audience_id: en-practitioner
 ---
 # T
 
@@ -196,6 +200,11 @@ sed 's/^audience:.*/audience: {audience}/' "$work/good.md" > "$work/noaud.md"
 python3 "$DP" quality-gate --draft "$work/noaud.md" --map "$work/good-map.txt" --judge "$work/judge-pass.txt" >/dev/null 2>&1 \
   && err "an unfilled audience passed the gate" \
   || ok "an unfilled audience fails the gate (stage-progression precondition)"
+# Story 13.71: audience_id presence is gated identically — never inferred later.
+sed 's/^audience_id:.*/audience_id: {audience_id}/' "$work/good.md" > "$work/noaudid.md"
+python3 "$DP" quality-gate --draft "$work/noaudid.md" --map "$work/good-map.txt" --judge "$work/judge-pass.txt" >/dev/null 2>&1 \
+  && err "an unfilled audience_id passed the gate" \
+  || ok "an unfilled audience_id fails the gate (13.71)"
 python3 "$DP" quality-gate --draft "$work/noaud.md" --map "$work/good-map.txt" --judge "$work/judge-pass.txt" \
   | jget '"audience" in d["failing_dimensions"]' | grep -q True \
   && ok "the audience precondition is named in failing_dimensions" || err "audience failure not named"

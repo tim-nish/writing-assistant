@@ -54,6 +54,7 @@ date: 2026-07-09
 mode: canonical
 language: en
 audience: en-practitioner
+audience_id: en-practitioner
 summary: s
 topics: [a]
 ---
@@ -65,7 +66,7 @@ Prose.
 graph TD; A-->B
 ```
 EOF
-sed -e 's/^language: en/language: ja/' -e 's/^audience: en-practitioner/audience: ja-practitioner/' \
+sed -e 's/^language: en/language: ja/' -e 's/^audience: en-practitioner/audience: ja-practitioner/' -e 's/^audience_id: en-practitioner/audience_id: ja-practitioner/' \
     -e 's/^mode: canonical/mode: external/' "$work/en.md" > "$work/ja.md"
 cat > "$work/cfg-en.json" <<'EOF'
 {"frontmatter":{"schema":["slug","title","language"]},

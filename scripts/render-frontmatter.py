@@ -71,6 +71,7 @@ def render(cfg, lang):
             # required on the draft, stripped by variant packaging, never part
             # of the site schema in user config.
             out.append("audience: {audience}   # pipeline-internal — stripped at packaging")
+            out.append("audience_id: {audience_id}   # pipeline-internal compatibility id (Story 13.71) — stripped at packaging")
 
     variants = cfg.get("syndication", {}).get("variants", {})
     if mode == "canonical":
