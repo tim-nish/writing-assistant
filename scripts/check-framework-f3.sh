@@ -45,7 +45,15 @@ check_order "## GATE {Pointer block}"
 [ "$order_ok" -eq 1 ] && ok "slots appear in the exact F3 order"
 
 # 2. Entry GATE precondition + exactly two fill-GATEs.
-has "GATE (entry)" "entry GATE present (a measurement you actually ran)"
+has "GATE (entry)" "entry GATE present (an evaluation you actually ran)"
+# Story 13.86 (#389): the GATE accepts observed results, not only measured
+# numbers — but still refuses an evaluation you did not run.
+has "evaluation you actually ran and its observed result" \
+  "entry GATE keys on an evaluation you ran + observed result (13.86)"
+has "need not be a benchmark number" "entry GATE admits qualitative results"
+has "counted instances" "entry GATE names the qualitative result forms"
+has "an evaluation you did not run" "entry GATE still refuses no-run subjects"
+has "this is a survey (F4)" "no-run redirect to F4 unchanged"
 grep -c '^## GATE {' "$F3" | grep -qx 2 && ok "exactly two fill-GATEs (What-it-caught, Pointer)" \
   || err "expected 2 '## GATE {' headings"
 
@@ -53,6 +61,11 @@ grep -c '^## GATE {' "$F3" | grep -qx 2 && ok "exactly two fill-GATEs (What-it-c
 has "results table/figure" "results GATE annotated as table/figure"
 has "Real results from running it" "results GATE cue: real results"
 has "placeholder does NOT satisfy" "results GATE rejects prose/[VERIFY] placeholder"
+# 13.86: qualitative rows satisfy the slot, pinned like sourced claims.
+has "whether quantitative or not" "results GATE admits qualitative observed results"
+has "caught-defect episodes" "results GATE names qualitative row forms"
+has "pinned like any sourced claim" "qualitative rows carry pins"
+has "Prose-only" "prose-only still refused alongside [VERIFY]"
 
 # 4. Naive-failure demo and results are cross-referenced to one measurement.
 has "DEMONSTRATE the failure" "naive-failure slot demonstrates (not asserts)"
