@@ -2794,6 +2794,53 @@ def cmd_checkpoint(args):
     return 0
 
 
+def cmd_progress(args):
+    """Record SUB-stage progress inside a long stage (Story 13.83, #388): after
+    each completed unit of work — a pinned-source batch in harvest, a filled
+    section in stage 3 — upsert it into `<ws>/checkpoint.json` under
+    `progress.<stage>.done`, so a mid-stage casualty resumes from the last
+    persisted boundary instead of replaying the whole stage. The upsert MERGES
+    into the existing checkpoint (run_state and any stage state are preserved)
+    and is idempotent per item. Record a unit only AFTER its artifacts are
+    durably written — the recording is the boundary, so a half-written unit
+    must never be marked done. A stage's normal completion checkpoint then
+    overwrites the file, clearing its sub-stage progress."""
+    if not os.path.isdir(args.ws):
+        sys.stderr.write(f"error: run workspace does not exist: {args.ws}\n")
+        return 1
+    path = _checkpoint_path(args.ws)
+    state = {}
+    if os.path.isfile(path):
+        try:
+            with open(path, encoding="utf-8") as f:
+                state = json.load(f)
+        except (OSError, json.JSONDecodeError) as e:
+            sys.stderr.write(f"error: existing checkpoint unreadable: {e}\n")
+            return 1
+    current = state.get("next_stage")
+    if current == DONE_STAGE:
+        sys.stderr.write(
+            "error: run is complete (next_stage: done) — sub-stage progress "
+            "cannot reopen it\n")
+        return 1
+    if current is not None and current != args.stage:
+        sys.stderr.write(
+            f"error: run is at next_stage {current!r}, not {args.stage!r} — "
+            "sub-stage progress is recorded only for the stage in progress "
+            "(a completed stage's checkpoint already points past it)\n")
+        return 1
+    state.setdefault("next_stage", args.stage)
+    done = state.setdefault("progress", {}).setdefault(args.stage, {}).setdefault("done", [])
+    added = [d for d in args.done if d not in done]
+    done.extend(added)
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(state, f, indent=2)
+    os.replace(tmp, path)
+    print(json.dumps({"stage": args.stage, "done": done, "added": added}))
+    return 0
+
+
 def cmd_resume(args):
     """Report where to resume a run from its workspace checkpoint. Prints a JSON
     object: `{"resumed": true, ...state}` when a checkpoint exists (resume from
@@ -3299,6 +3346,13 @@ def main(argv=None):
     sp.add_argument("state", nargs="?", default="-", help="the stage's output state JSON, or - for stdin")
     sp = sub.add_parser("resume", help="report where to resume a run from its workspace checkpoint (Story 13.5)")
     sp.add_argument("--ws", required=True, help="the run workspace ($WS) to resume")
+    sp = sub.add_parser("progress", help="record sub-stage progress (a completed unit inside a long stage) "
+                                         "into the workspace checkpoint (Story 13.83)")
+    sp.add_argument("--ws", required=True, help="the run workspace ($WS)")
+    sp.add_argument("--stage", required=True, help="the stage in progress (e.g. harvest, fill)")
+    sp.add_argument("--done", required=True, nargs="+",
+                    help="completed unit id(s) — e.g. source names or section slugs; "
+                         "idempotent, batchable in one call")
     sp = sub.add_parser("complete", help="finish the run through the dual-product completion gate (Story 13.68)")
     sp.add_argument("--draft", required=True, help="the workspace draft to persist as the canonical, or - for stdin")
     sp.add_argument("--slug", required=True, help="the article slug — names both products (<slug>.md)")
@@ -3507,6 +3561,7 @@ def main(argv=None):
     return {
         "start": cmd_start, "consume": cmd_consume, "interview": cmd_interview,
         "checkpoint": cmd_checkpoint, "resume": cmd_resume, "autostart": cmd_autostart,
+        "progress": cmd_progress,
         "stage0": cmd_stage0, "complete": cmd_complete,
         "classify-policy": cmd_classify_policy,
         "policy-block-check": cmd_policy_block_check,

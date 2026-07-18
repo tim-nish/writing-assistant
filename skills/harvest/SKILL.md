@@ -296,6 +296,23 @@ has no way to guess it. **Print the resolved absolute
 informational notes below (standalone runs), so "where is my fact sheet?" has a
 copy-pasteable answer rather than a `$WS` the user cannot expand.
 
+**Per-source progress recording (Story 13.83, #388) — pipeline-driven runs
+only.** A large harvest must survive a mid-stage turn-ceiling death without
+replaying sources already harvested. After each source's entries are extracted,
+pinned, validated, and **appended to `$WS/fact-sheet.md`** — in that order, the
+sheet write comes first — record the source as done (batch several in one
+call):
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py progress --ws "$WS" --stage harvest --done <source> [<source> …]
+```
+
+On a resumed run, the checkpoint's `progress.harvest.done` lists the sources
+already harvested: **skip them** — their entries are in the fact sheet; do not
+re-read, re-pin, or re-validate them — and continue with the first source not
+listed. Standalone harvests (no pipeline `$WS` checkpoint) skip this recording;
+the completion contract is unchanged either way.
+
 Pass that `$WS/fact-sheet.md` path as `<harvest-doc>` to the validators above.
 Never compose a storage path yourself, and never write the fact sheet, the
 NEEDS-OWNER list, or any scratch into the host working tree — only declared
