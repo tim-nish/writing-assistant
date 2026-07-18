@@ -44,13 +44,16 @@ owner can pick it back up instead of starting over:
   ```
 
   When it reports `resumed: true` and a `next_stage` short of the end, the summary
-  names the last completed stage and gives the resume command; a completed run
+  names the last completed stage and gives the resume command; when the state
+  carries a `budget_stop` note (an orderly stop, Story 13.85), relay that note —
+  it names the exact boundary reached and what remains. A completed run
   reports nothing here. This item is informational, not a blocker — a partial run
   is recoverable, not broken.
 
-Before a stage hard-fails at the ceiling, **surface a budget-triage signal** (a
-warning that the turn budget is nearly spent) rather than dying silently at
-`error_max_turns`, so the run can be checkpointed and resumed rather than lost.
+When a stage's budget-triage signal fires, the run performs an **orderly
+stop** (Story 13.85, #388): it finishes only the unit in progress, persists at
+that sub-stage boundary with a `--stop-note`, and exits clean — a normal end
+of an invocation, never a silent death at `error_max_turns`.
 
 ## Explicit next step — an in-conversation choice, never a file to open
 
