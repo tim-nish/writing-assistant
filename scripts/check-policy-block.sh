@@ -37,7 +37,7 @@ work=$(mktemp -d); trap 'rm -rf "$work"' EXIT
 python3 -c "import py_compile; py_compile.compile('$root/$PIPE', doraise=True)" 2>/dev/null \
   && ok "pipeline compiles" || { err "pipeline syntax error"; printf '\nFAILED.\n' >&2; exit 1; }
 
-sha=cb43caf4a5b6c7d8e9f0a1b2c3d4e5f607182931
+sha=deadbeef4a5b6c7d8e9f0a1b2c3d4e5f6071829
 oldsha=aaaa000000000000000000000000000000000000
 newsha=bbbb000000000000000000000000000000000000
 

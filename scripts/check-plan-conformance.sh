@@ -36,7 +36,7 @@ python3 -c "import py_compile; py_compile.compile('$root/$W', doraise=True)" 2>/
 python3 -c "import py_compile; py_compile.compile('$root/scripts/policy_subjects.py', doraise=True)" 2>/dev/null \
   && ok "shared policy_subjects module compiles" || err "policy_subjects syntax error"
 
-sha=cb43caf4a5b6c7d8e9f0a1b2c3d4e5f607182931
+sha=deadbeef4a5b6c7d8e9f0a1b2c3d4e5f6071829
 oldsha=aaaa000000000000000000000000000000000000
 
 # A no-conflict config: EN mode is source, not canonical.

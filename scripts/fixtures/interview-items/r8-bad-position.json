@@ -2,13 +2,13 @@
   {"id": "rc1", "gap_type": "reconciliation",
    "positions": [
      {"quote": "Website stays independent — reference records only.",
-      "pointer": "topics/articles.md:17@cb43caf4a5b6c7d8e9f0a1b2c3d4e5f607182931",
+      "pointer": "topics/articles.md:17@deadbeef4a5b6c7d8e9f0a1b2c3d4e5f6071829",
       "authority": "editor"},
      {"quote": "syndication.policy.en.mode: canonical",
       "pointer": "syndication.policy.en.mode",
       "authority": "config"},
      {"quote": "",
-      "pointer": "site/config.yaml:12@cb43caf4a5b6c7d8e9f0a1b2c3d4e5f607182931",
+      "pointer": "site/config.yaml:12@deadbeef4a5b6c7d8e9f0a1b2c3d4e5f6071829",
       "authority": "repo"}
    ],
    "question": "Which of these positions governs the EN topology?",
