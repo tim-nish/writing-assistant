@@ -946,7 +946,14 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py quality-gate \
   emitting **pass/fail per dimension + failing locations, no rewritten text**;
   its verdicts feed `--judge`. **Verdict grammar (exact — instruct the judge
   verbatim, #303):** one line per dimension, `dim1: pass|fail [locations]` and
-  `dim2: …` — the literal keys, never prose forms like `dimension 1: pass`. The
+  `dim2: …` — the literal keys, never prose forms like `dimension 1: pass`.
+  **Instruct the judge that dimensions 1–2 own only narrative/flow (Story
+  13.66):** a dim1/dim2 finding must cite a narrative-arc or paragraph-flow
+  defect, **never a sentence- or paragraph-length artifact** — length is
+  dimension 4's (mechanical), and a sentence split/merge made to satisfy dim4
+  is neutral for dim1/dim2. This is the rubric's dimension-separation contract
+  ([`quality-rubric.md`](quality-rubric.md)) and is what lets the second-cycle
+  delta re-check converge. The
   gate refuses an unparseable judge file with a named error (exit 2) before
   judging anything; re-spawn the judge with the grammar restated rather than
   treating that error as a quality failure — it does not consume a revision
