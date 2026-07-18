@@ -129,8 +129,15 @@ config or framework:
     Never scaffold silently, and never create the file inside the host repo.
 - **Article-type check** against the **closed set** of intent labels and their
   `F1`–`F4` aliases (`resolve_framework`) — an invalid name exits non-zero and
-  **nothing starts** (no workspace minted). Relay and stop; the error names the
-  valid intent labels.
+  **nothing starts** (no workspace minted). Relay and stop. **An unmapped
+  intent gets a reason and a nearest fit, never a bare label list (Story
+  13.81):** the error states *why* there is no framework (the category set is
+  ratified and closed — F1–F4 plus the working-note profile), names the
+  closest sanctioned fit for the intent, and for a tutorial/how-to intent
+  references the deliberate AP-10 exclusion (SPEC-article-frameworks) so the
+  writer sees a decision, not a bug. Relay that hint verbatim — never
+  fuzzy-select a framework on the writer's behalf; a mapped intent resolves
+  exactly as before.
 - **Workspace autostart** — resumption is **automatic, not opt-in**. It resumes
   the **newest in-progress run** (a workspace whose checkpoint records a
   `next_stage` other than `done`) when one exists, returning `"resumed": true`
