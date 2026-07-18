@@ -39,6 +39,31 @@ Rejection classes (each has a fixture under fixtures/interview-items/):
       in the seed quote, the question adds no tension and is rejected.
   R5  `gap_type` outside the closed vocabulary.
 
+Reconciliation items (Story 13.75, SPEC-policy-source-seam CAP-7 `conflict`
+class; seam-formats.md §2 "Reconciliation item"): a config↔policy(↔repo)
+disagreement is a `gap_type: "reconciliation"` item that carries a `positions`
+array INSTEAD of a seed — every disagreeing position, each
+`{quote, pointer, authority}` with `authority` ∈ {policy, config, repo}. The
+pointer grammar is per-authority:
+
+  policy  the existing FILEPIN whitelist grammar
+          (`GLOSSARY.md|LESSONS.md|topics/<name>.md:line[-line]@sha`);
+  config  an authoritative user-config key path + configVersion
+          (`syndication.policy.en.mode@<version>`);
+  repo    the harvest pointer convention (`path:line[-line]@sha`).
+
+`owner_answer` stays structurally empty (R1 applies unchanged). Additional
+rejection classes:
+
+  R8  a `reconciliation` item with <2 positions, or any position missing its
+      quote/pointer/authority, or an invalid authority — a conflict needs both
+      sides, auditable.
+  R9  mutually exclusive shapes — a `reconciliation` item carrying a `seed`,
+      or any other gap type carrying `positions`: the reconciliation gate
+      cannot be bypassed by re-typing a conflict. (The classifier's own output
+      validation enforces the other half — a conflict subject never passes
+      through as an ordinary item; `draft-pipeline.py classify-policy`.)
+
 Recommended-default items (Story 13.59, SPEC-policy-editorial-direction CAP-6)
 carry an optional `recommended_default` — a policy-recalled position offered as
 a proposed default the owner ratifies (approve/modify/replace/skip), for an
@@ -74,7 +99,10 @@ NEEDS_OWNER_TAXONOMY = {
     "warning", "opinion", "retrospective",
 }
 TENSION_TYPES = {"contradiction", "ambiguity", "missing-rationale", "reversal-candidate"}
-GAP_TYPES = NEEDS_OWNER_TAXONOMY | TENSION_TYPES
+# The conflict-classified question shape (Story 13.75, CAP-7): carries a
+# `positions` array instead of a seed — see the module docstring.
+RECONCILIATION_TYPE = "reconciliation"
+GAP_TYPES = NEEDS_OWNER_TAXONOMY | TENSION_TYPES | {RECONCILIATION_TYPE}
 
 # The editorial-judgment classes eligible for a policy-recalled recommended
 # default (SPEC-policy-editorial-direction CAP-6, Story 13.59). A subset of the
@@ -89,6 +117,18 @@ ELIGIBLE_DEFAULT_TYPES = {
 # must be commit-pinned (validate-fact-sheet.py's FILEPIN convention).
 POINTER_RE = re.compile(
     r"^(GLOSSARY\.md|LESSONS\.md|topics/[^/\s]+\.md):\d+(-\d+)?@[0-9a-f]{7,40}$")
+
+# Reconciliation-position pointer grammars, one per authority (Story 13.75,
+# seam-formats.md §2): `policy` reuses the FILEPIN whitelist grammar above;
+# `config` cites a user-config key path at its configVersion; `repo` uses the
+# harvest pointer convention (any repo path, commit-pinned).
+CONFIG_POINTER_RE = re.compile(r"^[A-Za-z0-9_.-]+@[A-Za-z0-9._-]+$")
+REPO_POINTER_RE = re.compile(r"^[^\s@]+:\d+(-\d+)?@[0-9a-f]{7,40}$")
+POSITION_POINTER_RES = {
+    "policy": POINTER_RE,
+    "config": CONFIG_POINTER_RE,
+    "repo": REPO_POINTER_RE,
+}
 
 # R4: a confirmation-shaped question opens with one of these stems and then
 # contributes (almost) no content word beyond its seed quote.
@@ -145,26 +185,70 @@ def validate_items(items):
             continue
         missing = [k for k in ("id", "gap_type", "question", "owner_answer")
                    if k not in item]
-        if "seed" not in item:
+        # Mutually exclusive shapes (R9): a reconciliation item carries
+        # `positions`, every other item carries `seed` (possibly null).
+        if item.get("gap_type") == RECONCILIATION_TYPE:
+            if "positions" not in item:
+                missing.append("positions")
+        elif "seed" not in item:
             missing.append("seed")
         if missing:
             rej("R5", f"missing required field(s): {', '.join(missing)}")
             continue
 
         gap_type = item["gap_type"]
-        seed = item["seed"]
+        seed = item.get("seed")
 
         if item["owner_answer"] != "":
             rej("R1", "owner_answer is pre-filled; it must be structurally "
                       "empty at generation — the tool cannot pre-decide")
         if gap_type not in GAP_TYPES:
             rej("R5", f"unknown gap_type {gap_type!r}; the vocabulary is closed "
-                      f"(NEEDS-OWNER taxonomy + {', '.join(sorted(TENSION_TYPES))})")
+                      f"(NEEDS-OWNER taxonomy + {', '.join(sorted(TENSION_TYPES))} "
+                      f"+ {RECONCILIATION_TYPE})")
+        elif gap_type == RECONCILIATION_TYPE:
+            if seed is not None:
+                rej("R9", "a reconciliation item must not carry a seed — the "
+                          "shapes are mutually exclusive (positions carry every "
+                          "disagreeing side; a seed would re-type the conflict)")
+                seed = None  # positions are the item's evidence; validate them below
         elif gap_type in TENSION_TYPES and seed is None:
             rej("R2", f"tension type {gap_type!r} requires a seed "
                       "(quote + pinned pointer); traceability is a rule, not a convention")
         elif gap_type not in TENSION_TYPES and seed is not None:
             rej("R2", f"a policy seed may only generate tension types, not {gap_type!r}")
+
+        # R9's other face: only a reconciliation item may carry positions — a
+        # conflict presented as any other item type bypasses the reconciliation
+        # gate by re-typing (seam-formats.md §2).
+        if gap_type != RECONCILIATION_TYPE and item.get("positions") is not None:
+            rej("R9", f"gap type {gap_type!r} must not carry a positions array — "
+                      "a conflict-classified subject is presented only as a "
+                      "reconciliation item, never re-typed")
+        if gap_type == RECONCILIATION_TYPE:
+            positions = item.get("positions")
+            if not isinstance(positions, list) or len(positions) < 2:
+                rej("R8", "a reconciliation item needs >=2 positions — a "
+                          "conflict has at least two disagreeing sides")
+            else:
+                for i, pos in enumerate(positions):
+                    if not isinstance(pos, dict):
+                        rej("R8", f"positions[{i}] is not an object")
+                        continue
+                    authority = pos.get("authority")
+                    if authority not in POSITION_POINTER_RES:
+                        rej("R8", f"positions[{i}] authority {authority!r} is invalid "
+                                  "(valid: policy, config, repo)")
+                        continue
+                    if not str(pos.get("quote", "")).strip():
+                        rej("R8", f"positions[{i}] ({authority}) has no quote — "
+                                  "nothing auditable")
+                    pointer = str(pos.get("pointer", "") or "")
+                    if not POSITION_POINTER_RES[authority].match(pointer):
+                        rej("R8", f"positions[{i}] ({authority}) pointer {pointer!r} "
+                                  "is missing or malformed for its authority "
+                                  "(policy: whitelist FILEPIN; config: "
+                                  "<key-path>@configVersion; repo: path:line@sha)")
 
         if seed is not None:
             if not isinstance(seed, dict) or not seed.get("quote", "").strip():

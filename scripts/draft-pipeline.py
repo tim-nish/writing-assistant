@@ -141,7 +141,7 @@ _PRESENTATION_SLOTS = {"opinion": 0, "audience": 1, "significance": 2}
 
 def presentation_slot(rec):
     """0 = claim/angle, 1 = audience, 2 = headline/significance, 3 = color."""
-    if rec.get("rationale") == "policy-seed":
+    if rec.get("rationale") in ("policy-seed", "policy-reconciliation"):
         return 0
     return _PRESENTATION_SLOTS.get(rec.get("topic"), 3)
 
@@ -1581,6 +1581,448 @@ def cmd_site_record(args):
     return 0
 
 
+# --- CAP-7 policy-result classification (Story 13.75, #365) -------------------
+#
+# The interview rationales that count as POLICY-PRIORITY for selection: the
+# #302 reserved slot, the presentation lead, and the staging-candidate emitter
+# all key on membership here, so a reconciliation item ranks at least as high
+# as a policy-seeded tension item everywhere a tension item ranks.
+POLICY_PRIORITY_RATIONALES = ("policy-seed", "policy-reconciliation")
+
+# The owner-judgment classes CAP-7 structurally exempts from every class but
+# open/conflict: judgment is never pre-decided or candidate-filtered, even
+# when an item's text happens to match a comparable subject.
+JUDGMENT_CLASSES = {
+    "opinion", "significance", "surprise", "tradeoff", "warning", "audience",
+    "motivation", "retrospective",
+}
+
+# The declarative comparable-subjects table and its detector live in the
+# shared module `policy_subjects.py` (extracted for Story 13.76 so the plan
+# conformance gate validates against the SAME table — never a second copy).
+_policy_subjects = _load("policy_subjects.py")
+COMPARABLE_SUBJECTS = _policy_subjects.COMPARABLE_SUBJECTS
+_parse_policy_surface = _policy_subjects.parse_policy_surface
+_config_lookup = _policy_subjects.config_lookup
+
+
+def cmd_classify_policy(args):
+    """Stage 2 pre-step: classify the served policy result for every candidate
+    policy item BEFORE the interview (Story 13.75, SPEC-policy-source-seam
+    CAP-7; seam-formats.md §2 reconciliation item). MECHANICAL — no LLM, no
+    semantic parsing of arbitrary subjects: classification is computed over the
+    declarative COMPARABLE_SUBJECTS table, which scopes it to RATIFIED FACTS
+    (CAP-7's ratified-fact vs owner-judgment boundary).
+
+    Four classes, per CAP-7:
+
+      determined / constrained — structurally present in the output but
+        EMPTY-BY-DEFAULT: they activate as comparable subjects gain
+        determining/excluding semantics in the table (the extension point).
+        The shipped EN-topology detector emits `conflict`.
+      open       — the default pass-through: policy does not answer; the item
+        is presented unchanged.
+      conflict   — a served policy line and an authoritative user-config key
+        disagree on a comparable subject: emit ONE reconciliation item
+        (`gap_type: reconciliation`, a `positions` array carrying every
+        disagreeing side with its pointer + authority) and REFUSE to pass any
+        candidate tension item on that subject through as an ordinary item —
+        the original is marked `superseded_by_reconciliation` (R9's
+        classifier half: the reconciliation gate cannot be bypassed).
+
+    Structural exemption: an item whose gap_type is an owner-judgment class
+    (opinion, significance, surprise, tradeoff, warning, audience, motivation,
+    retrospective) is ALWAYS `open` — judgment is never pre-decided or
+    filtered, even when its text matches a conflict subject.
+
+    Inputs: --surface (the reader's `read` output: pin + line-numbered files);
+    the resolved user config (--config-json, or --root like other
+    subcommands); --items (the candidate policy items the agent authored,
+    seam-formats.md §2); --facts (harvest-state JSON — reserved for repo-state
+    positions as subjects gain repo comparability); --config-version (the
+    cited configVersion; default: a sha256 prefix of the resolved config).
+
+    Output JSON: {pin, config_version, classified, reconciliation_items,
+    determined, constrained, journal_records, interview_items} —
+    `interview_items` is the ready-to-pass `--items` array for `interview`
+    (reconciliation items first, then the open pass-throughs, superseded
+    originals excluded).
+    """
+    try:
+        surface_text = open(args.surface, encoding="utf-8").read()
+    except OSError as e:
+        sys.stderr.write(f"error: cannot read policy surface {args.surface!r}: {e}\n")
+        return 2
+    pin, surface_lines = _parse_policy_surface(surface_text)
+
+    rf = _load("render-frontmatter.py")
+    cfg_args = argparse.Namespace(config_json=args.config_json, root=args.root,
+                                  global_config=args.global_config,
+                                  repo_config=args.repo_config)
+    try:
+        cfg = rf.load_config(cfg_args)
+    except Exception as e:
+        sys.stderr.write(f"error: cannot resolve user config: {e}\n")
+        return 2
+    config_version = args.config_version or hashlib.sha256(
+        json.dumps(cfg, sort_keys=True).encode("utf-8")).hexdigest()[:12]
+
+    items = []
+    if args.items:
+        items = _load_json_state(args.items, "candidate policy items")
+        if isinstance(items, dict) and "items" in items:
+            items = items["items"]
+        if not isinstance(items, list):
+            sys.stderr.write("error: --items must be a JSON array of interview items\n")
+            return 2
+    if args.facts:
+        # Reserved: repo-state positions join as the subject table gains
+        # repo-comparable rows; loading validates the input exists and parses.
+        _load_json_state(args.facts, "harvest state")
+
+    # 1. Conflict detection over the declared comparable subjects (shared
+    # detector — the conformance gate runs the same one).
+    conflicts = _policy_subjects.detect_conflicts(surface_lines, cfg, config_version)
+
+    reconciliation_items = []
+    journal_records = []
+    for i, c in enumerate(conflicts, 1):
+        subject = c["subject"]
+        rid = f"rc{i}"
+        question = (
+            f"Served policy records \"{c['policy']['quote']}\" "
+            f"({c['policy']['pointer']}), while your authoritative config "
+            f"declares {c['config']['quote']} ({c['config']['pointer']}) — "
+            f"these disagree on {subject['label']}. Which position governs "
+            "this run, and should the losing record be updated?")
+        reconciliation_items.append({
+            "id": rid, "gap_type": "reconciliation",
+            "positions": [c["policy"], c["config"]],
+            "question": question, "owner_answer": "",
+        })
+        journal_records.append({
+            "id": rid, "class": "conflict", "subject": subject["id"],
+            "positions": [c["policy"], c["config"]],
+        })
+
+    def conflict_for(item):
+        """The detected conflict a candidate tension item's seed line sits on
+        (matched by pinned pointer file:line, or by the subject's own line
+        pattern over the seed quote) — else None."""
+        seed = item.get("seed") or {}
+        seed_ptr = str(seed.get("pointer", "")).rsplit("@", 1)[0]
+        seed_quote = str(seed.get("quote", ""))
+        for i, c in enumerate(conflicts):
+            policy_loc = c["policy"]["pointer"].rsplit("@", 1)[0]
+            if seed_ptr and seed_ptr == policy_loc:
+                return i
+            if seed_quote and c["subject"]["policy_line"].search(seed_quote):
+                return i
+        return None
+
+    # 2. Classify every candidate item.
+    classified = []
+    open_items = []
+    for item in items:
+        gap_type = item.get("gap_type")
+        if gap_type in JUDGMENT_CLASSES:
+            # Structural exemption: owner judgment is never pre-decided or
+            # filtered — always open, text match or not.
+            classified.append({"id": item.get("id"), "class": "open",
+                               "exemption": "owner-judgment", "item": item})
+            open_items.append(item)
+            continue
+        ci = conflict_for(item)
+        if ci is not None:
+            rid = reconciliation_items[ci]["id"]
+            classified.append({"id": item.get("id"), "class": "conflict",
+                               "superseded_by_reconciliation": rid,
+                               "item": item})
+            journal_records.append({
+                "id": item.get("id"), "class": "conflict",
+                "superseded_by_reconciliation": rid,
+                "subject": conflicts[ci]["subject"]["id"],
+            })
+            continue
+        classified.append({"id": item.get("id"), "class": "open", "item": item})
+        open_items.append(item)
+
+    out = {
+        "stage": "classify-policy",
+        "pin": pin,
+        "config_version": config_version,
+        "classified": classified,
+        "reconciliation_items": reconciliation_items,
+        "determined": [],
+        "constrained": [],
+        "journal_records": journal_records,
+        "interview_items": reconciliation_items + open_items,
+    }
+    print(json.dumps(out, indent=2))
+    return 0
+
+
+# --- Stage 2→3 policy-block gate (Story 13.77, #365) --------------------------
+#
+# SPEC-article-draft-pipeline (2026-07-18 amendment): draft generation BLOCKS
+# on a conflict or stale plan — a stage-progression precondition like the
+# quality gate, surfaced as a publish blocker naming the conflicting positions
+# (or the moved pin/configVersion), never silently proceeded past. The block
+# point is the Stage 2→3 boundary: pre-draft the gate input is the
+# `classify-policy` result (+ recorded answers), and on resumed runs with an
+# existing plan, the plan's recorded CAP-4 conformance status (recomputed at
+# the current pin when a fresh surface is supplied).
+
+# Dispositions that count as an OWNER ANSWER to a reconciliation question —
+# any recorded decision, INCLUDING a reversal (which proceeds as a proposed
+# policy change via its staging-candidate block, never as current policy). A
+# skip records no decision, so the conflict stays unresolved and blocking.
+RECONCILIATION_ANSWERED = {"answered", "modified", "replaced", "approved",
+                           "ratified"}
+
+# The suggested block checkpoint: the run resumes AT the block — the
+# reconciliation question re-presents on resume (`next_stage: interview`) —
+# never before Stage 2, and never past the gate at `fill`.
+BLOCK_CHECKPOINT = {"stage": "policy-block", "next_stage": "interview"}
+
+
+def _conformance_recompute(args):
+    """Re-run the CAP-4 conformance gate over --plan against the supplied
+    surface (read-only — never --write) and return its parsed JSON. Delegated
+    to `write-article-plan.py conformance` via subprocess so this gate and the
+    plan gate can never diverge (same table, same rules, one implementation)."""
+    here = os.path.dirname(os.path.realpath(__file__))
+    cmd = [sys.executable, os.path.join(here, "write-article-plan.py"),
+           "conformance", "--plan", args.plan, "--surface", args.surface]
+    if args.config_json:
+        cmd += ["--config-json", args.config_json]
+    if args.root:
+        cmd += ["--root", args.root]
+    if args.config_version:
+        cmd += ["--config-version", args.config_version]
+    if args.staging:
+        cmd += ["--staging", args.staging]
+    r = subprocess.run(cmd, capture_output=True, text=True)
+    if r.returncode != 0:
+        raise RuntimeError(r.stderr.strip() or "conformance recompute failed")
+    return json.loads(r.stdout)
+
+
+def _conflict_blocker_text(blockers):
+    """The copy-pasteable publish-blocker wording for unresolved conflicts:
+    every disagreeing position named with its pointer, plus the repair."""
+    parts = []
+    for b in blockers:
+        pos = " vs ".join(
+            f"{p.get('authority', '?')}: \"{p.get('quote', '')}\" "
+            f"({p.get('pointer', '?')})" for p in b.get("positions", []))
+        if pos:
+            parts.append(pos)
+        elif b.get("recorded"):
+            rec = b["recorded"]
+            parts.append(f"recorded policy_conformance: conflict at "
+                         f"policy_pin {rec.get('policy_pin')} / configVersion "
+                         f"{rec.get('policy_config_version')} (re-run the "
+                         "conformance gate with the current surface to name "
+                         "the positions)")
+    return ("Draft generation is blocked: served policy and the "
+            "authoritative config disagree — " + "; ".join(parts) + ". "
+            "Answer the reconciliation question to choose which position "
+            "governs this run; an owner reversal proceeds as a proposed "
+            "policy change (its staging-candidate block), never as current "
+            "policy.")
+
+
+def _stale_blocker_text(pin_delta):
+    cur = pin_delta.get("current_pin") or ("unknown — re-consult at the "
+                                           "current pin to learn it")
+    changed = ", ".join(pin_delta.get("changed") or []) or "(unenumerated)"
+    return ("Draft generation is blocked: the consulted policy pin moved — "
+            f"recorded {pin_delta.get('recorded_pin')} (configVersion "
+            f"{pin_delta.get('recorded_config_version')}), current {cur}; "
+            f"changed consulted lines: {changed}. Re-consult at the current "
+            "pin (re-run the policy reader, classify-policy, and the "
+            "conformance recompute against the fresh surface), then re-run "
+            "this check — it proceeds or re-blocks per the new status.")
+
+
+def cmd_policy_block_check(args):
+    """The Stage 2→3 stage-progression precondition (Story 13.77,
+    SPEC-article-draft-pipeline 2026-07-18 amendment): draft generation blocks
+    on an unresolved config↔policy conflict or a stale plan. MECHANICAL — no
+    LLM; it reads what earlier mechanical steps already computed.
+
+    Blocked iff:
+
+      (a) --classification (a `classify-policy` output) contains a
+          reconciliation item with NO recorded owner answer — pass --answers
+          (the recorded answer records) to check dispositions; ANY recorded
+          decision unblocks, including a reversal (it proceeds as a proposed
+          policy change via staging, never as current policy). A skip is not
+          an answer;
+      (b) --plan (an existing article plan, the resumed-run half) whose
+          conformance status is `conflict` or `stale` — the recorded
+          `policy_conformance` frontmatter by default; with --surface the
+          status is RECOMPUTED at the current pin through the CAP-4 gate
+          (`write-article-plan.py conformance`, read-only), so a re-consult
+          whose referenced lines still hold clears a recorded `stale`.
+
+    `conformant` and `open` proceed unchanged. Generic mode — no
+    classification and no policy-touched plan — never fires the gate:
+    {blocked: false, reason: "generic-mode"}.
+
+    Blocked output is a publish-blocker payload: `action: publish-blocker`,
+    the conflicting positions with pointers (or `pin_delta` naming the moved
+    pin/configVersion), copy-pasteable `publish_blocker` wording, the in-run
+    `repair`, and the suggested block `checkpoint`
+    {"stage": "policy-block", "next_stage": "interview"} — resumable at the
+    block (the reconciliation question re-presents), never at `fill`.
+    """
+    blockers = []
+    positions = []
+    pin_delta = None
+    reasons = []
+    policy_in_play = False
+
+    # (a) The classification half: unresolved reconciliation items block.
+    if args.classification:
+        policy_in_play = True
+        data = _load_json_state(args.classification, "classify-policy output")
+        rec_items = data.get("reconciliation_items", []) \
+            if isinstance(data, dict) else []
+        answers = {}
+        if args.answers:
+            parsed = _load_json_state(args.answers, "answers batch")
+            for a in (parsed if isinstance(parsed, list) else [parsed]):
+                answers[a.get("id")] = a.get("disposition")
+        unresolved = 0
+        for item in rec_items:
+            disp = answers.get(item.get("id"))
+            if disp in RECONCILIATION_ANSWERED:
+                continue   # answered — a reversal rides staging as a proposal
+            unresolved += 1
+            blockers.append({
+                "kind": "conflict", "id": item.get("id"),
+                "positions": item.get("positions", []),
+                "question": item.get("question"),
+                "why": ("skipped — a skip records no reconciliation decision"
+                        if disp == "skipped" else "no recorded owner answer"),
+            })
+            positions.extend(item.get("positions", []))
+        if rec_items and not unresolved:
+            reasons.append("reconciliation-answered")
+        elif not rec_items:
+            reasons.append("no-conflict-classified")
+
+    # (b) The plan half (resumed runs): recorded status, or a recompute at
+    # the current pin when a fresh surface is in hand.
+    if args.plan:
+        wap = _load("write-article-plan.py")
+        try:
+            plan_text = open(args.plan, encoding="utf-8").read()
+        except OSError as e:
+            sys.stderr.write(f"error: cannot read plan {args.plan!r}: {e}\n")
+            return 2
+        fields, _body, _errs = wap.split_frontmatter(plan_text)
+        seeded = wap._truthy(fields.get("policy_seeded", ""))
+        recorded = fields.get("policy_conformance", "")
+        conf = None
+        if args.surface:
+            # Re-consult path: recompute through the CAP-4 gate at the
+            # current pin — a recorded `stale` clears when the referenced
+            # lines still hold; a live conflict re-blocks with positions.
+            policy_in_play = True
+            try:
+                conf = _conformance_recompute(args)
+            except (RuntimeError, json.JSONDecodeError, OSError) as e:
+                sys.stderr.write(f"error: conformance recompute failed: {e}\n")
+                return 2
+            status = conf["status"]
+        else:
+            if seeded or recorded:
+                policy_in_play = True
+            status = recorded or None
+
+        if status == "conflict":
+            conflict_findings = [f for f in (conf or {}).get("findings", [])
+                                 if f.get("kind") == "conflict"]
+            if conflict_findings:
+                for f in conflict_findings:
+                    blockers.append({"kind": "conflict",
+                                     "subject": f.get("subject"),
+                                     "positions": f.get("positions", []),
+                                     "why": f.get("note")})
+                    positions.extend(f.get("positions", []))
+            else:
+                blockers.append({
+                    "kind": "conflict",
+                    "recorded": {
+                        "policy_pin": fields.get("policy_pin"),
+                        "policy_config_version":
+                            fields.get("policy_config_version")},
+                    "why": "the plan records policy_conformance: conflict"})
+        elif status == "stale":
+            stale_findings = [f for f in (conf or {}).get("findings", [])
+                              if f.get("kind") == "stale"]
+            pin_delta = {
+                "recorded_pin": fields.get("policy_pin"),
+                "current_pin": (conf or {}).get("pin"),
+                "recorded_config_version": fields.get("policy_config_version"),
+                "current_config_version": (conf or {}).get("config_version"),
+                "changed": [f["pointer"] for f in stale_findings
+                            if f.get("pointer")],
+            }
+            blockers.append({"kind": "stale", "pin_delta": pin_delta,
+                             "why": "the consulted policy pin moved and a "
+                                    "referenced consulted line changed"
+                                    if conf else
+                                    "the plan records policy_conformance: "
+                                    "stale"})
+        elif status in ("conformant", "open"):
+            reasons.append(f"plan-{status}")
+
+    # Generic mode: no policy_source in play anywhere — the gate NEVER fires.
+    if not policy_in_play:
+        print(json.dumps({"stage": "policy-block-check", "blocked": False,
+                          "reason": "generic-mode",
+                          "note": "no policy classification and no "
+                                  "policy-seeded plan — behavior identical "
+                                  "to a repo without the seam"}, indent=2))
+        return 0
+
+    out = {"stage": "policy-block-check", "blocked": bool(blockers)}
+    if not blockers:
+        out["reason"] = "; ".join(reasons) or "no-policy-conflict"
+        print(json.dumps(out, indent=2))
+        return 0
+
+    conflict_blockers = [b for b in blockers if b["kind"] == "conflict"]
+    out["reason"] = "; ".join(
+        (["unresolved config↔policy conflict"] if conflict_blockers else []) +
+        (["stale plan (moved pin)"] if pin_delta else []))
+    out["action"] = "publish-blocker"
+    out["blockers"] = blockers
+    if positions:
+        out["positions"] = positions
+    if pin_delta:
+        out["pin_delta"] = pin_delta
+    texts = []
+    if conflict_blockers:
+        texts.append(_conflict_blocker_text(conflict_blockers))
+    if pin_delta:
+        texts.append(_stale_blocker_text(pin_delta))
+    out["publish_blocker"] = " ".join(texts)
+    out["repair"] = ("Repairable in-run: answer the reconciliation question "
+                     "(record it via `answer`, re-run this check — any "
+                     "recorded decision unblocks, a reversal routes to "
+                     "staging as a proposed policy change), or for a stale "
+                     "plan re-consult at the current pin (re-run the reader "
+                     "+ classify-policy + conformance) and re-run this check.")
+    out["checkpoint"] = dict(BLOCK_CHECKPOINT)
+    print(json.dumps(out, indent=2))
+    return 0
+
+
 def cmd_interview(args):
     """Stage 2: triage every candidate question against the harvest output
     (fact sheet + NEEDS-OWNER) into exactly one of three outcomes, then present
@@ -1669,7 +2111,14 @@ def cmd_interview(args):
     for item in seeded_candidates:
         rec = {"id": item["id"], "text": item["question"],
                "topic": item["gap_type"], "outcome": "open"}
-        if item.get("seed"):
+        if item.get("gap_type") == "reconciliation":
+            # A CAP-7 conflict-classified subject (Story 13.75): the explicit
+            # reconciliation question, carrying every disagreeing position.
+            # Ranks with the policy-seeded tension items everywhere they rank
+            # (reserved slot, presentation lead, staging-candidate emitter).
+            rec.update(rationale="policy-reconciliation",
+                       positions=item["positions"])
+        elif item.get("seed"):
             rec.update(rationale="policy-seed", seed=item["seed"])
         else:
             # A supplied item without a seed is a generic extra candidate,
@@ -1704,7 +2153,7 @@ def cmd_interview(args):
     # seeded candidates in play — never padded, never exceeded.
     survivors = [r for r in triage if r["outcome"] != "suppressed"]
     survivors.sort(key=lambda r: 0 if r["outcome"] == "recommended"
-                   else 1 if r["rationale"] == "policy-seed" else 2)
+                   else 1 if r["rationale"] in POLICY_PRIORITY_RATIONALES else 2)
     # ONE SLOT IS RESERVED for the highest-priority policy-seeded tension item
     # whenever one exists (#302; SPEC-article-draft-pipeline CAP-2 amended
     # 2026-07-17). Priority order alone starves seeds on any repo whose harvest
@@ -1715,7 +2164,8 @@ def cmd_interview(args):
     # cap itself is untouched: the reserved item DISPLACES the lowest-priority
     # survivor, it never extends the budget.
     if len(survivors) > QUESTION_BUDGET:
-        seeds = [r for r in survivors if r.get("rationale") == "policy-seed"]
+        seeds = [r for r in survivors
+                 if r.get("rationale") in POLICY_PRIORITY_RATIONALES]
         if seeds and QUESTION_BUDGET >= 1:
             keep = {id(seeds[0])}          # the reservation
             for r in survivors:            # fill the rest in priority order
@@ -1735,7 +2185,8 @@ def cmd_interview(args):
                   "from_gap": r["outcome"] == "recommended", "outcome": r["outcome"],
                   "rationale": r["rationale"],
                   **({"grounding": r["grounding"]} if "grounding" in r else {}),
-                  **({"seed": r["seed"]} if "seed" in r else {})}
+                  **({"seed": r["seed"]} if "seed" in r else {}),
+                  **({"positions": r["positions"]} if "positions" in r else {})}
                  for r in presented]
     out = {
         "stage": "interview",
@@ -1944,6 +2395,10 @@ def cmd_journal(args):
                      "rationale": t.get("rationale")}
             if "seed" in t:
                 entry["seed"] = [t["seed"]["pointer"]]
+            if "positions" in t:
+                entry["positions"] = [{"authority": p["authority"],
+                                       "pointer": p["pointer"]}
+                                      for p in t["positions"]]
             entries.append(entry)
             continue
         disposition = answers.get(qid)
@@ -1959,6 +2414,13 @@ def cmd_journal(args):
             # Policy-seeded question: the journal's seed<- field, parallel to
             # the recommendation grounding (Story 14.4).
             entry["seed"] = [t["seed"]["pointer"]]
+        if "positions" in t:
+            # Reconciliation ask (Story 13.75, CAP-7 conflict class): every
+            # disagreeing position rides into the journal, parallel to seed<-,
+            # so the reconciliation is attributable from run state.
+            entry["positions"] = [{"authority": p["authority"],
+                                   "pointer": p["pointer"]}
+                                  for p in t["positions"]]
         entries.append(entry)
 
     # The /ask-style consulted: line the run artifact must end with (CAP-5):
@@ -1966,6 +2428,15 @@ def cmd_journal(args):
     # explicit `none` naming why (unset vs unavailable, from --policy-note).
     seeds = [(t["seed"]["pointer"], t["id"]) for t in triage
              if t.get("seed") and t["id"] in asked_ids]
+    # Reconciliation asks: their policy-authority positions are served lines
+    # too, so they join the same audited pointer → question mapping (the
+    # config-authority side carries a configVersion, not the run's pin — it
+    # stays in the journal entry's positions, never the consulted: line).
+    for t in triage:
+        if t.get("positions") and t["id"] in asked_ids:
+            for pos in t["positions"]:
+                if pos.get("authority") == "policy" and "@" in str(pos.get("pointer", "")):
+                    seeds.append((pos["pointer"], t["id"]))
     # Decision-level influences (Story 13.37): '<pointer>=<label>' pairs — e.g.
     # the policy-informed article-type recommendation — join the same audited
     # mapping; the grammar is unchanged (pointer → what it shaped, at the pin).
@@ -2078,7 +2549,7 @@ def cmd_staging_candidates(args):
     questions = {q["id"]: q for q in interview.get("questions", [])}
     blocks = []
     for qid, q in questions.items():
-        if q.get("rationale") != "policy-seed":
+        if q.get("rationale") not in ("policy-seed", "policy-reconciliation"):
             continue
         a = by_id.get(qid)
         if not a or a.get("disposition") not in ("answered", "modified", "replaced"):
@@ -2090,6 +2561,33 @@ def cmd_staging_candidates(args):
         if not text:
             continue
         gist = re.sub(r"[^a-z0-9]+", "-", q["topic"].lower()).strip("-")
+        if q.get("rationale") == "policy-reconciliation":
+            # A config↔policy reconciliation decision (Story 13.75, CAP-7):
+            # the owner just arbitrated between a served ratified line and an
+            # authoritative config key. Framed as exactly that — analogous to
+            # the #306 stale-seed framing — with every position it decided
+            # between, so the hub receives a proposed policy change carrying
+            # both sides, never a "resolution" missing its context. The answer
+            # is NEVER treated as current policy by this run's later stages
+            # (that plan-side gate is Story 13.76's).
+            positions = "; ".join(
+                f"{p.get('authority', '?')}: \"{p.get('quote', '')}\" — "
+                f"{p.get('pointer', '?')}" for p in q.get("positions", []))
+            tags = ["config-policy-reconciliation"] + (args.tag or [])
+            blocks.append("\n".join([
+                "<!-- staging-candidate -->",
+                "---",
+                f"slug: {args.created}-{args.source_repo}-{gist}-{qid}",
+                f"created: {args.created}",
+                f"source_repo: {args.source_repo}",
+                "perishable: true",
+                f"tags: [{', '.join(tags)}]",
+                "---",
+                f"Q: Config↔policy reconciliation decision — {q['text']} "
+                f"(positions: {positions})",
+                f"Decision: {text}",
+            ]))
+            continue
         tags = [q["topic"]] + (args.tag or [])
         blocks.append("\n".join([
             "<!-- staging-candidate -->",
@@ -2789,6 +3287,56 @@ def main(argv=None):
     sp.add_argument("framework")
     sp.add_argument("sources", nargs="*")
     sp.add_argument("--root", help="host-repo root (default: git top-level of cwd; errors outside a git repo)")
+    sp = sub.add_parser("classify-policy",
+                        help="CAP-7 policy-result classification: a mechanical "
+                             "pre-step between the policy read and `interview` "
+                             "(Story 13.75) — emits reconciliation items for "
+                             "config↔policy conflicts, supersedes re-typed "
+                             "conflict candidates, passes everything else "
+                             "through open")
+    sp.add_argument("--surface", required=True,
+                    help="the policy reader's `read` output (pin line + "
+                         "line-numbered files)")
+    sp.add_argument("--items", help="candidate policy items JSON "
+                                    "(seam-formats.md §2), or - for stdin")
+    sp.add_argument("--facts", help="harvest-state JSON (reserved: repo-state "
+                                    "positions as subjects gain repo comparability)")
+    sp.add_argument("--config-json", help="resolved config as JSON (FILE or - for stdin)")
+    sp.add_argument("--root", help="host-repo root (default: git top-level of cwd)")
+    sp.add_argument("--global-config")
+    sp.add_argument("--repo-config")
+    sp.add_argument("--config-version",
+                    help="the configVersion cited on config-authority positions "
+                         "(default: sha256 prefix of the resolved config JSON)")
+    sp = sub.add_parser("policy-block-check",
+                        help="Stage 2→3 precondition (Story 13.77): draft "
+                             "generation blocks on an unresolved "
+                             "config↔policy conflict or a stale plan — "
+                             "publish-blocker payload + block checkpoint; "
+                             "conformant/open (and generic mode) proceed")
+    sp.add_argument("--classification",
+                    help="the `classify-policy` output JSON (FILE or -); an "
+                         "unanswered reconciliation item blocks")
+    sp.add_argument("--answers",
+                    help="recorded answer records (JSON list) — an answered "
+                         "reconciliation (incl. a reversal routed to staging) "
+                         "unblocks; a skip does not")
+    sp.add_argument("--plan",
+                    help="an existing article plan (the resumed-run half): "
+                         "its recorded policy_conformance blocks on "
+                         "conflict/stale")
+    sp.add_argument("--surface",
+                    help="fresh policy surface (the reader's `read` output) — "
+                         "with --plan, recompute conformance at the current "
+                         "pin (a re-consult clears a recorded stale)")
+    sp.add_argument("--config-json", help="resolved config as JSON "
+                                          "(FILE or - for stdin)")
+    sp.add_argument("--root", help="host-repo root (default: git top-level of cwd)")
+    sp.add_argument("--config-version",
+                    help="the cited configVersion for the recompute")
+    sp.add_argument("--staging",
+                    help="the run's staging-candidates.md — a covered "
+                         "reversal is conformant as a proposed policy change")
     sp = sub.add_parser("interview")
     sp.add_argument("--framework", required=True)
     sp.add_argument("--items", help="candidate interview-item JSON (e.g. policy-seeded questions); "
@@ -2921,6 +3469,8 @@ def main(argv=None):
         "start": cmd_start, "consume": cmd_consume, "interview": cmd_interview,
         "checkpoint": cmd_checkpoint, "resume": cmd_resume, "autostart": cmd_autostart,
         "stage0": cmd_stage0, "complete": cmd_complete,
+        "classify-policy": cmd_classify_policy,
+        "policy-block-check": cmd_policy_block_check,
         "review-reentry": cmd_review_reentry,
         "answer": cmd_answer, "journal": cmd_journal, "provenance": cmd_provenance,
         "staging-candidates": cmd_staging_candidates,

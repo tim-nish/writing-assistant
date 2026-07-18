@@ -400,13 +400,61 @@ dependency; no exit code here may abort the run**:
   halt and report it like any CAP-5 finding (this cannot happen after a clean
   `stage0`).
 
+### Policy-result classification — CAP-7, before any owner question (Story 13.75)
+
+After authoring the policy items and **before** running `interview`, classify
+the served policy result against the authoritative user config
+(SPEC-policy-source-seam CAP-7, added 2026-07-18, #365). This is a
+**mechanical pre-step** — a deterministic pass over a declarative
+comparable-subjects table, never an LLM judgment:
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py classify-policy \
+  --surface "$WS/policy-surface.txt" --root "$HOST" \
+  --items "$WS/policy-items.json" > "$WS/policy-classified.json"
+```
+
+Every candidate subject lands in exactly one of CAP-7's four classes —
+`determined` / `constrained` / `open` / `conflict` (the first two are
+structurally present in the output and empty until the subject table grows;
+the shipped detector covers the EN-topology regression as `conflict`). Pass
+the output's `interview_items` array (reconciliation items first, then the
+open pass-throughs) as the `--items` file below, and carry its
+`journal_records` into the run record. Three contracts hold:
+
+- **A conflict subject is presented ONLY as the emitted reconciliation
+  question** — a `gap_type: reconciliation` item whose `positions` array
+  carries every disagreeing side (`{quote, pointer, authority ∈
+  policy|config|repo}`; seam-formats.md §2) — **never as an ordinary
+  content-preference question whose candidates smuggle the conflict in**. The
+  classifier marks the original tension item `superseded_by_reconciliation`
+  and drops it from the pass-through; do not re-add it. (This is the
+  2026-07-18 regression: a policy-incompatible records-only answer was
+  offered as an ordinary candidate, selected, and shipped unreconciled
+  against `syndication.policy` EN-canonical config.)
+- **Owner judgment is never pre-decided — the structural exemption.** An item
+  whose gap_type is a judgment class (`opinion`, `significance`, `surprise`,
+  `tradeoff`, `warning`, `audience`, `motivation`, `retrospective`) always
+  classifies `open` and passes through untouched, even when its text matches
+  a conflict subject: for judgment questions the "questions only" rule stands
+  whole and no class other than open/conflict may apply.
+- **An owner answer that reverses a served ratified line is a proposed policy
+  change, not policy.** It routes to the staging-candidate emitter (below) as
+  a config↔policy reconciliation decision, and is **never treated as current
+  policy by later stages of the same run** — the plan-side conformance gate
+  that enforces this at draft time is Story 13.76's, not this step's.
+
 Then select the interview questions from the stage-1 state (with policy items
 when the probe produced them):
 
 ```
 python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py interview --framework <F> \
-  [--items "$WS/policy-items.json"] <state>
+  [--items "$WS/policy-classified-items.json"] <state>
 ```
+
+(where `policy-classified-items.json` is the classifier output's
+`interview_items` array; on a run with no policy items at all, skip
+`classify-policy` and `--items` alike)
 
 **Three-outcome triage over the harvest output (Story 10.2).** Every candidate
 question is triaged against the harvest output **only** — the fact sheet and the
@@ -460,7 +508,10 @@ The surviving (non-suppressed) questions are returned as `questions`, and are:
   for — and the loss is silent: the editorial anchor falls back to a routine
   slot answer (`policy_seeded: false`) and contribute-back emits an empty file.
   With no valid tension item, selection is exactly as before — no slot is held
-  open and nothing is padded;
+  open and nothing is padded. A **reconciliation item counts as a
+  tension-priority item** here (Story 13.75): it ranks at least as high as a
+  policy-seeded tension question for both the priority order and the reserved
+  slot, and its `positions` ride into the journal like a seed does;
 - **at most 5**, and **zero** when harvest already covers everything — never
   padded to five.
 
@@ -664,6 +715,15 @@ Each block mirrors the policy hub's staging-area frontmatter (`slug, created,
 source_repo, perishable, tags`) followed by the question and the owner's
 decision in full sentences (seam-formats.md §3).
 
+**An answered reconciliation question emits a config↔policy reconciliation
+block (Story 13.75, CAP-7).** When the owner answered a `reconciliation` item
+(dispositions `answered`/`modified`/`replaced`), the emitter frames its block
+as the **config↔policy reconciliation decision**, citing every position it
+decided between (the served line at the pin, the config key at its
+configVersion). The owner's answer is a **proposed policy change** for
+whichever record lost — it is never treated as current policy by this run's
+later stages (the plan-gate enforcement is Story 13.76's).
+
 **A staleness-routed item proposes an update, not a resolution (#306).** When
 the answered item was a `reversal-candidate` raised because its seed predated
 the material (above), the block's question and decision are framed as a
@@ -680,6 +740,67 @@ nothing —
 never an empty block. When candidates were emitted, the completion summary's
 **informational notes** must name the file (`$WS/staging-candidates.md`) and
 the block count, so a proposal is never silently buried in run output.
+
+### Stage 2→3 policy-block gate — draft generation blocks on a conflict/stale plan (Story 13.77)
+
+**After the answers are recorded (and staging candidates emitted), before any
+Stage 3 fill**, run the stage-progression precondition
+(SPEC-article-draft-pipeline, 2026-07-18 amendment: draft generation blocks on
+a conflict or stale plan — like the quality gate, never silently proceeded
+past). It is mechanical (no LLM):
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py policy-block-check \
+  --classification "$WS/policy-classified.json" --answers <answers.json> \
+  > "$WS/policy-block.json"
+```
+
+**Resumed-run half (autostart):** when a resumed run already has an emitted
+article plan (a prior invocation reached plan emission), the plan's recorded
+CAP-4 conformance status **re-validates before Stage 3+ continues** — pass the
+plan, and the fresh surface so the status is **recomputed at the current pin**
+through the 13.76 `conformance` machinery (read-only — same table, same rules,
+one implementation):
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py policy-block-check \
+  --plan <plans/<slug>.md> --surface "$WS/policy-surface.txt" \
+  --root <host-repo> [--staging "$WS/staging-candidates.md"]
+```
+
+Branch on the JSON:
+
+- **`blocked: false`** (`conformant` / `open` / answered reconciliation) —
+  proceed to Stage 3 unchanged.
+- **`blocked: true`** (`action: publish-blocker`) — **surface the
+  `publish_blocker` payload in-conversation** (it names the conflicting
+  positions with their pointers, or the moved pin/configVersion — never a bare
+  status), **write the block checkpoint, and STOP the run**: checkpoint the
+  output's suggested `checkpoint` object —
+  `{"stage": "policy-block", "next_stage": "interview"}` — via
+  `checkpoint --ws "$WS"`, so the run resumes **at the block** and the
+  reconciliation question **re-presents on resume**; never checkpoint before
+  Stage 2, and never `next_stage: fill` (that would resume past the gate).
+  The completion summary's **publish-blockers bucket** carries the payload
+  (positions/pin delta included) and the resume path.
+- **In-run repair** — the block is repairable in the same invocation:
+  - **conflict** → if the owner answers the reconciliation question now
+    (CAP-7), record it via `answer` and **re-run the check** — any recorded
+    decision unblocks, **including a reversal**, which proceeds as a proposed
+    policy change through its staging-candidate block (never as current
+    policy);
+  - **stale** → **re-consult at the current pin**: re-run the policy reader
+    (`read-policy-source.py read`), `classify-policy`, and the conformance
+    recompute against the fresh surface, then re-run the check — it proceeds
+    or re-blocks per the new status (a recorded `stale` whose referenced
+    lines still hold at the new pin clears to `conformant`).
+- **Generic mode never touches the gate**: with no `policy_source` toggle (or
+  reader exit 10) there is no classification and no policy-seeded plan, and
+  the check returns `{blocked: false, reason: "generic-mode"}` — behavior
+  identical to a repo without the seam.
+
+This gate is a **separate precondition at the same boundary** as the quality
+gate: it changes nothing about the quality gate or `[VERIFY]` markers.
 
 ## Stage 3 — fill the framework (with `[VERIFY]` markers)
 
@@ -1178,12 +1299,47 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/write-article-plan.py write \
   --slug <slug> --root <host-repo> "$WS/article-plan.md"
 ```
 
+### Policy-conformance gate (SPEC-article-plan CAP-4, Story 13.76)
+
+When the run consulted the policy seam (Stage 2 wrote `$WS/policy-surface.txt`),
+run the conformance gate on the assembled plan **before** handing it to
+`write` — a policy-seeded plan without conformance data is refused by the
+writer:
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/write-article-plan.py conformance \
+  --plan "$WS/article-plan.md" --surface "$WS/policy-surface.txt" \
+  --root <host-repo> [--staging "$WS/staging-candidates.md"] --write
+```
+
+- The gate validates every policy-seeded decision the plan records against
+  the **same pinned policy result** the run consulted and the authoritative
+  user config, then `--write` records `policy_pin`, `policy_config_version`,
+  and `policy_conformance` (∈ `conformant`/`open`/`conflict`/`stale`) into
+  the plan's frontmatter through the writer's fail-closed validation. The
+  recorded status **rides the plan**.
+- At plan emission a `conflict` or `stale` status is **recorded, not blocking**
+  — the stage-progression block fired earlier, at the Stage 2→3 boundary
+  (`policy-block-check`, Story 13.77), and the recorded status is what that
+  gate **re-validates on the next resumed run** before Stage 3+ continues.
+  Relay the status (and the findings' positions/pointers) in the completion
+  summary's informational bucket.
+- Pass `--staging` when the run emitted staging candidates: a plan decision
+  that **reverses a served ratified line** is conformant **only as a proposed
+  policy change** (its staging-candidate block exists →
+  `reversal_as_proposal: true`); without the block it stays `conflict`. The
+  reversal is never treated as current policy.
+- The gate writes **nothing to any policy hub** — with `--write` it touches
+  exactly one file: the plan.
+
 - The frontmatter is the closed schema (SPEC-article-plan CAP-2): `kind:
   article-plan` (constant, the machine marker that keeps a plan **out of the
   evidence stream**), `slug` (equal to the filename stem), `intent`, `claim`,
   `status` (`outlined`/`drafted`/`superseded`), `run_id`, `pin`
   (`<source-repo>@<commit>`); optional `audience`, `policy_seeded`+`seed`,
-  `relates`. Everything the draft or its variants own (title, summary, topics,
+  `relates`, and the CAP-4 conformance trio `policy_pin` /
+  `policy_config_version` / `policy_conformance` (all three **required** when
+  `policy_seeded: true` — the conformance gate below records them). Everything the draft or its variants own (title, summary, topics,
   language, …), machine state (journal/checkpoint/provenance map), and
   free-text `evidence:` are **forbidden** — the writer refuses them with
   per-key diagnostics. Every evidence reference in the **body** is a
@@ -1220,7 +1376,11 @@ the `complete` subcommand's JSON (the dual-product completion gate, Story
 summarize: surface the gate's hard error instead.
 
 Any unresolved `[VERIFY]` marker or unrendered figure is a **publish blocker**,
-listed under that bucket and nowhere else.
+listed under that bucket and nowhere else. A run stopped by the Stage 2→3
+policy-block gate (Story 13.77) lists its block there too: the bucket carries
+the `publish_blocker` payload — the conflicting **positions with pointers**, or
+the moved pin/configVersion — plus the **resume path** (the block checkpoint;
+resume re-presents the reconciliation question).
 
 **Partial progress and the turn budget (Story 13.7).** The turn/compute budget is
 a real ceiling. As a stage nears it,
@@ -1274,6 +1434,7 @@ their reference lives in [`variants.md`](variants.md).
 | `interview` | 2 | Build the bounded gap-interview question set for the framework | `--framework` (req) `<state\|->` |
 | `answer` | 2 | Record one owner answer (single form), or validate a batch | `--id` `--disposition` `--text` `--pointer` (repeatable) `--batch` |
 | `journal` | 2 | Write the interview journal (triage record, Story 10.4) | `--interview` (req) `--answers` |
+| `policy-block-check` | 2→3 | Stage-progression precondition (Story 13.77): blocks Stage 3 fill on an unresolved config↔policy conflict or a `conflict`/`stale` plan, emitting the publish-blocker payload + block checkpoint; `conformant`/`open` and generic mode proceed | `--classification` `--answers` `--plan` `--surface` `--config-json` `--root` `--config-version` `--staging` |
 | `provenance` | 3 | Parse + structurally validate the sidecar provenance map | `--map` `--count` `--draft` |
 | `quality-gate` | 3→4 | The mandatory quality gate; non-zero exit blocks Stage 4 (Story 11.4) | `--draft` `--map` `--judge` |
 | `verify-markers` | 3/4 | Validate `[VERIFY: reason]` markers; `--count` prints the count (drive to 0) | `<draft\|->` `--count` |

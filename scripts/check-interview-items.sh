@@ -87,6 +87,35 @@ PY
   && ok "a recommended-default item still fails R1 if owner_answer is pre-filled" \
   || err "recommended-default + pre-filled owner_answer: rc=$rc msg='$msg'"
 
+# --- 2c. Reconciliation items (Story 13.75, SPEC CAP-7; seam-formats §2 R8/R9) --
+# A conflict-classified subject is a `reconciliation` item: a `positions` array
+# (>=2, each {quote, pointer, authority ∈ policy|config|repo}, per-authority
+# pointer grammar) INSTEAD of a seed. R1 (owner_answer empty) applies unchanged.
+set +e; out=$(python3 "$VAL" "$FIX/valid-reconciliation.json" 2>&1); rc=$?; set -e
+[ "$rc" -eq 0 ] && [ -z "$out" ] \
+  && ok "a reconciliation item (policy + config positions) passes" \
+  || err "valid-reconciliation: rc=$rc out='$out'"
+expect r8-one-sided-reconciliation.json R8 "reconciliation with <2 positions"
+expect r8-bad-position.json             R8 "invalid authority / unpinned config pointer / empty quote"
+expect r9-reconciliation-with-seed.json R9 "reconciliation carrying a seed (mutually exclusive shapes)"
+expect r9-positions-on-tension.json     R9 "conflict re-typed: positions on a tension item"
+# r8-bad-position covers all three per-position failure shapes at once.
+set +e; msg=$(python3 "$VAL" "$FIX/r8-bad-position.json" 2>&1 >/dev/null); set -e
+n=$(printf '%s\n' "$msg" | grep -c 'R8:' || true)
+[ "$n" -eq 3 ] && ok "R8 catches bad authority AND bad pointer AND empty quote" \
+  || err "R8 expected 3 rejections, got $n"
+# A reconciliation item never smuggles a pre-decided answer past R1.
+set +e; msg=$(python3 - "$FIX/valid-reconciliation.json" <<'PY' 2>&1 >/dev/null
+import json,sys,subprocess
+items=json.load(open(sys.argv[1])); items[0]["owner_answer"]="config governs"
+p=subprocess.run(["python3","scripts/validate-interview-items.py","-"],input=json.dumps(items),
+                 capture_output=True,text=True); sys.stderr.write(p.stderr); sys.exit(p.returncode)
+PY
+); rc=$?; set -e
+[ "$rc" -eq 1 ] && printf '%s' "$msg" | grep -q 'R1:' \
+  && ok "a reconciliation item still fails R1 if owner_answer is pre-filled" \
+  || err "reconciliation + pre-filled owner_answer: rc=$rc msg='$msg'"
+
 # --- 3. stdin form -------------------------------------------------------------
 set +e; printf '[]' | python3 "$VAL" - >/dev/null 2>&1; rc=$?; set -e
 [ "$rc" -eq 0 ] && ok "empty set from stdin passes" || err "stdin form rc=$rc"
