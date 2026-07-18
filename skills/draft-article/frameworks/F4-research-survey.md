@@ -13,6 +13,18 @@ re-implement them. Scope, the map, My take, the reading list, and the pointer
 block each appear **exactly once**; the branch unit between the map and My take
 repeats per taxonomy branch. Section order is load-bearing.
 
+**Claim placement — front-stated angle, deferred defence (resolves the survey
+take-ordering tension).** A survey's section order deliberately keeps the full
+**My take** as the closing GATE: the map is the artifact readers bookmark, and
+the developed argument earns its place only after the map and branches. That
+must not leave the article's *claim* unidentifiable until the end — the review's
+cold-read (`what is this article's claim?`) and reader's-order checks expect it
+early. So the two are reconciled by placement, not by moving the section:
+**Scope states the survey's angle in one sentence up front** (the reader knows
+where you land within 80 words), and **My take** at the end is where that angle
+is *defended* with the field's direction + your paper/repo. The one-sentence
+Scope angle is not the GATE and never substitutes for it.
+
 ## Visual slot (SPEC-article-visuals CAP-1)
 
 **F4 declares one landscape table or concept map** — the field map in *The map*
@@ -32,8 +44,10 @@ Config-bound `article` frontmatter (rendered per language from user config; see
 - `related.publications` — *(your preprint slug — F4's paper+code pairing)*
 
 ## {Scope and audience}                             (~80 words) [SKIP: verify]
-{(What's covered, what's excluded, who this is for, and the as-of date —
-surveys age; dating them keeps them citable.)}
+{(Open with the survey's angle in ONE sentence — where you land on the field, so
+the claim is identifiable up front (the full defence is the closing "My take"
+GATE, never here). Then: what's covered, what's excluded, who this is for, and
+the as-of date — surveys age; dating them keeps them citable.)}
 
 ## {The map}                                        (table or diagram + ~100 words) [SKIP: verify]
 {(A taxonomy of approaches. The map is the artifact readers bookmark. Every
