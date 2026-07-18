@@ -81,11 +81,13 @@ from nothing (evidence-gate-must-be-agent-fed).
    private assets). `~/work/articles/drafts/` is the standing recommendation
    when it exists.
 3. **Policy source (optional — explicit offer, stated consequence).** Offer
-   the `policy_source` block with a proposed `path` (the owner's policy repo
-   checkout, if one is known) — **path only** (SPEC-policy-topic-at-draft
-   CAP-1, Story 13.34): which policy topics an article reads is a
-   **per-article decision made at draft time** (draft-article Stage 2), so
-   setup asks no `track`/`topics` question and writes neither key. State the
+   the `policy_source` block as a **presence toggle** — `enabled: true`,
+   **never a filesystem path** (Story 13.73, #366: the consumer holds no hub
+   location; the tsurezure-gateway MCP registration is the integration, and
+   the gateway's own operator config owns the hub path). Which policy topics
+   an article reads stays a **per-article decision made at draft time**
+   (draft-article Stage 2 — SPEC-policy-topic-at-draft), so setup asks no
+   `track`/`topics` question and writes neither key. State the
    consequence of declining in one line: *"without
    it, the Stage-2 interview runs generic — no policy-seeded tension
    questions, `consulted: none`."* Declining is a valid, recorded choice —
@@ -99,8 +101,9 @@ from nothing (evidence-gate-must-be-agent-fed).
 printf '%s' '<approved sources JSON>' | \
   python3 ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-writing-sources.py set-sources --root <host-repo>
 python3 ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-writing-sources.py set-draft-location <dir> --root <host-repo>
-# only when the owner accepted the policy_source offer (path only — Story 13.34):
-python3 ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-writing-sources.py set-policy-source <path> --root <host-repo>
+# only when the owner accepted the policy_source offer (presence toggle,
+# no path argument — Story 13.73):
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-writing-sources.py set-policy-source --root <host-repo>
 ```
 
 The writers are fail-closed (a malformed result refuses and writes nothing)
@@ -131,10 +134,15 @@ it never ends the run with a broken config:
    (or the owner explicitly accepted an empty one), and relay any noise
    warning.
 3. When `policy_source` was declared:
-   `read-policy-source.py pin --root <host-repo>` and `whitelist` — the pin
-   resolves and the whitelist names GLOSSARY, LESSONS, and the matched
-   topics. An unusable path here is a setup-time finding (fix the path or
-   drop the block) even though at run time it would only degrade.
+   `read-policy-source.py pin --root <host-repo>` and `whitelist` — a
+   **gateway health check** (Story 13.73, #366): the pin arrives from the
+   tsurezure-gateway and the whitelist names GLOSSARY and LESSONS. No
+   filesystem is read — there is no hub path to check. An unusable gateway
+   here (exit **11**, unreachable/timeout, or exit **13**, a named
+   tool-surface gap) is a **setup-time finding**: report it with the
+   reader's one-line reason, not as a hard onboarding failure — exit 13's
+   named-gap output still counts as **gateway-reachable**, and at run time
+   either case only degrades the interview to generic mode.
 
 ## Completion summary
 

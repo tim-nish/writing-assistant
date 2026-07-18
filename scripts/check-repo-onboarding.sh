@@ -4,14 +4,15 @@
 # README/manifest surface (CAP-4). POSIX shell + stdlib Python only.
 #
 # Covers: creating a full config from scratch through writers only (no manual
-# YAML) in the conventional block order; comment-preserving per-key surgery
-# for set-policy-source; idempotency (unchanged input rewrites nothing);
-# fail-closed refusals that write NOTHING (>2 topics exit 4; `..` include
-# pattern / empty list exit 5); declarative set-sources replace emitting the
-# inline include form (#221); legacy in-repo file migrating whole to the
-# machine-global path on first write; and the setup skill contract lines
-# (writers-only, policy_source optional with stated consequence, no absolute
-# plugin paths).
+# YAML) in the conventional block order; the re-shaped set-policy-source
+# (Story 13.73: presence toggle, NO path argument; declarative block replace
+# is the sanctioned migration for a legacy path/track/topics block);
+# idempotency (unchanged input rewrites nothing); fail-closed refusals that
+# write NOTHING (`..` include pattern / empty list exit 5); declarative
+# set-sources replace emitting the inline include form (#221); legacy in-repo
+# file migrating whole to the machine-global path on first write; and the
+# setup skill contract lines (writers-only, policy_source optional with
+# stated consequence, toggle-not-path, no absolute plugin paths).
 
 set -eu
 
@@ -43,13 +44,18 @@ printf '[{"path": ".", "include": ["docs/**", "README.md"]}, {"path": "../plab"}
   && ok "set-sources creates the file from scratch" \
   || err "set-sources failed on a missing config"
 $PY set-draft-location "~/drafts/" --root "$work/host" >/dev/null 2>&1
-out=$($PY set-policy-source ../plab --root "$work/host" 2>/dev/null); rc=$?
-[ "$rc" -eq 0 ] && printf '%s' "$out" | grep -q '"declared": true' \
-  && ok "set-policy-source declares the block (JSON echo, path-only)" \
+out=$($PY set-policy-source --root "$work/host" 2>/dev/null); rc=$?
+[ "$rc" -eq 0 ] && [ "$out" = '{"declared": true}' ] \
+  && ok "set-policy-source declares the toggle (JSON echo, no path ever)" \
   || err "set-policy-source: rc=$rc out='$out'"
-# The removed flags are gone from the CLI (Story 13.36) — passing one is a
-# usage error, not a silent write.
-if $PY set-policy-source ../plab --track eval --root "$work/host" >/dev/null 2>&1; then
+# The retired PATH positional (13.73) and the removed flags (13.36) are gone
+# from the CLI — passing one is a usage error, not a silent write.
+if $PY set-policy-source ../plab --root "$work/host" >/dev/null 2>&1; then
+  err "PATH argument still accepted (retired, Story 13.73)"
+else
+  ok "PATH argument retired with the config key (13.73)"
+fi
+if $PY set-policy-source --track eval --root "$work/host" >/dev/null 2>&1; then
   err "--track still accepted (flag should be removed)"
 else
   ok "--track flag removed with the config keys"
@@ -65,29 +71,36 @@ grep -q 'include: \["docs/\*\*", "README.md"\]' "$f" \
   && ok "set-sources emits the inline include form (#221)" \
   || err "include not emitted inline"
 
-# --- 2. Per-key surgery preserves comments & untouched keys ------------------
+# --- 2. Surgery preserves comments outside the block & untouched keys --------
 printf '# HEADER kept\n%s' "$(cat "$f")" > "$f"
-$PY set-policy-source ../plab2 --root "$work/host" >/dev/null 2>&1
-head -1 "$f" | grep -q '# HEADER kept' && ok "surgery keeps comments" || err "comment lost"
-grep -q 'path: ../plab2' "$f" \
-  && ok "path replaced by per-key surgery" || err "per-key surgery wrong"
+$PY set-policy-source --root "$work/host" >/dev/null 2>&1
+head -1 "$f" | grep -q '# HEADER kept' && ok "surgery keeps comments outside the block" || err "comment lost"
+grep -q 'enabled: true' "$f" && ! grep -q '^  path:' "$f" \
+  && ok "block is the presence toggle — no path key on disk" || err "toggle surgery wrong"
 
 # --- 3. Idempotency: unchanged input writes nothing ---------------------------
 m1=$(stat -c %Y "$f" 2>/dev/null || stat -f %m "$f")
 sleep 1
-$PY set-policy-source ../plab2 --root "$work/host" >/dev/null 2>&1
+$PY set-policy-source --root "$work/host" >/dev/null 2>&1
 m2=$(stat -c %Y "$f" 2>/dev/null || stat -f %m "$f")
 [ "$m1" = "$m2" ] && ok "set-policy-source idempotent" || err "rewrote an unchanged file"
 
-# --- 4. Fail-closed refusals write NOTHING ------------------------------------
+# --- 4. Legacy keys: named errors on read, migrated whole by the writer -------
 sed -i.bak '/^policy_source:/a\
+  path: ../plab\
   track: leftover' "$f" && rm -f "$f.bak"
-before=$(cat "$f")
-rc=0; $PY set-policy-source ../plab3 --root "$work/host" >/dev/null 2>&1 || rc=$?
-[ "$rc" -eq 4 ] && [ "$(cat "$f")" = "$before" ] \
-  && ok "leftover removed key: exit 4, file untouched (fail-closed)" \
-  || err "removed-key refusal: rc=$rc or file changed"
-grep -v '^  track: leftover$' "$f" > "$f.tmp" && mv "$f.tmp" "$f"
+rc=0; msg=$($PY --root "$work/host" policy-source 2>&1 >/dev/null) || rc=$?
+[ "$rc" -eq 4 ] && printf '%s' "$msg" | grep -q 'policy_source.path' \
+  && printf '%s' "$msg" | grep -qi 'retired' \
+  && ok "legacy path/track keys: getter exit 4 with the migration notice" \
+  || err "legacy-key getter: rc=$rc msg='$msg'"
+# The re-shaped writer is the sanctioned migration: the whole block is
+# replaced by the toggle (13.73) — legacy keys never survive, never honored.
+rc=0; $PY set-policy-source --root "$work/host" >/dev/null 2>&1 || rc=$?
+[ "$rc" -eq 0 ] && grep -q 'enabled: true' "$f" \
+  && ! grep -Eq '^  (path|track|topics):' "$f" \
+  && ok "writer migrates a legacy block whole to the toggle (13.73)" \
+  || err "legacy-block migration failed: rc=$rc"
 before=$(cat "$f")
 rc=0; printf '[{"path": ".", "include": ["../evil/**"]}]' | $PY set-sources --root "$work/host" >/dev/null 2>&1 || rc=$?
 [ "$rc" -eq 5 ] && [ "$(cat "$f")" = "$before" ] \
@@ -112,7 +125,7 @@ sources:
 output:
   drafts: articles/drafts/
 YAML
-$PY set-policy-source ../plab --root "$work/legacyhost" >/dev/null 2>"$work/e6"
+$PY set-policy-source --root "$work/legacyhost" >/dev/null 2>"$work/e6"
 grep -q 'migrated:' "$work/e6" && ok "legacy file: migration notice" || err "no migration notice"
 g=$(find "$work/xdg" -path '*legacyhost*' -name writing-sources.yaml 2>/dev/null | head -1)
 [ -n "$g" ] && grep -q 'sources:' "$g" && grep -q 'policy_source:' "$g" \
@@ -142,17 +155,27 @@ grep -q 'escape hatch' README.md && ok "README keeps manual edit as escape hatch
 grep -q 'setup, draft-article' .claude-plugin/plugin.json \
   && ok "plugin manifest lists setup" || err "manifest missing setup"
 
-# Setup offers/writes policy_source.path ONLY (Story 13.34,
-# SPEC-policy-topic-at-draft CAP-1): topic context is a draft-time decision.
+# Setup offers/writes the PRESENCE TOGGLE only (Story 13.73, #366): never a
+# filesystem path; topic context stays a draft-time decision (13.34/13.36).
 SK="skills/setup/SKILL.md"
-grep -q 'path only' "$SK" && ok "setup offer is path-only" || err "setup still offers track"
+grep -q 'presence toggle' "$SK" && grep -q 'enabled: true' "$SK" \
+  && ok "setup offer is the presence toggle" || err "setup missing the toggle offer"
+grep -qi 'never a filesystem path' "$SK" \
+  && ok "setup never proposes a hub path (13.73)" || err "setup still proposes a path"
+grep -q 'set-policy-source <path>' "$SK" \
+  && err "setup Stage C still passes a path to the writer" \
+  || ok "setup Stage C writes the toggle without a path"
 grep -q 'per-article decision' "$SK" && ok "setup names topics a per-article decision" \
   || err "draft-time rationale missing"
-grep -q 'set-policy-source <path> --track' "$SK" \
-  && err "setup Stage C still passes --track to the writer" \
-  || ok "setup Stage C writes path without --track"
 grep -qE 'a .track. matched|track proposal' "$SK" \
   && err "setup Stage B still proposes a track" \
   || ok "setup Stage B proposes no track"
+# Stage E is a GATEWAY health check: findings, not hard failures (13.73).
+grep -qi 'gateway health check' "$SK" \
+  && ok "setup Stage E verifies via a gateway health check" \
+  || err "Stage E missing the gateway health check wording"
+grep -qi 'gateway-reachable' "$SK" \
+  && ok "Stage E counts exit 13's named gap as gateway-reachable" \
+  || err "Stage E missing the exit-13 reachability rule"
 
 [ "$fail" -eq 0 ] && printf '\nPASSED.\n' || { printf '\nFAILED.\n' >&2; exit 1; }

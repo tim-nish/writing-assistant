@@ -6,12 +6,15 @@
 # Covers: the identical CLI contract (pin line, `=== FILE @ sha` sections,
 # `N: text` lines) now composed entirely from gateway MCP payloads via the
 # WRITING_ASSISTANT_GATEWAY_CMD test seam (stub server under fixtures/);
-# ZERO filesystem reads under any hub path (the fixture hub path never
-# exists, and the reader still serves); the code whitelist and exit-5
-# refusals unchanged; served misses as answers (exit 0), distinguishable
-# from unavailability; exit 11 one-liner when the gateway is unreachable
-# (old 12 collapses into it); exit 13 for the named tool-surface gaps
-# (list-topics enumeration, whole-GLOSSARY read); 10/4 unchanged.
+# ZERO filesystem reads under any hub path (the consumer holds NO hub path
+# at all — Story 13.73: the policy_source block is the presence toggle
+# `enabled: true`); the code whitelist and exit-5 refusals unchanged; served
+# misses as answers (exit 0), distinguishable from unavailability; exit 11
+# one-liner when the gateway is unreachable (old 12 collapses into it);
+# exit 13 for the named tool-surface gaps (list-topics enumeration,
+# whole-GLOSSARY read); exit 10 for an absent toggle or `enabled: false`;
+# exit 4 for a malformed block INCLUDING the retired path/track/topics keys
+# (the resolver's migration notice relayed, never silently honored).
 
 set -eu
 
@@ -36,10 +39,11 @@ python3 -c "import py_compile; py_compile.compile('$root/$STUB', doraise=True)" 
 
 work=$(mktemp -d); trap 'rm -rf "$work"' EXIT
 
-# --- fixture: gateway-served content; the hub path NEVER exists on disk -------
-# The policy_source.path points at a directory that does not exist. Every
-# passing read below is therefore proof of zero hub filesystem reads: there is
-# nothing to read — all content arrives from the stub gateway.
+# --- fixture: gateway-served content; NO hub path exists anywhere ------------
+# The policy_source block is the presence toggle (13.73) — the config carries
+# no filesystem location at all. Every passing read below is therefore proof
+# of zero hub filesystem reads: there is nothing named to read — all content
+# arrives from the stub gateway.
 cat > "$work/fixture.json" <<JSON
 {
   "pin": "product-lab@$SHA",
@@ -68,9 +72,8 @@ sources:
 output:
   drafts: articles/drafts/
 policy_source:
-  path: ../no-such-hub
+  enabled: true
 YAML
-[ ! -e "$work/no-such-hub" ] || err "fixture hub path unexpectedly exists"
 
 WRITING_ASSISTANT_GATEWAY_CMD="python3 $root/$STUB $work/fixture.json"
 export WRITING_ASSISTANT_GATEWAY_CMD
@@ -167,18 +170,27 @@ set -e
   && ok "gateway dies mid-session: exit 11, never a partial/hung read" \
   || err "dead gateway: rc=$rc msg='$msg'"
 
-# --- 9. Unset (10) / malformed (4): unchanged; old 12 case now serves ---------
+# --- 9. Unset/disabled (10) / malformed incl. retired keys (4) ----------------
 mkdir -p "$work/unset"; printf 'sources:\n  - path: .\n' > "$work/unset/writing-sources.yaml"
 set +e; msg=$($PY --root "$work/unset" pin 2>&1 >/dev/null); rc=$?; set -e
 [ "$rc" -eq 10 ] && [ "$(printf '%s\n' "$msg" | wc -l)" -eq 1 ] \
   && printf '%s' "$msg" | grep -q 'policy_source unavailable' \
   && ok "unset block: exit 10, one unavailable line" || err "unset: rc=$rc msg='$msg'"
 
+# enabled: false — same degrade as unset (exit 10), never an error
+mkdir -p "$work/off"
+printf 'sources:\n  - path: .\npolicy_source:\n  enabled: false\n' > "$work/off/writing-sources.yaml"
+set +e; msg=$($PY --root "$work/off" pin 2>&1 >/dev/null); rc=$?; set -e
+[ "$rc" -eq 10 ] && [ "$(printf '%s\n' "$msg" | wc -l)" -eq 1 ] \
+  && printf '%s' "$msg" | grep -q 'policy_source unavailable' \
+  && ok "enabled: false — exit 10, one unavailable line (same degrade as unset)" \
+  || err "enabled false: rc=$rc msg='$msg'"
+
 cat > "$host/writing-sources.yaml" <<'YAML'
 sources:
   - path: .
 policy_source:
-  path: ../no-such-hub
+  enabled: true
   track: eval
 YAML
 set +e; msg=$($PY --root "$host" read --only LESSONS.md 2>&1 >/dev/null); rc=$?; set -e
@@ -186,19 +198,33 @@ set +e; msg=$($PY --root "$host" read --only LESSONS.md 2>&1 >/dev/null); rc=$?;
   && ok "leftover track key: reader refuses (exit 4), never silently applies it" \
   || err "leftover track: rc=$rc msg='$msg'"
 
-# Old exit-12 case (path exists, not a git repo): the path key is ignored
-# entirely — the gateway serves regardless. 12 is never emitted.
+# The RETIRED path key (13.73): exit 4 with the resolver's migration notice
+# relayed — never silently honored, never joined into the filesystem.
+cat > "$host/writing-sources.yaml" <<'YAML'
+sources:
+  - path: .
+policy_source:
+  path: ../no-such-hub
+YAML
+set +e; msg=$($PY --root "$host" pin 2>&1 >/dev/null); rc=$?; set -e
+[ "$rc" -eq 4 ] && printf '%s' "$msg" | grep -q 'policy_source.path' \
+  && printf '%s' "$msg" | grep -qi 'retired' \
+  && printf '%s' "$msg" | grep -qi 'gateway owns the hub location' \
+  && ok "retired path key: exit 4, migration notice relayed (never honored)" \
+  || err "retired path key: rc=$rc msg='$msg'"
+
+# Restore the toggle for the zero-reads section below.
 mkdir -p "$work/plain-dir"; printf 'x\n' > "$work/plain-dir/GLOSSARY.md"
 cat > "$host/writing-sources.yaml" <<'YAML'
 sources:
   - path: .
 policy_source:
-  path: ../plain-dir
+  enabled: true
 YAML
 got=$($PY --root "$host" pin)
 [ "$got" = "product-lab@$SHA" ] \
-  && ok "non-git path key: ignored — served via the gateway (12 collapsed, never emitted)" \
-  || err "non-git path: got '$got'"
+  && ok "toggle present + gateway up: served (12 retired, never emitted)" \
+  || err "toggle + gateway: got '$got'"
 
 # --- 10. Zero hub reads, read-only: nothing under any local path is touched ---
 sleep 1  # mtime granularity
@@ -208,9 +234,9 @@ $PY --root "$host" whitelist >/dev/null
 changed=$(find "$work/plain-dir" -newer "$stamp" -type f | wc -l)
 [ "$changed" -eq 0 ] && ok "read-only: no file under the declared path created or modified" \
   || err "reader touched $changed file(s) under the declared path"
-grep -rqn 'policy_repo\|rev-parse\|glob.glob\|os.path.isdir' "$root/$RDR" \
+grep -rqn 'policy_repo\|rev-parse\|glob.glob\|os.path.isdir\|os.path.isfile\|os.path.exists' "$root/$RDR" \
   && err "reader still carries direct-filesystem policy code" \
-  || ok "no direct-filesystem policy code paths remain in the reader"
+  || ok "no direct-filesystem policy code paths remain in the reader (no path-existence checks)"
 
 if [ "$fail" -eq 0 ]; then
   printf '\nAll policy-reader checks passed.\n'; exit 0

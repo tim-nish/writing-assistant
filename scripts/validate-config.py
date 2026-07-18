@@ -208,9 +208,12 @@ def validate_writing_sources(args, findings):
 
 def validate_policy_source(args, findings):
     """Relay a malformed `policy_source` block (resolver exit 4) as stage-0
-    findings. An absent block is silent, and a well-formed block whose path is
-    unusable is deliberately NOT a config error — usability is checked at read
-    time and degrades the interview instead (SPEC-policy-source-seam CAP-6)."""
+    per-key findings — including the RETIRED `path` key's migration notice
+    (Story 13.73, #366: the block is a presence toggle, `enabled: true`; the
+    consumer holds no hub path). An absent block is silent, a bare
+    `enabled: true` block validates clean, and whether the GATEWAY is usable
+    is deliberately NOT a config error — usability is checked at read time
+    and degrades the interview instead (SPEC-policy-source-seam CAP-6)."""
     cmd = [sys.executable, SRC_RES]
     if args.root:
         cmd += ["--root", args.root]

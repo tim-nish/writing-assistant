@@ -50,16 +50,19 @@ output:
   # In-host alternative (resolves relative to the host-repo root, NOT the cwd):
   # drafts: articles/drafts/
 
-# Optional: point the Stage-2 interview at your policy repo so it
-# can seed tension questions from your recorded positions. Absent = the
-# interview runs exactly as before. The read is bounded IN CODE to GLOSSARY.md,
-# LESSONS.md, and at most 2 topics/*.md files — never the hub's history archive, never a write — and
-# every run pins the repo's commit. An unusable path (missing, unreadable, not
-# a git repo) is not a config error: the interview logs one line and degrades
-# to generic questions.
+# Optional: let the Stage-2 interview seed tension questions from your
+# recorded policy positions. Absent = the interview runs exactly as before.
+# This is a PRESENCE TOGGLE only (#366): the assistant holds no filesystem
+# path to your policy hub — all policy content is served by the
+# tsurezure-gateway MCP server, whose own operator config owns the hub
+# location. The read stays bounded IN CODE to GLOSSARY.md, LESSONS.md, and at
+# most 2 topics/*.md files — never the hub's history archive, never a write —
+# and every run pins the served commit. An unreachable gateway is not a
+# config error: the interview logs one line and degrades to generic questions.
 # Which topics/*.md files an article reads is chosen PER ARTICLE at draft time
 # (draft-article Stage 2 proposes <=2 and the owner approves) — it is not
-# config. The former track / topics keys were removed (Story 13.36); a
-# leftover key is reported as a named configuration error.
+# config. The former path key was retired (Story 13.73) and the track / topics
+# keys were removed (Story 13.36); a leftover key is reported as a named
+# configuration error with a migration notice.
 # policy_source:
-#   path: ../policy-hub                  # local checkout of your policy repo; plain path, no URL/sync
+#   enabled: true                        # presence toggle — no path; the gateway owns the hub location

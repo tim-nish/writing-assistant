@@ -384,15 +384,17 @@ dependency; no exit code here may abort the run**:
   whether the surface itself draws that line. Write the items to
   `"$WS/policy-items.json"` (seam-formats.md §2) and pass them via `--items`
   below; they are schema-validated **before** triage.
-- **10** (`policy_source` unset) — generic interview, **silently**: no items,
-  no log line, behavior identical to a repo without the seam.
-- **11 / 12** (path missing / not a git repo) — the reader printed exactly one
-  `policy_source unavailable: <reason>` line; **relay that one line once** and
-  continue with the generic interview. Do not retry, do not warn again — one
-  line, then generic mode. Keep the reason: the journal's `consulted:` line
-  records it (`--policy-note`).
+- **10** (`policy_source` toggle absent or `enabled` falsy) — generic
+  interview, **silently**: no items, no log line, behavior identical to a
+  repo without the seam.
+- **11** (toggle present, gateway unavailable — unreachable, transport error,
+  or timeout; the retired exit 12 collapses here) — the reader printed
+  exactly one `policy_source unavailable: <reason>` line;
+  **relay that one line once** and continue with the generic interview. Do
+  not retry, do not warn again — one line, then generic mode. Keep the
+  reason: the journal's `consulted:` line records it (`--policy-note`).
 - **13** (named gateway tool-surface gap — Story 13.72) — treat exactly like
-  11/12: the reader printed one `policy tool-surface gap: <reason>` line;
+  11: the reader printed one `policy tool-surface gap: <reason>` line;
   relay it once, continue generic, record it via `--policy-note`.
 - **4** (malformed block) — a stage-0 configuration error slipped through;
   halt and report it like any CAP-5 finding (this cannot happen after a clean
@@ -671,8 +673,10 @@ The distinction matters downstream: the owner is being handed a candidate
 *correction* to a recorded position, and a block that framed it as a resolved
 conflict would record a dispute that never existed. **This is where the tool
 stops**: the blocks land in the run workspace only — the owner copies accepted
-ones into the hub's staging area by hand, and nothing is ever written under
-`policy_source.path`. A run with no answered tension questions emits nothing —
+ones into the hub's staging area by hand, and nothing is ever written into
+the policy hub (the consumer holds no hub path at all — Story 13.73; the
+gateway serves read-only). A run with no answered tension questions emits
+nothing —
 never an empty block. When candidates were emitted, the completion summary's
 **informational notes** must name the file (`$WS/staging-candidates.md`) and
 the block count, so a proposal is never silently buried in run output.
