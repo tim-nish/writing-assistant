@@ -72,15 +72,24 @@ MAP
 python3 "$VP" --map "$work/badptr.txt" --fact-sheet "$work/ids.txt" >/dev/null 2>&1 \
   && err "unresolvable derived pointer accepted" || ok "derived pointer must resolve to a fact-sheet entry"
 
+# Judge-findings files carry the Story 13.67 attestation (drafts + hash below);
+# these two cases must fail through the SEMANTIC layer, not the attestation gate.
+printf 'plain draft body\n' > "$work/plain-draft.md"
+PLAINH=$(python3 -c "import hashlib;print(hashlib.sha256(open('$work/plain-draft.md',encoding='utf-8').read().encode()).hexdigest())")
+
 # AC2 — a narration sentence the judge flags (asserts a checkable proposition) fails.
-printf 'P1.S3: narration asserts a checkable proposition (falsifiability)\n' > "$work/verdicts.txt"
-python3 "$VP" --map "$work/good.txt" --fact-sheet "$work/ids.txt" --judge-findings "$work/verdicts.txt" >/dev/null 2>&1 \
-  && err "judge-flagged narration was not a gate failure" || ok "judge-flagged narration (falsifiability) is a gate failure"
+{ printf 'attestation: draft-sha256=%s\ngraded: P1.S2,P1.S3\n' "$PLAINH"
+  printf 'P1.S3: narration asserts a checkable proposition (falsifiability)\n'; } > "$work/verdicts.txt"
+out=$(python3 "$VP" --map "$work/good.txt" --fact-sheet "$work/ids.txt" --draft "$work/plain-draft.md" --judge-findings "$work/verdicts.txt" 2>&1) && rc=0 || rc=$?
+[ "$rc" -eq 1 ] && printf '%s' "$out" | grep -q 'falsifiability' \
+  && ok "judge-flagged narration (falsifiability) is a gate failure" || err "judge-flagged narration was not a semantic gate failure (rc=$rc): $out"
 
 # AC3b — a judge-flagged forbidden derivation category fails.
-printf 'P1.S2: derived adds causality (forbidden)\n' > "$work/verdicts2.txt"
-python3 "$VP" --map "$work/good.txt" --fact-sheet "$work/ids.txt" --judge-findings "$work/verdicts2.txt" >/dev/null 2>&1 \
-  && err "judge-flagged forbidden category was not a gate failure" || ok "judge-flagged forbidden derivation category is a gate failure"
+{ printf 'attestation: draft-sha256=%s\ngraded: P1.S2,P1.S3\n' "$PLAINH"
+  printf 'P1.S2: derived adds causality (forbidden)\n'; } > "$work/verdicts2.txt"
+out=$(python3 "$VP" --map "$work/good.txt" --fact-sheet "$work/ids.txt" --draft "$work/plain-draft.md" --judge-findings "$work/verdicts2.txt" 2>&1) && rc=0 || rc=$?
+[ "$rc" -eq 1 ] && printf '%s' "$out" | grep -q 'causality' \
+  && ok "judge-flagged forbidden derivation category is a gate failure" || err "judge-flagged forbidden category was not a semantic gate failure (rc=$rc): $out"
 
 # Structural independence: narration/verify carrying a pointer fails even without a fact sheet.
 printf 'P1.S3: narration <- fs-1\n' | python3 "$VP" --map - >/dev/null 2>&1 \
@@ -107,6 +116,8 @@ P1.S1[L7]: sourced <- fs-1
 P1.S2[L8]: narration
 P2.S1[L9]: sourced <- fs-3
 MAP
+ANCH=$(python3 -c "import hashlib;print(hashlib.sha256(open('$work/anch-draft.md',encoding='utf-8').read().encode()).hexdigest())")
+att() { printf 'attestation: draft-sha256=%s\ngraded: P1.S2\n' "$ANCH"; }
 # The hand-off carries the anchored line verbatim — no skip rules to apply.
 python3 "$VP" --map "$work/anch-map.txt" --draft "$work/anch-draft.md" --list-narration \
   | grep -q 'P1.S2 \[L8\]: Under a binary rule' \
@@ -117,21 +128,21 @@ python3 "$VP" --map "$work/anch-map.txt" --draft "$work/anch-draft.md" --list-de
 
 # Determinism: every judge spawn receives byte-identical text (the defect was
 # three judges deriving three different numberings from the same draft).
-n=$(for i in 1 2 3; do python3 "$VP" --map "$work/anch-map.txt" --draft "$work/anch-draft.md" --list-narration; done | sort -u | wc -l)
+n=$(for i in 1 2 3; do python3 "$VP" --map "$work/anch-map.txt" --draft "$work/anch-draft.md" --list-narration | cksum; done | sort -u | wc -l)
 [ "$n" -eq 1 ] && ok "three independent spawns get an identical hand-off (deterministic)" \
   || err "hand-off differed across spawns ($n variants)"
 
 # A mislocated verdict is detectable from the record alone: the judge echoes the
 # sentence it graded, and it does not match the anchor. This is the observed
 # case — a confident finding against text that was not at that position.
-printf 'P1.S2 ~ "enumerates six universal derivation rules": asserts a checkable proposition\n' \
+{ att; printf 'P1.S2 ~ "enumerates six universal derivation rules": asserts a checkable proposition\n'; } \
   > "$work/jf-bad.txt"
 python3 "$VP" --map "$work/anch-map.txt" --draft "$work/anch-draft.md" \
   --judge-findings "$work/jf-bad.txt" 2>&1 | grep -q 'ANCHOR MISMATCH' \
   && ok "a judge verdict quoting the wrong sentence is caught mechanically (#304)" \
   || err "anchor mismatch not detected"
 # A judge quoting the real anchored sentence is graded as a normal finding.
-printf 'P1.S2 ~ "Under a binary rule, a sentence is either sourced": asserts a checkable proposition\n' \
+{ att; printf 'P1.S2 ~ "Under a binary rule, a sentence is either sourced": asserts a checkable proposition\n'; } \
   > "$work/jf-ok.txt"
 out=$(python3 "$VP" --map "$work/anch-map.txt" --draft "$work/anch-draft.md" \
       --judge-findings "$work/jf-ok.txt" 2>&1 || true)
@@ -140,12 +151,48 @@ printf '%s' "$out" | grep -q 'asserts a checkable proposition' \
   && ok "a correctly-located verdict is graded normally, not discarded" \
   || err "a correct verdict was mishandled: $out"
 # A verdict against a position absent from the map cannot be trusted.
-printf 'P9.S9: asserts a checkable proposition\n' > "$work/jf-ghost.txt"
+{ att; printf 'P9.S9: asserts a checkable proposition\n'; } > "$work/jf-ghost.txt"
 python3 "$VP" --map "$work/anch-map.txt" --draft "$work/anch-draft.md" \
   --judge-findings "$work/jf-ghost.txt" 2>&1 | grep -q 'not in the map' \
   && ok "a verdict against an unmapped position is rejected" || err "ghost position accepted"
 python3 "$VP" --map "$work/good.txt" --list-derived | grep -q 'P1.S2: fs-12, fs-14' \
   && ok "derived claims are listable for the judge" || err "--list-derived wrong"
+
+# --- Story 13.67 (#364): fail-closed judge attestation ---
+# Comment-only file: absence of verdicts is never PASS.
+printf '# isolated-judge verdicts: all positions PASS\n' > "$work/att-comment.txt"
+out=$(python3 "$VP" --map "$work/anch-map.txt" --draft "$work/anch-draft.md" \
+      --judge-findings "$work/att-comment.txt" 2>&1) && rc=0 || rc=$?
+[ "$rc" -eq 3 ] && printf '%s' "$out" | grep -q 'never PASS' \
+  && ok "comment-only verdicts file fails closed (13.67)" || err "comment-only file not rejected (rc=$rc)"
+# Coverage gap: graded set must cover every narration+derived position.
+printf 'attestation: draft-sha256=%s\ngraded: P9.S1\n' "$ANCH" > "$work/att-gap.txt"
+out=$(python3 "$VP" --map "$work/anch-map.txt" --draft "$work/anch-draft.md" \
+      --judge-findings "$work/att-gap.txt" 2>&1) && rc=0 || rc=$?
+[ "$rc" -eq 3 ] && printf '%s' "$out" | grep -q 'ungraded position(s): P1.S2' \
+  && ok "worklist coverage gap fails closed naming the missing positions (13.67)" || err "coverage gap not rejected (rc=$rc): $out"
+# Unknown graded position.
+printf 'attestation: draft-sha256=%s\ngraded: P1.S2,P9.S9\n' "$ANCH" > "$work/att-ghost.txt"
+out=$(python3 "$VP" --map "$work/anch-map.txt" --draft "$work/anch-draft.md" \
+      --judge-findings "$work/att-ghost.txt" 2>&1) && rc=0 || rc=$?
+[ "$rc" -eq 3 ] && printf '%s' "$out" | grep -q 'not in the map: P9.S9' \
+  && ok "unknown graded position fails closed (13.67)" || err "unknown graded position not rejected (rc=$rc)"
+# Draft-hash mismatch: verdicts for a prior draft never validate the current one.
+printf 'attestation: draft-sha256=%s\ngraded: P1.S2\n' \
+  "0000000000000000000000000000000000000000000000000000000000000000" > "$work/att-stale.txt"
+out=$(python3 "$VP" --map "$work/anch-map.txt" --draft "$work/anch-draft.md" \
+      --judge-findings "$work/att-stale.txt" 2>&1) && rc=0 || rc=$?
+[ "$rc" -eq 3 ] && printf '%s' "$out" | grep -q 'draft-sha256 mismatch' \
+  && ok "draft-hash mismatch fails closed (13.67)" || err "stale-draft attestation not rejected (rc=$rc)"
+# Valid attestation with zero failure verdicts = judged clean = PASS.
+att > "$work/att-clean.txt"
+python3 "$VP" --map "$work/anch-map.txt" --draft "$work/anch-draft.md" \
+  --judge-findings "$work/att-clean.txt" >/dev/null 2>&1 \
+  && ok "valid attestation with no failures passes (judged clean, 13.67)" || err "valid clean attestation rejected"
+# The hand-off emits the attestation header the judge echoes.
+python3 "$VP" --map "$work/anch-map.txt" --draft "$work/anch-draft.md" --list-narration \
+  | grep -q "attestation: draft-sha256=$ANCH" \
+  && ok "hand-off emits the attestation header for the judge to echo (13.67)" || err "hand-off missing attestation header"
 
 # SKILL wires the independent check and states it does not share drafting context.
 grep -q 'verify-provenance.py' "$SKILL" && grep -qi 'does .*not.*share\|not share this' "$SKILL" \
@@ -154,6 +201,11 @@ grep -q 'verify-provenance.py' "$SKILL" && grep -qi 'does .*not.*share\|not shar
 # saw the drafting turn, spawned via the Task tool — not an inline continuation.
 grep -qi 'subagent' "$SKILL" && grep -qi 'never saw the drafting turn' "$SKILL" \
   && ok "SKILL spawns the provenance judge as an isolated subagent (NFR13)" || err "SKILL does not spawn an isolated judge subagent"
+# Story 13.67: the SKILL states the attestation grammar and the re-spawn rule.
+grep -q 'attestation: draft-sha256=' "$SKILL" \
+  && ok "SKILL states the judge attestation grammar verbatim (13.67)" || err "SKILL missing attestation grammar"
+grep -qi 're-spawn.*judge\|judge.*re-spawn\|every revision cycle re-spawns' "$SKILL" \
+  && ok "SKILL states every revision cycle re-spawns the judge (13.67)" || err "SKILL missing re-spawn-per-cycle rule"
 
 if [ "$fail" -eq 0 ]; then
   printf '\nAll verify-provenance checks passed.\n'; exit 0
