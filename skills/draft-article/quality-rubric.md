@@ -120,3 +120,27 @@ v1 defaults**, tuned here from dogfood/exemplar runs (Open question 3):
 
 A metric crossing its threshold is a dimension-4 **fail**, reported with the
 location and the measured value.
+
+## Dimension separation — length is dimension 4's, flow is dimensions 1–2's (#349, Story 13.66)
+
+Dimensions 4 (mechanical) and 1–2 (LLM-judged) must not double-count the same
+edit, or a fix for one re-triggers the other and revision oscillates (the
+observed dim4 sentence-split re-triggering a dim1/dim2 finding):
+
+- **Dimension 4 owns length and vocabulary distribution** — sentence length,
+  paragraph length, heading density, sourced-claim density. These are the
+  mechanical, zero-token concerns.
+- **Dimensions 1–2 own only the interpretive concerns** — narrative arc,
+  one-idea-per-paragraph, connective tissue, orphan facts. A dim1/dim2 finding
+  **must cite a narrative or flow defect**, never a sentence- or
+  paragraph-*length* artifact that dimension 4 already governs.
+- **A sentence split or merge performed to satisfy dimension 4 is neutral for
+  dimensions 1–2.** Splitting a >40-word sentence into two shorter ones, or
+  merging two fragments, is a length edit — dimensions 1–2 do not raise a new
+  finding solely because a sentence was split or joined. (Dimension 4's
+  paragraph "wall of text" check *cross-references* dimension 2 as a hint, but
+  the length threshold is dimension 4's verdict, not a second dim2 finding.)
+
+This separation is what makes the two-cycle delta re-check (#349) converge: a
+cycle that fixes a dim4 length threshold cannot manufacture a fresh dim1/dim2
+interpretive finding on the same text.
