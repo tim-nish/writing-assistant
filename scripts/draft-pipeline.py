@@ -69,6 +69,39 @@ def resolve_framework(name):
     if key in FRAMEWORKS:
         return key
     return INTENT_ALIASES.get(key)
+
+
+# Nearest-fit hints for unmapped intents (Story 13.81). Resolution stays a
+# closed mapping — these NEVER select a framework; they only shape the
+# refusal so the writer gets a reason and a direction instead of a bare
+# label list. First matching row wins.
+NEAREST_FIT_HINTS = [
+    (re.compile(r"tutorial|how-?to|walkthrough|step-?by-?step|guide"),
+     'a tutorial/how-to framework is deliberately excluded — ratified-banned '
+     'by AP-10 (SPEC-article-frameworks), not a gap. Closest fit: "share '
+     'engineering lessons" (the lessons behind the how-to), or the '
+     'lightweight working-note profile'),
+    (re.compile(r"announc|launch|release|intro"),
+     'closest fit: "introduce the project"'),
+    (re.compile(r"lesson|postmortem|retro|debug|incident|migrat"),
+     'closest fit: "share engineering lessons"'),
+    (re.compile(r"bench|eval|measur|test|method"),
+     'closest fit: "explain the evaluation methodology"'),
+    (re.compile(r"survey|landscape|compar|review|state.of"),
+     'closest fit: "survey a research area"'),
+]
+
+
+def nearest_fit(raw):
+    """A refusal hint for an unmapped intent: why the set is closed, plus the
+    closest sanctioned fit (or the working-note profile as the light fallback)."""
+    key = re.sub(r"[^a-z0-9]+", "-", raw.strip().lower()).strip("-")
+    for pat, hint in NEAREST_FIT_HINTS:
+        if pat.search(key):
+            return hint
+    return ('closest fit: none of the sanctioned categories maps cleanly — '
+            'the lightweight working-note profile is the fallback for '
+            'material outside them')
 GLOB_RE = re.compile(r"[*?\[\]{}]")
 RANGE_RE = re.compile(r"^[A-Za-z0-9_.\-~^@]+\.\.\.?[A-Za-z0-9_.\-~^@/]+$")
 
@@ -2883,8 +2916,12 @@ def _run_state(framework, sources, root=None):
         labels = "; ".join(
             f'"{INTENT_LABELS[k]}" ({k.upper()})' for k in sorted(FRAMEWORKS))
         sys.stderr.write(
-            f"error: invalid article type {framework!r}. "
-            f"Valid: {labels}. Nothing started.\n")
+            f"error: invalid article type {framework!r} — this intent maps to "
+            "no framework. The category set is ratified and closed "
+            "(SPEC-article-frameworks: the four below plus the working-note "
+            f"profile). Valid: {labels}.\n"
+            f"{nearest_fit(framework)}.\n"
+            "Nothing started.\n")
         return None, 2
     framework_file = os.path.join("skills", "draft-article", "frameworks", FRAMEWORKS[key])
     if not os.path.isfile(os.path.join(plugin_root(), framework_file)):
