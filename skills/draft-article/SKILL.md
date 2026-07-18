@@ -739,6 +739,67 @@ never an empty block. When candidates were emitted, the completion summary's
 **informational notes** must name the file (`$WS/staging-candidates.md`) and
 the block count, so a proposal is never silently buried in run output.
 
+### Stage 2→3 policy-block gate — draft generation blocks on a conflict/stale plan (Story 13.77)
+
+**After the answers are recorded (and staging candidates emitted), before any
+Stage 3 fill**, run the stage-progression precondition
+(SPEC-article-draft-pipeline, 2026-07-18 amendment: draft generation blocks on
+a conflict or stale plan — like the quality gate, never silently proceeded
+past). It is mechanical (no LLM):
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py policy-block-check \
+  --classification "$WS/policy-classified.json" --answers <answers.json> \
+  > "$WS/policy-block.json"
+```
+
+**Resumed-run half (autostart):** when a resumed run already has an emitted
+article plan (a prior invocation reached plan emission), the plan's recorded
+CAP-4 conformance status **re-validates before Stage 3+ continues** — pass the
+plan, and the fresh surface so the status is **recomputed at the current pin**
+through the 13.76 `conformance` machinery (read-only — same table, same rules,
+one implementation):
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py policy-block-check \
+  --plan <plans/<slug>.md> --surface "$WS/policy-surface.txt" \
+  --root <host-repo> [--staging "$WS/staging-candidates.md"]
+```
+
+Branch on the JSON:
+
+- **`blocked: false`** (`conformant` / `open` / answered reconciliation) —
+  proceed to Stage 3 unchanged.
+- **`blocked: true`** (`action: publish-blocker`) — **surface the
+  `publish_blocker` payload in-conversation** (it names the conflicting
+  positions with their pointers, or the moved pin/configVersion — never a bare
+  status), **write the block checkpoint, and STOP the run**: checkpoint the
+  output's suggested `checkpoint` object —
+  `{"stage": "policy-block", "next_stage": "interview"}` — via
+  `checkpoint --ws "$WS"`, so the run resumes **at the block** and the
+  reconciliation question **re-presents on resume**; never checkpoint before
+  Stage 2, and never `next_stage: fill` (that would resume past the gate).
+  The completion summary's **publish-blockers bucket** carries the payload
+  (positions/pin delta included) and the resume path.
+- **In-run repair** — the block is repairable in the same invocation:
+  - **conflict** → if the owner answers the reconciliation question now
+    (CAP-7), record it via `answer` and **re-run the check** — any recorded
+    decision unblocks, **including a reversal**, which proceeds as a proposed
+    policy change through its staging-candidate block (never as current
+    policy);
+  - **stale** → **re-consult at the current pin**: re-run the policy reader
+    (`read-policy-source.py read`), `classify-policy`, and the conformance
+    recompute against the fresh surface, then re-run the check — it proceeds
+    or re-blocks per the new status (a recorded `stale` whose referenced
+    lines still hold at the new pin clears to `conformant`).
+- **Generic mode never touches the gate**: with no `policy_source` toggle (or
+  reader exit 10) there is no classification and no policy-seeded plan, and
+  the check returns `{blocked: false, reason: "generic-mode"}` — behavior
+  identical to a repo without the seam.
+
+This gate is a **separate precondition at the same boundary** as the quality
+gate: it changes nothing about the quality gate or `[VERIFY]` markers.
+
 ## Stage 3 — fill the framework (with `[VERIFY]` markers)
 
 Fill the chosen framework's slots from the fact sheet and the interview answers.
@@ -1402,10 +1463,12 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/write-article-plan.py conformance \
   and `policy_conformance` (∈ `conformant`/`open`/`conflict`/`stale`) into
   the plan's frontmatter through the writer's fail-closed validation. The
   recorded status **rides the plan**.
-- A `conflict` or `stale` status is **recorded, not blocking** — the
-  stage-progression block on a non-conformant plan is Story 13.77's, not this
-  step's. Relay the status (and the findings' positions/pointers) in the
-  completion summary's informational bucket.
+- At plan emission a `conflict` or `stale` status is **recorded, not blocking**
+  — the stage-progression block fired earlier, at the Stage 2→3 boundary
+  (`policy-block-check`, Story 13.77), and the recorded status is what that
+  gate **re-validates on the next resumed run** before Stage 3+ continues.
+  Relay the status (and the findings' positions/pointers) in the completion
+  summary's informational bucket.
 - Pass `--staging` when the run emitted staging candidates: a plan decision
   that **reverses a served ratified line** is conformant **only as a proposed
   policy change** (its staging-candidate block exists →
@@ -1458,7 +1521,11 @@ the `complete` subcommand's JSON (the dual-product completion gate, Story
 summarize: surface the gate's hard error instead.
 
 Any unresolved `[VERIFY]` marker or unrendered figure is a **publish blocker**,
-listed under that bucket and nowhere else.
+listed under that bucket and nowhere else. A run stopped by the Stage 2→3
+policy-block gate (Story 13.77) lists its block there too: the bucket carries
+the `publish_blocker` payload — the conflicting **positions with pointers**, or
+the moved pin/configVersion — plus the **resume path** (the block checkpoint;
+resume re-presents the reconciliation question).
 
 **Partial progress and the turn budget (Story 13.7).** The turn/compute budget is
 a real ceiling. As a stage nears it,
@@ -1488,6 +1555,7 @@ pipeline order. This is the authoritative flag list — consult it instead of
 | `interview` | 2 | Build the bounded gap-interview question set for the framework | `--framework` (req) `<state\|->` |
 | `answer` | 2 | Record one owner answer (single form), or validate a batch | `--id` `--disposition` `--text` `--pointer` (repeatable) `--batch` |
 | `journal` | 2 | Write the interview journal (triage record, Story 10.4) | `--interview` (req) `--answers` |
+| `policy-block-check` | 2→3 | Stage-progression precondition (Story 13.77): blocks Stage 3 fill on an unresolved config↔policy conflict or a `conflict`/`stale` plan, emitting the publish-blocker payload + block checkpoint; `conformant`/`open` and generic mode proceed | `--classification` `--answers` `--plan` `--surface` `--config-json` `--root` `--config-version` `--staging` |
 | `provenance` | 3 | Parse + structurally validate the sidecar provenance map | `--map` `--count` `--draft` |
 | `quality-gate` | 3→4 | The mandatory quality gate; non-zero exit blocks Stage 4 (Story 11.4) | `--draft` `--map` `--judge` |
 | `verify-markers` | 3/4 | Validate `[VERIFY: reason]` markers; `--count` prints the count (drive to 0) | `<draft\|->` `--count` |
