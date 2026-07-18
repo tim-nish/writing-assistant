@@ -209,15 +209,33 @@ specific workspace's checkpoint directly when you need it:
 python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py resume --ws "$WS"
 ```
 
-**Mark the run done on completion.** When the pipeline finishes (Stage 5
-variants emitted), write a final checkpoint with `next_stage: done` so
-`autostart` treats the run as complete and starts fresh next time rather than
-re-resuming it:
+**Mark the run done on completion — through the completion gate (Story 13.68).**
+When the pipeline finishes, run the `complete` subcommand. It is the **only
+sanctioned way to finish a draft run** — never hand-write the final
+`next_stage: done` checkpoint:
 
 ```
-printf '{"stage":"variants","next_stage":"done"}' | \
-  python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py checkpoint --ws "$WS" -
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py complete \
+  --draft "$WS/<draft>.md" --slug <slug> --root <host-repo> --ws "$WS"
 ```
+
+The run's declared products are **two** (SPEC-article-draft-pipeline,
+2026-07-18 amendment; SPEC-platform-variants CAP-1): the canonical draft at
+`<output.drafts>/<slug>.md` and the article plan at `plans/<slug>.md` — **both
+must be durably persisted before completion may be reported**. `complete`
+persists the canonical (with the emission trailer carrying its content hash,
+the same convention the variants stage records), verifies the plan exists at
+its resolved destination (the schema-less **user-scoped fallback counts** as a
+successful plan write), and only after BOTH products verify writes the final
+`next_stage: done` checkpoint so `autostart` treats the run as complete. A
+failed write of either product is a **hard error naming the product and path**:
+the run never reports "complete", and the checkpoint never records
+`next_stage: done` over a workspace-only canonical. The gate applies whenever
+`complete` runs, so a resumed run checkpointed before this contract is never
+grandfathered. On success the JSON names **both persisted absolute paths** —
+relay them in the completion summary's informational notes. Re-running
+`complete` over already-persisted products re-verifies and succeeds
+(idempotent).
 
 Checkpoint state lives under `$WS` with the other intermediates
 (`docs/storage-architecture.md` D2), never in the host tree.
@@ -1329,6 +1347,12 @@ this run produces an **article body**, the informational bucket includes a
 python3 ${CLAUDE_PLUGIN_ROOT}/scripts/reading-time.py --language <en|ja> <draft>
 ```
 
+The informational bucket also names **both persisted product paths** —
+`drafts/<slug>.md` and `plans/<slug>.md`, copy-pasteable, taken verbatim from
+the `complete` subcommand's JSON (the dual-product completion gate, Story
+13.68). A run whose `complete` invocation failed has no completion to
+summarize: surface the gate's hard error instead.
+
 Any unresolved `[VERIFY]` marker or unrendered figure is a **publish blocker**,
 listed under that bucket and nowhere else.
 
@@ -1368,3 +1392,4 @@ pipeline order. This is the authoritative flag list — consult it instead of
 | `variants` | 5 | Emit platform-ready variants as profile-driven projections; emission is the owner's explicit choice — no `--platforms` reports options and emits nothing | `<draft>` `--platforms <ids\|all>` `--list-platforms` `--config-json` `--root` `--global-config` `--repo-config` `--out` `--create-out` `--ws` `--dry-run` |
 | `variant-staleness` | 5/post | Compare each variant's recorded canonical hash against the current draft; mismatches are publish blockers (Story 16.7) | `<draft\|->` `--variants <files…>` `--out` `--root` |
 | `site-record` | post-publish | Propose the site's `mode: external` record after the owner confirms the published URL (Story 16.9); proposal lands in `$WS` only | `<draft\|->` `--url` `--date` `--config-json` `--root` `--global-config` `--repo-config` `--ws` |
+| `complete` | completion | The dual-product completion gate (Story 13.68): persist the canonical to `<output.drafts>/<slug>.md`, verify `plans/<slug>.md`, then (and only then) write the `next_stage: done` checkpoint; the only sanctioned way to finish a run | `--draft` (req) `--slug` (req) `--root` `--ws` |

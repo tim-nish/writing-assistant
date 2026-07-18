@@ -2326,6 +2326,137 @@ def _run_state(framework, sources, root=None):
     }, 0
 
 
+# --- Completion gate: durable dual-product persistence (Story 13.68) ---------
+# GitHub #361: a run could report "complete and verified" while the canonical
+# draft existed only as a workspace copy. The 2026-07-18 SPEC amendment
+# (SPEC-article-draft-pipeline; SPEC-platform-variants CAP-1) declares the
+# run's products — drafts/{slug}.md AND plans/{slug}.md — and makes their
+# persistence a hard completion gate: both persisted before the run may report
+# completion; a failed write of either is a hard error. `complete` is the ONLY
+# sanctioned way to finish a draft run — the SKILL calls it instead of
+# hand-writing the final `next_stage: done` checkpoint.
+
+# The emission trailer the canonical carries — the SAME trailer the variants
+# stage appends to every emitted variant (one hash convention, not two): the
+# hash is sha256 over the draft text WITHOUT the trailer, so a variant emitted
+# from the trailer-stripped canonical records the same canonical_sha256.
+_EMISSION_TRAILER_RE = re.compile(
+    r"\n*<!-- writing-assistant: canonical-sha256=[0-9a-f]{64} -->\s*$")
+
+
+def cmd_complete(args):
+    """Finish a draft run through the dual-product completion gate (Story
+    13.68). The declared products are two — the canonical draft at
+    `<output.drafts>/<slug>.md` and the article plan at `plans/<slug>.md` —
+    and BOTH must be durably persisted before completion may be reported:
+
+      1. persist the workspace draft as the canonical, with the emission
+         trailer `<!-- writing-assistant: canonical-sha256=<hex> -->` whose
+         hash is sha256 over the draft content WITHOUT the trailer (the
+         variants stage's convention, reused — one hash convention, not two);
+      2. verify the plan exists at its resolved destination (write-article-
+         plan.py `dest`); the schema-less user-scoped fallback COUNTS — the
+         fallback changes where the plan lives, never whether it was written;
+      3. only after both products verify, write the final `next_stage: done`
+         checkpoint to the workspace (--ws).
+
+    Any failure is a hard error naming the failed product and path, exits
+    non-zero, and writes NO checkpoint — the run never reports complete over a
+    workspace-only canonical, and partial success (canonical yes, plan no)
+    still hard-errors. Idempotent: re-running over already-persisted products
+    re-verifies (same hash, byte-identical canonical) and succeeds. The gate
+    applies whenever `complete` runs, so a resumed pre-contract run is never
+    grandfathered.
+    """
+    def product_error(product, path, reason):
+        sys.stderr.write(
+            f"error: completion gate: {product} not persisted — {reason} "
+            f"(path: {path}). The run may not report completion, and the "
+            "checkpoint does not record `next_stage: done`.\n")
+        return 1
+
+    # Product 1 — the canonical draft at <output.drafts>/<slug>.md.
+    try:
+        text = _read_text(args.draft)
+    except OSError as e:
+        return product_error("canonical draft (drafts/{slug}.md)", args.draft,
+                             f"cannot read the workspace draft: {e}")
+    out_dir = _resolve_drafts_dir(args.root)   # undeclared → named SystemExit
+    canonical_path = os.path.abspath(os.path.join(out_dir, f"{args.slug}.md"))
+    if not os.path.isdir(out_dir):
+        return product_error(
+            "canonical draft (drafts/{slug}.md)", canonical_path,
+            f"the resolved output.drafts directory does not exist: {out_dir}")
+    # Strip any existing trailer BEFORE hashing so the hash is always over the
+    # draft content alone — and a re-run over the persisted canonical verifies
+    # to the same hash instead of hashing its own trailer.
+    body = _EMISSION_TRAILER_RE.sub("", text).rstrip("\n") + "\n"
+    canonical_sha = hashlib.sha256(body.encode("utf-8")).hexdigest()
+    content = body + \
+        f"\n<!-- writing-assistant: canonical-sha256={canonical_sha} -->\n"
+    try:
+        tmp = canonical_path + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as fh:
+            fh.write(content)
+        os.replace(tmp, canonical_path)
+    except OSError as e:
+        return product_error("canonical draft (drafts/{slug}.md)",
+                             canonical_path, f"write failed: {e}")
+
+    # Product 2 — the article plan at its resolved destination (SPEC-article-
+    # plan). Resolution is delegated to the plan writer's own `dest` so the
+    # two can never disagree; conforming articles repo and user-scoped
+    # fallback are BOTH a successful plan write.
+    here = os.path.dirname(os.path.realpath(__file__))
+    cmd = [sys.executable, os.path.join(here, "write-article-plan.py"),
+           "dest", "--slug", args.slug]
+    if args.root:
+        cmd += ["--root", args.root]
+    r = subprocess.run(cmd, capture_output=True, text=True)
+    if r.returncode != 0:
+        return product_error(
+            "article plan (plans/{slug}.md)", "(unresolved)",
+            r.stderr.strip() or "could not resolve the plan destination")
+    dest = json.loads(r.stdout)
+    plan_path = os.path.abspath(dest["path"])
+    if not os.path.isfile(plan_path):
+        return product_error(
+            "article plan (plans/{slug}.md)", plan_path,
+            "no plan exists at the resolved destination — write it first "
+            "(write-article-plan.py write --slug " + args.slug + ")")
+
+    # Both products verified — NOW (and only now) the run may be marked done.
+    checkpoint_path = None
+    if args.ws:
+        if not os.path.isdir(args.ws):
+            sys.stderr.write(f"error: run workspace does not exist: {args.ws}\n")
+            return 1
+        checkpoint_path = _checkpoint_path(args.ws)
+        tmp = checkpoint_path + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump({"stage": "complete", "next_stage": DONE_STAGE}, f,
+                      indent=2)
+        os.replace(tmp, checkpoint_path)
+
+    # Both persisted paths, absolute and copy-pasteable — the completion
+    # summary relays them under informational notes.
+    out = {
+        "stage": "complete",
+        "next_stage": DONE_STAGE,
+        "slug": args.slug,
+        "products": {
+            "canonical": {"path": canonical_path,
+                          "canonical_sha256": canonical_sha},
+            "plan": {"path": plan_path,
+                     "conforming": dest.get("conforming"),
+                     "fallback": dest.get("fallback")},
+        },
+        "checkpoint": checkpoint_path,
+    }
+    print(json.dumps(out, indent=2))
+    return 0
+
+
 def cmd_stage0(args):
     """Story 13.13: fold the whole of Stage 0 into ONE invocation instead of
     three — configuration validation (CAP-5), framework check, and workspace
@@ -2379,6 +2510,12 @@ def main(argv=None):
     sp.add_argument("state", nargs="?", default="-", help="the stage's output state JSON, or - for stdin")
     sp = sub.add_parser("resume", help="report where to resume a run from its workspace checkpoint (Story 13.5)")
     sp.add_argument("--ws", required=True, help="the run workspace ($WS) to resume")
+    sp = sub.add_parser("complete", help="finish the run through the dual-product completion gate (Story 13.68)")
+    sp.add_argument("--draft", required=True, help="the workspace draft to persist as the canonical, or - for stdin")
+    sp.add_argument("--slug", required=True, help="the article slug — names both products (<slug>.md)")
+    sp.add_argument("--root", help="host-repo root (default: git top-level of cwd; errors outside a git repo)")
+    sp.add_argument("--ws", help="run workspace; the final `next_stage: done` checkpoint is written here "
+                                 "only after BOTH products verify")
     sp = sub.add_parser("autostart", help="auto-resume the newest in-progress run, else mint a fresh one (Story 13.12)")
     sp.add_argument("--root", help="host-repo root (default: git top-level of cwd; errors outside a git repo)")
     sp = sub.add_parser("stage0", help="fold Stage 0 into one call: config validation + framework + autostart (Story 13.13)")
@@ -2505,7 +2642,7 @@ def main(argv=None):
     return {
         "start": cmd_start, "consume": cmd_consume, "interview": cmd_interview,
         "checkpoint": cmd_checkpoint, "resume": cmd_resume, "autostart": cmd_autostart,
-        "stage0": cmd_stage0,
+        "stage0": cmd_stage0, "complete": cmd_complete,
         "answer": cmd_answer, "journal": cmd_journal, "provenance": cmd_provenance,
         "staging-candidates": cmd_staging_candidates,
         "review-consulted": cmd_review_consulted,
