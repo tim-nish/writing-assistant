@@ -85,20 +85,34 @@ def validate(plan, slot_count):
         if not isinstance(m, dict):
             yield (tag, "member is not an object")
             continue
+        fixes = {
+            "role": "state the communicative role — the part of the "
+                    "argument this visual carries",
+            "format": 'set "table" or "diagram" (the CAP-4 '
+                      "table-vs-diagram rule, applied per member)",
+            "placement": "name the framework slot or the section the "
+                         "visual sits in",
+        }
         for key in ("role", "format", "placement"):
             if not str(m.get(key, "")).strip():
-                yield (f"{tag}.{key}", "required and non-empty")
+                yield (f"{tag}.{key}",
+                       f"required and non-empty — fix: {fixes[key]}")
         elements = m.get("required_elements")
         if not isinstance(elements, list) or not elements:
             yield (f"{tag}.required_elements",
-                   "a member must enumerate at least one required element")
+                   "a member must enumerate at least one required element — "
+                   "fix: list the nodes/relationships/rows the role demands, "
+                   "then map each one in `evidence`")
             continue
         evidence = m.get("evidence")
         if not isinstance(evidence, dict):
             yield (f"{tag}.evidence",
                    "a member must map each required element to its evidence "
                    "(a pinned pointer, an interview-answer id, or a "
-                   "[VERIFY]/NEEDS-OWNER marker)")
+                   "[VERIFY]/NEEDS-OWNER marker) — fix: add an `evidence` "
+                   "object with one entry per required element, e.g. "
+                   '{"<element>": "path:line@sha" | "q4" | '
+                   '"[VERIFY: reason]"}')
             continue
         for el in elements:
             val = str(evidence.get(el, "")).strip()
@@ -107,11 +121,16 @@ def validate(plan, slot_count):
                        "element has no evidence — a source pointer, an "
                        "interview-answer id, or an explicit [VERIFY]/NEEDS-OWNER "
                        "marker is required (CAP-3); an unsourced element is "
-                       "never laundered into the set")
+                       "never laundered into the set — fix: set "
+                       f'evidence[{el!r}] to "path:line@sha", an answer id '
+                       'like "q4", or "[VERIFY: <why it is unpinned>]"')
             elif not (PINNED_PTR_RE.match(val) or VERIFY_RE.search(val)):
                 yield (f"{tag}.evidence[{el!r}]",
                        f"evidence {val!r} is neither a pinned pointer / "
-                       "interview-answer id nor a [VERIFY]/NEEDS-OWNER marker")
+                       "interview-answer id nor a [VERIFY]/NEEDS-OWNER marker "
+                       '— fix: use "path:line@sha", a bare commit sha, a URL, '
+                       '"den:pkg@ver", an answer id like "q4", or '
+                       '"[VERIFY: reason]"')
 
 
 def main(argv=None):
@@ -141,6 +160,10 @@ def main(argv=None):
     sys.stderr.write("visual-set plan REFUSED — not ratifiable:\n")
     for where, reason in defects:
         sys.stderr.write(f"  {where}: {reason}\n")
+    sys.stderr.write(
+        "resolve exactly the fields named above and resubmit — a plan "
+        "authored from the scaffold shape (SKILL.md, Visual-set plan) is "
+        "ratifiable first-try\n")
     return REFUSED
 
 

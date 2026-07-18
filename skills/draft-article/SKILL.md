@@ -1008,11 +1008,44 @@ as a whole:
 
 Recommend multiple visuals **only when distinct parts of the argument
 materially benefit** — the step makes the set deliberate, never larger.
+
+**Author the plan from this scaffold (Story 13.79)** — the ratifiability
+invariants are unchanged; the shape below satisfies them by construction, so a
+plan authored from it is the natural first output. Every member carries **≥1
+`required_elements`**, and `evidence` maps **each** element to a pinned
+pointer (`path:line@sha`), an interview-answer id (`q4`), or an explicit
+`[VERIFY: reason]` / NEEDS-OWNER marker:
+
+```json
+{
+  "members": [
+    {
+      "role": "the harvest→draft→review pipeline flow",
+      "required_elements": ["harvest", "draft", "review", "gate edge"],
+      "format": "diagram",
+      "placement": "Section 3 (Architecture) — declared slot",
+      "evidence": {
+        "harvest":   "skills/harvest/SKILL.md:11@a1b2c3d",
+        "draft":     "q4",
+        "review":    "skills/review-article/SKILL.md:1@a1b2c3d",
+        "gate edge": "[VERIFY: the ordering is argued in prose, unpinned]"
+      }
+    }
+  ]
+}
+```
+
 Validate the assembled plan (the cap + the zero-plan-no-padding rule) with:
 
 ```
 python3 ${CLAUDE_PLUGIN_ROOT}/scripts/validate-visual-set.py --slot-count <n> "$WS/visual-set-plan.json"
 ```
+
+A refusal names the **exact member/field and its concrete fix** (e.g.
+`members[0].evidence['gate edge']: element has no evidence — fix: …`) —
+resolve exactly the named fields and resubmit; never rewrite the whole plan
+from scratch on a refusal, and never present a plan to the owner before the
+validator accepts it.
 
 **The owner ratifies, modifies, or declines the whole plan.** Modification
 (remove a member, change a role/format/placement, add one within the cap)
