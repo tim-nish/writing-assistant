@@ -220,19 +220,26 @@ the review — its findings split into two kinds:
 
 - **Review-precondition failures — these halt.** The unit of review is a
   *framework-complete* draft, so if lint reports residual `[VERIFY]` markers,
-  unfilled GATE slots, un-stripped framework-template residue, or no frontmatter
-  block at all, the draft is not a well-formed review unit: **stop and report the
-  precondition failure** — there is nothing complete to review yet.
-- **Frontmatter schema defects on an otherwise-complete draft — these do NOT
-  halt.** Missing/extra schema fields, title length, or platform-native
-  frontmatter on a content-complete draft are **publish blockers**, not a stop:
-  the **structure, prose, and cold-read passes still run** so the owner gets
-  content feedback *and* the blocker list in one review round. These blockers
-  route to the completion summary's publish-blockers bucket, exactly like a
-  configuration defect (they never enter the capped structure/prose findings).
+  unfilled GATE slots, or un-stripped framework-template residue, the draft is
+  not a well-formed review unit: **stop and report the precondition failure** —
+  there is nothing complete to review yet. These are *body-incompleteness*
+  signals; a missing frontmatter block is not one of them (see below).
+- **Frontmatter defects on an otherwise-complete draft — these do NOT halt.**
+  Missing/extra schema fields, title length, platform-native frontmatter, **and
+  a missing frontmatter block entirely** are **publish blockers**, not a stop:
+  `lint-article` reports the absent block as `schema` findings (naming the full
+  required field set, #143) and still runs every body check, so the body is
+  reviewable. The **structure, prose, and cold-read passes still run** so the
+  owner gets content feedback *and* the blocker list in one review round. These
+  blockers route to the completion summary's publish-blockers bucket, exactly
+  like a configuration defect (they never enter the capped structure/prose
+  findings).
 
-Blocking all content review on a frontmatter defect alone wastes the review of a
-content-complete draft; the split above is deliberate.
+Blocking all content review on a frontmatter defect alone — including a wholly
+absent frontmatter block — wastes the review of a content-complete body; the
+split above is deliberate. A missing frontmatter block is a `schema`-category
+finding (the most extreme one), not a body-incompleteness signal, so it is a
+publish blocker the content passes run alongside, never a halt.
 
 ## Findings contract
 
