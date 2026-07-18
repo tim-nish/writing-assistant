@@ -1007,11 +1007,22 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py repair-hop \
   (interview provenance), never a SOURCE.
 
 This is the **only** backward edge to harvest/interview beyond the rewrite
-route above. It counts against the **same two-cycle bound** as rewrites/gate
-revisions, and an unrepaired missing-input finding becomes a **publish
-blocker** rather than a third hop — the cap accounting and blocker are
-Story 13.64. A hop interrupted at the turn ceiling resumes from the
-checkpoint like any stage.
+route above, and it counts against the **same two-cycle bound** as
+rewrites/gate revisions. Pass the cycles already spent on this draft as
+`--cycle N`; when the cap is reached the command emits a **publish blocker**
+(`action: publish-blocker`, `publishable: false`) instead of a third hop — the
+unrepaired missing-input gap routes to the completion summary's
+publish-blocker bucket (CAP-6), exactly as an unresolved rubric/config blocker
+forces "not publishable":
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py repair-hop \
+  --upstream "re-harvest bench/results.md" --cycle 2   # -> publish-blocker, no third hop
+```
+
+A within-budget hop returns the incremented `cycle` so the next stage carries
+it forward. A hop interrupted at the turn ceiling resumes from the checkpoint
+like any stage.
 
 A **fact-sheet-stitched draft fails** this gate (dimension 4) and does **not**
 reach Stage 4 unrevised.
