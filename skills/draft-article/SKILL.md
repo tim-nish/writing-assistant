@@ -3,7 +3,8 @@ name: draft-article
 description: >
   Draft a technical article from a repository's own material. Invoke as
   "draft article <article-type> from <sources>" to run the pipeline: harvest →
-  gap interview → framework fill → verification → platform variants. Article
+  gap interview → framework fill → verification → completion (variants are a
+  separate post-review invocation — see variants.md). Article
   types are intent labels — "introduce the project", "share engineering
   lessons", "explain the evaluation methodology", "survey a research area"
   (F1-F4 remain the internal/expert alias); sources are paths, globs, or
@@ -152,7 +153,7 @@ is resolver-internal; always ask the resolver, never spell it out. The harvest f
 sheet and NEEDS-OWNER list, interview answers, the provenance map, quality-gate
 output, and any scratch all live under `$WS/`; there is no state-vs-cache split.
 The **only** files this pipeline writes into the host repo are the declared
-products at `output.drafts` (Stage 5). Pass `$WS` to Stage 1 so harvest writes
+products at `output.drafts` (the `complete` gate). Pass `$WS` to Stage 1 so harvest writes
 there rather than minting its own workspace.
 
 ### Plan consultation at draft start (SPEC-article-plan CAP-3, Story 13.57)
@@ -242,7 +243,8 @@ Checkpoint state lives under `$WS` with the other intermediates
 
 **Resumed-run audience recheck (Story 13.41 — stage 0's half of the presence
 rule).** When `stage0`/`autostart` resumes a run (`"resumed": true`) whose
-`next_stage` is `verify` or `variants` — i.e. a filled draft already exists among
+`next_stage` is `verify` (or `variants`, from a checkpoint written before Story
+13.69 made variant emission post-review) — i.e. a filled draft already exists among
 the intermediates — confirm that draft carries a **resolved `audience`** before
 continuing (a run checkpointed before the audience precondition existed may lack
 it). If it is missing or still `{audience}` (or `audience_id` is missing or
@@ -1144,155 +1146,8 @@ question, capture the bullet answer verbatim as in Stage 2, and apply it — the
 draft never drifts into unbounded editing.
 
 Stage 4 exit: zero unmarked invented claims, zero `[VERIFY]` markers — the draft
-is ready for platform variants.
-
-## Stage 5 — platform-ready variants
-
-Emit platform-ready copies of the **verified** draft as **projections** of the
-canonical draft. Which platforms, and each one's canonical policy, come from user
-config (`syndication.policy` / `syndication.variants`) keyed by the draft's
-`language` — **never a hardcoded mapping**; **how** each variant is packaged
-(frontmatter fields, tag cap, `canonical_url` format, diagram-`visuals`
-treatment) comes entirely from that platform's **profile** (a machine-global
-declaration, SPEC-platform-variants CAP-2), so there is no per-platform code path
-and adding a platform is one profile file.
-
-**Emission is the owner's explicit publish decision (CAP-6/#226) — the pipeline
-never auto-emits every configured platform.** First read the choices, then
-present them **in-conversation** as a selection (never a path to open):
-
-```
-python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py variants <draft> --list-platforms
-```
-
-Offer the owner: *emit each `available` platform / both / stop here.* Then emit
-exactly their choice (a comma-separated subset, or `all`):
-
-```
-python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py variants <draft> --platforms <chosen>
-```
-
-The **completion summary records the choice and its outcome** — which platforms
-were offered, which the owner emitted, and where each file landed (an owner who
-picks only one platform leaves no file for the others, anywhere).
-
-- **Precondition:** the draft carries **zero `[VERIFY]` markers** — Stage 4 must
-  be complete. Any unresolved marker aborts the stage. The draft must also
-  declare a resolved `audience` (the named reader) and `audience_id` (the
-  compatibility identifier, Story 13.71) — an unfilled one is a hard stop.
-- **Lede re-targeting proposal (Story 16.5; trigger amended by Story 13.71),
-  the variant's only owner touchpoint.** For each emitted variant the pipeline
-  fires a **deterministic trigger** — it compares the draft's declared
-  **`audience_id`, `language`, and `register`** against the profile's (register
-  defaults from language on both sides: `ja` implies です/ます; the free-text
-  `audience` named reader is never compared — Story 13.71). When any of the
-  three **differ** (e.g. a Zenn/JA profile for an EN draft) the
-  variant carries `lede_retarget: true` and a `lede_proposals` entry. Perform
-  **exactly one** judgment step for it: re-target the lede and framing to the
-  profile's named reader (です/ます register for `ja`) **without introducing any
-  claim absent from the canonical draft**, and present it under the
-  [owner-facing proposal contract](../owner-facing-proposal-contract.md)
-  (approve / modify / replace). When all three **match**, emission is
-  pure packaging — **no proposal, no touchpoint** (a same-reader EN→dev.to
-  emission fires nothing). The trigger is never your
-  judgment over content; there is no `lede_retarget` profile field.
-- **Emission metadata:** each emitted variant carries the canonical draft's
-  content hash (a trailing `canonical-sha256` comment) so a later run can flag a
-  variant whose source draft has since changed (Story 16.7).
-- **Projection, not rewrite:** the body carries over unchanged (claims, evidence,
-  provenance, section structure); only frontmatter/packaging and the profile's
-  declared visual treatment differ from the canonical draft.
-- **EN / `mode: canonical`** (dev.to-style profile) → the full article text with
-  the profile's frontmatter, whose `canonical_url` is composed from the owner's
-  base value and the profile's format, pointing back at the site page.
-- **JA / `mode: external`** (Zenn-style profile) → a repo-sync copy with the
-  profile's frontmatter and the full body — the platform is canonical via
-  repo-sync, so its profile declares `canonical_url: {policy: none}`. A profile
-  whose `packaging.visuals` cannot render Mermaid HTML-comments each diagram and
-  raises a render publish blocker (reported as `render_blockers`).
-- Each variant is written to the **resolved `output.drafts`** location (Story
-  1.3; `--out <dir>` overrides). Files are named `{slug}.{platform}.md`.
-- **`output.drafts` may live outside the host repo — and should (#213):** the
-  recommended destination is a directory in the owner's **private articles
-  repository** (`~`/absolute paths supported; a relative value keeps resolving
-  against the host root). When `output.drafts` is **undeclared**, ask the owner
-  once, recommending that external default and saying why — articles are private
-  assets and a host repo may be public — then record the answer with
-  `resolve-writing-sources.py set-draft-location <path>` (it writes to the
-  machine-global config, never into the host repo). When the resolved external
-  directory **does not exist**, the stage stops and names it: confirm the
-  location with the owner, then re-run with `--create-out` (or create it by
-  hand) — the pipeline never silently creates directory trees outside the host.
-
-### Visual rendering per platform (SPEC-article-visuals CAP-5)
-
-The two platforms render diagrams differently, so each variant handles a
-Mermaid/figure-spec visual its own way:
-
-- **Zenn variant** — **embeds the Mermaid source directly** (a ` ```mermaid ` code
-  block). Zenn renders it natively, so the diagram appears with **zero manual
-  work**.
-- **dev.to variant** — dev.to does **not** render Mermaid, so the variant carries
-  the **Mermaid/figure-spec inside an HTML comment** (`<!-- … -->`, invisible until
-  rendered) and lists **each unrendered figure as a publish blocker** ("render to
-  image before publishing") in the **completion summary's publish-blocker bucket**
-  (Story 7.5 / CAP-6). The owner renders it to an image before publishing.
-
-A **figure-spec** visual (no Mermaid) is handled the same way per platform: shown
-where the platform can render it, otherwise carried in a comment and blocker-listed.
-
-Each variant is publishable on its platform with **no manual reformatting beyond
-filling the canonical URL**. The draft then exits this pipeline into
-SPEC-article-review (`next_stage: review`).
-
-### Platform lint — every emitted variant gets it (Story 13.41, CAP-5)
-
-Immediately after emitting each variant, run the **profile-parameterized
-mechanical lint** on it (zero LLM tokens; each defect reported `path:line`):
-
-```
-python3 ${CLAUDE_PLUGIN_ROOT}/scripts/lint-platform-variant <variant-file> \
-  --root <host-repo> --ws "$WS" [--dest-repo <output.drafts repo root>]
-```
-
-Pass `--dest-repo` when the profile declares a target directory layout so the
-existence check runs against the **`output.drafts` destination repo**. A lint
-defect is a **publish blocker** for that variant (CAP-6 bucket) — relay each
-finding; never re-run a structure/prose/cold-read pass on a variant.
-
-### Stale-variant check — before any publish handoff (Story 13.41, FR60)
-
-On a **resumed run** that already emitted variants, and always **before handing
-variants to the owner for publishing**, verify no variant's canonical draft has
-moved since emission:
-
-```
-python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py variant-staleness <draft> --root <host-repo>
-```
-
-Any `publish_blockers` entry (`stale-variant` / `unrecorded-canonical-hash`)
-goes to the completion summary's blocker bucket. The remedy is structural: route
-the change to the canonical draft, **re-emit** the variant (which records the
-new hash), never edit the variant in place.
-
-### Post-publish next step — the site's external record (Story 13.41, FR62)
-
-For a variant whose language maps to `mode: external` in `syndication.policy`
-(the site holds a record, not the body), the completion summary's next-step
-choice includes — **after the owner publishes** — "confirm the published URL →
-generate the site record". This runs **outside** the per-article attention
-budget (post-publish), and the offer is **re-presentable on any later
-invocation** until the owner confirms; it is never silently dropped:
-
-```
-python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py site-record <draft> \
-  --url <final published URL> [--date <real publication date>] --ws "$WS"
-```
-
-The output is a **ready-to-paste proposal** (≤ line budget, body forbidden)
-written to `$WS` only — applying it to the site tree is the owner's act; the
-pipeline never writes the site tree. Without `--url` it reports the offer as
-pending — re-offer it next invocation.
+is ready for the article plan and the `complete` gate. Variant emission is
+**not** part of this flow (see the pointer section below).
 
 ## Emit the article plan (SPEC-article-plan CAP-1/CAP-2, Story 13.55)
 
@@ -1366,12 +1221,36 @@ informational notes — read from `draft-pipeline.py resume --ws "$WS"` — per 
 shared completion-summary contract; a partial run is recoverable, never a silent
 loss.
 
+## Platform variants — a separate post-review invocation
+
+Variant emission is **not a stage of this flow** (SPEC-article-draft-pipeline
+CAP-4; SPEC-platform-variants CAP-3, 2026-07-18 amendments). The draft flow
+ends at the `complete` gate, with next step **review-article** — no platform
+decision is presented during a draft run. Variants are emitted later, post-
+review, by a standalone invocation that consumes the **persisted canonical**
+at `<output.drafts>/<slug>.md` (SPEC-platform-variants CAP-1) — never a
+workspace copy:
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py variants --slug <slug> --root <host-repo>
+```
+
+The full contract — platform listing, the owner's explicit emission choice,
+the lede re-targeting proposal, per-platform visual rendering, the platform
+lint, the stale-variant check, the post-publish site record, and those
+subcommands' flag reference — lives in [`variants.md`](variants.md)
+(`${CLAUDE_SKILL_DIR}/variants.md`). A canonical that exists only in a run
+workspace is refused there with a pointed error naming the expected persisted
+path — run `complete` first.
+
 ## Pipeline command reference (`draft-pipeline.py`)
 
-Every subcommand of `${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py`, in
+Every draft-flow subcommand of `${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py`, in
 pipeline order. This is the authoritative flag list — consult it instead of
 `--help` or the script source. Positional args are shown in `<angle brackets>`;
-`-` means "read from stdin".
+`-` means "read from stdin". The variant-emission subcommands (`variants`,
+`variant-staleness`, `site-record`) are post-review, not part of this flow —
+their reference lives in [`variants.md`](variants.md).
 
 | Subcommand | Stage | Purpose | Args / flags |
 |---|---|---|---|
@@ -1389,7 +1268,4 @@ pipeline order. This is the authoritative flag list — consult it instead of
 | `verify-markers` | 3/4 | Validate `[VERIFY: reason]` markers; `--count` prints the count (drive to 0) | `<draft\|->` `--count` |
 | `verify` | 4 | Build the owner verification worklist, one entry per marker | `<draft\|->` |
 | `reroute` | 4 | Reroute an over-budget section into a new bounded interview question (Story 4.5) | `--rewrites` (req) `--section` |
-| `variants` | 5 | Emit platform-ready variants as profile-driven projections; emission is the owner's explicit choice — no `--platforms` reports options and emits nothing | `<draft>` `--platforms <ids\|all>` `--list-platforms` `--config-json` `--root` `--global-config` `--repo-config` `--out` `--create-out` `--ws` `--dry-run` |
-| `variant-staleness` | 5/post | Compare each variant's recorded canonical hash against the current draft; mismatches are publish blockers (Story 16.7) | `<draft\|->` `--variants <files…>` `--out` `--root` |
-| `site-record` | post-publish | Propose the site's `mode: external` record after the owner confirms the published URL (Story 16.9); proposal lands in `$WS` only | `<draft\|->` `--url` `--date` `--config-json` `--root` `--global-config` `--repo-config` `--ws` |
 | `complete` | completion | The dual-product completion gate (Story 13.68): persist the canonical to `<output.drafts>/<slug>.md`, verify `plans/<slug>.md`, then (and only then) write the `next_stage: done` checkpoint; the only sanctioned way to finish a run | `--draft` (req) `--slug` (req) `--root` `--ws` |

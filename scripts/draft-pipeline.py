@@ -1122,9 +1122,25 @@ def _resolve_drafts_dir(root):
     return r.stdout.strip()
 
 
+def _strip_emission_trailer(text):
+    """Strip the persisted canonical's emission trailer (Story 13.68) before
+    hashing or projecting, normalizing exactly the way `complete` normalizes
+    before it hashes — so a variant emitted from the persisted canonical
+    records the SAME canonical_sha256 the trailer itself carries (one hash
+    convention, not two). A trailer-less draft passes through byte-identical.
+    """
+    if _EMISSION_TRAILER_RE.search(text):
+        return _EMISSION_TRAILER_RE.sub("", text).rstrip("\n") + "\n"
+    return text
+
+
 def cmd_variants(args):
-    """Stage 5: emit platform-ready variants of a VERIFIED draft as PROJECTIONS
-    of the canonical draft through declared platform profiles (Story 16.3). Which
+    """Emit platform-ready variants of the PERSISTED canonical draft as
+    PROJECTIONS through declared platform profiles (Story 16.3; Story 13.69 —
+    a standalone post-review invocation, SPEC-platform-variants CAP-1/CAP-3,
+    not a stage of the draft flow). The sanctioned input is the persisted
+    canonical at `<output.drafts>/<slug>.md` (loaded via `--slug`, written by
+    the draft flow's `complete` gate) — never a run-workspace copy. Which
     platforms come from the config canonical policy; HOW each is packaged comes
     entirely from that platform's profile (Story 16.1) — there is no hardcoded
     per-platform code path. WHICH configured platforms are actually emitted is
@@ -1135,7 +1151,47 @@ def cmd_variants(args):
     carrying the canonical draft's content hash; the profile-resolution log lands
     in the run workspace.
     """
-    text = sys.stdin.read() if args.draft == "-" else open(args.draft, encoding="utf-8").read()
+    # Input resolution (Story 13.69): the sanctioned form is `--slug`, which
+    # loads the persisted canonical. A positional path is accepted only when it
+    # already IS inside the resolved output.drafts (i.e. the persisted
+    # canonical), or under the test-only --allow-external-draft escape. A
+    # workspace-only canonical is a pointed refusal, never a silent fallback.
+    if getattr(args, "slug", None):
+        drafts_dir = _resolve_drafts_dir(args.root)
+        canonical_path = os.path.join(drafts_dir, f"{args.slug}.md")
+        if not os.path.isfile(canonical_path):
+            sys.stderr.write(
+                f"error: no persisted canonical at {canonical_path} — variants "
+                "consume the persisted canonical draft (SPEC-platform-variants "
+                "CAP-1), never a workspace copy. Finish the draft flow first: "
+                "`draft-pipeline.py complete --draft <ws-draft> --slug "
+                f"{args.slug}` persists <output.drafts>/{args.slug}.md, then "
+                "re-run variants --slug.\n")
+            return 1
+        text = open(canonical_path, encoding="utf-8").read()
+    else:
+        text = sys.stdin.read() if args.draft == "-" else open(args.draft, encoding="utf-8").read()
+        if not getattr(args, "allow_external_draft", False):
+            drafts_dir = os.path.realpath(_resolve_drafts_dir(args.root))
+            src = None if args.draft == "-" else os.path.realpath(args.draft)
+            if src is None or not src.startswith(drafts_dir + os.sep):
+                try:
+                    slug_hint = _read_frontmatter(text)[0].get("slug") or "<slug>"
+                except SystemExit:
+                    slug_hint = "<slug>"
+                expected = os.path.join(drafts_dir, f"{slug_hint}.md")
+                sys.stderr.write(
+                    f"error: draft {args.draft!r} is not the persisted canonical "
+                    f"— variants consume {expected} (SPEC-platform-variants "
+                    "CAP-1), never a workspace copy. Run the draft flow's "
+                    "completion first (`draft-pipeline.py complete --draft "
+                    f"<ws-draft> --slug {slug_hint}`), then invoke `variants "
+                    f"--slug {slug_hint}`.\n")
+                return 1
+    # The persisted canonical carries the emission trailer; project and hash
+    # the trailer-stripped content so the recorded canonical_sha256 equals the
+    # trailer's own hash and no inherited trailer rides into a variant body.
+    text = _strip_emission_trailer(text)
 
     # Precondition: a verified draft carries zero well-formed [VERIFY] markers.
     unresolved = [c for c in VERIFY_CANDIDATE.findall(text) if VERIFY_CANONICAL.match(c)]
@@ -1343,6 +1399,9 @@ def cmd_variant_staleness(args):
     blocker too (re-emit to record one).
     """
     text = sys.stdin.read() if args.draft == "-" else open(args.draft, encoding="utf-8").read()
+    # The persisted canonical carries its own emission trailer (Story 13.68);
+    # hash the trailer-stripped content — the one shared hash convention.
+    text = _strip_emission_trailer(text)
     canonical_sha = hashlib.sha256(text.encode("utf-8")).hexdigest()
 
     if args.variants:
@@ -2603,7 +2662,18 @@ def main(argv=None):
                          "revisions + prior hops); at the two-cycle cap the hop "
                          "becomes a publish blocker (Story 13.64)")
     sp = sub.add_parser("variants")
-    sp.add_argument("draft", nargs="?", default="-", help="verified draft, or - for stdin")
+    sp.add_argument("draft", nargs="?", default="-",
+                    help="draft path, or - for stdin; must be the persisted "
+                         "canonical inside the resolved output.drafts unless "
+                         "--allow-external-draft is passed (Story 13.69)")
+    sp.add_argument("--slug",
+                    help="the sanctioned post-review form (Story 13.69): load "
+                         "the persisted canonical <output.drafts>/<slug>.md "
+                         "written by the draft flow's `complete` gate")
+    sp.add_argument("--allow-external-draft", action="store_true",
+                    help="TEST-ONLY escape for check harnesses: accept a "
+                         "positional draft outside the resolved output.drafts "
+                         "(production invocations use --slug)")
     sp.add_argument("--config-json", help="resolved config as JSON (FILE or - for stdin)")
     sp.add_argument("--root", help="host-repo root (default: git top-level of cwd; errors outside a git repo)")
     sp.add_argument("--global-config")
