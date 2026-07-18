@@ -2796,6 +2796,8 @@ def _autostart(root):
     if os.path.isdir(base):
         # Run ids are timestamp-based, so reverse-lexicographic == newest-first.
         for run_id in sorted(os.listdir(base), reverse=True):
+            if os.path.islink(os.path.join(base, run_id)):
+                continue  # the `latest` shorthand (F40) is not a resumable run
             cp = os.path.join(base, run_id, CHECKPOINT_FILE)
             if not os.path.isfile(cp):
                 continue

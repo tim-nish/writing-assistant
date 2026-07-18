@@ -148,6 +148,15 @@ ws3=$($PY new-run --root "$host" --run-id r3)
 printf -- '---\ntitle: "Gamma article"\n---\nbody\n' > "$ws3/draft.md"
 printf '{"next_stage": "done", "framework": "F3", "reviewed": true}' > "$ws3/checkpoint.json"
 
+# F40 — a `latest` symlink repoints at the newest run for easy re-finding, with
+# a relative target, and never leaks into the enumeration (the ['r1','r3']
+# assertion below is the leak guard; this checks the shorthand itself).
+runsdir=$(dirname "$ws3")
+[ -L "$runsdir/latest" ] && ok "new-run: runs/latest is a symlink (F40)" || err "runs/latest is not a symlink"
+[ "$(readlink "$runsdir/latest")" = "r3" ] \
+  && ok "new-run: runs/latest points (relatively) at the newest run (F40)" \
+  || err "runs/latest does not point at the newest run: $(readlink "$runsdir/latest" 2>&1)"
+
 $PY list-drafts --root "$host" | python3 -c "
 import json, sys
 ds = json.load(sys.stdin)
