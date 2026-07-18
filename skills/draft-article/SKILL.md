@@ -848,6 +848,31 @@ gate: it changes nothing about the quality gate or `[VERIFY]` markers.
 
 Fill the chosen framework's slots from the fact sheet and the interview answers.
 
+**Per-section progress recording (Story 13.84, #388).** Stage 3 is a long
+stage: an evidence-heavy fill can exceed one invocation's budget by itself, so
+it persists per section, in framework slot order, using the same sub-stage
+mechanism as harvest (Story 13.83). The unit is **the section plus its
+provenance** — after drafting each section: (1) append the section's prose to
+the workspace draft (Read it first on any overwrite — the artifact-write
+precondition), (2) append that section's provenance-map lines to the working
+sidecar map in `$WS`, (3) only then record the boundary:
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py progress --ws "$WS" --stage fill --done <section-slug> [<section-slug> …]
+```
+
+A section is never recorded before both writes land — a draft section the map
+does not cover must not survive an interrupt. On a resumed run
+(`progress.fill.done` present), **reuse the persisted draft and map**: skip
+the listed sections, continue with the first unlisted framework slot, and do
+not regenerate completed sections' prose or provenance lines. Because sections
+append in slot order, earlier sections' `[L<line>]` anchors stay stable; the
+stage-end structural validation below (`provenance --map --draft`) remains the
+backstop that catches any drift, exactly as for a single-invocation fill. The
+downstream contract is unchanged: the quality gate, `verify-provenance`, and
+the stage-completion checkpoint (which clears `progress.fill`) all see the
+same artifacts as today.
+
 **Applying a skipped input's declared slot effect (Story 10.5).** When the owner
 **skipped** the question feeding a slot, read that slot's `[SKIP: <effect>]` tag
 (declared in the framework template; see
@@ -907,10 +932,11 @@ An **inferred** claim — beyond sources, interview, or legal derivation — car
 an inline **`[VERIFY: <reason>]`** marker exactly as before. **Never an unmarked
 assertion.**
 
-**The sidecar provenance map.** When Stage 3 completes, write a **sidecar
-provenance map** to the run workspace (never inline — the draft body stays clean
-for variants and review), one line per sentence keyed by paragraph/sentence
-position:
+**The sidecar provenance map.** Stage 3 maintains a **sidecar provenance map**
+in the run workspace, appended per section as the fill progresses (Story
+13.84 above; never inline — the draft body stays clean for variants and
+review), one line per sentence keyed by paragraph/sentence position; when
+Stage 3 completes, the full map is validated as below:
 
 ```
 P4.S2[L31]: derived <- fs-12, fs-14

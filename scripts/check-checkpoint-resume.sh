@@ -109,6 +109,32 @@ printf '{"stage":"variants","next_stage":"done"}' | python3 "$DP" checkpoint --w
 python3 "$DP" progress --ws "$WS2" --stage fill --done s1 2>&1 | grep -q 'cannot reopen' \
   && ok "progress: refuses to reopen a done run" || err "progress reopened a done run"
 
+# --- Stage-3 per-section progress (Story 13.84, #388) -----------------------
+WS3="$work/ws3"; mkdir -p "$WS3"
+# After the interview completes (next_stage: fill), fill sections record.
+printf '{"stage":"interview","next_stage":"fill","run_state":{"framework":"F2"}}' | python3 "$DP" checkpoint --ws "$WS3" - >/dev/null
+python3 "$DP" progress --ws "$WS3" --stage fill --done scope the-map >/dev/null \
+  && ok "fill: sections record against next_stage=fill" || err "fill progress refused mid-stage"
+out=$(python3 "$DP" resume --ws "$WS3")
+echo "$out" | jget 'd["progress"]["fill"]["done"]' | grep -q 'the-map' \
+  && ok "fill: resume lists completed sections" || err "resume missing fill sections"
+echo "$out" | jget 'd["run_state"]["framework"]' | grep -q F2 \
+  && ok "fill: run_state survives section recording" || err "fill progress clobbered run_state"
+# Stage-3 completion clears fill progress.
+printf '{"stage":"provenance","next_stage":"quality-gate"}' | python3 "$DP" checkpoint --ws "$WS3" - >/dev/null
+python3 "$DP" resume --ws "$WS3" | grep -q '"progress"' \
+  && err "stage-3 completion did not clear fill progress" || ok "fill: stage completion clears section progress"
+
+# SKILL wires per-section fill recording (13.84): unit = section + provenance.
+grep -q 'Per-section progress recording' "$SKILL" && grep -q 'stage fill' "$SKILL" \
+  && ok "SKILL documents per-section fill recording (13.84)" || err "SKILL missing fill progress contract"
+grep -q 'never recorded before both writes land' "$SKILL" \
+  && ok "SKILL orders draft+map writes before the section boundary" || err "SKILL missing section write-first rule"
+grep -q 'reuse the persisted draft and map' "$SKILL" \
+  && ok "SKILL resume reuses persisted sections (no regeneration)" || err "SKILL missing fill resume-skip"
+grep -q 'appended per section as the fill progresses' "$SKILL" \
+  && ok "SKILL provenance map maintained incrementally" || err "provenance map still stage-end-only"
+
 # SKILL documents sub-stage progress; harvest SKILL states the write-first rule.
 grep -q 'Sub-stage progress' "$SKILL" && grep -q 'progress --ws' "$SKILL" \
   && ok "SKILL documents sub-stage progress recording (13.83)" || err "SKILL missing sub-stage progress"
