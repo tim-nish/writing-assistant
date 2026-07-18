@@ -90,6 +90,35 @@ printf '%s' "$sec" | grep -qi 'degrades to the per-slot flow' \
   && ok "AC: declining degrades to the per-slot flow" || err "decline-degrade rule missing"
 grep -q 'CAP-2a' "$SPEC" && ok "spec declares CAP-2a" || err "spec missing CAP-2a"
 
+# --- First-try ratifiability (Story 13.79) ---------------------------------
+# The skill scaffolds the required shape before the validator call.
+printf '%s' "$sec" | grep -q '"required_elements"' \
+  && ok "AC(13.79): skill shows the required plan shape (scaffold)" \
+  || err "skill has no authoring scaffold for the plan shape"
+printf '%s' "$sec" | grep -qi 'resolve exactly the named fields' \
+  && ok "AC(13.79): skill instructs fixing exactly the named fields on refusal" \
+  || err "skill missing the refusal-resolution instruction"
+# Refusals carry a concrete fix, not just the rule.
+reason 1 "$NOROLE" | grep -q 'fix:' \
+  && ok "AC(13.79): a missing-role refusal names the concrete fix" \
+  || err "missing-role refusal has no fix hint"
+reason 1 "$NOELEM" | grep -q 'fix: list the nodes' \
+  && ok "AC(13.79): an empty-elements refusal says what to list" \
+  || err "empty-elements refusal has no fix hint"
+reason 1 "$UNSOURCED" | grep -q 'fix: set' \
+  && ok "AC(13.79): an unevidenced-element refusal shows the accepted forms" \
+  || err "unevidenced-element refusal has no fix hint"
+BADPTR='{"members":[{"role":"r","required_elements":["e"],"format":"diagram","placement":"S","evidence":{"e":"just prose"}}]}'
+reason 1 "$BADPTR" | grep -q 'fix: use' \
+  && ok "AC(13.79): a malformed-evidence refusal lists the accepted grammar" \
+  || err "malformed-evidence refusal has no fix hint"
+reason 1 "$NOROLE" | grep -q 'resolve exactly the fields named above' \
+  && ok "AC(13.79): refusal footer directs a targeted resubmit" \
+  || err "refusal footer missing"
+# The contract itself is unchanged: the good plan still passes as-is.
+pass 1 "$GOOD" && ok "AC(13.79): ratifiability contract unchanged (good plan still passes)" \
+  || err "contract changed — previously valid plan now refused"
+
 if [ "$fail" -eq 0 ]; then
   printf '\nAll visual-set-plan checks passed.\n'; exit 0
 else
