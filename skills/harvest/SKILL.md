@@ -285,6 +285,8 @@ passes its run workspace in (`$WS` from its Stage 0); standalone, mint one:
 ```
 WS=$(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-paths.py new-run --root <host-repo>)
 # write the harvest document to "$WS/fact-sheet.md"
+# (if fact-sheet.md already exists — a resumed or re-entered run — Read it
+#  before writing: the Write tool refuses to overwrite an unread file)
 ```
 
 Because this path lives **outside** the host repo (in the resolver's
