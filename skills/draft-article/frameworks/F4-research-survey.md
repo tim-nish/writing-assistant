@@ -3,9 +3,14 @@
 **Use when:** low-cadence reputation-anchor surveys (e.g. signature methods).
 
 **GATE (entry) — a framework-selection precondition, not a fill-in slot:** you
-have read the primary papers, and a related preprint/repo of yours exists or is
-imminent (spec §6.2 paper+code pairing). No paper+code pairing of your own → this
-isn't yet a reputation-anchor survey.
+have read the field's **primary sources**, and a related artifact of yours
+exists or is imminent — the **source+artifact pairing** (Story 13.87, #391).
+Primary sources are external papers when the surveyed field is published
+literature, or the internal design records themselves — specs, ADRs, issues,
+commits — when the survey maps an internal system's design space. The artifact
+half does not widen: a preprint/repo (or the system itself) of **yours** must
+exist or be imminent — that is the reputation anchor. No source+artifact
+pairing of your own → this isn't yet a reputation-anchor survey.
 
 Slot syntax, the config-bound frontmatter, and the shared pointer block are
 defined once in [`CONVENTIONS.md`](CONVENTIONS.md) — F4 reuses them and does not
@@ -41,7 +46,7 @@ Config-bound `article` frontmatter (rendered per language from user config; see
 - `title` — *(field + angle, e.g. "Signature methods for market data: a field guide")*
 - `summary` — *(≤240 chars: scope + who it's for)*
 - `topics` — *({kebab-case} tags)*
-- `related.publications` — *(your preprint slug — F4's paper+code pairing)*
+- `related.publications` — *(your preprint/artifact slug — F4's source+artifact pairing)*
 
 ## {Scope and audience}                             (~80 words) [SKIP: verify]
 {(Open with the survey's angle in ONE sentence — where you land on the field, so
@@ -54,7 +59,9 @@ the as-of date — surveys age; dating them keeps them citable.)}
 approach named here must resolve to a citation — no uncited claims.)}
 
 <!-- Branch unit START — repeat this block once per taxonomy branch (no fixed
-     count). Each branch carries its OWN 2–4 key-paper citations. Do NOT repeat
+     count). Each branch carries its OWN 2–4 key-paper citations. In an
+     internal design-space survey, "papers" reads as the primary design
+     records (specs, ADRs, issues, commits) per the entry GATE. Do NOT repeat
      Scope, the map, My take, or the reading list. -->
 
 ## {Branch: core idea / key papers / when to use / open problems}   (~150 words each) [SKIP: verify]

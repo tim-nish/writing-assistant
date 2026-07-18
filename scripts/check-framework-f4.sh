@@ -54,6 +54,16 @@ branch=$(line "## {Branch:"); end=$(line "Branch unit END"); mytake=$(line "## G
   || err "branch-unit markers do not bracket the branch slot correctly"
 has "branch's OWN" "each branch carries its own citations"
 
+# 2b. Entry GATE: source+artifact pairing (Story 13.87, #391).
+has "GATE (entry)" "entry GATE present"
+has "source+artifact pairing" "entry GATE names the source+artifact pairing"
+has "external papers when the surveyed field is published" \
+  "entry GATE covers the external-literature source class"
+has "specs, ADRs, issues," "entry GATE covers internal design records"
+has "internal system's design space" "entry GATE admits internal design-space surveys"
+has "exist or be imminent" "artifact half unchanged (reputation anchor kept)"
+absent "spec §6.2" "dangling spec §6.2 pointer retired (rule stated in-repo)"
+
 # 3. "My take" GATE requires BOTH angle AND link.
 has "REQUIRES BOTH" "My-take GATE requires both components"
 has "link to your preprint/repo" "My-take requires a preprint/repo link"
