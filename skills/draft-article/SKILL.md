@@ -988,6 +988,31 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py quality-gate \
    that would touch it surfaces to the owner instead (same principle as
    ">1 rewrite → new interview question").
 
+**Missing-input repair hop (SPEC-article-draft-pipeline; Story 13.63).** A
+review or quality-gate finding classified **missing-input** — an evidence gap
+prose cannot fix (review Story 13.62) — does not route to an edit. It routes
+back **one bounded hop** to the upstream remediation the finding names, then
+re-enters the pipeline:
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py repair-hop \
+  --upstream "re-harvest bench/results.md"   # or: "ask <one bounded question>"
+```
+
+- `re-harvest <target>` → re-enter **harvest** narrowed to that scoped target;
+  the new facts are pinned exactly like any Stage-1 fact (declared-scope
+  boundary and pin rules unchanged), and a policy line never becomes a SOURCE.
+- `ask <question>` → re-enter the **interview** with exactly one owner-facing
+  question under the proposal contract; the answer records as owner judgment
+  (interview provenance), never a SOURCE.
+
+This is the **only** backward edge to harvest/interview beyond the rewrite
+route above. It counts against the **same two-cycle bound** as rewrites/gate
+revisions, and an unrepaired missing-input finding becomes a **publish
+blocker** rather than a third hop — the cap accounting and blocker are
+Story 13.64. A hop interrupted at the turn ceiling resumes from the
+checkpoint like any stage.
+
 A **fact-sheet-stitched draft fails** this gate (dimension 4) and does **not**
 reach Stage 4 unrevised.
 

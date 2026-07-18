@@ -784,6 +784,63 @@ def cmd_reroute(args):
     return 0
 
 
+def cmd_repair_hop(args):
+    """Missing-input repair hop (Story 13.63, SPEC-article-draft-pipeline
+    missing-input repair route). A review or quality-gate finding classified
+    `missing-input` routes back ONE bounded hop to a scoped re-harvest or a
+    single bounded owner-elicitation question, then re-enters the pipeline.
+
+    Input is the finding's `Upstream:` remediation, exactly one of:
+      re-harvest <scoped target>   -> re-enter harvest, narrowed to <target>
+      ask <one bounded question>   -> re-enter the interview with one question
+
+    This is the ONLY backward edge to harvest/interview beyond the rewrite
+    route. The two-cycle bound and publish-blocker are enforced by the cycle
+    accounting (Story 13.64), not here; this command emits the hop action and
+    the stage to re-enter.
+    """
+    remediation = args.upstream.strip()
+    m = re.match(r"^(?:Upstream:\s*)?re-harvest\s+(?P<target>\S.*)$",
+                 remediation, re.IGNORECASE)
+    if m:
+        target = m.group("target").strip()
+        out = {
+            "stage": "repair-hop",
+            "action": "re-harvest",
+            "scope": target,
+            "next_stage": "harvest",
+            "note": ("re-harvest the scoped target only (declared-scope boundary "
+                     "and pin rules unchanged); new facts are pinned like any "
+                     "Stage-1 fact, and a policy line never becomes a SOURCE"),
+        }
+        print(json.dumps(out, indent=2))
+        return 0
+    m = re.match(r"^(?:Upstream:\s*)?ask\s+(?P<q>\S.*)$",
+                 remediation, re.IGNORECASE)
+    if m:
+        question = m.group("q").strip().rstrip(".")
+        out = {
+            "stage": "repair-hop",
+            "action": "elicit",
+            "next_stage": "interview",
+            "question": {
+                "id": "repair-hop",
+                "text": f"{question}?" if not question.endswith("?") else question,
+                "from_repair_hop": True,
+            },
+            "note": ("exactly one owner-facing question under the proposal "
+                     "contract; the answer is recorded as owner judgment "
+                     "(interview provenance), never a SOURCE"),
+        }
+        print(json.dumps(out, indent=2))
+        return 0
+    sys.stderr.write(
+        "error: a missing-input Upstream: remediation must be exactly one of "
+        "`re-harvest <target>` or `ask <question>` (Story 13.63); got "
+        f"{remediation!r}\n")
+    return 2
+
+
 def _read_frontmatter(text):
     """Parse the leading `---` article frontmatter into a dict. Stdlib-only
     line surgery (host repos have no PyYAML): top-level `key: value` pairs, with
@@ -2276,6 +2333,10 @@ def main(argv=None):
     sp.add_argument("--rewrites", type=int, required=True,
                     help="rewrites already applied to this section")
     sp.add_argument("--section", default="?", help="section identifier (for the routed question)")
+    sp = sub.add_parser("repair-hop")
+    sp.add_argument("--upstream", required=True,
+                    help="a missing-input finding's Upstream: remediation "
+                         "(`re-harvest <target>` or `ask <question>`)")
     sp = sub.add_parser("variants")
     sp.add_argument("draft", nargs="?", default="-", help="verified draft, or - for stdin")
     sp.add_argument("--config-json", help="resolved config as JSON (FILE or - for stdin)")
@@ -2322,6 +2383,7 @@ def main(argv=None):
         "review-consulted": cmd_review_consulted,
         "quality-gate": cmd_quality_gate,
         "verify-markers": cmd_verify_markers, "verify": cmd_verify, "reroute": cmd_reroute,
+        "repair-hop": cmd_repair_hop,
         "variants": cmd_variants,
         "variant-staleness": cmd_variant_staleness,
         "site-record": cmd_site_record,
