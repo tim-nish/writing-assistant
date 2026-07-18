@@ -244,6 +244,35 @@ def parse_provenance_map(text):
     return entries
 
 
+def _provenance_problems(entries, draft_lines=None):
+    """The structural per-class and line-anchor checks over parsed map entries
+    — the ONE validation path shared by the `provenance` command and by
+    `review-reentry` (Story 13.70), so a map review re-persists under can never
+    be held to a different standard than the map stage 3 shipped. Returns
+    (tally, problems); anchor checks run only when `draft_lines` is given."""
+    tally = {c: 0 for c in PROV_CLASSES}
+    problems = []
+    for pos, cls, ptrs, anchor in entries:
+        tally[cls] += 1
+        if cls == "sourced" and len(ptrs) < 1:
+            problems.append(f"{pos}: sourced claim carries no pointer")
+        elif cls == "derived" and len(ptrs) < 2:
+            problems.append(f"{pos}: derived claim must inherit >=2 pointers (got {len(ptrs)})")
+        elif cls in ("narration", "verify") and ptrs:
+            problems.append(f"{pos}: {cls} must carry no pointer (got {len(ptrs)})")
+        if draft_lines is not None:
+            if anchor is None:
+                problems.append(f"{pos}: no line anchor — a judge cannot locate this "
+                                "sentence without re-deriving the numbering (write "
+                                f"`{pos}[L<line>]`)")
+            elif not (1 <= anchor <= len(draft_lines)):
+                problems.append(f"{pos}: anchor L{anchor} is outside the draft "
+                                f"(1..{len(draft_lines)})")
+            elif not draft_lines[anchor - 1].strip():
+                problems.append(f"{pos}: anchor L{anchor} points at a blank line")
+    return tally, problems
+
+
 def cmd_provenance(args):
     """Stage 3: parse and structurally validate the sidecar provenance map
     (Story 11.1). Enforces the per-class pointer contract:
@@ -274,26 +303,7 @@ def cmd_provenance(args):
     if getattr(args, "draft", None):
         draft_lines = _read_text(args.draft).splitlines()
 
-    tally = {c: 0 for c in PROV_CLASSES}
-    problems = []
-    for pos, cls, ptrs, anchor in entries:
-        tally[cls] += 1
-        if cls == "sourced" and len(ptrs) < 1:
-            problems.append(f"{pos}: sourced claim carries no pointer")
-        elif cls == "derived" and len(ptrs) < 2:
-            problems.append(f"{pos}: derived claim must inherit >=2 pointers (got {len(ptrs)})")
-        elif cls in ("narration", "verify") and ptrs:
-            problems.append(f"{pos}: {cls} must carry no pointer (got {len(ptrs)})")
-        if draft_lines is not None:
-            if anchor is None:
-                problems.append(f"{pos}: no line anchor — a judge cannot locate this "
-                                "sentence without re-deriving the numbering (write "
-                                f"`{pos}[L<line>]`)")
-            elif not (1 <= anchor <= len(draft_lines)):
-                problems.append(f"{pos}: anchor L{anchor} is outside the draft "
-                                f"(1..{len(draft_lines)})")
-            elif not draft_lines[anchor - 1].strip():
-                problems.append(f"{pos}: anchor L{anchor} points at a blank line")
+    tally, problems = _provenance_problems(entries, draft_lines)
 
     if args.count:
         print(json.dumps(tally))
@@ -1399,15 +1409,24 @@ def cmd_variant_staleness(args):
     blocker too (re-emit to record one).
     """
     text = sys.stdin.read() if args.draft == "-" else open(args.draft, encoding="utf-8").read()
+    out = _staleness_report(text, paths=list(args.variants) if args.variants else None,
+                            out_dir=args.out, root=args.root)
+    print(json.dumps(out, indent=2))
+    return 0
+
+
+def _staleness_report(text, paths=None, out_dir=None, root=None):
+    """The staleness comparison itself — canonical content hash vs each
+    variant's recorded emission hash — shared by the `variant-staleness`
+    command and by `review-reentry` (Story 13.70), so review's stale marking
+    can never drift from the standalone check. Returns the report dict."""
     # The persisted canonical carries its own emission trailer (Story 13.68);
     # hash the trailer-stripped content — the one shared hash convention.
     text = _strip_emission_trailer(text)
     canonical_sha = hashlib.sha256(text.encode("utf-8")).hexdigest()
 
-    if args.variants:
-        paths = list(args.variants)
-    else:
-        out_dir = args.out if args.out else _resolve_drafts_dir(args.root)
+    if paths is None:
+        out_dir = out_dir if out_dir else _resolve_drafts_dir(root)
         slug = None
         try:
             fields, _ = _read_frontmatter(text)
@@ -1454,8 +1473,7 @@ def cmd_variant_staleness(args):
     }
     if publish_blockers:
         out["publish_blockers"] = publish_blockers
-    print(json.dumps(out, indent=2))
-    return 0
+    return out
 
 
 def cmd_site_record(args):
@@ -2403,6 +2421,47 @@ _EMISSION_TRAILER_RE = re.compile(
     r"\n*<!-- writing-assistant: canonical-sha256=[0-9a-f]{64} -->\s*$")
 
 
+class _CanonicalWriteError(Exception):
+    """A canonical-draft persistence failure: `.path` is the destination the
+    write was for, `.reason` names what went wrong."""
+    def __init__(self, path, reason):
+        super().__init__(reason)
+        self.path = path
+        self.reason = reason
+
+
+def _persist_canonical(text, slug, root):
+    """Persist `text` as the canonical draft at `<output.drafts>/<slug>.md`,
+    stamped with the emission trailer — THE one canonical write path (Story
+    13.68), reused verbatim by review's post-arbitration re-entry (Story 13.70)
+    so a reviewed canonical can never be persisted under a different trailer or
+    hash convention than the completion gate's. Strips any existing trailer
+    BEFORE hashing so the hash is always over the draft content alone (a re-run
+    over the persisted canonical verifies to the same hash instead of hashing
+    its own trailer). Atomic (temp + os.replace). Returns
+    (canonical_path, canonical_sha); raises _CanonicalWriteError on failure
+    (an undeclared output.drafts still exits via _resolve_drafts_dir's own
+    named SystemExit)."""
+    out_dir = _resolve_drafts_dir(root)   # undeclared → named SystemExit
+    canonical_path = os.path.abspath(os.path.join(out_dir, f"{slug}.md"))
+    if not os.path.isdir(out_dir):
+        raise _CanonicalWriteError(
+            canonical_path,
+            f"the resolved output.drafts directory does not exist: {out_dir}")
+    body = _EMISSION_TRAILER_RE.sub("", text).rstrip("\n") + "\n"
+    canonical_sha = hashlib.sha256(body.encode("utf-8")).hexdigest()
+    content = body + \
+        f"\n<!-- writing-assistant: canonical-sha256={canonical_sha} -->\n"
+    try:
+        tmp = canonical_path + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as fh:
+            fh.write(content)
+        os.replace(tmp, canonical_path)
+    except OSError as e:
+        raise _CanonicalWriteError(canonical_path, f"write failed: {e}")
+    return canonical_path, canonical_sha
+
+
 def cmd_complete(args):
     """Finish a draft run through the dual-product completion gate (Story
     13.68). The declared products are two — the canonical draft at
@@ -2440,27 +2499,12 @@ def cmd_complete(args):
     except OSError as e:
         return product_error("canonical draft (drafts/{slug}.md)", args.draft,
                              f"cannot read the workspace draft: {e}")
-    out_dir = _resolve_drafts_dir(args.root)   # undeclared → named SystemExit
-    canonical_path = os.path.abspath(os.path.join(out_dir, f"{args.slug}.md"))
-    if not os.path.isdir(out_dir):
-        return product_error(
-            "canonical draft (drafts/{slug}.md)", canonical_path,
-            f"the resolved output.drafts directory does not exist: {out_dir}")
-    # Strip any existing trailer BEFORE hashing so the hash is always over the
-    # draft content alone — and a re-run over the persisted canonical verifies
-    # to the same hash instead of hashing its own trailer.
-    body = _EMISSION_TRAILER_RE.sub("", text).rstrip("\n") + "\n"
-    canonical_sha = hashlib.sha256(body.encode("utf-8")).hexdigest()
-    content = body + \
-        f"\n<!-- writing-assistant: canonical-sha256={canonical_sha} -->\n"
     try:
-        tmp = canonical_path + ".tmp"
-        with open(tmp, "w", encoding="utf-8") as fh:
-            fh.write(content)
-        os.replace(tmp, canonical_path)
-    except OSError as e:
+        canonical_path, canonical_sha = _persist_canonical(
+            text, args.slug, args.root)
+    except _CanonicalWriteError as e:
         return product_error("canonical draft (drafts/{slug}.md)",
-                             canonical_path, f"write failed: {e}")
+                             e.path, e.reason)
 
     # Product 2 — the article plan at its resolved destination (SPEC-article-
     # plan). Resolution is delegated to the plan writer's own `dest` so the
@@ -2510,6 +2554,155 @@ def cmd_complete(args):
                      "conforming": dest.get("conforming"),
                      "fallback": dest.get("fallback")},
         },
+        "checkpoint": checkpoint_path,
+    }
+    print(json.dumps(out, indent=2))
+    return 0
+
+
+# --- Review post-arbitration re-entry (Story 13.70) --------------------------
+# GitHub #371, umbrella #362: a 2026-07-18 review run ended an arbitration
+# round that applied edits by hand-writing the done/reviewed checkpoint — over
+# a provenance map with 5 anchors dangling on blank lines, with review-authored
+# sentences never classified, and with a variant auto re-emitted. The SPEC
+# amendments (SPEC-article-review "Post-arbitration re-entry";
+# SPEC-platform-variants CAP-3: review never re-emits) make the ordered
+# sequence mechanical: persist → revalidate → report scoped checks → mark
+# variants stale → STOP. `review-reentry` IS that sequence, and it is the only
+# writer of the review done/reviewed checkpoint for a round with applied edits:
+# a done/reviewed checkpoint over an INVALID map is impossible because the
+# command that validates the map is the command that writes the checkpoint.
+
+def cmd_review_reentry(args):
+    """Post-arbitration re-entry into the gate regime (Story 13.70). Invoked by
+    the review SKILL after an arbitration round that applied >=1 accepted
+    finding, with the edited draft and the provenance map rebuilt against it.
+    The ordered sequence, stopping at the first failure:
+
+      (a) persist the reviewed canonical to `<output.drafts>/<slug>.md` via
+          the SAME write path as the draft flow's `complete` gate
+          (`_persist_canonical` — one write path, one trailer convention);
+      (b) structurally validate the rebuilt map against the edited draft,
+          anchors required (the `provenance --map --draft` checks, reused);
+      (c) report the scoped regression checks the SKILL must now run — this
+          command spawns NO judges; it emits the worklist (verify-provenance
+          re-run always; the quality gate's mechanical dims when
+          --rubric-applied says a rubric-mapped finding was applied);
+      (d) mark existing variants stale: run the staleness comparison
+          (`variant-staleness` internals, reused) and list the stale variants;
+      (e) STOP — review never emits or re-emits a variant (CAP-3); it writes
+          the `{"stage":"review","next_stage":"done","reviewed":true}`
+          checkpoint and re-emission stays a fresh explicit publish decision
+          (`variants --slug <slug>`).
+
+    An invalid map is a refusal: non-zero, named error, NO checkpoint — the
+    dangling-anchor-under-done/reviewed failure (#362) cannot recur. With
+    `--applied 0` the command is a strict no-op: nothing persisted, nothing
+    marked, exit 0."""
+    if args.applied == 0:
+        print(json.dumps({
+            "stage": "review-reentry", "applied": 0, "noop": True,
+            "reason": "zero applied edits — the draft, map, and variants are "
+                      "unchanged; nothing persisted, no variants marked stale, "
+                      "no checkpoint written",
+        }, indent=2))
+        return 0
+    if not os.path.isdir(args.ws):
+        sys.stderr.write(f"error: run workspace does not exist: {args.ws}\n")
+        return 1
+
+    # (a) Persist the reviewed canonical — the completion gate's write path.
+    try:
+        text = _read_text(args.draft)
+    except OSError as e:
+        sys.stderr.write(
+            f"error: review-reentry: cannot read the edited draft: {e}\n")
+        return 1
+    try:
+        canonical_path, canonical_sha = _persist_canonical(
+            text, args.slug, args.root)
+    except _CanonicalWriteError as e:
+        sys.stderr.write(
+            "error: review-reentry: reviewed canonical not persisted — "
+            f"{e.reason} (path: {e.path})\n")
+        return 1
+
+    # (b) Structurally validate the rebuilt map against the edited draft —
+    # anchors required, exactly the `provenance --map --draft` standard.
+    try:
+        map_text = _read_text(args.map)
+    except OSError as e:
+        sys.stderr.write(
+            f"error: review-reentry: cannot read the rebuilt map: {e}\n")
+        return 1
+    draft_lines = _strip_emission_trailer(text).splitlines()
+    try:
+        entries = parse_provenance_map(map_text)
+        tally, problems = _provenance_problems(entries, draft_lines)
+    except ValueError as e:
+        entries, tally, problems = [], {}, [str(e)]
+    if problems:
+        sys.stderr.write(
+            "error: review-reentry: invalid-provenance-map — the rebuilt map "
+            "does not validate against the edited draft, and a done/reviewed "
+            "checkpoint over an INVALID map is refused (no checkpoint "
+            "written):\n")
+        for pr in problems:
+            sys.stderr.write(f"  {pr}\n")
+        return 1
+
+    # (c) The scoped regression worklist — reported, never run here.
+    required_checks = [{
+        "check": "verify-provenance",
+        "reason": "the draft changed in review, so the prior judge run's "
+                  "attestation (Story 13.67) no longer binds to this content "
+                  "hash — a FRESH isolated judge must grade the rebuilt map",
+    }]
+    if args.rubric_applied:
+        required_checks.append({
+            "check": "quality-gate-mechanical",
+            "reason": "a rubric-mapped finding was applied — re-run the "
+                      "quality gate's mechanical dimensions on the edited "
+                      "draft (`quality-gate --draft --map`)",
+        })
+
+    # (d) Mark existing variants stale — the staleness comparison, reused,
+    # over the just-persisted canonical (its trailer-stripped hash).
+    out_dir = os.path.dirname(canonical_path)
+    variant_paths = [
+        os.path.join(out_dir, f) for f in sorted(os.listdir(out_dir))
+        if f.startswith(f"{args.slug}.") and f.endswith(".md")
+        and f != f"{args.slug}.md"]
+    staleness = _staleness_report(
+        open(canonical_path, encoding="utf-8").read(), paths=variant_paths)
+    stale_variants = [v for v in staleness["variants"]
+                      if v["status"] != "fresh"]
+
+    # (e) STOP — nothing is emitted. Write the done/reviewed checkpoint (this
+    # command is its only sanctioned writer for a round with applied edits).
+    checkpoint_path = _checkpoint_path(args.ws)
+    tmp = checkpoint_path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump({"stage": "review", "next_stage": DONE_STAGE,
+                   "reviewed": True}, f, indent=2)
+    os.replace(tmp, checkpoint_path)
+
+    out = {
+        "stage": "review-reentry",
+        "next_stage": DONE_STAGE,
+        "slug": args.slug,
+        "applied": args.applied,
+        "canonical": {"path": canonical_path,
+                      "canonical_sha256": canonical_sha},
+        "map_validation": {"ok": True, "entries": len(entries),
+                           "tally": tally},
+        "required_checks": required_checks,
+        "stale_variants": stale_variants,
+        # Review never emits or re-emits a variant (CAP-3) — re-emission is a
+        # fresh explicit publish decision through the standalone variants flow.
+        "emitted_variants": [],
+        "re_emission": f"variants --slug {args.slug} "
+                       "(owner publish decision; skills/draft-article/variants.md)",
         "checkpoint": checkpoint_path,
     }
     print(json.dumps(out, indent=2))
@@ -2575,6 +2768,21 @@ def main(argv=None):
     sp.add_argument("--root", help="host-repo root (default: git top-level of cwd; errors outside a git repo)")
     sp.add_argument("--ws", help="run workspace; the final `next_stage: done` checkpoint is written here "
                                  "only after BOTH products verify")
+    sp = sub.add_parser("review-reentry",
+                        help="post-arbitration re-entry: persist the reviewed canonical, revalidate "
+                             "the rebuilt map, report scoped checks, mark variants stale, STOP (Story 13.70)")
+    sp.add_argument("--draft", required=True, help="the edited (reviewed) draft to persist as the canonical")
+    sp.add_argument("--map", required=True, help="the provenance map rebuilt against the edited draft")
+    sp.add_argument("--slug", required=True, help="the article slug — names the canonical and its variants")
+    sp.add_argument("--root", help="host-repo root (default: git top-level of cwd; errors outside a git repo)")
+    sp.add_argument("--ws", required=True, help="run workspace; the done/reviewed checkpoint is written "
+                                                "here only after the rebuilt map validates")
+    sp.add_argument("--applied", type=int, default=1,
+                    help="accepted findings applied this round (default 1); 0 = strict no-op — "
+                         "nothing persisted, nothing marked stale, no checkpoint")
+    sp.add_argument("--rubric-applied", action="store_true",
+                    help="a rubric-mapped finding was applied — the required-checks worklist adds "
+                         "the quality gate's mechanical dimensions")
     sp = sub.add_parser("autostart", help="auto-resume the newest in-progress run, else mint a fresh one (Story 13.12)")
     sp.add_argument("--root", help="host-repo root (default: git top-level of cwd; errors outside a git repo)")
     sp = sub.add_parser("stage0", help="fold Stage 0 into one call: config validation + framework + autostart (Story 13.13)")
@@ -2713,6 +2921,7 @@ def main(argv=None):
         "start": cmd_start, "consume": cmd_consume, "interview": cmd_interview,
         "checkpoint": cmd_checkpoint, "resume": cmd_resume, "autostart": cmd_autostart,
         "stage0": cmd_stage0, "complete": cmd_complete,
+        "review-reentry": cmd_review_reentry,
         "answer": cmd_answer, "journal": cmd_journal, "provenance": cmd_provenance,
         "staging-candidates": cmd_staging_candidates,
         "review-consulted": cmd_review_consulted,

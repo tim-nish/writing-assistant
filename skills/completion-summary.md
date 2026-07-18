@@ -22,7 +22,9 @@ Partition everything the run surfaced into exactly three labelled buckets:
    variant (`lint-platform-variant`, CAP-5 of SPEC-platform-variants), or a
    **stale variant** — a `publish_blockers` entry from `variant-staleness`
    (`stale-variant` / `unrecorded-canonical-hash`, FR60): the canonical draft
-   moved since emission, so route the change to the draft and re-emit. A
+   moved since emission, so route the change to the draft; re-emission is the
+   owner's explicit publish decision through the standalone variants flow
+   (`variants --slug <slug>`), never something a review run performs. A
    blocker appears **here and nowhere else** — never also under informational
    notes or optional cleanup.
 3. **Optional cleanup** — nice-to-have polish the owner may skip.
