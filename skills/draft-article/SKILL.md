@@ -1383,12 +1383,45 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/write-article-plan.py write \
   --slug <slug> --root <host-repo> "$WS/article-plan.md"
 ```
 
+### Policy-conformance gate (SPEC-article-plan CAP-4, Story 13.76)
+
+When the run consulted the policy seam (Stage 2 wrote `$WS/policy-surface.txt`),
+run the conformance gate on the assembled plan **before** handing it to
+`write` — a policy-seeded plan without conformance data is refused by the
+writer:
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/write-article-plan.py conformance \
+  --plan "$WS/article-plan.md" --surface "$WS/policy-surface.txt" \
+  --root <host-repo> [--staging "$WS/staging-candidates.md"] --write
+```
+
+- The gate validates every policy-seeded decision the plan records against
+  the **same pinned policy result** the run consulted and the authoritative
+  user config, then `--write` records `policy_pin`, `policy_config_version`,
+  and `policy_conformance` (∈ `conformant`/`open`/`conflict`/`stale`) into
+  the plan's frontmatter through the writer's fail-closed validation. The
+  recorded status **rides the plan**.
+- A `conflict` or `stale` status is **recorded, not blocking** — the
+  stage-progression block on a non-conformant plan is Story 13.77's, not this
+  step's. Relay the status (and the findings' positions/pointers) in the
+  completion summary's informational bucket.
+- Pass `--staging` when the run emitted staging candidates: a plan decision
+  that **reverses a served ratified line** is conformant **only as a proposed
+  policy change** (its staging-candidate block exists →
+  `reversal_as_proposal: true`); without the block it stays `conflict`. The
+  reversal is never treated as current policy.
+- The gate writes **nothing to any policy hub** — with `--write` it touches
+  exactly one file: the plan.
+
 - The frontmatter is the closed schema (SPEC-article-plan CAP-2): `kind:
   article-plan` (constant, the machine marker that keeps a plan **out of the
   evidence stream**), `slug` (equal to the filename stem), `intent`, `claim`,
   `status` (`outlined`/`drafted`/`superseded`), `run_id`, `pin`
   (`<source-repo>@<commit>`); optional `audience`, `policy_seeded`+`seed`,
-  `relates`. Everything the draft or its variants own (title, summary, topics,
+  `relates`, and the CAP-4 conformance trio `policy_pin` /
+  `policy_config_version` / `policy_conformance` (all three **required** when
+  `policy_seeded: true` — the conformance gate below records them). Everything the draft or its variants own (title, summary, topics,
   language, …), machine state (journal/checkpoint/provenance map), and
   free-text `evidence:` are **forbidden** — the writer refuses them with
   per-key diagnostics. Every evidence reference in the **body** is a

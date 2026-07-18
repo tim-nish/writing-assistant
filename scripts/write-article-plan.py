@@ -22,7 +22,13 @@ Frontmatter contract (issue #310, owner-set 2026-07-17):
   REQUIRED  kind (constant `article-plan`), slug (== filename stem), intent,
             claim, status (outlined|drafted|superseded), run_id,
             pin (`<source-repo>@<commit>`)
-  OPTIONAL  audience, audience_id, policy_seeded, seed (required iff policy_seeded), relates
+  OPTIONAL  audience, audience_id, policy_seeded, seed (required iff policy_seeded), relates,
+            policy_pin (`<name>@<sha>`, the consulted policy pin),
+            policy_config_version (`[A-Za-z0-9._-]+`),
+            policy_conformance (conformant|open|conflict|stale)
+            — the CAP-4 trio; ALL THREE required when policy_seeded is true
+            (a policy-seeded plan without conformance data is refused: run
+            the `conformance --write` gate to record them)
   FORBIDDEN everything the canonical draft or its variants own (title, summary,
             topics, language, published, variants_emitted, canonical_url),
             machine-state content (checkpoint, journal, provenance-map data),
@@ -57,9 +63,22 @@ Subcommands (each takes --root; default: the git top-level of cwd):
       A repo with no plans, or a schema-less destination, degrades silently:
       it prints an empty plan list with a `degraded` reason — never a failure,
       never a prompt about missing plans.
+
+  conformance --plan plans/<slug>.md --surface <policy-surface>
+              [--config-json J | --root R] [--config-version V]
+              [--staging <staging-candidates.md>] [--write]
+      The CAP-4 policy-conformance gate (Story 13.76): validate every
+      policy-seeded decision the plan records against the SAME pinned policy
+      result the run consulted (the seam's served surface) and the
+      authoritative user config, and compute status ∈
+      conformant | open | conflict | stale. `--write` records the consulted
+      pin, configVersion, and status into the plan's frontmatter through this
+      writer's fail-closed validation. The gate writes NOTHING to any policy
+      hub — with --write it touches exactly one file: the plan.
 """
 
 import argparse
+import hashlib
 import importlib.util
 import json
 import os
@@ -72,8 +91,15 @@ PLAN_DIR = "plans"
 REFUSED = 4  # schema violation — nothing is written
 
 REQUIRED_KEYS = ("kind", "slug", "intent", "claim", "status", "run_id", "pin")
-OPTIONAL_KEYS = ("audience", "audience_id", "policy_seeded", "seed", "relates")
+OPTIONAL_KEYS = ("audience", "audience_id", "policy_seeded", "seed", "relates",
+                 "policy_pin", "policy_config_version", "policy_conformance")
 PLAN_STATUSES = ("outlined", "drafted", "superseded")
+
+# The CAP-4 conformance trio (Story 13.76): optional in general, required as a
+# set when the plan is policy-seeded — recorded by `conformance --write`.
+CONFORMANCE_KEYS = ("policy_pin", "policy_config_version", "policy_conformance")
+CONFORMANCE_STATUSES = ("conformant", "open", "conflict", "stale")
+CONFIG_VERSION_RE = re.compile(r"^[A-Za-z0-9._-]+$")
 
 # Fields the canonical draft or its variants own — a plan restating one forks
 # the source of truth.
@@ -101,6 +127,15 @@ PINNED_PTR_RE = re.compile(
 # The trailing `(?![\d@-])` blocks the match from backtracking into a genuinely
 # pinned pointer (`path:12@sha` must not match as `path:1`).
 UNPINNED_PTR_RE = re.compile(r"(?<![\w@/:.-])([\w./-]+\.\w+:\d+(?:-\d+)?)(?![\d@-])")
+
+
+def _load_mod(fname):
+    here = os.path.dirname(os.path.realpath(__file__))
+    spec = importlib.util.spec_from_file_location(
+        fname.replace("-", "_").replace(".py", ""), os.path.join(here, fname))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
 
 
 def _load_paths():
@@ -212,6 +247,31 @@ def validate_plan(text, path):
                                            fields["seed"]):
         yield ("seed", f"must be a commit-pinned file:line@commit pointer (got "
                        f"{fields['seed']!r})")
+
+    # CAP-4 conformance trio (Story 13.76): each key validated fail-closed,
+    # and a policy-seeded plan must carry all three — a policy-seeded plan
+    # without conformance data is refused.
+    if fields.get("policy_pin") and not PIN_RE.match(fields["policy_pin"]):
+        yield ("policy_pin", f"must be the consulted policy pin <name>@<sha> "
+                             f"(got {fields['policy_pin']!r}) — it is what the "
+                             "conformance gate validated against")
+    pcv = fields.get("policy_config_version")
+    if pcv and not CONFIG_VERSION_RE.match(pcv):
+        yield ("policy_config_version",
+               f"must match [A-Za-z0-9._-]+ (got {pcv!r}) — the configVersion "
+               "the conformance gate consulted")
+    pc = fields.get("policy_conformance")
+    if pc and pc not in CONFORMANCE_STATUSES:
+        yield ("policy_conformance", f"unknown conformance status {pc!r}; "
+                                     "valid: " + ", ".join(CONFORMANCE_STATUSES))
+    if _truthy(fields.get("policy_seeded", "")):
+        for key in CONFORMANCE_KEYS:
+            if not str(fields.get(key, "")).strip():
+                yield (key, "required when policy_seeded is true — a "
+                            "policy-seeded plan without conformance data is "
+                            "refused; run the `conformance --write` gate "
+                            "(SPEC-article-plan CAP-4) to record the consulted "
+                            "pin, configVersion, and status")
 
     # Forbidden fields.
     for key in fields:
@@ -401,6 +461,288 @@ def cmd_consult(args):
     return 0
 
 
+# --- CAP-4 policy-conformance gate (Story 13.76, #365) ------------------------
+
+# A commit-pinned policy pointer in the seam whitelist grammar
+# (`file:line[-line]@sha`) — the form a plan body carries for policy-consulted
+# decisions.
+POLICY_PTR_RE = re.compile(r"([\w./-]+):(\d+)(?:-\d+)?@([0-9a-f]{7,40})")
+# An optional recorded quote on the same body line as a pointer: the first
+# double-quoted span is treated as the plan's record of the consulted line.
+QUOTE_RE = re.compile(r'"([^"]+)"')
+
+
+def _plan_policy_refs(fields, body, surface_files):
+    """Every policy pointer the plan records that references the served
+    surface: the `seed:` frontmatter pointer plus each body pointer whose file
+    is one the surface serves. Each ref: {file, line, sha, quote, at} — quote
+    is the first double-quoted span on the same body line (None when the plan
+    recorded no quote; the seed pointer never carries one)."""
+    refs = []
+    seed = fields.get("seed", "")
+    m = POLICY_PTR_RE.fullmatch(seed)
+    if m and m.group(1) in surface_files:
+        refs.append({"file": m.group(1), "line": int(m.group(2)),
+                     "sha": m.group(3), "quote": None, "at": "seed"})
+    for lineno, ln in enumerate(body.split("\n"), 1):
+        for m in POLICY_PTR_RE.finditer(ln):
+            if m.group(1) not in surface_files:
+                continue
+            qm = QUOTE_RE.search(ln)
+            refs.append({"file": m.group(1), "line": int(m.group(2)),
+                         "sha": m.group(3),
+                         "quote": qm.group(1) if qm else None,
+                         "at": f"body line {lineno}"})
+    # One ref per referenced file:line — a quoted body pointer wins over a
+    # quoteless one (e.g. the seed) for the same line, so a recorded quote is
+    # always the one compared in the stale check.
+    merged, order = {}, []
+    for r in refs:
+        k = (r["file"], r["line"])
+        if k not in merged:
+            merged[k] = r
+            order.append(k)
+        elif merged[k]["quote"] is None and r["quote"] is not None:
+            merged[k] = {**r}
+    return [merged[k] for k in order]
+
+
+def _staging_blocks(path):
+    """Split a staging-candidates file into its `<!-- staging-candidate -->`
+    blocks (each block's full text, marker excluded)."""
+    try:
+        text = open(path, encoding="utf-8").read()
+    except OSError as e:
+        raise SystemExit(f"error: cannot read staging candidates {path!r}: {e}")
+    parts = text.split("<!-- staging-candidate -->")
+    return [p.strip() for p in parts[1:] if p.strip()]
+
+
+def _staging_covers(blocks, subject):
+    """Does a staging-candidate block record the reversal for this subject as
+    a proposed policy change? Match by subject/tag: the block carries the
+    `config-policy-reconciliation` tag (the CAP-7 reconciliation emitter's
+    framing) and names the subject's config key."""
+    for b in blocks:
+        if "config-policy-reconciliation" in b and subject["config_key"] in b:
+            return True
+    return False
+
+
+def cmd_conformance(args):
+    """The CAP-4 policy-conformance gate (Story 13.76): validate every
+    policy-seeded decision the plan records against the SAME pinned policy
+    result the run consulted (--surface: the reader's `read` output) and the
+    authoritative user config, and compute the plan's conformance status.
+
+    Status rules (mechanical; precedence conflict > stale > conformant/open):
+
+      conflict    — the shared comparable-subjects detector
+                    (policy_subjects.detect_conflicts, the SAME table and rule
+                    as `draft-pipeline.py classify-policy`) fires between the
+                    served surface and the resolved config, and no staging
+                    candidate covers it. Both positions are named with
+                    pointers in the findings.
+      conformant (reversal_as_proposal) — the detector fires but the run's
+                    staging candidates (--staging) carry a
+                    `config-policy-reconciliation` block naming the subject's
+                    config key: the reversal is conformant ONLY as a proposed
+                    policy change, never treated as current policy.
+      stale       — THE EXACT RULE: the pin has moved (the plan's recorded
+                    `policy_pin` differs from the surface's current pin, OR a
+                    referenced pointer's own @sha differs from the sha the
+                    surface currently serves for that file) AND at least one
+                    plan-referenced consulted line changed — mechanically, for
+                    each referenced `file:line`: when the plan records a quote
+                    on the pointer's line, the line is changed iff that quote
+                    no longer appears in the surface's current text at
+                    `file:line`; when no quote is recorded, the pin mismatch
+                    alone counts that referenced file as changed; a referenced
+                    `file:line` the current surface no longer serves counts as
+                    changed. A moved pin whose every referenced line is
+                    unchanged (recorded quotes still present) is NOT stale.
+      conformant  — checked and clean: at least one referenced consulted line
+                    is classifiable by the comparable-subjects table, no
+                    conflict fired, and the pin/lines are current.
+      open        — policy-seeded decisions exist but the comparable table
+                    cannot classify their subjects (nothing to check) — or the
+                    plan records no policy-seeded decision at all.
+
+    Output JSON: {status, pin, config_version, reversal_as_proposal,
+    findings: [...]} with per-finding positions/pointers. With --write the
+    gate records `policy_pin`, `policy_config_version`, `policy_conformance`
+    into the plan's frontmatter THROUGH the writer's fail-closed validation
+    (a plan the schema refuses is left untouched). The gate writes NOTHING to
+    any policy hub — with --write it touches exactly one file: the plan.
+    """
+    try:
+        plan_text = open(args.plan, encoding="utf-8").read()
+    except OSError as e:
+        sys.stderr.write(f"error: cannot read plan {args.plan!r}: {e}\n")
+        return 2
+    fields, body, fm_errors = split_frontmatter(plan_text)
+    if fm_errors or not fields:
+        _report(fm_errors or [("(frontmatter)", "no frontmatter fields")])
+        return REFUSED
+    try:
+        surface_text = open(args.surface, encoding="utf-8").read()
+    except OSError as e:
+        sys.stderr.write(f"error: cannot read policy surface {args.surface!r}: {e}\n")
+        return 2
+
+    ps = _load_mod("policy_subjects.py")
+    pin, surface_lines = ps.parse_policy_surface(surface_text)
+    if not pin:
+        sys.stderr.write(f"error: policy surface {args.surface!r} carries no "
+                         "`pin:` line — the gate validates against a pinned "
+                         "result only\n")
+        return 2
+
+    rf = _load_mod("render-frontmatter.py")
+    cfg_args = argparse.Namespace(config_json=args.config_json, root=args.root,
+                                  global_config=None, repo_config=None)
+    try:
+        cfg = rf.load_config(cfg_args)
+    except Exception as e:
+        sys.stderr.write(f"error: cannot resolve user config: {e}\n")
+        return 2
+    config_version = args.config_version or hashlib.sha256(
+        json.dumps(cfg, sort_keys=True).encode("utf-8")).hexdigest()[:12]
+
+    surface_files = {sl["file"] for sl in surface_lines}
+    by_file_line = {(sl["file"], sl["line"]): sl["text"] for sl in surface_lines}
+    file_shas = {sl["file"]: sl["sha"] for sl in surface_lines}
+    refs = _plan_policy_refs(fields, body, surface_files)
+    policy_seeded = _truthy(fields.get("policy_seeded", ""))
+
+    findings = []
+    status = None
+    reversal = False
+
+    # 1. Conflict: the shared detector, surface vs authoritative config.
+    conflicts = ps.detect_conflicts(surface_lines, cfg, config_version)
+    if conflicts:
+        blocks = _staging_blocks(args.staging) if args.staging else []
+        unresolved = []
+        for c in conflicts:
+            if _staging_covers(blocks, c["subject"]):
+                findings.append({
+                    "kind": "reversal-as-proposal", "subject": c["subject"]["id"],
+                    "positions": [c["policy"], c["config"]],
+                    "note": "the reversing decision has its staging-candidate "
+                            "block — conformant only as a proposed policy "
+                            "change, never as current policy",
+                })
+            else:
+                unresolved.append(c)
+                findings.append({
+                    "kind": "conflict", "subject": c["subject"]["id"],
+                    "positions": [c["policy"], c["config"]],
+                    "note": f"served policy and the authoritative config "
+                            f"disagree on {c['subject']['label']}",
+                })
+        if unresolved:
+            status = "conflict"
+        else:
+            status = "conformant"
+            reversal = True
+
+    # 2. Stale: pin moved AND a referenced consulted line changed.
+    recorded_pin = fields.get("policy_pin", "")
+    pin_moved = bool(recorded_pin and recorded_pin != pin) or any(
+        r["sha"] != file_shas.get(r["file"]) for r in refs)
+    if status is None and pin_moved:
+        for r in refs:
+            ptr = f"{r['file']}:{r['line']}@{r['sha']}"
+            cur = by_file_line.get((r["file"], r["line"]))
+            if cur is None:
+                findings.append({"kind": "stale", "pointer": ptr, "at": r["at"],
+                                 "note": "the current surface no longer serves "
+                                         "this line"})
+            elif r["quote"] is not None:
+                if r["quote"].strip() and r["quote"].strip() not in cur:
+                    findings.append({"kind": "stale", "pointer": ptr,
+                                     "at": r["at"], "current": cur.strip(),
+                                     "recorded": r["quote"].strip(),
+                                     "note": "the consulted line changed since "
+                                             "the recorded quote"})
+            else:
+                findings.append({"kind": "stale", "pointer": ptr, "at": r["at"],
+                                 "note": "pin moved and no quote is recorded "
+                                         "for this referenced line — the "
+                                         "mismatch counts"})
+        if any(f["kind"] == "stale" for f in findings):
+            status = "stale"
+
+    # 3. Conformant (checked and clean) vs open (nothing the table can check).
+    if status is None:
+        checkable = []
+        for r in refs:
+            cur = by_file_line.get((r["file"], r["line"]), "")
+            probe = r["quote"] if r["quote"] is not None else cur
+            for subject in ps.COMPARABLE_SUBJECTS:
+                if probe and subject["policy_line"].search(probe):
+                    checkable.append((r, subject))
+                    break
+        if not policy_seeded and not refs:
+            status = "open"
+            findings.append({"kind": "no-policy-decisions",
+                             "note": "the plan records no policy-seeded "
+                                     "decision — nothing to check"})
+        elif checkable:
+            status = "conformant"
+            for r, subject in checkable:
+                findings.append({
+                    "kind": "checked-clean", "subject": subject["id"],
+                    "pointer": f"{r['file']}:{r['line']}@{r['sha']}",
+                    "at": r["at"]})
+        else:
+            status = "open"
+            for r in refs:
+                findings.append({
+                    "kind": "unclassifiable",
+                    "pointer": f"{r['file']}:{r['line']}@{r['sha']}",
+                    "at": r["at"],
+                    "note": "no comparable subject classifies this consulted "
+                            "line — recorded open, not checked"})
+            if not refs:
+                findings.append({"kind": "unclassifiable",
+                                 "note": "policy_seeded is set but the plan "
+                                         "references no served policy line "
+                                         "the comparable table can classify"})
+
+    out = {"status": status, "pin": pin, "config_version": config_version,
+           "reversal_as_proposal": reversal, "findings": findings}
+
+    if args.write:
+        # Record the trio in place, THROUGH the writer's fail-closed schema:
+        # strip any prior conformance keys, insert the fresh ones before the
+        # closing `---` (deterministic), validate, and only then write. The
+        # plan file is the ONLY thing the gate ever writes.
+        lines = plan_text.split("\n")
+        end = next(i for i in range(1, len(lines)) if lines[i].strip() == "---")
+        head = [ln for ln in lines[1:end]
+                if not re.match(r"^(policy_pin|policy_config_version|"
+                                r"policy_conformance)\s*:", ln)]
+        head += [f"policy_pin: {pin}",
+                 f"policy_config_version: {config_version}",
+                 f"policy_conformance: {status}"]
+        new_text = "\n".join(["---"] + head + lines[end:])
+        slug = fields.get("slug") or os.path.splitext(
+            os.path.basename(args.plan))[0]
+        defects = list(validate_plan(new_text,
+                                     os.path.join(PLAN_DIR, f"{slug}.md")))
+        if defects:
+            _report(defects)
+            return REFUSED
+        with open(args.plan, "w", encoding="utf-8") as fh:
+            fh.write(new_text)
+        out["written"] = args.plan
+
+    print(json.dumps(out, indent=2))
+    return 0
+
+
 def main(argv=None):
     p = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -425,11 +767,31 @@ def main(argv=None):
 
     sub.add_parser("consult", parents=[root_parent])
 
+    sp = sub.add_parser("conformance", parents=[root_parent])
+    sp.add_argument("--plan", required=True, help="the plan file to validate")
+    sp.add_argument("--surface", required=True,
+                    help="the policy reader's `read` output (pin line + "
+                         "line-numbered files) the run consulted")
+    sp.add_argument("--config-json",
+                    help="resolved config as JSON (FILE or - for stdin); "
+                         "default: resolve from --root")
+    sp.add_argument("--config-version",
+                    help="the cited configVersion (default: a sha256 prefix "
+                         "of the resolved config)")
+    sp.add_argument("--staging",
+                    help="the run's staging-candidates.md — a reversal with "
+                         "its staging block is conformant as a proposed "
+                         "policy change")
+    sp.add_argument("--write", action="store_true",
+                    help="record policy_pin/policy_config_version/"
+                         "policy_conformance into the plan (fail-closed)")
+
     args = p.parse_args(argv)
     if not hasattr(args, "root"):
         args.root = None
     return {"validate": cmd_validate, "dest": cmd_dest,
-            "write": cmd_write, "consult": cmd_consult}[args.cmd](args)
+            "write": cmd_write, "consult": cmd_consult,
+            "conformance": cmd_conformance}[args.cmd](args)
 
 
 if __name__ == "__main__":
