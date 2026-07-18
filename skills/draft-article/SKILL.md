@@ -156,6 +156,20 @@ The **only** files this pipeline writes into the host repo are the declared
 products at `output.drafts` (the `complete` gate). Pass `$WS` to Stage 1 so harvest writes
 there rather than minting its own workspace.
 
+**Artifact-write precondition (Story 13.78).** The harness Write tool refuses
+to overwrite a file that has not been Read in the current session (`File has
+not been read yet`). Two situations make a pipeline target already-exist:
+**re-writes** (the Stage 3 revision loop, a regenerated provenance map, a
+visual *modify*, re-entry after a policy block) and **resumed runs**, where
+every artifact persisted by a prior invocation exists but nothing in this
+session has Read it. So before every Write to a `$WS` path (or any path this
+run may have written before): **Read the target first if it exists; only a
+path minted fresh this turn may be written blind.** On a resume, treat every
+existing workspace artifact as unread. Writes routed through the pipeline
+scripts (`stage0`/checkpoints, `journal`, `complete`,
+`write-article-plan.py`) are exempt — the precondition applies only to the
+Write tool, and burning retry turns on it is a known budget leak (#388).
+
 ### Plan consultation at draft start (SPEC-article-plan CAP-3, Story 13.57)
 
 After Stage 0, before the interview, **consult existing article plans** in the
@@ -1046,7 +1060,9 @@ residue (unchanged decline semantics).
   rendered;
 - **choices whose labels state their concrete effect** — *approve* → "insert
   the source at the shown workspace path, exactly as written", *modify* →
-  "revise the source, then insert", *decline* → "omit the visual; the slot
+  "revise the source, then insert" (a *modify* re-writes the same workspace
+  path — Read it first, per the artifact-write precondition), *decline* →
+  "omit the visual; the slot
   leaves no `[Figure: …]` residue".
 
 **On approval, stage 3 inserts the workspace file's content exactly as
@@ -1164,7 +1180,9 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py quality-gate \
 
 **On failure — bounded retry, then surface (never silent):**
 
-1. Stage 3 **revises against the named failing dimensions only**, then re-runs
+1. Stage 3 **revises against the named failing dimensions only** (Read the
+   current draft and provenance map before re-writing either — the
+   artifact-write precondition; every cycle here is an overwrite), then re-runs
    **both** the quality gate **and** `verify-provenance` — readability revision
    is exactly where an unmarked claim would re-enter, so both gates run every
    cycle.
