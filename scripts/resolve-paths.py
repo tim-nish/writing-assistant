@@ -188,6 +188,35 @@ def _timestamp_run_id():
     return now.strftime("%Y%m%dT%H%M%S-") + f"{now.microsecond:06d}"
 
 
+def _update_latest(base, ws):
+    """Point <runs_dir>/latest at the just-created run dir (F40).
+
+    Run ids are microsecond timestamps, so a human who wants the most recent
+    run's fact sheet otherwise has to eyeball the newest of a deep list of
+    `runs/<ts>/` dirs. `latest` is a stable shorthand: `ls runs/latest/` or
+    `cd runs/latest`. The target is RELATIVE (the run-id basename) so the link
+    survives the tree being moved. Best-effort — a filesystem without symlink
+    support, or a lost race with a concurrent run, is silently tolerated: the
+    shorthand is a convenience, never a correctness requirement, and both run
+    enumerators skip the symlink so a stale `latest` never corrupts a listing
+    or a resume.
+    """
+    link = os.path.join(base, "latest")
+    tmp = os.path.join(base, f".latest.{os.getpid()}.tmp")
+    try:
+        try:
+            os.remove(tmp)
+        except FileNotFoundError:
+            pass
+        os.symlink(os.path.basename(ws), tmp)
+        os.replace(tmp, link)  # atomic swap over any existing `latest`
+    except OSError:
+        try:
+            os.remove(tmp)
+        except OSError:
+            pass
+
+
 def new_run(root, run_id=None):
     """Create <repo-dir>/runs/<run-id>/ and return it (Story 9.2).
 
@@ -199,21 +228,25 @@ def new_run(root, run_id=None):
 
     An explicit --run-id must be fresh; without one, a unique id is minted, and
     on the astronomically unlikely microsecond collision a random suffix is
-    appended until the directory does not already exist.
+    appended until the directory does not already exist. A `latest` symlink is
+    repointed at the new run for easy re-finding (F40).
     """
     base = runs_dir(root)
     if run_id is not None:
         ws = os.path.join(base, run_id)
         os.makedirs(ws)  # exist_ok=False: an explicit id must be new
+        _update_latest(base, ws)
         return ws
     while True:
         ws = os.path.join(base, _timestamp_run_id())
         try:
             os.makedirs(ws)
+            _update_latest(base, ws)
             return ws
         except FileExistsError:
             ws = os.path.join(base, _timestamp_run_id() + "-" + os.urandom(3).hex())
             os.makedirs(ws, exist_ok=False)
+            _update_latest(base, ws)
             return ws
 
 
@@ -347,6 +380,8 @@ def cmd_list_drafts(args):
     out = []
     for rid in (sorted(os.listdir(base)) if os.path.isdir(base) else []):
         ws = os.path.join(base, rid)
+        if os.path.islink(ws):
+            continue  # the `latest` shorthand (F40) is not a distinct run
         draft = os.path.join(ws, "draft.md")
         if not os.path.isfile(draft):
             continue
