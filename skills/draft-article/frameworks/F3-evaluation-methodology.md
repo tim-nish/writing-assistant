@@ -3,9 +3,12 @@
 **Use when:** writing about how to measure — benchmark design, agent evaluation,
 leakage, reproducibility.
 
-**GATE (entry) — a framework-selection precondition, not a fill-in slot:** a
-measurement you actually ran. No measurement of your own → this is a survey (F4),
-not a methodology piece.
+**GATE (entry) — a framework-selection precondition, not a fill-in slot:** an
+evaluation you actually ran and its observed result (Story 13.86, #389). The
+result need not be a benchmark number: counted instances, caught-defect
+episodes, or gate outcomes from a process/gate-based evaluation satisfy the
+GATE — what it refuses is an evaluation you did not run. No evaluation of your
+own → this is a survey (F4), not a methodology piece.
 
 Slot syntax, the config-bound frontmatter, and the shared pointer block are
 defined once in [`CONVENTIONS.md`](CONVENTIONS.md) — F3 reuses them and does not
@@ -44,7 +47,10 @@ guarantees and why, before HOW it's coded.)}
 
 ## GATE {What it caught}                            (results table/figure + ~100 words) [SKIP: blocker]
 {(Real results from running it. This slot empty = article not publishable.
-Requires an actual results table/figure produced by the run — prose or a bare
+Requires an actual results table/figure produced by the run — observed results
+qualify whether quantitative or not (Story 13.86, #389): a benchmark table, or
+rows of counted instances / caught-defect episodes / gate outcomes, each row
+pinned like any sourced claim. Prose-only or a bare
 [VERIFY] placeholder does NOT satisfy this GATE — reporting the after-result on
 the SAME measurement the naive approach demonstrated above.)}
 
