@@ -111,7 +111,11 @@ This slot empty = article not publishable (AP-10).)}
 ## F3 — Evaluation & benchmark methodology
 
 **Use when:** writing about how to measure — benchmark design, agent evaluation, leakage, reproducibility.
-**GATE (entry):** a measurement you actually ran.
+**GATE (entry):** an evaluation you actually ran and its observed result
+(amended 2026-07-18, #389). The result need not be a benchmark number: counted
+instances, caught-defect episodes, or gate outcomes from a process/gate-based
+evaluation satisfy the GATE — what it refuses is an evaluation you did not run.
+No evaluation of your own → this is a survey (F4), not a methodology piece.
 
 ```markdown
 ---
@@ -138,7 +142,13 @@ related: { projects: [{benchmark-project-slug}], publications: [], products: [] 
 guarantees and why, before HOW it's coded.)}
 
 ## GATE {What it caught}                            (results table/figure + ~100 words)
-{(Real results from running it. This slot empty = article not publishable.)}
+{(Real results from running it. This slot empty = article not publishable.
+Observed results qualify whether quantitative or not (amended 2026-07-18,
+#389): a benchmark table, or rows of counted instances / caught-defect
+episodes / gate outcomes — each row pinned like any sourced claim. Prose-only
+or a bare [VERIFY] placeholder still does not satisfy this GATE, and the
+result must report the after-state of the SAME evaluation the naive approach
+demonstrated above.)}
 
 ## {What this measurement cannot tell you}          (~80 words)
 {(Scope the metric's validity. For an evaluation audience this section IS the credential.)}
@@ -155,7 +165,16 @@ undercuts its own thesis.)}
 ## F4 — Research survey
 
 **Use when:** low-cadence reputation-anchor surveys (e.g. signature methods).
-**GATE (entry):** you have read the primary papers, and a related preprint/repo of yours exists or is imminent (spec §6.2 paper+code pairing).
+**GATE (entry):** you have read the field's **primary sources**, and a related
+artifact of yours exists or is imminent (the **source+artifact pairing**,
+amended 2026-07-18, #391 — stated here in full; the former "spec §6.2
+paper+code pairing" pointer resolved to nothing in this repo). Primary
+sources are external papers when the surveyed field is published literature,
+or the internal design records themselves — specs, ADRs, issues,
+commits — when the survey maps an internal system's design space. The second
+half is the reputation anchor and does not widen: a preprint/repo (or the
+system itself) of **yours** must exist or be imminent. No source+artifact
+pairing of your own → this isn't yet a reputation-anchor survey.
 
 ```markdown
 ---
