@@ -143,8 +143,10 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py variant-staleness <draft
 
 Any `publish_blockers` entry (`stale-variant` / `unrecorded-canonical-hash`)
 goes to the completion summary's blocker bucket. The remedy is structural: route
-the change to the canonical draft, **re-emit** the variant (which records the
-new hash), never edit the variant in place.
+the change to the canonical draft, then **re-emit** the variant through this
+flow as the owner's explicit publish decision (which records the new hash) —
+never edit the variant in place, and never let another stage (review included)
+re-emit it implicitly.
 
 ## Post-publish next step — the site's external record (Story 13.41, FR62)
 
