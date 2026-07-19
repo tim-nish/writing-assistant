@@ -101,6 +101,16 @@ every extension below must preserve:
     default. Consultation uses the existing pinned, bounded, read-only policy
     reader (`read-policy-source.py`, ≤2 draft-time-selected topics, code-enforced
     allowlist, recorded pin) — no new reader or access path.
+  - **Amended 2026-07-19 (triage, #423):** the recalled default generalizes to
+    **1–3 candidate defaults ordered by recontextualizing power** (the one that
+    most reframes the others first), each recalled with its pinned rationale; the
+    owner ratifies **exactly one** (approve/modify/replace/skip). The candidates
+    are presented as the **single** interview item (they count once against the
+    ≤5 cap — never a per-candidate batch); `owner_answer` stays empty at
+    generation, a policy pointer never becomes a SOURCE, and machine-*finality*
+    is declined (SPEC-policy-source-seam Non-goals). Invariants 1–3, class
+    eligibility, and the whole-surface/staleness authoring rules are unchanged; a
+    single candidate is the prior behavior.
 
 ## Constraints
 
