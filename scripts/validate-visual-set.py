@@ -57,6 +57,9 @@ PINNED_PTR_RE = re.compile(
     r"|den:[A-Za-z0-9._-]+@[A-Za-z0-9._-]+"
     r"|[qa]\d+)$")
 VERIFY_RE = re.compile(r"\[VERIFY\b|NEEDS-OWNER", re.IGNORECASE)
+# A fact-sheet id is a derived index into the fact sheet, not evidence: the
+# fact's own SOURCE pointer is the pinned form ratification needs (F72).
+FACT_SHEET_ID_RE = re.compile(r"^fs-\d+$")
 
 MEMBER_KEYS = ("role", "required_elements", "format", "placement", "evidence")
 
@@ -124,6 +127,13 @@ def validate(plan, slot_count):
                        "never laundered into the set — fix: set "
                        f'evidence[{el!r}] to "path:line@sha", an answer id '
                        'like "q4", or "[VERIFY: <why it is unpinned>]"')
+            elif FACT_SHEET_ID_RE.match(val):
+                yield (f"{tag}.evidence[{el!r}]",
+                       f"evidence {val!r} is a fact-sheet id — a derived "
+                       "index, not evidence — fix: copy that fact's own "
+                       'SOURCE pointer ("path:line@sha") from the fact '
+                       "sheet; a fact with no pinned SOURCE routes to "
+                       '"[VERIFY: reason]" instead')
             elif not (PINNED_PTR_RE.match(val) or VERIFY_RE.search(val)):
                 yield (f"{tag}.evidence[{el!r}]",
                        f"evidence {val!r} is neither a pinned pointer / "

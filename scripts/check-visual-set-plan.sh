@@ -112,6 +112,10 @@ BADPTR='{"members":[{"role":"r","required_elements":["e"],"format":"diagram","pl
 reason 1 "$BADPTR" | grep -q 'fix: use' \
   && ok "AC(13.79): a malformed-evidence refusal lists the accepted grammar" \
   || err "malformed-evidence refusal has no fix hint"
+FSID='{"members":[{"role":"r","required_elements":["e"],"format":"diagram","placement":"S","evidence":{"e":"fs-11"}}]}'
+reason 1 "$FSID" | grep -q 'fact-sheet id' \
+  && ok "F72: a fact-sheet-id evidence value gets the targeted dereference fix" \
+  || err "fact-sheet-id refusal not targeted"
 reason 1 "$NOROLE" | grep -q 'resolve exactly the fields named above' \
   && ok "AC(13.79): refusal footer directs a targeted resubmit" \
   || err "refusal footer missing"
