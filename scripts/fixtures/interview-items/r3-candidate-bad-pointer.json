@@ -1,0 +1,14 @@
+[
+  {"id": "d1", "gap_type": "warning", "seed": null,
+   "recommended_default": {
+     "candidates": [
+       {"default": "warn readers synthetic scenarios may not transfer",
+        "quote": "check realism before trusting a synthetic score",
+        "pointer": "LESSONS.md:30@8f3c2d1e4a5b6c7d8e9f0a1b2c3d4e5f60718293"},
+       {"default": "warn about same-backend-only reproducibility",
+        "quote": "cross-backend results differ by floating point",
+        "pointer": "LESSONS.md:31"}
+     ]},
+   "question": "What would you warn a reader about before adopting this?",
+   "owner_answer": ""}
+]

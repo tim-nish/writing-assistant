@@ -82,7 +82,15 @@ own rejection classes, distinct from R1/R5:
   R3  also covers a `recommended_default` that is not auditable: a missing
       proposed-answer text, an empty recalled quote, or a pointer that is
       unpinned or outside the structural whitelist — the recalled position must
-      resolve at its pin exactly like a seed (invariant 3, audited).
+      resolve at its pin exactly like a seed (invariant 3, audited). In the
+      multi-candidate form it applies per candidate.
+  R10 a `recommended_default.candidates` list (Story 13.92, #423) that is not
+      1-3 entries. The multi-candidate form carries 1-3 machine-proposed
+      answers ORDERED by recontextualizing power (most-reframing first), each
+      auditable like a single default (R3, per candidate); the owner ratifies
+      exactly one (approve/modify/replace/skip) and the machine is never final
+      (R1 unchanged). A `recommended_default` with no `candidates` key is the
+      single-position N=1 case — byte-identical to before.
 
 Input: a JSON array of items (or {"items": [...]}) from a file argument or
 stdin (`-`). Output: silent + exit 0 when every item passes; else one
@@ -283,6 +291,9 @@ def validate_items(items):
         # every existing item shape is byte-identical to before.
         rd = item.get("recommended_default")
         if rd is not None:
+            # Eligibility (R6/R7) is a property of the item's gap type — it
+            # applies whether the default is a single position or a candidate
+            # list, and is checked once.
             if gap_type in TENSION_TYPES:
                 rej("R7", f"a recommended default on tension type {gap_type!r} is "
                           "rejected — tension questions are owner-only (NFR15) and "
@@ -291,20 +302,39 @@ def validate_items(items):
                 rej("R6", f"a recommended default on gap type {gap_type!r} is "
                           "rejected — only editorial-judgment classes are eligible "
                           f"({', '.join(sorted(ELIGIBLE_DEFAULT_TYPES))})")
-            # Auditability holds regardless of eligibility (invariant 3): the
-            # recalled position must carry a proposed answer, a quote, and a
+
+            # Auditability holds regardless of eligibility (invariant 3): a
+            # proposed position must carry a proposed answer, a quote, and a
             # pinned whitelist pointer, or it is not offerable.
-            if not isinstance(rd, dict) or not str(rd.get("default", "")).strip():
-                rej("R3", "recommended_default has no proposed answer text — "
-                          "nothing for the owner to ratify")
-            else:
-                if not str(rd.get("quote", "")).strip():
-                    rej("R3", "recommended_default has no recalled quote — the "
+            def _audit_position(pos, label):
+                if not isinstance(pos, dict) or not str(pos.get("default", "")).strip():
+                    rej("R3", f"{label} has no proposed answer text — "
+                              "nothing for the owner to ratify")
+                    return
+                if not str(pos.get("quote", "")).strip():
+                    rej("R3", f"{label} has no recalled quote — the "
                               "proposed default is not auditable")
-                if not POINTER_RE.match(str(rd.get("pointer", "")) or ""):
-                    rej("R3", f"recommended_default pointer {rd.get('pointer')!r} is "
+                if not POINTER_RE.match(str(pos.get("pointer", "")) or ""):
+                    rej("R3", f"{label} pointer {pos.get('pointer')!r} is "
                               "missing, unpinned, or outside the whitelist — a "
                               "recalled position must resolve at its pin like a seed")
+
+            # Two shapes (Story 13.92, #423): a single recalled position (N=1,
+            # the original form) OR a `candidates` list of 1-3 positions ordered
+            # by recontextualizing power. Order is the caller's semantic
+            # judgment; the schema enforces count (1-3) and per-candidate
+            # auditability only, and the owner still ratifies exactly one.
+            candidates = rd.get("candidates") if isinstance(rd, dict) else None
+            if candidates is not None:
+                if not isinstance(candidates, list) or not (1 <= len(candidates) <= 3):
+                    rej("R10", "recommended_default.candidates must carry 1-3 entries "
+                               "— 1-3 machine-proposed answers ordered by "
+                               "recontextualizing power (most-reframing first)")
+                else:
+                    for i, cand in enumerate(candidates):
+                        _audit_position(cand, f"candidates[{i}]")
+            else:
+                _audit_position(rd, "recommended_default")
 
         if not str(item["question"]).strip() and not any(
                 r[0] == iid and r[1] == "R4" for r in rejections):

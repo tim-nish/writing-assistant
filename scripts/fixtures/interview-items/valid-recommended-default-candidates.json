@@ -1,0 +1,14 @@
+[
+  {"id": "d1", "gap_type": "significance", "seed": null,
+   "recommended_default": {
+     "candidates": [
+       {"default": "the reproducibility guarantee is the result that matters most",
+        "quote": "reproducibility is the feature",
+        "pointer": "topics/articles.md:36@8f3c2d1e4a5b6c7d8e9f0a1b2c3d4e5f60718293"},
+       {"default": "the cost-aware, distributional evaluation is the headline",
+        "quote": "cost-aware evaluation separates robust allocation from paper profits",
+        "pointer": "LESSONS.md:22@8f3c2d1e4a5b6c7d8e9f0a1b2c3d4e5f60718293"}
+     ]},
+   "question": "Which result matters most to the reader here?",
+   "owner_answer": ""}
+]
