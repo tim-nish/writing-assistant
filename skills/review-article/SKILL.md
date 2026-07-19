@@ -454,7 +454,11 @@ host repo declares a `policy_source`; if the source is absent or unusable the
 pass is **skipped** — one line, never an abort (wiring in Story 15.3).
 
 Read the bounded policy surface through the seam's reader — never any other
-path into the policy repo:
+path into the policy repo. **The reader is the sole `policy_source` detector**:
+do not pre-probe for config with `ls`/`ugrep`/globbing `config/*.yaml` to decide
+whether a policy source exists — that surfaces `Exit code 2` shell noise on a
+host with no policy source (F75). Run the reader directly and branch on its
+exit code (below); an unset source is exit 10, not an error to discover first:
 
 ```
 python3 ${CLAUDE_PLUGIN_ROOT}/scripts/read-policy-source.py --root "$HOST" read

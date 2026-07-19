@@ -187,6 +187,24 @@ assert d["products"]["plan"]["fallback"], d
 [ -f "$ws4/checkpoint.json" ] && ok "done-checkpoint written on the fallback path" \
   || err "no checkpoint despite both products verified"
 
+# 7. F82: a missing output.drafts INSIDE the host is auto-created (the ratified
+#    #213 variants convention: create inside-host, consent outside), so a fresh
+#    host no longer hard-errors 'directory does not exist' on the first draft.
+h5="$work/host5"; mkdir -p "$h5"; git -C "$h5" init -q
+d5="$h5/articles/drafts"                       # inside the host, NOT created
+python3 "$root/scripts/resolve-writing-sources.py" --root "$h5" \
+  set-draft-location "$d5/" >/dev/null 2>&1
+python3 "$W" write --slug "$slug" --root "$h5" "$work/plan.md" >/dev/null 2>&1 \
+  && ok "fixture: plan written for the inside-host auto-create case" || err "inside-host plan write failed"
+ws5="$work/ws5"; mkdir -p "$ws5"
+[ ! -d "$d5" ] || err "fixture bug: inside-host drafts dir already exists"
+out=$(python3 "$DP" complete --draft "$ws/draft.md" --slug "$slug" --root "$h5" --ws "$ws5") \
+  && ok "inside-host missing output.drafts is auto-created — complete succeeds (F82)" \
+  || err "inside-host missing output.drafts still refused (F82 regression)"
+[ -f "$d5/$slug.md" ] \
+  && ok "canonical persisted into the auto-created inside-host drafts dir" \
+  || err "canonical not persisted after auto-create"
+
 if [ "$fail" -eq 0 ]; then
   printf '\nAll completion-gate checks passed.\n'; exit 0
 else
