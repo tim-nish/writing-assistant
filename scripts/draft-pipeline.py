@@ -939,7 +939,14 @@ def cmd_quality_gate(args):
 
 
 def _read_text(path):
-    return sys.stdin.read() if path == "-" else open(path, encoding="utf-8").read()
+    if path == "-":
+        return sys.stdin.read()
+    try:
+        return open(path, encoding="utf-8").read()
+    except FileNotFoundError:
+        raise SystemExit(f"error: file not found: {path}")
+    except IsADirectoryError:
+        raise SystemExit(f"error: expected a file but got a directory: {path}")
 
 
 def _load_json_state(path, label):
@@ -2944,7 +2951,17 @@ def cmd_review_consulted(args):
         --policy-note — every review run states its policy provenance.
     """
     if args.policy_note is not None:
-        print(f"consulted: none ({args.policy_note or 'policy_source unset'})")
+        # Callers naturally pass the whole rendered phrase, not the bare reason;
+        # unwrap an already-wrapped `none (...)` (optionally prefixed by the
+        # rendered `consulted: ` label) so the output never double-wraps to
+        # `consulted: none (none (...))` (F77).
+        note = args.policy_note.strip()
+        for prefix in ("consulted:",):
+            if note.startswith(prefix):
+                note = note[len(prefix):].strip()
+        if note.startswith("none (") and note.endswith(")"):
+            note = note[len("none ("):-1].strip()
+        print(f"consulted: none ({note or 'policy_source unset'})")
         return 0
     if not args.pin:
         sys.stderr.write("error: pass --pin product-lab@<sha> (seeded mode) "
@@ -3336,7 +3353,7 @@ class _CanonicalWriteError(Exception):
         self.reason = reason
 
 
-def _persist_canonical(text, slug, root):
+def _persist_canonical(text, slug, root, create_out=False):
     """Persist `text` as the canonical draft at `<output.drafts>/<slug>.md`,
     stamped with the emission trailer — THE one canonical write path (Story
     13.68), reused verbatim by review's post-arbitration re-entry (Story 13.70)
@@ -3347,13 +3364,31 @@ def _persist_canonical(text, slug, root):
     its own trailer). Atomic (temp + os.replace). Returns
     (canonical_path, canonical_sha); raises _CanonicalWriteError on failure
     (an undeclared output.drafts still exits via _resolve_drafts_dir's own
-    named SystemExit)."""
+    named SystemExit).
+
+    A missing output.drafts follows the ratified variants convention (#213,
+    F82): created automatically when it resolves INSIDE the host repo, refused
+    without `--create-out` consent when it resolves OUTSIDE (a private articles
+    repo) — the same inside-host/outside-host rule the variants emitter applies,
+    so both writers at this altitude behave identically."""
     out_dir = _resolve_drafts_dir(root)   # undeclared → named SystemExit
     canonical_path = os.path.abspath(os.path.join(out_dir, f"{slug}.md"))
     if not os.path.isdir(out_dir):
-        raise _CanonicalWriteError(
-            canonical_path,
-            f"the resolved output.drafts directory does not exist: {out_dir}")
+        host = os.path.realpath(root) if root else _git_toplevel()
+        inside_host = host and os.path.realpath(out_dir).startswith(host + os.sep)
+        if not inside_host and not create_out:
+            raise _CanonicalWriteError(
+                canonical_path,
+                f"the resolved output.drafts directory resolves outside the host "
+                f"repo to {out_dir} and does not exist — create it yourself, or "
+                "re-run with --create-out after confirming the location with the "
+                "owner")
+        try:
+            os.makedirs(out_dir, exist_ok=True)
+        except OSError as e:
+            raise _CanonicalWriteError(
+                canonical_path,
+                f"could not create the output.drafts directory {out_dir}: {e}")
     body = _EMISSION_TRAILER_RE.sub("", text).rstrip("\n") + "\n"
     canonical_sha = hashlib.sha256(body.encode("utf-8")).hexdigest()
     content = body + \
@@ -3407,7 +3442,7 @@ def cmd_complete(args):
                              f"cannot read the workspace draft: {e}")
     try:
         canonical_path, canonical_sha = _persist_canonical(
-            text, args.slug, args.root)
+            text, args.slug, args.root, create_out=getattr(args, "create_out", False))
     except _CanonicalWriteError as e:
         return product_error("canonical draft (drafts/{slug}.md)",
                              e.path, e.reason)
@@ -3526,7 +3561,7 @@ def cmd_review_reentry(args):
         return 1
     try:
         canonical_path, canonical_sha = _persist_canonical(
-            text, args.slug, args.root)
+            text, args.slug, args.root, create_out=getattr(args, "create_out", False))
     except _CanonicalWriteError as e:
         sys.stderr.write(
             "error: review-reentry: reviewed canonical not persisted — "
@@ -3687,6 +3722,9 @@ def main(argv=None):
     sp.add_argument("--draft", required=True, help="the workspace draft to persist as the canonical, or - for stdin")
     sp.add_argument("--slug", required=True, help="the article slug — names both products (<slug>.md)")
     sp.add_argument("--root", help="host-repo root (default: git top-level of cwd; errors outside a git repo)")
+    sp.add_argument("--create-out", action="store_true",
+                    help="consent to creating a missing output.drafts OUTSIDE the host "
+                         "repo (inside the host it is created automatically, per #213)")
     sp.add_argument("--ws", help="run workspace; the final `next_stage: done` checkpoint is written here "
                                  "only after BOTH products verify")
     sp = sub.add_parser("review-reentry",
@@ -3696,6 +3734,9 @@ def main(argv=None):
     sp.add_argument("--map", required=True, help="the provenance map rebuilt against the edited draft")
     sp.add_argument("--slug", required=True, help="the article slug — names the canonical and its variants")
     sp.add_argument("--root", help="host-repo root (default: git top-level of cwd; errors outside a git repo)")
+    sp.add_argument("--create-out", action="store_true",
+                    help="consent to creating a missing output.drafts OUTSIDE the host "
+                         "repo (inside the host it is created automatically, per #213)")
     sp.add_argument("--ws", required=True, help="run workspace; the done/reviewed checkpoint is written "
                                                 "here only after the rebuilt map validates")
     sp.add_argument("--applied", type=int, default=1,

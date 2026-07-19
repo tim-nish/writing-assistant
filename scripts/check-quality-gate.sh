@@ -100,6 +100,14 @@ rc=0; python3 "$DP" quality-gate --draft "$work/good.md" --map "$work/good-map.t
 [ "$rc" -eq 2 ] && ok "a judge file missing a gated dimension exits 2 (incomplete = unparseable)" \
   || err "missing-dimension judge file exited $rc, expected 2"
 
+# F83 — a nonexistent --judge path is a named error, never a raw FileNotFoundError
+# traceback (the same convention _load_json_state gives JSON callers).
+rc=0; errout=$(python3 "$DP" quality-gate --draft "$work/good.md" --map "$work/good-map.txt" --judge "$work/no-such-judge.txt" 2>&1 >/dev/null) || rc=$?
+[ "$rc" -ne 0 ] && echo "$errout" | grep -q 'file not found' \
+  && ! echo "$errout" | grep -q 'Traceback' \
+  && ok "a missing --judge file is a named 'file not found' error, not a traceback (F83)" \
+  || err "missing --judge file: rc=$rc, output: $errout"
+
 # #305 — dim3 is MECHANICAL: the judge gates dims 1-2 only, and a judge file
 # carrying no dim3 line is complete.
 printf 'dim1: pass\ndim2: pass\n' > "$work/judge-12.txt"

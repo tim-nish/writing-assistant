@@ -52,6 +52,14 @@ line=$(python3 "$PIPE" review-consulted --policy-note "policy_source unavailable
 [ "$line" = "consulted: none (policy_source unavailable: path does not exist)" ] \
   && ok "skipped (unavailable): reason carried" || err "unavailable mode wrong: '$line'"
 
+# F77: a caller that passes the whole rendered phrase must not double-wrap.
+line=$(python3 "$PIPE" review-consulted --policy-note "none (policy_source unavailable: gateway down)")
+[ "$line" = "consulted: none (policy_source unavailable: gateway down)" ] \
+  && ok "skipped (pre-wrapped): single wrap, not none (none (...))" || err "double-wrap not normalized: '$line'"
+line=$(python3 "$PIPE" review-consulted --policy-note "consulted: none (policy_source unset)")
+[ "$line" = "consulted: none (policy_source unset)" ] \
+  && ok "skipped (label+wrap): rendered phrase normalized" || err "labelled wrap not normalized: '$line'"
+
 # --- 4. Usage error names both modes ------------------------------------------------
 set +e; msg=$(python3 "$PIPE" review-consulted 2>&1 >/dev/null); rc=$?; set -e
 [ "$rc" -eq 2 ] && printf '%s' "$msg" | grep -q -- '--policy-note' \
