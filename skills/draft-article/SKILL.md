@@ -1358,6 +1358,46 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py repair-hop \
   --upstream "re-harvest bench/results.md"   # or: "ask <one bounded question>"
 ```
 
+**Evidence-type absences build episodes on the hop (Story 13.91, #417).**
+When the missing-input finding came from the gate's evidence-type check
+(`evidence_types.missing_input[]`, Story 13.90), do not go straight to the
+generic `ask` — construct candidate episodes from what harvest already
+captured:
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py episode-candidates \
+  --state "$WS/checkpoint.json" --section "<failing section>"
+```
+
+- The command reads **only the fact sheet** (never a source — the Stage-1
+  scope boundary holds on the hop) and groups event-kind facts by source
+  file, with same-source result/number/quote facts as support. Each
+  candidate's `frame` is null: **author the one-line narrative frame
+  yourself, from the grouped claims only** — compression, never new
+  causality/significance (a frame asserting more than its constituents is
+  invented evidence).
+- Present **one** owner question (proposal contract, in-conversation): every
+  candidate as an option — frame first, constituent pointers collapsed — plus
+  an explicit decline. One question total, never one per candidate; this IS
+  the hop's single bounded elicitation, so it counts against the same
+  two-cycle bound.
+- On selection, record it:
+
+  ```
+  python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py episode-select \
+    --state "$WS/checkpoint.json" --frame "<approved one-line frame>" \
+    --pointers "<primary>,<constituent>,…"
+  ```
+
+  The selected episode enters the fact sheet as a pinned entry (claim =
+  frame, SOURCE = primary constituent, KIND `event` — harvest grammar
+  unchanged); checkpoint the printed state, re-enter stage-3 fill, and the
+  re-run gate can now satisfy the section's declared type.
+- **Decline-all, or `episode-candidates` reports no candidates
+  (`action: publish-blocker-path`):** the absence follows Story 13.90's
+  publish-blocker semantics — surface it in the completion summary naming
+  the section and missing type; never loop, never open-ended re-harvest.
+
 - `re-harvest <target>` → re-enter **harvest** narrowed to that scoped target;
   the new facts are pinned exactly like any Stage-1 fact (declared-scope
   boundary and pin rules unchanged), and a policy line never becomes a SOURCE.
