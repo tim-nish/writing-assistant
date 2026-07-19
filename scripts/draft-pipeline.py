@@ -1138,6 +1138,127 @@ def cmd_repair_hop(args):
     return 2
 
 
+# --- Episode candidates on the missing-input hop (Story 13.91, #417) ---------
+# SPEC-article-draft-pipeline evidence-type constraint: "On that hop, the
+# pipeline constructs candidate episodes from already-captured event facts —
+# grouped events plus a one-line narrative frame plus the constituent source
+# pointers; harvest itself stays capture-only and gains no extraction logic —
+# and presents them for owner selection as the hop's single bounded
+# elicitation question." These two commands are the mechanical half:
+# `episode-candidates` reads ONLY the state's fact sheet (never a source —
+# the Story 3.1 scope boundary holds on the hop) and emits candidate
+# scaffolds whose `frame` is null; the orchestrating skill authors each
+# one-line frame FROM the grouped claims (compression only — a frame
+# asserting more than its constituents is an invented-evidence defect) and
+# presents ONE question. `episode-select` records the owner's pick as a new
+# fact-sheet entry pinned like any harvested material.
+
+EPISODE_SEED_KINDS = {"event"}                          # an episode is built from events
+EPISODE_SUPPORT_KINDS = {"result", "number", "quote"}   # same-source supporting facts
+
+
+def _pointer_path(source):
+    """The file path of a pinned `path:line[@-range]@sha` pointer, or None for
+    the other sanctioned forms (sha / URL / den: / qN) — those group alone."""
+    m = re.match(r"^(?P<path>.+):\d+(?:-\d+)?@[0-9a-f]{7,40}$", source or "")
+    return m.group("path") if m else None
+
+
+def cmd_episode_candidates(args):
+    """Build candidate episodes from the state's captured event facts, grouped
+    by source file, for owner selection on the missing-input repair hop."""
+    state = _load_json_state(args.state, "--state")
+    fact_sheet = state.get("fact_sheet") or []
+    groups = {}
+    for e in fact_sheet:
+        if e.get("kind") in EPISODE_SEED_KINDS:
+            key = _pointer_path(e.get("source")) or e.get("source")
+            groups.setdefault(key, []).append(e)
+    if not groups:
+        out = {
+            "stage": "episode-candidates",
+            "section": args.section,
+            "candidates": [],
+            "action": "publish-blocker-path",
+            "reason": ("the fact sheet holds no event-kind facts to build an "
+                       "episode from — equivalent to a declined hop: the "
+                       "unrepaired evidence-type absence follows Story 13.90's "
+                       "publish-blocker semantics (CAP-6, naming the section "
+                       "and the missing type), never open-ended re-harvest"),
+        }
+        print(json.dumps(out, indent=2))
+        return 0
+    candidates = []
+    for i, (key, events) in enumerate(sorted(groups.items()), 1):
+        support = [e for e in fact_sheet
+                   if e.get("kind") in EPISODE_SUPPORT_KINDS
+                   and (_pointer_path(e.get("source")) or e.get("source")) == key]
+        candidates.append({
+            "id": f"e{i}",
+            "group": key,
+            "events": events,
+            "support": support,
+            "pointers": [e["source"] for e in events + support],
+            "frame": None,   # authored by the skill from the claims above — one line
+        })
+    out = {
+        "stage": "episode-candidates",
+        "section": args.section,
+        "candidates": candidates,
+        "elicitation": {
+            "contract": ("ONE bounded owner question under the proposal contract "
+                         "(CAP-6 in-conversation): all candidates as options plus "
+                         "an explicit decline — never one question per candidate"),
+            "options": [c["id"] for c in candidates] + ["decline"],
+            "on_decline": ("follow Story 13.90's publish-blocker semantics — the "
+                           "absence stays a missing-input finding, no further hop"),
+        },
+        "note": ("frames are compression of the listed claims only; a frame "
+                 "asserting new causality/significance is invented evidence"),
+    }
+    print(json.dumps(out, indent=2))
+    return 0
+
+
+def cmd_episode_select(args):
+    """Record the owner-selected episode as a new fact-sheet entry — claim =
+    the one-line frame, source = the primary constituent pointer — validated
+    through the harvest grammar so it enters pinned exactly like any harvested
+    material, and constrained to constituents the fact sheet already holds."""
+    state = _load_json_state(args.state, "--state")
+    fact_sheet = state.get("fact_sheet") or []
+    frame = (args.frame or "").strip()
+    if not frame or "\n" in frame:
+        sys.stderr.write("error: --frame must be one non-empty line (the episode's "
+                         "narrative frame)\n")
+        return 2
+    pointers = [p.strip() for p in (args.pointers or "").split(",") if p.strip()]
+    if not pointers:
+        sys.stderr.write("error: --pointers must list the constituent source "
+                         "pointers (comma-separated; first = primary)\n")
+        return 2
+    known = {e.get("source") for e in fact_sheet}
+    invented = [p for p in pointers if p not in known]
+    if invented:
+        sys.stderr.write(
+            "error: episode constituents must already be captured fact-sheet "
+            f"sources (capture stays harvest's; nothing new enters here): {invented}\n")
+        return 2
+    if any(e.get("claim") == frame for e in fact_sheet):
+        sys.stderr.write(f"error: an identical claim already exists in the fact sheet: {frame!r}\n")
+        return 2
+    vfs = _load("validate-fact-sheet.py")
+    primary = pointers[0]
+    if not vfs.source_form_ok(primary, "event"):
+        sys.stderr.write(f"error: primary pointer {primary!r} is not a valid SOURCE "
+                         "form for KIND event (harvest grammar unchanged)\n")
+        return 2
+    state["fact_sheet"] = fact_sheet + [{"claim": frame, "source": primary, "kind": "event"}]
+    state["episode_selected"] = {"claim": frame, "constituents": pointers}
+    print(json.dumps(state, indent=2))
+    return 0
+
+
 def _read_frontmatter(text):
     """Parse the leading `---` article frontmatter into a dict. Stdlib-only
     line surgery (host repos have no PyYAML): top-level `key: value` pairs, with
@@ -3723,6 +3844,26 @@ def main(argv=None):
     sp.add_argument("--rewrites", type=int, required=True,
                     help="rewrites already applied to this section")
     sp.add_argument("--section", default="?", help="section identifier (for the routed question)")
+    sp = sub.add_parser("episode-candidates",
+                        help="build candidate episodes from the state's captured event "
+                             "facts for owner selection on the missing-input repair hop "
+                             "(Story 13.91); reads only the fact sheet, never a source")
+    sp.add_argument("--state", required=True,
+                    help="consume/checkpoint state JSON carrying the fact sheet")
+    sp.add_argument("--section", default=None,
+                    help="the failing section (from the gate's missing_input finding) — "
+                         "label only, carried into the output")
+    sp = sub.add_parser("episode-select",
+                        help="record the owner-selected episode as a pinned fact-sheet "
+                             "entry (Story 13.91): claim = the one-line frame, source = "
+                             "the primary constituent pointer")
+    sp.add_argument("--state", required=True,
+                    help="the same state JSON episode-candidates read")
+    sp.add_argument("--frame", required=True,
+                    help="the owner-approved one-line narrative frame")
+    sp.add_argument("--pointers", required=True,
+                    help="comma-separated constituent pointers (must already be "
+                         "fact-sheet sources); the first is the primary SOURCE")
     sp = sub.add_parser("repair-hop")
     sp.add_argument("--upstream", required=True,
                     help="a missing-input finding's Upstream: remediation "
@@ -3793,6 +3934,8 @@ def main(argv=None):
         "quality-gate": cmd_quality_gate,
         "verify-markers": cmd_verify_markers, "verify": cmd_verify, "reroute": cmd_reroute,
         "repair-hop": cmd_repair_hop,
+        "episode-candidates": cmd_episode_candidates,
+        "episode-select": cmd_episode_select,
         "variants": cmd_variants,
         "variant-staleness": cmd_variant_staleness,
         "site-record": cmd_site_record,
