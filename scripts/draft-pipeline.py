@@ -998,17 +998,22 @@ def cmd_verify(args):
     """
     text = sys.stdin.read() if args.draft == "-" else open(args.draft, encoding="utf-8").read()
     worklist = []
-    for lineno, line in enumerate(text.splitlines(), 1):
-        for m in VERIFY_CANDIDATE.finditer(line):
-            frag = m.group(0)
-            if not VERIFY_CANONICAL.match(frag):
-                sys.stderr.write(
-                    f"error: malformed marker at line {lineno}: {frag}   "
-                    "(must be exactly `[VERIFY: <reason>]`; resolve Stage 3 first)\n"
-                )
-                return 1
-            worklist.append({"line": lineno, "marker": frag,
-                             "reason": frag[len("[VERIFY: "):-1]})
+    # Scan the whole text, not line-by-line: a marker word-wrapped across
+    # physical lines is well-formed to verify-markers/provenance (their
+    # candidate class crosses newlines) and must enter this worklist too —
+    # the line-by-line scan silently dropped it and an unresolved marker
+    # could ship without the owner ever seeing it (F10).
+    for m in VERIFY_CANDIDATE.finditer(text):
+        frag = m.group(0)
+        lineno = text.count("\n", 0, m.start()) + 1
+        if not VERIFY_CANONICAL.match(frag):
+            sys.stderr.write(
+                f"error: malformed marker at line {lineno}: {frag}   "
+                "(must be exactly `[VERIFY: <reason>]`; resolve Stage 3 first)\n"
+            )
+            return 1
+        reason = " ".join(frag[len("[VERIFY: "):-1].split())
+        worklist.append({"line": lineno, "marker": frag, "reason": reason})
     remaining = len(worklist)
     out = {
         "stage": "verify",

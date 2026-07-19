@@ -47,6 +47,23 @@ assert lines==[2,4], lines
 assert d["worklist"][0]["reason"].startswith("inferred from logs"), d
 ' && ok "worklist has one entry per marker with line + reason" || err "worklist wrong"
 
+# 2b. A word-wrapped marker (newline inside the brackets) still enters the
+# worklist — verify-markers/provenance accept it as well-formed, so the
+# worklist scan must see it too or it ships unresolved (F10).
+cat > "$work/wrapped.md" <<'EOF'
+Sourced intro.
+The reader cost claim is an estimate [VERIFY: this next claim is
+my inference, not a statement in the sources].
+EOF
+python3 "$DP" verify "$work/wrapped.md" | python3 -c '
+import json,sys
+d=json.load(sys.stdin)
+assert d["remaining"]==1, d
+assert d["worklist"][0]["line"]==2, d
+assert "\n" not in d["worklist"][0]["reason"], d
+' && ok "F10: a word-wrapped marker enters the worklist (line of its start, reason unwrapped)" \
+  || err "wrapped marker dropped from worklist"
+
 # 3. Zero markers -> pass complete, next_stage = variants (Stage 5).
 printf 'Every claim here is sourced or confirmed.\n' > "$work/clean.md"
 python3 "$DP" verify "$work/clean.md" | python3 -c '
