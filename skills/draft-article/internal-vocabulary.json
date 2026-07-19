@@ -57,7 +57,7 @@
   ],
   "patterns": [
     "Stage \\d+",
-    "\\bF[1-4]\\b",
+    "\\bF[1-5]\\b",
     "\\bNEEDS-OWNER\\b",
     "\\[VERIFY\\]"
   ],

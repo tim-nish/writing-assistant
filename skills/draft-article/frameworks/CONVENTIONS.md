@@ -1,10 +1,12 @@
-# Framework conventions (shared by F1–F4)
+# Framework conventions (shared by F1–F5)
 
 Every framework in this directory follows these conventions, so a draft's
-structure and its editorial gate are unambiguous by inspection. The four
-frameworks (`F1`–`F4`) supply only their body slots; the frontmatter and the
+structure and its editorial gate are unambiguous by inspection. The five
+frameworks (`F1`–`F5`) supply only their body slots; the frontmatter and the
 pointer block below are shared and rendered from user config — never hand-copied
-or hardcoded.
+or hardcoded. (`F5`, the working-note profile, additionally runs the slim
+pipeline profile — no interview, so its slots carry no `[SKIP: …]` tags; see
+`F5-working-note.md`.)
 
 ## Slot syntax
 
@@ -76,7 +78,7 @@ Value slots (`{slug}`, `{title}`, …) are filled later by the pipeline (Story
 **Every framework ends with `## GATE {Pointer block}`.** Its content — focus
 areas, site URL/name, and the related / newsletter / counterpart lines — is
 drawn entirely from user config (`pointer_block.*`, `owner.*`). It is rendered by
-one shared template so the block is **byte-identical across all four
+one shared template so the block is **byte-identical across all five
 frameworks**:
 
 ```sh
@@ -109,6 +111,7 @@ important visual has a defined place:
 | F2 | **optional** before/after or timeline |
 | F3 | one **comparison table** (**required**) |
 | F4 | one **landscape table or concept map** |
+| F5 | **none** — the working-note profile never proposes a visual |
 
 A visual slot is **proposed, not auto-filled** (Story 8.2): the pipeline offers it
 under the owner-facing proposal contract, and the owner approves, modifies, or
