@@ -104,6 +104,27 @@ python3 "$DP" journal --interview "$work/iv.json" --answers "$work/ans.json" \
   && err "malformed --seed-extra accepted" \
   || ok "malformed --seed-extra fails closed"
 
+# F77: the unseeded --policy-note branch normalizes exactly like
+# review-consulted — a caller pasting the whole rendered 'none (...)' phrase
+# must not double-wrap to 'consulted: none (none (...))'.
+jout=$(python3 "$DP" journal --interview "$work/iv.json" --answers "$work/ans.json" \
+       --policy-note 'none (policy_source unavailable: gateway down)')
+printf '%s' "$jout" | python3 -c "
+import json, sys
+c = json.load(sys.stdin)['consulted']
+assert c == 'consulted: none (policy_source unavailable: gateway down)', c
+" && ok "F77: journal pre-wrapped --policy-note is unwrapped, not double-wrapped" \
+  || err "journal double-wrap not normalized"
+# A bare reason still passes through unchanged (behavior pinned).
+jout=$(python3 "$DP" journal --interview "$work/iv.json" --answers "$work/ans.json" \
+       --policy-note 'policy_source unavailable: gateway down')
+printf '%s' "$jout" | python3 -c "
+import json, sys
+c = json.load(sys.stdin)['consulted']
+assert c == 'consulted: none (policy_source unavailable: gateway down)', c
+" && ok "journal bare --policy-note reason carried unchanged" \
+  || err "journal bare-reason behavior changed"
+
 # --- Editorial anchor (Story 13.38, SPEC-policy-editorial-direction CAP-2) ----
 # The first PRESENTED question with an owner-text answer becomes the anchor.
 st='{"fact_sheet":[],"needs_owner":[]}'

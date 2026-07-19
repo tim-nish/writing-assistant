@@ -967,6 +967,26 @@ def _load_json_state(path, label):
         raise SystemExit(f"error: {label} is not valid JSON: {e}")
 
 
+def _bare_policy_reason(note):
+    """Reduce a `--policy-note` value to the bare skip reason (F77).
+
+    The flag expects the bare reason, but callers naturally paste the whole
+    rendered line (`none (<reason>)`, optionally prefixed by the `consulted: `
+    label). Both `consulted:` emitters — the interview seam (cmd_journal) and
+    the review seam (cmd_review_consulted) — normalize through here so neither
+    double-wraps to `consulted: none (none (...))`. Returns None/empty
+    unchanged so the caller can fall back to the `policy_source unset` default.
+    """
+    if not note:
+        return note
+    s = note.strip()
+    if s.startswith("consulted:"):
+        s = s[len("consulted:"):].strip()
+    if s.startswith("none (") and s.endswith(")"):
+        s = s[len("none ("):-1].strip()
+    return s
+
+
 def cmd_verify_markers(args):
     """Stage 3/4: validate the `[VERIFY: reason]` markers in a draft. Every
     VERIFY-shaped bracket must match the canonical form exactly; anything else
@@ -2787,7 +2807,8 @@ def cmd_journal(args):
         mapping = "; ".join(f"{ptr.rsplit('@', 1)[0]} → {qid}" for ptr, qid in seeds)
         consulted = f"consulted: product-lab@{pin} — {mapping}"
     else:
-        consulted = f"consulted: none ({args.policy_note or 'policy_source unset'})"
+        consulted = ("consulted: none "
+                     f"({_bare_policy_reason(args.policy_note) or 'policy_source unset'})")
 
     out = {"stage": "interview", "journal": entries, "consulted": consulted}
     # Echo the pinned presentation order (Story 13.30, CAP-4) so a mis-ordered
@@ -2956,17 +2977,11 @@ def cmd_review_consulted(args):
         --policy-note — every review run states its policy provenance.
     """
     if args.policy_note is not None:
-        # Callers naturally pass the whole rendered phrase, not the bare reason;
-        # unwrap an already-wrapped `none (...)` (optionally prefixed by the
-        # rendered `consulted: ` label) so the output never double-wraps to
-        # `consulted: none (none (...))` (F77).
-        note = args.policy_note.strip()
-        for prefix in ("consulted:",):
-            if note.startswith(prefix):
-                note = note[len(prefix):].strip()
-        if note.startswith("none (") and note.endswith(")"):
-            note = note[len("none ("):-1].strip()
-        print(f"consulted: none ({note or 'policy_source unset'})")
+        # Shared normalization with the interview seam (cmd_journal): a caller
+        # pasting the whole rendered `none (...)` phrase must not double-wrap
+        # to `consulted: none (none (...))` (F77).
+        print("consulted: none "
+              f"({_bare_policy_reason(args.policy_note) or 'policy_source unset'})")
         return 0
     if not args.pin:
         sys.stderr.write("error: pass --pin product-lab@<sha> (seeded mode) "
