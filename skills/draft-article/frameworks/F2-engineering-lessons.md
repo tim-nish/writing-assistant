@@ -39,7 +39,7 @@ context to make the lesson intelligible — this is not the project intro.)}
 ## {What I believed going in}                       (~60 words) [SKIP: omit]
 {(The reasonable-sounding assumption. Readers must recognize themselves in it.)}
 
-## GATE {What actually happened}                    (~120 words + artifact) [SKIP: blocker]
+## GATE {What actually happened}                    (~120 words + artifact) [SKIP: blocker] [EVIDENCE: episode|example|measurement]
 {(The surprise, WITH the artifact: log excerpt, diff, number, screenshot.
 This slot empty = article not publishable (AP-10). Each lesson needs its OWN
 artifact — the evidence gate is enforced once per lesson, not once per article.)}

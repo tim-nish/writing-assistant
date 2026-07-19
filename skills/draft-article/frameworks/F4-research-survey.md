@@ -54,7 +54,7 @@ the claim is identifiable up front (the full defence is the closing "My take"
 GATE, never here). Then: what's covered, what's excluded, who this is for, and
 the as-of date — surveys age; dating them keeps them citable.)}
 
-## {The map}                                        (table or diagram + ~100 words) [SKIP: verify]
+## {The map}                                        (table or diagram + ~100 words) [SKIP: verify] [EVIDENCE: example]
 {(A taxonomy of approaches. The map is the artifact readers bookmark. Every
 approach named here must resolve to a citation — no uncited claims.)}
 

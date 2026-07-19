@@ -618,6 +618,65 @@ def _loc_set(s):
     return {p.strip().lower() for p in parts if p.strip()}
 
 
+# --- Per-section minimum evidence type (Story 13.90, #416) -------------------
+# SPEC-article-frameworks "Per-section minimum evidence type" +
+# SPEC-article-draft-pipeline evidence-type constraint: each framework slot may
+# declare the minimum evidence TYPE it needs as an authored `[EVIDENCE: …]`
+# heading tag (like `[SKIP: …]`); at the stage 3→4 boundary the gate checks
+# each declared section's fill against fact-sheet KINDs — a section whose
+# declared type is absent classifies as MISSING-INPUT and takes the bounded
+# repair route (`repair-hop`), never a silent backfill or a passing gate.
+
+EVIDENCE_TYPES = {"episode", "example", "measurement", "none"}
+# Declared, checkable mapping from evidence types to the fact-sheet KIND
+# vocabulary (validate-fact-sheet.py KINDS) — the mechanical proxy for "the
+# section contains that kind of evidence": an anchored sourced/derived claim
+# whose pointer resolves to a fact-sheet entry of an allowed KIND.
+EVIDENCE_KINDS = {
+    "episode": {"event"},
+    "example": {"event", "quote", "result"},
+    "measurement": {"number", "result"},
+}
+EVIDENCE_TAG_RE = re.compile(r"\[EVIDENCE:\s*([a-z|\s]+)\]")
+
+
+def _slot_key(heading):
+    """Normalize a slot/section heading for template↔draft matching: drop the
+    leading ##, the GATE marking, `{…}` slot braces, `[SKIP:…]`/`[EVIDENCE:…]`
+    tags, and `(…)` annotations — the fill preserves heading text, so the
+    normalized words are the stable join key."""
+    h = re.sub(r"\[(?:SKIP|EVIDENCE):[^\]]*\]", "", heading)
+    h = re.sub(r"\(.*?\)", "", h)
+    h = h.replace("GATE", "").replace("{", "").replace("}", "")
+    return re.sub(r"[^a-z0-9]+", " ", h.lower()).strip()
+
+
+def parse_evidence_declarations(framework_text):
+    """[(slot_key, {types})] for every slot heading carrying an `[EVIDENCE: …]`
+    tag with a type other than `none`. Raises ValueError on vocabulary drift —
+    an unknown type or `none` combined with others is an authored template
+    defect, surfaced before anything is judged."""
+    decls = []
+    for line in framework_text.splitlines():
+        if not line.startswith("##"):
+            continue
+        m = EVIDENCE_TAG_RE.search(line)
+        if not m:
+            continue
+        types = {t.strip() for t in m.group(1).split("|") if t.strip()}
+        bad = types - EVIDENCE_TYPES
+        if bad:
+            raise ValueError(
+                f"unknown evidence type(s) {sorted(bad)} (vocabulary: "
+                f"{sorted(EVIDENCE_TYPES)}) in: {line.strip()}")
+        if "none" in types and len(types) > 1:
+            raise ValueError(f"`none` cannot be combined with other types: {line.strip()}")
+        if types == {"none"}:
+            continue
+        decls.append((_slot_key(line), types))
+    return decls
+
+
 def cmd_quality_gate(args):
     """Stage 3→4 quality gate (Story 11.4). Dimensions 3 and 4 are mechanical
     here; dimensions 1–2 come from the single-pass judge's verdicts (--judge, a
@@ -770,12 +829,90 @@ def cmd_quality_gate(args):
     else:
         results["audience"] = ("pass", "")
 
+    # Per-section minimum evidence type (Story 13.90, #416) — a stage-
+    # progression precondition beside the rubric dimensions. Runs whenever the
+    # framework file is supplied and declares types; fails CLOSED when the
+    # inputs it needs are missing, because a gate that cannot check has not
+    # checked.
+    evidence_missing = []
+    evidence_checked = False
+    if getattr(args, "framework_file", None):
+        try:
+            decls = parse_evidence_declarations(_read_text(args.framework_file))
+        except ValueError as e:
+            sys.stderr.write(f"error: evidence-type declarations: {e}\n")
+            return 2
+        except OSError as e:
+            sys.stderr.write(f"error: cannot read --framework-file: {e}\n")
+            return 2
+        if decls:
+            if not args.map or not getattr(args, "state", None):
+                sys.stderr.write(
+                    "error: the framework declares per-section minimum evidence "
+                    "types, so the gate needs --map (anchored provenance map) "
+                    "and --state (consume/checkpoint state carrying the fact "
+                    "sheet) — the check fails closed rather than silently "
+                    "skipping (SPEC-article-draft-pipeline, evidence-type "
+                    "constraint)\n")
+                return 2
+            state = _load_json_state(args.state, "--state")
+            kinds_by_source = {e.get("source"): e.get("kind")
+                               for e in state.get("fact_sheet", [])}
+            lines = draft.splitlines()
+            heads = [(i + 1, ln) for i, ln in enumerate(lines) if ln.startswith("##")]
+            sections = []
+            for idx, (lineno, ln) in enumerate(heads):
+                end = heads[idx + 1][0] - 1 if idx + 1 < len(heads) else len(lines)
+                sections.append((_slot_key(ln), lineno, end))
+            evidence_checked = True
+            for slot, types in decls:
+                sec = next((s for s in sections if s[0] == slot), None)
+                allowed = set().union(*(EVIDENCE_KINDS[t] for t in types))
+                found = set()
+                if sec:
+                    for _pos, _cls, ptrs, anchor in prov_entries:
+                        if anchor and sec[1] <= anchor <= sec[2]:
+                            for ptr in ptrs:
+                                k = kinds_by_source.get(ptr)
+                                if k:
+                                    found.add(k)
+                if not (found & allowed):
+                    tlist = "|".join(sorted(types))
+                    evidence_missing.append({
+                        "section": slot,
+                        "section_present": bool(sec),
+                        "declared": sorted(types),
+                        "allowed_kinds": sorted(allowed),
+                        "found_kinds": sorted(found),
+                        "classification": "missing-input",
+                        # A ready-made `Upstream:` remediation in exactly the
+                        # shape `repair-hop` consumes — the bounded route, never
+                        # open-ended re-harvest.
+                        "upstream": (f"ask Section '{slot}' declares minimum evidence "
+                                     f"type {tlist} and the draft satisfies none: which "
+                                     f"concrete {tlist} from the sources should fill it? "
+                                     "Name its source."),
+                    })
+            results["evidence"] = ("pass", "") if not evidence_missing else (
+                "fail", "; ".join(
+                    f"{m['section']}: declared {'|'.join(m['declared'])}, found "
+                    f"{','.join(m['found_kinds']) or 'nothing'}" for m in evidence_missing))
+
     failing = [d for d, (v, _) in results.items() if v == "fail"]
     out = {"gate": "quality", "pass": not failing,
            "dimensions": {d: {"verdict": v, "locations": loc} for d, (v, loc) in results.items()},
            "failing_dimensions": failing}
     if vocab_stamp:
         out["dim3_inventory"] = vocab_stamp
+    if evidence_checked:
+        out["evidence_types"] = {
+            "checked": True,
+            "missing_input": evidence_missing,
+            "note": ("a failing section is a MISSING-INPUT finding — route its "
+                     "`upstream` line through `repair-hop` (the bounded repair "
+                     "route, same two-cycle bound); never backfill with "
+                     "unrelated factual material"),
+        }
     # Delta re-check accounting (#349): what the second cycle suppressed as a
     # fresh interpretive dim1/dim2 finding (not in cycle-1's locations), so the
     # convergence decision is auditable from the gate output alone.
@@ -3558,6 +3695,14 @@ def main(argv=None):
                     help="comma-separated repo-internal terms the ratified audience already "
                          "knows; excluded from the dim3 scan (repeatable). Audience judgment "
                          "enters once, as owner-ratified data — never re-judged per pass")
+    sp.add_argument("--framework-file", dest="framework_file",
+                    help="the run's framework template (run-state `framework_file`); "
+                         "enables the per-section minimum evidence-type check (Story "
+                         "13.90) from its authored [EVIDENCE: …] heading tags")
+    sp.add_argument("--state",
+                    help="consume/checkpoint state JSON carrying the fact sheet (KIND "
+                         "per pointer) — required whenever --framework-file declares "
+                         "evidence types; the check fails closed without it")
     sp.add_argument("--profile", choices=("full", "slim"), default="full",
                     help="gate profile: `full` (default) requires the dim1-2 rubric judge; "
                          "`slim` (working-note, Story 13.89) waives dims 1-2 by ratified "

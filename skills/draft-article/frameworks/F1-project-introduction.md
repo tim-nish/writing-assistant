@@ -45,7 +45,7 @@ code block, screenshot, or command + output. Show, don't enumerate features.)}
 {(The one non-obvious decision — e.g. "why JAX-native" — and what it COST.
 A decision with no tradeoff stated reads as marketing.)}
 
-## GATE {Evidence}                                  (~100 words + 1 figure/table) [SKIP: blocker]
+## GATE {Evidence}                                  (~100 words + 1 figure/table) [SKIP: blocker] [EVIDENCE: episode|example|measurement]
 {(A result, benchmark number, or worked example produced by the real system.
 This slot empty = article not publishable (AP-10).)}
 

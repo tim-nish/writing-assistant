@@ -44,13 +44,13 @@ Config-bound `article` frontmatter (rendered per language from user config; see
 - `summary` — *(≤240 chars: the lesson + the number)*
 - `topics` — *({kebab-case} tags)*
 
-## GATE {One lesson}                                (~80 words)
+## GATE {One lesson}                                (~80 words) [EVIDENCE: episode|example]
 {(One transferable lesson from this period's own work, stated as a claim with
 its boundary — where it applies and where it doesn't. AP-10: it must come from
 the owner's logs/decisions/scars, not from reading. One lesson exactly; a
 second lesson is next issue's.)}
 
-## GATE {One number}                                (~40 words + the number)
+## GATE {One number}                                (~40 words + the number) [EVIDENCE: measurement]
 {(One real observed number from the period — a measurement, count, or cost —
 with its source pointer. A number that was not actually observed is not a
 working note; estimates and targets do not fill this slot.)}

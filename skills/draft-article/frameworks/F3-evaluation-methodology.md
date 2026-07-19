@@ -45,7 +45,7 @@ must report the after-result on THIS same measurement.)}
 {(Design principle first, implementation sketch second. WHAT the method
 guarantees and why, before HOW it's coded.)}
 
-## GATE {What it caught}                            (results table/figure + ~100 words) [SKIP: blocker]
+## GATE {What it caught}                            (results table/figure + ~100 words) [SKIP: blocker] [EVIDENCE: measurement]
 {(Real results from running it. This slot empty = article not publishable.
 Requires an actual results table/figure produced by the run — observed results
 qualify whether quantitative or not (Story 13.86, #389): a benchmark table, or

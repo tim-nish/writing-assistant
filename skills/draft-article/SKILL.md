@@ -363,7 +363,10 @@ here runs exactly as the full pipeline does:
   publish blockers, never questions.
 - **Lighter quality gate:** run `quality-gate --profile slim` — the dim1–2
   rubric judge is waived by contract (do not spawn a judge subagent);
-  mechanical dims 3–4 and the audience precondition run in full.
+  mechanical dims 3–4 and the audience precondition run in full. The
+  per-section evidence-type check (Story 13.90) also runs in full — slim
+  never bypasses it: F5's one-lesson and one-number blocks carry
+  `[EVIDENCE: …]` declarations like any GATE slot.
 - **No visual proposal:** F5 declares no visual slot — never offer one.
 - **Framework:** `frameworks/F5-working-note.md` — four fixed blocks (one
   lesson / one number / published-links / what-I'm-building); no entry gate.
@@ -1250,9 +1253,22 @@ sheet.
 
 ```
 python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py quality-gate \
-  --draft <draft> --map "$WS/provenance-map.txt" --judge "$WS/rubric-verdicts.txt"
+  --draft <draft> --map "$WS/provenance-map.txt" --judge "$WS/rubric-verdicts.txt" \
+  --framework-file "$FRAMEWORK_FILE" --state "$WS/checkpoint.json"
 ```
 
+- **Per-section minimum evidence types are checked mechanically here (Story
+  13.90, #416):** pass `--framework-file` (the run state's `framework_file`)
+  and `--state` (the checkpoint carrying the fact sheet) so the gate verifies
+  every slot carrying an authored `[EVIDENCE: …]` tag against the fact-sheet
+  KINDs anchored into that section. A section filled without its declared
+  type is a **missing-input finding** — the gate output's
+  `evidence_types.missing_input[]` carries a ready-made `upstream` line;
+  route it through `repair-hop` (below), **never** backfill the section with
+  unrelated factual material and never report success past it. An unrepaired
+  absence after the shared two-cycle bound surfaces as a publish blocker
+  naming the section and the missing type. The gate **fails closed** (exit
+  2) if the framework declares types but `--map`/`--state` are missing.
 - **Dimension 4 (readability mechanics) is checked mechanically** here (zero
   tokens): sentence/paragraph-length distributions, heading density, and — from
   the provenance map — the **stitched-fact-sheet** signature (wall-to-wall
@@ -1319,6 +1335,7 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py quality-gate \
      ```
      python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py quality-gate \
        --draft <draft> --map "$WS/provenance-map.txt" --judge "$WS/rubric-verdicts.txt" \
+       --framework-file "$FRAMEWORK_FILE" --state "$WS/checkpoint.json" \
        --cycle 2 --prior-locations "Section 2, para 3; Section 4"
      ```
 2. **At most 2 revision cycles.** If the gate still fails after two, the failure
@@ -1594,7 +1611,7 @@ their reference lives in [`variants.md`](variants.md).
 | `journal` | 2 | Write the interview journal (triage record, Story 10.4) | `--interview` (req) `--answers` |
 | `policy-block-check` | 2→3 | Stage-progression precondition (Story 13.77): blocks Stage 3 fill on an unresolved config↔policy conflict or a `conflict`/`stale` plan, emitting the publish-blocker payload + block checkpoint; `conformant`/`open` and generic mode proceed | `--classification` `--answers` `--plan` `--surface` `--config-json` `--root` `--config-version` `--staging` |
 | `provenance` | 3 | Parse + structurally validate the sidecar provenance map | `--map` `--count` `--draft` |
-| `quality-gate` | 3→4 | The mandatory quality gate; non-zero exit blocks Stage 4 (Story 11.4) | `--draft` `--map` `--judge` |
+| `quality-gate` | 3→4 | The mandatory quality gate; non-zero exit blocks Stage 4 (Story 11.4) | `--draft` `--map` `--judge` `--framework-file` `--state` `--profile` |
 | `verify-markers` | 3/4 | Validate `[VERIFY: reason]` markers; `--count` prints the count (drive to 0) | `<draft\|->` `--count` |
 | `verify` | 4 | Build the owner verification worklist, one entry per marker | `<draft\|->` |
 | `reroute` | 4 | Reroute an over-budget section into a new bounded interview question (Story 4.5) | `--rewrites` (req) `--section` |
