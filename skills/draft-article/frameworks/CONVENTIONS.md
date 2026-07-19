@@ -51,6 +51,24 @@ sees the consequence before choosing.
 **Every GATE slot's skip effect is `blocker`** — a GATE is mandatory by
 definition, so skipping its feeding question cannot silently drop it.
 
+## Per-section minimum evidence type (Story 13.90, #414/#416)
+
+A slot may declare the **minimum evidence TYPE** required to fulfill its
+editorial purpose, as an `[EVIDENCE: <type>[|<type>…]]` tag on its heading —
+authored with the templates exactly like `[SKIP: …]`. The vocabulary is
+closed: `episode | example | measurement | none` (`none` stands alone and
+equals no tag; alternation means *any one* of the listed types satisfies the
+slot). Enforcement is the pipeline's contract
+(SPEC-article-draft-pipeline, evidence-type constraint): at the stage 3→4
+boundary, `quality-gate --framework-file … --state …` maps each declared
+section's anchored provenance pointers to fact-sheet KINDs
+(`episode→event; example→event|quote|result; measurement→number|result`) —
+a section filled without its declared type is a **missing-input finding**
+that takes the bounded repair route, never a silent backfill; textual fill
+with unrelated factual material (thresholds, config values) is **not fill**
+(CAP-3). The tag never survives into a draft — it annotates the template
+heading only, like `[SKIP: …]`.
+
 ## Config-bound frontmatter
 
 Every framework opens with an `article` frontmatter block. Its **field set,
