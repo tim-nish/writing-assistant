@@ -10,7 +10,7 @@ sources:
 
 > **Findings contract, not a build contract.** This spec records where this
 > repository's specs and docs have drifted from the owner's ratified policy,
-> found by a policy-guarded alignment review on 2026-07-16. Each finding is
+> found by a policy-alignment review on 2026-07-16. Each finding is
 > quote-vs-quote (repo line ↔ recorded position), severity-tagged
 > (blocker / should / nit), and carries the amendment that would close it.
 > **Nothing here is auto-applied** — the owner arbitrates each finding

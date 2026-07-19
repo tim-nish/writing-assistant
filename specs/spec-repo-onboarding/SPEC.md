@@ -4,8 +4,9 @@
 Origin: owner UX proposal during the 2026-07-15 QSB dogfood run, after the
 first-run gap surfaced twice (a host repo with no machine-global config fails
 closed with no guided path; a config without `policy_source` silently loses the
-policy narrative). Policy-guard reviewed against the owner's pinned recall
-surface — conforms; advisory tensions recorded in the run
+policy narrative). Reviewed against the owner's pinned recall surface through
+the tsurezure-gateway (consult-first, pinned, receipts) per
+SPEC-policy-source-seam — conforms; advisory tensions recorded in the run
 transcript and folded into Constraints below.
 
 > **Amended 2026-07-15 (triage, #230)** per SPEC-policy-topic-at-draft: the
