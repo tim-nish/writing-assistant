@@ -87,6 +87,31 @@ PY
   && ok "a recommended-default item still fails R1 if owner_answer is pre-filled" \
   || err "recommended-default + pre-filled owner_answer: rc=$rc msg='$msg'"
 
+# --- 2b'. Multi-candidate recommended defaults (Story 13.92, #423) -------------
+# The recommended default generalizes to 1-3 candidate answers ordered by
+# recontextualizing power; the owner still ratifies exactly one. Count (1-3) is
+# R10; each candidate is auditable like a single default (R3, per candidate).
+set +e; out=$(python3 "$VAL" "$FIX/valid-recommended-default-candidates.json" 2>&1); rc=$?; set -e
+[ "$rc" -eq 0 ] && [ -z "$out" ] \
+  && ok "recommended default with 1-3 ordered candidates passes" \
+  || err "valid-recommended-default-candidates: rc=$rc out='$out'"
+expect r10-candidate-count.json      R10 "candidates list outside 1-3 entries"
+expect r3-candidate-bad-pointer.json R3  "a candidate with an unpinned pointer (per-candidate audit)"
+# Eligibility still binds the multi-candidate form: candidates on a tension type
+# are R7 (owner-only), exactly like a single default.
+set +e; msg=$(python3 - "$FIX/valid-recommended-default-candidates.json" <<'PY' 2>&1 >/dev/null
+import json,sys,subprocess
+items=json.load(open(sys.argv[1])); items[0]["gap_type"]="contradiction"
+items[0]["seed"]={"quote":"reproducibility is the feature",
+                  "pointer":"LESSONS.md:22@8f3c2d1e4a5b6c7d8e9f0a1b2c3d4e5f60718293"}
+p=subprocess.run(["python3","scripts/validate-interview-items.py","-"],input=json.dumps(items),
+                 capture_output=True,text=True); sys.stderr.write(p.stderr); sys.exit(p.returncode)
+PY
+); rc=$?; set -e
+[ "$rc" -eq 1 ] && printf '%s' "$msg" | grep -q 'R7:' \
+  && ok "candidates on a tension type are still R7 (owner-only)" \
+  || err "multi-candidate on tension: expected R7, rc=$rc msg='$msg'"
+
 # --- 2c. Reconciliation items (Story 13.75, SPEC CAP-7; seam-formats §2 R8/R9) --
 # A conflict-classified subject is a `reconciliation` item: a `positions` array
 # (>=2, each {quote, pointer, authority ∈ policy|config|repo}, per-authority

@@ -673,12 +673,19 @@ propose-ratify invariant applied to the *shape* of the answer: it saves the
 owner seconds per question, and is **no substitute for #302's reserved slot**
 (the cap fills on count, not time).
 
-- **Item shape (Story 13.59).** Carry the recalled position on the interview
-  item as `recommended_default {default, quote, pointer}`, with `owner_answer`
-  structurally empty at generation. `validate-interview-items.py` refuses a
-  default on an ineligible class (**R6**) or a tension item (**R7**), and one
-  whose recalled position is not auditable (**R3**) — so a bad default never
-  reaches the owner.
+- **Item shape (Story 13.59; multi-candidate Story 13.92).** Carry the recalled
+  position on the interview item as `recommended_default {default, quote,
+  pointer}`, with `owner_answer` structurally empty at generation. When more
+  than one recalled position fits the gap, carry **1–3 candidates ordered by
+  recontextualizing power** (the one that most reframes the others first)
+  instead: `recommended_default {candidates: [{default, quote, pointer}, …]}`
+  — 1–3 entries, each auditable, the owner ratifying **exactly one**
+  (approve/modify/replace/skip); the machine is never final. A single position
+  (no `candidates` key) is the N=1 case, unchanged.
+  `validate-interview-items.py` refuses a default on an ineligible class
+  (**R6**) or a tension item (**R7**), a recalled position that is not
+  auditable (**R3**, per candidate), and a `candidates` list outside 1–3
+  (**R10**) — so a bad default never reaches the owner.
 - **Presentation.** Present the default under the owner-facing proposal
   contract like every other ask (Where/Why/Effect, plain-text payload per
   section (g); the seed quote + `file:line@commit` pointer is the **Why**),
