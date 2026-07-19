@@ -52,6 +52,16 @@ has "never a harvest source"           "Q&A-archive exclusion stated"
 has "public repository links only"     "public-links-only constraint stated"
 has "CONVENTIONS.md"                   "reuses shared conventions"
 has "--profile slim"                   "names the lighter gate invocation"
+
+# 2b. Narrative-arc sourcing for the one-lesson block (Story 13.93, #425).
+has "narrative-arc sourcing"           "one-lesson arc sourcing contract referenced"
+has "misconception"                    "arc mapping: misconception stated"
+has "turning point"                    "arc mapping: turning point stated"
+has "## Journey"                       "Journey-section selection input named"
+has "origin:"                          "origin marker convention named"
+has "the origin marker to the owner"   "origin marker surfaced to owner at selection"
+has "never the batch history"          "batch-history exclusion restated at the source"
+
 # Prose may MENTION the tags to explain their absence; the invariant is that
 # no slot heading carries one and no placeholder line exists.
 if grep -qE '^##.*\[SKIP:' "$F5"; then err "a slot heading carries [SKIP:] (slim profile has no interview)"; else ok "no slot carries a [SKIP] tag"; fi

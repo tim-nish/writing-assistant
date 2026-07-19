@@ -81,4 +81,25 @@ The owner produces a publishable draft by filling one framework end-to-end and t
   this ratification orders no build; adding the F5 template file is additive
   and non-breaking (Assumptions).
 
+  **Fill — narrative-arc sourcing (2026-07-19, #425; owner decision record
+  2026-07-19).** The working note's **one-lesson block is told as an arc**,
+  sourced from the recall surface via the seam, lessons-first (constraints
+  (1)–(3) above unchanged — never the batch history):
+  - **Selection inputs:** lessons whose body carries a `## Journey` section
+    (original framing → actual question → what moved it, with an `origin:`
+    marker), plus topic-thread **Declined** lines and struck-through
+    **superseded** decision lines — the surface's native reversal records.
+  - **Structure mapping** (the arc onto the one-lesson block): *misconception*
+    = the Journey's original framing / superseded position; *turning point* =
+    "what moved it"; *evidence* = the lesson's **public Evidence pointers
+    only**; *abstraction* = the lesson one-liner.
+  - **Origin marker:** a Journey may be hub-native or backfilled
+    (`origin: reconstructed <date>`); both are valid sources, but the marker
+    is **surfaced to the owner at selection time**.
+  Guarantees (1)–(3) hold unchanged, and the slim-profile scrub runs the
+  publication-boundary lint + the dated provenance convention for anything
+  touching private hub content (SPEC-platform-variants, "Working-note slim
+  profile"). This fills the sourcing detail only; the F5 four-block shape and
+  the slim profile are unchanged.
+
 - ~~Where should the templates be installed for day-to-day authoring: `docs/article-frameworks/` in this repo, or as assets of the drafting skill from SPEC-article-draft-pipeline?~~ **Resolved 2026-07-16 (owner decision record, template placement):** the F1–F4 templates live **only** as assets of the drafting skill (`skills/draft-article/frameworks/`) — implementation assets consumed by the skill, single canonical source bundled with the plugin. `docs/article-frameworks/` holds lightweight **pointers only**: framework name, one-line description, canonical asset path — never template content (the templates are already human-readable Markdown; the problem is discoverability, not readability). No generated documentation views and no regeneration machinery unless a future need arises that opening the canonical asset cannot satisfy (e.g. synthesized cross-framework comparison tables).
