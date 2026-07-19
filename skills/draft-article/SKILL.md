@@ -357,6 +357,18 @@ here runs exactly as the full pipeline does:
   seam — read-only, pinned, lessons first**; the policy hub's **Q&A history
   archive is never a harvest source**; **published text carries public
   repository links only**. State these bounds to the owner at Stage 0.
+- **The one-lesson block is told as a narrative arc (Story 13.93, #425;
+  SPEC-article-frameworks "Fill — narrative-arc sourcing").** At fill, select
+  the lesson from a recall-surface `## Journey` section (original framing →
+  actual question → what moved it), a topic-thread Declined line, or a
+  struck-through superseded decision, and map the arc onto the block:
+  misconception (original/superseded framing) → turning point ("what moved
+  it") → evidence (the lesson's **public** Evidence pointers only) →
+  abstraction (the lesson one-liner). A Journey may be hub-native or
+  `origin: reconstructed <date>`; both are valid, but **surface the origin
+  marker to the owner at selection**. No usable Journey/reversal record →
+  a plain one-lesson claim, arc not invented. F5's own template carries the
+  full contract.
 - **No Stage 2 interview:** `consume --framework working-note` emits
   `next_stage: fill` (`interview` rejects F5 with a named error). NEEDS-OWNER
   entries still ride the state — at fill they become `[VERIFY]` markers or

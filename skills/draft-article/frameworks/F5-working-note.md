@@ -48,7 +48,21 @@ Config-bound `article` frontmatter (rendered per language from user config; see
 {(One transferable lesson from this period's own work, stated as a claim with
 its boundary — where it applies and where it doesn't. AP-10: it must come from
 the owner's logs/decisions/scars, not from reading. One lesson exactly; a
-second lesson is next issue's.)}
+second lesson is next issue's.
+
+Tell it as an ARC (SPEC-article-frameworks, "Fill — narrative-arc sourcing",
+#425): misconception → turning point → evidence → abstraction. Source it from
+the recall surface via the seam, lessons-first — never the batch history
+(constraint 2). SELECTION INPUTS: a lesson carrying a `## Journey` section
+(original framing → actual question → what moved it, with an `origin:`
+marker), a topic-thread Declined line, or a struck-through superseded decision.
+STRUCTURE MAPPING: misconception = the Journey's original framing / superseded
+position; turning point = "what moved it"; evidence = the lesson's PUBLIC
+Evidence pointers only (constraint 3); abstraction = the lesson one-liner. A
+Journey may be hub-native or backfilled (`origin: reconstructed <date>`); both
+are valid sources, but SURFACE the origin marker to the owner at selection.
+With no lesson carrying a usable Journey / reversal record, do not invent an
+arc — fall back to a plain one-lesson claim and note the gap.)}
 
 ## GATE {One number}                                (~40 words + the number) [EVIDENCE: measurement]
 {(One real observed number from the period — a measurement, count, or cost —
