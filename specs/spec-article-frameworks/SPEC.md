@@ -12,6 +12,8 @@ sources:
 
 > **Canonical contract.** This SPEC and the files in `companions:` are the complete, preservation-validated contract for what to build, test, and validate. Source documents listed in frontmatter are for traceability only — consult them only if you need narrative rationale or prose color this contract intentionally omits.
 
+> **Amended 2026-07-19 (triage, #413/#414)** per /triage-gh on the Tanuki F54/F56 findings: slot fill gains a **type dimension** — each framework section declares the minimum evidence TYPE it needs (see the Constraints bullet), CAP-3's success criterion covers a slot filled *below* its declared type, and enforcement (fail-closed at the stage 3→4 boundary, routing through the missing-input repair route) is SPEC-article-draft-pipeline's contract.
+
 # Article Frameworks
 
 ## Why
@@ -28,7 +30,7 @@ A pain to solve: the owner writes self-branding technical articles for dev.to (E
   - **success:** A filled framework's frontmatter passes the site's build validation (AC-4) when dropped into `content/articles/` unchanged.
 - **CAP-3**
   - **intent:** Frameworks encode the editorial gate as mandatory slots — an evidence slot (AP-10: the piece must require the owner's logs/numbers/scars) and a pointer-block slot (spec §3 invariant: every artifact ends with the domain + capture links).
-  - **success:** A framework with an unfilled evidence or pointer-block slot is unambiguously identifiable as not-publishable by inspection of the marked slots.
+  - **success:** A framework with an unfilled evidence or pointer-block slot — or a slot filled **without its declared minimum evidence type** (amended 2026-07-19, #414: textual fill with unrelated factual material, e.g. thresholds or config values in an Evidence slot, is not fill) — is unambiguously identifiable as not-publishable by inspection of the marked slots and their declarations.
 
 ## Constraints
 
@@ -37,6 +39,7 @@ A pain to solve: the owner writes self-branding technical articles for dev.to (E
 - Category set is fixed to the four above **plus the ratified working-note category** (amended 2026-07-16 — see the working-note entry under Open Questions for its contract); a category outside spec §9's sanctioned genres (e.g. generic tutorials) must not get a framework.
 - **Length is an outcome, not a target** (added 2026-07-10, prior dogfooding round Q2): frameworks bound structure — every slot filled, no slot padded — and never define or optimize toward a word count. Platform hard limits, where they exist, are validation (publish blockers), not optimization targets.
 - **Visual slots** (added 2026-07-10): each framework's expected visuals — F1 one overview diagram, F2 optional before/after or timeline, F3 one comparison table (required), F4 one landscape table or concept map — are defined by SPEC-article-visuals CAP-1; a declined slot is omitted entirely, never left as a placeholder.
+- **Per-section minimum evidence type** (added 2026-07-19, #414): each framework section/slot declares the minimum evidence TYPE required to fulfill its editorial purpose — `episode | example | measurement | none` — authored with the templates exactly like skip semantics (per-slot values are template content). An Evidence slot (CAP-3/AP-10) declares at least one concrete episode, example, or observed result; thresholds, config values, or policy numbers alone never satisfy it. The declaration is contract, the check is the pipeline's: SPEC-article-draft-pipeline enforces it fail-closed at the stage 3→4 boundary and routes absence through its missing-input repair route — this spec introduces no runtime tooling (Constraints, unchanged).
 - **Skip semantics per slot** (added 2026-07-11, `docs/interview-architecture.md` D2): each framework slot fed by an interview question declares the effect of a skipped input — omit the slot, defer the decision, accept the recommended answer later, fill with `[VERIFY]`-marked inference, or raise a publish blocker. The interview engine records only the skip disposition; the slot's declared contract determines the consequence, and the skip choice's label states it. Per-slot values are template content, authored with the templates.
 
 ## Non-goals

@@ -6,9 +6,9 @@ description: >
   gap interview → framework fill → verification → completion (variants are a
   separate post-review invocation — see variants.md). Article
   types are intent labels — "introduce the project", "share engineering
-  lessons", "explain the evaluation methodology", "survey a research area"
-  (F1-F4 remain the internal/expert alias); sources are paths, globs, or
-  commit ranges.
+  lessons", "explain the evaluation methodology", "survey a research area",
+  "write a working note" (F1-F5 remain the internal/expert alias); sources
+  are paths, globs, or commit ranges.
 ---
 
 # Draft article
@@ -20,9 +20,10 @@ draft article <article-type> from <sources>
 ```
 
 - **article-type** — an **intent label**: "introduce the project", "share
-  engineering lessons", "explain the evaluation methodology", or "survey a
-  research area". The framework ids `F1`–`F4` keep working as the
-  internal/expert alias (see
+  engineering lessons", "explain the evaluation methodology", "survey a
+  research area", or "write a working note" (the lightweight slim-profile
+  entry — see "Working-note slim profile" below). The framework ids
+  `F1`–`F5` keep working as the internal/expert alias (see
   `${CLAUDE_PLUGIN_ROOT}/skills/draft-article/frameworks/`); both forms
   resolve through `resolve_framework` in the pipeline helper — a closed
   mapping, never fuzzy-matched.
@@ -30,7 +31,7 @@ draft article <article-type> from <sources>
   (`HEAD~20..HEAD`).
 
 **No article type given?** Ask by intent, in-conversation (proposal contract):
-offer the four intent labels with a **repo-grounded recommendation** — e.g. a
+offer the five intent labels with a **repo-grounded recommendation** — e.g. a
 tagged release exists → "introduce the project" is viable; no release → its
 own entry precondition already redirects to "share engineering lessons", so
 recommend that. Draft the recommendation from repo state you can check
@@ -128,11 +129,12 @@ config or framework:
     contents** before re-running Stage 0; without consent, stop.
     Never scaffold silently, and never create the file inside the host repo.
 - **Article-type check** against the **closed set** of intent labels and their
-  `F1`–`F4` aliases (`resolve_framework`) — an invalid name exits non-zero and
+  `F1`–`F5` aliases (`resolve_framework`) — an invalid name exits non-zero and
   **nothing starts** (no workspace minted). Relay and stop. **An unmapped
   intent gets a reason and a nearest fit, never a bare label list (Story
   13.81):** the error states *why* there is no framework (the category set is
-  ratified and closed — F1–F4 plus the working-note profile), names the
+  ratified and closed — the four categories plus the working-note profile,
+  all five enterable), names the
   closest sanctioned fit for the intent, and for a tutorial/how-to intent
   references the deliberate AP-10 exclusion (SPEC-article-frameworks) so the
   writer sees a decision, not a bug. Relay that hint verbatim — never
@@ -337,6 +339,37 @@ Story 3.1 scope boundary. It:
   interview`, Story 4.3), so unsourced gaps are not dropped;
 - advances on a valid-but-empty result (empty fact sheet and/or NEEDS-OWNER) —
   the stage contract is total.
+
+**Working-note runs:** pass the article type — `consume <harvest-doc>
+--framework working-note` — so consume routes `next_stage: fill` (the slim
+profile has no interview stage; see "Working-note slim profile" below).
+
+## Working-note slim profile (F5 — Story 13.89, #412)
+
+The ratified working-note category (SPEC-article-frameworks, working-note
+ratification 2026-07-16) runs a **slim pipeline profile**, because its
+contract is "assembly <1hr" and the full pipeline's attention budget is
+mis-sized for it. Differences from the full flow — everything not listed
+here runs exactly as the full pipeline does:
+
+- **Sources are constrained (ratified, binding):** the active repos' recent
+  activity **plus the owner's policy recall surface via the policy-source
+  seam — read-only, pinned, lessons first**; the policy hub's **Q&A history
+  archive is never a harvest source**; **published text carries public
+  repository links only**. State these bounds to the owner at Stage 0.
+- **No Stage 2 interview:** `consume --framework working-note` emits
+  `next_stage: fill` (`interview` rejects F5 with a named error). NEEDS-OWNER
+  entries still ride the state — at fill they become `[VERIFY]` markers or
+  publish blockers, never questions.
+- **Lighter quality gate:** run `quality-gate --profile slim` — the dim1–2
+  rubric judge is waived by contract (do not spawn a judge subagent);
+  mechanical dims 3–4 and the audience precondition run in full.
+- **No visual proposal:** F5 declares no visual slot — never offer one.
+- **Framework:** `frameworks/F5-working-note.md` — four fixed blocks (one
+  lesson / one number / published-links / what-I'm-building); no entry gate.
+- **Variants:** the email + web-archive renderings come from the working-note
+  slim packaging profile (SPEC-platform-variants) at the separate post-review
+  variants invocation, as with any draft.
 
 ## Stage 2 — bounded gap interview
 

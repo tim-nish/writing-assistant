@@ -38,7 +38,14 @@ FRAMEWORKS = {
     "f2": "F2-engineering-lessons.md",
     "f3": "F3-evaluation-methodology.md",
     "f4": "F4-research-survey.md",
+    "f5": "F5-working-note.md",
 }
+
+# The ratified working-note profile (SPEC-article-frameworks, working-note
+# ratification 2026-07-16; entry path Story 13.89 / #412) runs SLIM: no
+# 5-question interview (consume routes straight to fill) and a lighter quality
+# gate (mechanical dimensions only — see cmd_quality_gate --profile).
+SLIM_PROFILE_FRAMEWORKS = {"f5"}
 
 # Owner-facing intent labels (SPEC-draft-article-ux CAP-1, Story 13.27). The
 # invocation accepts these; F1-F4 stay valid as the internal/expert alias and
@@ -49,8 +56,12 @@ INTENT_LABELS = {
     "f2": "share engineering lessons",
     "f3": "explain the evaluation methodology",
     "f4": "survey a research area",
+    "f5": "write a working note",
 }
 INTENT_ALIASES = {
+    "write-a-working-note": "f5",
+    "working-note": "f5",
+    "working-notes": "f5",
     "introduce-the-project": "f1",
     "project-introduction": "f1",
     "share-engineering-lessons": "f2",
@@ -80,7 +91,7 @@ NEAREST_FIT_HINTS = [
      'a tutorial/how-to framework is deliberately excluded — ratified-banned '
      'by AP-10 (SPEC-article-frameworks), not a gap. Closest fit: "share '
      'engineering lessons" (the lessons behind the how-to), or the '
-     'lightweight working-note profile'),
+     'lightweight working-note profile ("write a working note")'),
     (re.compile(r"announc|launch|release|intro"),
      'closest fit: "introduce the project"'),
     (re.compile(r"lesson|postmortem|retro|debug|incident|migrat"),
@@ -100,8 +111,8 @@ def nearest_fit(raw):
         if pat.search(key):
             return hint
     return ('closest fit: none of the sanctioned categories maps cleanly — '
-            'the lightweight working-note profile is the fallback for '
-            'material outside them')
+            'the lightweight working-note profile ("write a working note") is '
+            'the fallback for material outside them')
 GLOB_RE = re.compile(r"[*?\[\]{}]")
 RANGE_RE = re.compile(r"^[A-Za-z0-9_.\-~^@]+\.\.\.?[A-Za-z0-9_.\-~^@/]+$")
 
@@ -666,9 +677,23 @@ def cmd_quality_gate(args):
             if missing:
                 sys.stderr.write(f"  missing verdicts: {', '.join(missing)}\n")
             return 2
-    for dim in ("dim1", "dim2"):
-        verdict, locations = judged.get(dim, ("fail", "no judge verdict"))
-        results[dim] = (verdict, "" if verdict == "pass" else locations)
+    if getattr(args, "profile", "full") == "slim":
+        # Working-note lighter gate (Story 13.89 / #412; SPEC-article-frameworks
+        # working-note ratification: "a lighter quality gate"): the interpretive
+        # dim1-2 rubric judge is waived by profile — the mechanical dimensions
+        # (3-4) and the audience precondition still run in full below.
+        if args.judge:
+            sys.stderr.write(
+                "error: --profile slim waives the dim1-2 rubric judge (the "
+                "working-note lighter gate) — do not pass --judge\n")
+            return 2
+        for dim in ("dim1", "dim2"):
+            results[dim] = ("waived",
+                            "slim profile (working-note): mechanical dimensions only")
+    else:
+        for dim in ("dim1", "dim2"):
+            verdict, locations = judged.get(dim, ("fail", "no judge verdict"))
+            results[dim] = (verdict, "" if verdict == "pass" else locations)
 
     # Second-cycle DELTA re-check (#349, Story 13.65). On cycle 2, the dim1–2
     # LLM judge is scoped to VERIFY that cycle-1's failing locations were
@@ -2087,6 +2112,13 @@ def cmd_interview(args):
     to a generic interview no matter what the policy probe found.
     """
     framework = args.framework.upper()
+    if framework.lower() in SLIM_PROFILE_FRAMEWORKS:
+        sys.stderr.write(
+            "error: the working-note profile (F5) runs slim — it has no "
+            "interview stage by ratified contract (SPEC-article-frameworks, "
+            "working-note ratification: no 5-question interview). `consume "
+            "--framework working-note` routes straight to fill.\n")
+        return 2
     if framework not in FRAMEWORK_PRIORITY:
         sys.stderr.write(f"error: invalid framework {args.framework!r}. Valid: F1, F2, F3, F4.\n")
         return 2
@@ -2734,6 +2766,20 @@ def cmd_consume(args):
         "fact_sheet": fact_sheet,
         "needs_owner": needs_owner,
     }
+    # Slim-profile routing (Story 13.89 / #412): the working-note profile has
+    # no interview stage by ratified contract — consume routes straight to
+    # fill. NEEDS-OWNER entries are still carried in the state (they surface
+    # as [VERIFY]/blocker material at fill), just never as interview questions.
+    if args.framework:
+        key = resolve_framework(args.framework)
+        if key is None:
+            sys.stderr.write(
+                f"error: invalid article type {args.framework!r} for --framework "
+                "(same closed set as `start`).\n")
+            return 2
+        if key in SLIM_PROFILE_FRAMEWORKS:
+            state["next_stage"] = "fill"
+            state["profile"] = "slim"
     print(json.dumps(state, indent=2))
     return 0
 
@@ -2980,8 +3026,8 @@ def _run_state(framework, sources, root=None):
         sys.stderr.write(
             f"error: invalid article type {framework!r} — this intent maps to "
             "no framework. The category set is ratified and closed "
-            "(SPEC-article-frameworks: the four below plus the working-note "
-            f"profile). Valid: {labels}.\n"
+            "(SPEC-article-frameworks: the four categories plus the "
+            f"working-note profile — all five below). Valid: {labels}.\n"
             f"{nearest_fit(framework)}.\n"
             "Nothing started.\n")
         return None, 2
@@ -2993,13 +3039,16 @@ def _run_state(framework, sources, root=None):
     if not gate_ok:
         sys.stderr.write(f"error: {gate_msg}\nNothing started.\n")
         return None, 2
-    return {
+    state = {
         "next_stage": "harvest",
         "framework": key.upper(),
         "framework_file": framework_file,
         "sources_raw": list(sources),
         "sources": [{"value": t, "form": classify(t)} for t in sources],
-    }, 0
+    }
+    if key in SLIM_PROFILE_FRAMEWORKS:
+        state["profile"] = "slim"
+    return state, 0
 
 
 # --- Completion gate: durable dual-product persistence (Story 13.68) ---------
@@ -3356,6 +3405,10 @@ def main(argv=None):
                                    "(default: cwd; e.g. F1 requires a tagged release)")
     sp = sub.add_parser("consume")
     sp.add_argument("doc", nargs="?", default="-", help="harvest output document, or - for stdin")
+    sp.add_argument("--framework", default=None,
+                    help="the run's article type (same closed set as `start`); a "
+                         "slim-profile framework (working-note) routes consume's "
+                         "next_stage to fill — no interview stage (Story 13.89)")
     sp = sub.add_parser("checkpoint", help="persist a completed stage's state to <ws>/checkpoint.json (Story 13.5)")
     sp.add_argument("--ws", required=True, help="the run workspace ($WS) to checkpoint into")
     sp.add_argument("state", nargs="?", default="-", help="the stage's output state JSON, or - for stdin")
@@ -3505,6 +3558,10 @@ def main(argv=None):
                     help="comma-separated repo-internal terms the ratified audience already "
                          "knows; excluded from the dim3 scan (repeatable). Audience judgment "
                          "enters once, as owner-ratified data — never re-judged per pass")
+    sp.add_argument("--profile", choices=("full", "slim"), default="full",
+                    help="gate profile: `full` (default) requires the dim1-2 rubric judge; "
+                         "`slim` (working-note, Story 13.89) waives dims 1-2 by ratified "
+                         "contract — mechanical dims 3-4 and audience still run")
     sp.add_argument("--cycle", type=int, default=1,
                     help="revision cycle (1 = first gate; 2 = the second/delta re-check, "
                          "#349). On cycle 2 the dim1-2 judge is scoped to cycle-1's failing "
