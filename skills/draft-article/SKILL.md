@@ -1104,7 +1104,12 @@ invariants are unchanged; the shape below satisfies them by construction, so a
 plan authored from it is the natural first output. Every member carries **≥1
 `required_elements`**, and `evidence` maps **each** element to a pinned
 pointer (`path:line@sha`), an interview-answer id (`q4`), or an explicit
-`[VERIFY: reason]` / NEEDS-OWNER marker:
+`[VERIFY: reason]` / NEEDS-OWNER marker. **Fact-sheet ids (`fs-11`) are NOT
+in the evidence grammar (#410, Tanuki F72)** — the validator refuses them
+every time: before emitting the plan, dereference each fact-sheet id to the
+entry's own pinned `SOURCE` pointer (`path:line@sha`, carried verbatim in the
+fact sheet) and cite that. Authoring with grammar-valid evidence on the first
+attempt is the contract; the refusal path is recovery, not the workflow:
 
 ```json
 {
@@ -1487,7 +1492,12 @@ answers, visual decisions, unresolved items) — **no new owner interaction**,
 and regenerating it from the same artifacts is byte-identical.
 
 Assemble the plan text from run state and hand it to the sanctioned writer,
-which validates fail-closed and places it:
+which validates fail-closed and places it. **Every source pointer in the plan
+body must be pinned — `path:line@sha`, never bare `path:line` (#410, Tanuki
+F81): the writer's schema refuses unpinned pointers every time.** Carry
+pointers verbatim from the artifacts the plan projects (fact sheet, journal,
+visual-set plan — all already pinned); never re-derive or hand-type a pointer
+at assembly. First-attempt validity is the contract; the refusal is recovery:
 
 ```
 python3 ${CLAUDE_PLUGIN_ROOT}/scripts/write-article-plan.py write \
