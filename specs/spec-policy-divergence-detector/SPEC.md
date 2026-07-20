@@ -11,11 +11,17 @@ sources:
   # opposite direction.
 ---
 
-> **Draft 2026-07-20, awaiting owner ratification as written.** Hand-authored per the
-> owner's instruction to proceed on #436 (which was filed "do not implement yet").
-> Ratifying this spec supersedes the "no third consumer of the seam" non-goal of
-> SPEC-policy-consistency-pass (amendment recorded there); nothing else in the two
-> ratified seam consumers changes.
+> **Ratified 2026-07-20 (#436).** Owner-ratified against the hub decision record
+> (2026-07-20, consumer-triggered policy feedback) once the hub-side intake shape
+> was settled. Ratification supersedes the "no third consumer of the seam" non-goal
+> of SPEC-policy-consistency-pass (amendment recorded there); nothing else in the
+> two ratified seam consumers changes. **Ratification condition (CAP-3):** the
+> staging block is a **conformance copy** of the hub staging-file schema
+> (product-lab `specs/knowledge-architecture.md` §3.1) with declared precedence —
+> the hub schema is the authority, it wins on any mismatch, and a mismatch is a
+> defect of this spec; this spec owns only the detector-specific divergence
+> payload, and never assumes it is the sole emitter into that intake (see CAP-3,
+> the emission-formats constraint, and `detector-formats.md` §4).
 
 > **Canonical contract.** This SPEC and the files in `companions:` are the complete,
 > preservation-validated contract for what to build, test, and validate. Source documents
@@ -81,8 +87,10 @@ pipeline, nothing machine-final.
     with three effect-stating choices mirroring the consistency pass's
     arbitration: **report upstream** (emit the proposal — a tracker issue in
     this repo carrying the record, or a staging-schema block in the run
-    workspace, reusing the seam CAP-4 emitter schema verbatim, offered for
-    manual copy into the upstream intake), **fix here** (the divergence is a
+    workspace **conforming to the hub staging-file schema** (product-lab
+    `specs/knowledge-architecture.md` §3.1, the authority — precedence and
+    payload split in `detector-formats.md` §4), offered for manual copy into the
+    upstream intake), **fix here** (the divergence is a
     consumer defect — route to this repo's tracker as an ordinary issue; no
     upstream proposal), **dismiss** (not a divergence; one-line reason,
     remembered per CAP-4). Nothing is emitted without the owner's choice; no
@@ -130,9 +138,16 @@ pipeline, nothing machine-final.
   cut by the cap are counted in the run output, never silently dropped.
 - The detector never blocks or fails a run: any detector-internal error skips
   the pass with one logged line (the seam's degradation discipline).
-- Emission formats are reused, not invented: the staging-schema block is the
-  seam CAP-4 emitter schema verbatim; quotes and pointers use the existing
-  `file:line@commit` grammar at the run's pin.
+- Emission formats are **conformed, not invented**: the staging-schema block is a
+  **conformance copy of the hub staging-file schema** — product-lab
+  `specs/knowledge-architecture.md` §3.1, the authority. **The hub schema wins on
+  any mismatch, and a mismatch is a defect of THIS spec (or its seam carrier),
+  never of the hub.** This spec defines only the **detector-specific divergence
+  payload** carried inside that envelope; the seam CAP-4 staging emitter is the
+  in-repo carrier and must itself conform to §3.1. This detector is **not the only
+  emitter** into that intake — a hub-side fork-triage skill cites the same §3.1
+  authority — so nothing here assumes a single emitter. Quotes and pointers use
+  the existing `file:line@commit` grammar at the run's pin.
 - Publication boundary: records, issues, and the ledger carry only the served
   pointer grammar already public in this repo — no upstream-internal paths or
   identifiers beyond it.

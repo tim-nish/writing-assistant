@@ -74,10 +74,27 @@ Where/Why/Effect, journal entry per disposition:
   you copy by hand), *fix here* (ordinary issue in this repo; no upstream
   proposal), *dismiss* (ledger entry with your reason; won't re-prompt).
 
-## 4. Reused emission formats (no new upstream-facing format)
+## 4. Emission formats — conformance copies, not new definitions
 
-- **Staging-schema block:** the seam CAP-4 staging-candidate emitter schema
-  verbatim (`seam-formats.md` §3) — the candidate's quote-vs-quote pair goes in
-  the block's question/decision prose, framed as a policy-update *proposal*.
+The staging file is copied into the **upstream hub intake**, so its schema
+authority is the **hub staging-file schema**, never this repo:
+
+- **Staging-schema block — a conformance copy of hub §3.1.** The block's
+  **envelope** (container fields, naming, structure) conforms to the hub
+  staging-file schema, **product-lab `specs/knowledge-architecture.md` §3.1**,
+  pinned at the hub commit the run consulted (`product-lab@<commit>`).
+  **Precedence: the hub schema is the authority — it wins on any mismatch, and a
+  mismatch is a defect of THIS spec (or its seam carrier), never of the hub.**
+  This spec defines only the **detector-specific payload** placed inside that
+  envelope: the CAP-2 divergence record's quote-vs-quote pair, `direction`, and
+  `rationale`, framed as a policy-update *proposal*. The seam CAP-4
+  staging-candidate emitter (`seam-formats.md` §3) is the **in-repo carrier** that
+  writes the file; it too is a conformance copy of §3.1, so carrier and detector
+  share one authority — an implementing check verifies the carrier's envelope
+  against §3.1, and a drift is fixed on the repo side.
+- **Not the only emitter.** A hub-side **fork-triage skill** (proposal in flight)
+  emits into the same §3.1 intake and cites the same authority. Nothing here may
+  assume it is the sole producer of §3.1 staging files: **shared envelope,
+  distinct payloads**.
 - **Tracker issue:** this repo's ordinary issue format carrying the candidate
   record body, titled by direction and subject, referencing the ledger key.
