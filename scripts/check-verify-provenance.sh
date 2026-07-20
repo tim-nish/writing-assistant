@@ -65,6 +65,25 @@ python3 "$VP" --map "$work/den-bad.txt" --fact-sheet "$work/den-ids.txt" >/dev/n
   && err "undeclared den pointer accepted" \
   || ok "a den pointer absent from the fact sheet is still a gate failure"
 
+# Story 17.2 (#439) — a paragraph-granularity OWNER-ATTRIBUTED PROSE SPAN: a
+# bare `P<n>` position (no `.S<n>`) carrying an interview question-id pointer is
+# valid `sourced` attribution for the whole owner-opinion paragraph. It must
+# pass when the question-id resolves, and still fail closed when it does not.
+printf 'q2\nfs-15\n' > "$work/span-ids.txt"
+cat > "$work/span.txt" <<'MAP'
+P1.S1: sourced <- fs-15
+P2: sourced <- q2
+MAP
+python3 "$VP" --map "$work/span.txt" --fact-sheet "$work/span-ids.txt" >/dev/null 2>&1 \
+  && ok "paragraph-granularity owner-attributed span (P<n> <- q<id>) is accepted (Story 17.2)" \
+  || err "paragraph-granularity owner-attributed span rejected by verify-provenance"
+cat > "$work/span-bad.txt" <<'MAP'
+P2: sourced <- q9
+MAP
+python3 "$VP" --map "$work/span-bad.txt" --fact-sheet "$work/span-ids.txt" >/dev/null 2>&1 \
+  && err "owner span with unresolvable question-id accepted" \
+  || ok "an owner span whose question-id does not resolve is still a gate failure"
+
 # AC3a — a derived claim whose inherited pointer does not resolve is a gate failure.
 cat > "$work/badptr.txt" <<'MAP'
 P1.S2: derived <- fs-12, fs-99
