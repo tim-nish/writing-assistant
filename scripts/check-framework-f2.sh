@@ -3,10 +3,11 @@
 # 2.3). POSIX shell only.
 #
 # Checks: exact slot order; the repeatable lesson unit (slots 2-6) is bracketed
-# by START/END markers with Context and the pointer block OUTSIDE it (so neither
-# is duplicated); the per-lesson "What actually happened" artifact GATE; the
-# >3-lessons split guidance (guidance, not a hard cap); the mechanism / change-
-# cost cues preserved; and reuse of Story 2.1's shared conventions.
+# by the `<!-- Lesson unit — … -->` / `<!-- Lesson unit END -->` comment markers
+# with Context and the pointer block OUTSIDE it (so neither is duplicated); the
+# per-lesson "What actually happened" artifact GATE; the >3-lessons split as a
+# DECLINABLE SUGGESTION (CAP-8/#432 demoted it from a hard cap); the mechanism /
+# change-cost cues preserved; and reuse of Story 2.1's shared conventions.
 
 set -eu
 
@@ -44,9 +45,13 @@ check_order "## GATE {Pointer block}"
 [ "$order_ok" -eq 1 ] && ok "slots appear in the exact F2 order"
 
 # 2. Repeatable lesson unit brackets slots 2-6; Context + pointer are OUTSIDE it.
-has "Lesson unit START" "lesson-unit START marker"
+# The unit is delimited by the HTML-comment markers `<!-- Lesson unit — … -->`
+# (opening) and `<!-- Lesson unit END -->` (closing) — the opening marker was
+# reworded from "Lesson unit START" when the CAP-8 lesson-obligations note
+# landed (#432); "CONTENT OBLIGATIONS" is the stable, ASCII-safe anchor for it.
+has "CONTENT OBLIGATIONS" "lesson-unit opening marker (<!-- Lesson unit — … -->)"
 has "Lesson unit END"   "lesson-unit END marker"
-ctx=$(line "## {Context}"); start=$(line "Lesson unit START")
+ctx=$(line "## {Context}"); start=$(line "CONTENT OBLIGATIONS")
 believed=$(line "## {What I believed going in}"); end=$(line "Lesson unit END")
 applies=$(line "When this applies to you"); ptr=$(line "## GATE {Pointer block}")
 { [ "$ctx" -lt "$start" ] && [ "$start" -lt "$believed" ]; } \
@@ -61,7 +66,9 @@ has "Each lesson needs its OWN" "per-lesson artifact GATE (enforced per lesson)"
 has "WITH the artifact" "what-happened requires a shown artifact"
 
 # 4. >3-lessons rule is authoring guidance (in a comment), not a hard cap.
-has "split into two articles" ">3 lessons -> split guidance"
+# CAP-8/#432 demoted it from a hard "split into two articles" rule to a
+# DECLINABLE SUGGESTION surfaced as an owner choice — assert the demoted form.
+has "DECLINABLE SUGGESTION" ">3 lessons -> declinable split suggestion (CAP-8, #432)"
 # the guidance lives inside the HTML comment block, i.e. it is instruction text
 grep -q '>3 lessons' "$F2" && ok "the split rule is guidance text, not an enforced cap" \
   || err "missing the >3-lessons guidance text"
