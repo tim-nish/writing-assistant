@@ -76,6 +76,21 @@ unset XDG_STATE_HOME
 grep -qi 'draft-pipeline.py stage0' "$SKILL" && grep -qi 'one call\|single invocation\|one turn' "$SKILL" \
   && ok "SKILL wires the folded stage0 (Story 13.13)" || err "SKILL does not wire the folded stage0"
 
+# 6. CAP-8 (#432) — an optional depth/scope directive is captured into run-state:
+#    a level maps to {"level": …}, anything else to {"scope": …}, and absent it
+#    is simply not present (prior behavior byte-for-byte).
+out=$(python3 "$DP" start F2 specs/ --root "$host" --depth deep-dive)
+echo "$out" | jget "d.get('depth')" | grep -q "'level': 'deep-dive'" \
+  && ok "depth level directive captured as {level} (CAP-8)" || err "depth level not captured"
+out=$(python3 "$DP" start F2 specs/ --root "$host" --depth "just the retry bug, deeply")
+echo "$out" | jget "d.get('depth')" | grep -q "'scope':" \
+  && ok "depth scope statement captured as {scope} (CAP-8)" || err "depth scope not captured"
+out=$(python3 "$DP" start F2 specs/ --root "$host")
+echo "$out" | jget "'depth' in d" | grep -q False \
+  && ok "no --depth -> no depth key (prior behavior unchanged)" || err "depth key present without directive"
+grep -qi 'depth/scope directive' "$SKILL" && grep -q 'CAP-8' "$SKILL" \
+  && ok "SKILL documents the depth/scope directive (CAP-8)" || err "SKILL missing depth/scope guidance"
+
 if [ "$fail" -eq 0 ]; then
   printf '\nAll stage0-fold checks passed.\n'; exit 0
 else
