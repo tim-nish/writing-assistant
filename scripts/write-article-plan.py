@@ -25,7 +25,9 @@ Frontmatter contract (issue #310, owner-set 2026-07-17):
   OPTIONAL  audience, audience_id, policy_seeded, seed (required iff policy_seeded), relates,
             policy_pin (`<name>@<sha>`, the consulted policy pin),
             policy_config_version (`[A-Za-z0-9._-]+`),
-            policy_conformance (conformant|open|conflict|stale)
+            policy_conformance (conformant|open|conflict|stale),
+            arc (#440/#434: projected at completion from the run's argument-plan
+                 intermediate; thesis projects into `claim`)
             — the CAP-4 trio; ALL THREE required when policy_seeded is true
             (a policy-seeded plan without conformance data is refused: run
             the `conformance --write` gate to record them)
@@ -92,7 +94,13 @@ REFUSED = 4  # schema violation — nothing is written
 
 REQUIRED_KEYS = ("kind", "slug", "intent", "claim", "status", "run_id", "pin")
 OPTIONAL_KEYS = ("audience", "audience_id", "policy_seeded", "seed", "relates",
-                 "policy_pin", "policy_config_version", "policy_conformance")
+                 "policy_pin", "policy_config_version", "policy_conformance",
+                 # `arc` (#440/#434): projected at completion from the run's
+                 # argument-plan intermediate ($WS/argument-plan.md) — the
+                 # ordered movement the draft realizes. Thesis projects into the
+                 # existing `claim` field. C2: the plan-record is the
+                 # projection-of-record; the intermediate is not persisted here.
+                 "arc")
 PLAN_STATUSES = ("outlined", "drafted", "superseded")
 
 # The CAP-4 conformance trio (Story 13.76): optional in general, required as a
