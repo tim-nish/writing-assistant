@@ -3101,7 +3101,8 @@ def cmd_consume(args):
 def cmd_start(args):
     _rp = _load("resolve-paths.py")
     state, code = _run_state(args.framework, args.sources, _rp.host_root(args.root),
-                             depth=getattr(args, "depth", None))
+                             depth=getattr(args, "depth", None),
+                             element=getattr(args, "element", None))
     if state is None:
         return code
     print(json.dumps(state, indent=2))
@@ -3331,7 +3332,7 @@ def _entry_gate_ok(key, framework_file, root):
 DEPTH_LEVELS = {"deep-dive", "standard", "note"}
 
 
-def _run_state(framework, sources, root=None, depth=None):
+def _run_state(framework, sources, root=None, depth=None, element=None):
     # `root` MUST already be resolved (resolve-paths host_root) — the entry gate
     # below runs git against it, and a raw --root string or None would reopen
     # the side channel #309 closed. Callers resolve once, then pass it down.
@@ -3374,6 +3375,15 @@ def _run_state(framework, sources, root=None, depth=None):
         d = depth.strip()
         state["depth"] = ({"level": d.lower()} if d.lower() in DEPTH_LEVELS
                           else {"scope": d})
+    if element and element.strip():
+        # CAP-9 named-element pin (#431): the owner named a specific story
+        # element ("write the article about <element>"). Selection is PINNED to
+        # it — the name resolves to the element id at selection, harvest
+        # assembles evidence for that element ALONE, and the interview covers
+        # its gaps. The pin SCOPES the run; it does NOT widen the
+        # declared-source boundary — harvest still reads only writing-sources
+        # files (the sources selection above), just gathered for one element.
+        state["element"] = {"name": element.strip()}
     return state, 0
 
 
@@ -3727,7 +3737,8 @@ def cmd_stage0(args):
     root = rp.host_root(args.root)
     # 2. Framework check + entry-gate precondition (before minting a workspace).
     run_state, code = _run_state(args.framework, args.sources, root,
-                                 depth=getattr(args, "depth", None))
+                                 depth=getattr(args, "depth", None),
+                                 element=getattr(args, "element", None))
     if run_state is None:
         return code
     # 3. Workspace autostart (mint or resume).
@@ -3747,6 +3758,9 @@ def main(argv=None):
     sp.add_argument("framework")
     sp.add_argument("sources", nargs="*")
     sp.add_argument("--depth", help="optional depth/scope directive (deep-dive|standard|note, or an explicit scope statement) — CAP-8, #432")
+    sp.add_argument("--element", help="pin the run to one named story element (\"write about <element>\"): "
+                                      "selection is pinned to it, harvest scopes to that element alone "
+                                      "without widening the source boundary — CAP-9, #431")
     sp.add_argument("--root", help="host-repo root, for the framework entry-gate check "
                                    "(default: cwd; e.g. F1 requires a tagged release)")
     sp = sub.add_parser("consume")
@@ -3804,6 +3818,9 @@ def main(argv=None):
     sp.add_argument("framework")
     sp.add_argument("sources", nargs="*")
     sp.add_argument("--depth", help="optional depth/scope directive (deep-dive|standard|note, or an explicit scope statement) — CAP-8, #432")
+    sp.add_argument("--element", help="pin the run to one named story element (\"write about <element>\"): "
+                                      "selection is pinned to it, harvest scopes to that element alone "
+                                      "without widening the source boundary — CAP-9, #431")
     sp.add_argument("--root", help="host-repo root (default: git top-level of cwd; errors outside a git repo)")
     sp = sub.add_parser("classify-policy",
                         help="CAP-7 policy-result classification: a mechanical "

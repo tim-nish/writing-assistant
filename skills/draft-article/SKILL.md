@@ -94,6 +94,12 @@ defaults to the git top-level of the current directory and errors if cwd is not
 inside a git repo; pass it explicitly whenever the session's working directory
 might not be the host repo.)
 
+Two **optional** owner directives ride the same call: `--depth "<level or
+scope>"` (CAP-8, below) and `--element "<name>"` — the **named-element pin**
+(CAP-9/#431) that scopes the whole run to one story element (see "Story-element
+selection" below). Both are enhancers; absent them the run behaves exactly as
+before.
+
 **Say which repository you are operating on, first (#309).** `stage0` returns the
 resolved `target`; make it the run's **first owner-visible line** — before any
 scope read, workspace mint, or LLM spend:
@@ -232,6 +238,24 @@ repeatedly from one repo does not reselect covered material by chance:
   [proposal contract](../owner-facing-proposal-contract.md); a re-cover is the
   owner's to ratify). With **no plans**, nothing is excluded and selection is
   exactly as today.
+
+**Named-element pin — scope the whole run to one element (CAP-9, #431).** The
+owner can say **"write the article about *this* element"** by passing
+`--element <name>` to stage 0 (recorded as `state.element`). When set:
+
+- the name **resolves to an element id** (18.8) and **selection is pinned** to
+  it — no other elements are selected, and the disclosure above states the pin
+  as the selecting rule;
+- **harvest assembles evidence for that element alone**, and the **interview
+  covers that element's gaps**;
+- the pin **scopes** the run — it does **not widen the declared-source
+  boundary**. Harvest still reads only the writing-sources-declared files (the
+  stage-0 sources selection is a filter, never a scope widener); it just gathers
+  for the one pinned element. A named element outside the declared sources finds
+  no evidence there — the pin never reaches past the source boundary to get it.
+
+With **no** `--element`, selection is exactly as above (the default, disclosed
+rule) — the pin is an optional owner input, never a required gate.
 
 ### Depth/scope directive (CAP-8, #432)
 
