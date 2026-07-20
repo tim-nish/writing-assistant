@@ -10,8 +10,9 @@ Contract enforced per entry (a `- ` bullet line):
   * SOURCE is one of:
       path:line@sha   a file pointer PINNED to a commit sha, so it stays
                       resolvable after edits shift line numbers
-      path:l1-l2@sha  a line-range pointer, accepted ONLY for a `quote` whose
-                      verbatim text spans consecutive physical lines (#119)
+      path:l1-l2@sha  a line-range pointer, accepted for the SPAN-eligible kinds
+                      (`quote` + the four narrative kinds, #438) whose text
+                      spans consecutive physical lines (#119)
       sha             a commit sha (7-40 hex)
       https://…       a URL (external, declared-source citation)
       den:<id>@<run>  a Tanuki Den finding, pinned to the run that judged it
@@ -41,11 +42,22 @@ import re
 import subprocess
 import sys
 
-KINDS = {"result", "decision", "number", "quote", "event"}
+KINDS = {"result", "decision", "number", "quote", "event",
+         "chronology", "motivation", "cost", "reversal"}
+# The closed set is nine (amended 2026-07-20, #438): five atomic kinds plus four
+# NARRATIVE kinds (chronology | motivation | cost | reversal), which admit
+# pointer-backed narrative material. The set is widened by this decided amount,
+# never opened. This set and `skills/harvest/SKILL.md §3` are the two enforcement
+# copies of the closed set — a change to one without the other is a defect.
+# SPAN-eligible kinds may use a multi-line `path:l1-l2@sha` range: `quote` (a
+# wrapped verbatim quote) plus the four narrative kinds (a rationale paragraph, a
+# chronology block); every other KIND is single-line-pin only.
+SPAN_ELIGIBLE = {"quote", "chronology", "motivation", "cost", "reversal"}
 SHA_RE = re.compile(r"^[0-9a-f]{7,40}$")
 FILEPIN_RE = re.compile(r"^(?P<path>.+):(?P<line>\d+)@(?P<sha>[0-9a-f]{7,40})$")
-# A line-range pointer `path:line1-line2@sha` — accepted ONLY for a `quote`
-# whose verbatim text genuinely spans consecutive physical lines (#119).
+# A line-range pointer `path:line1-line2@sha` — accepted for the SPAN_ELIGIBLE
+# kinds (`quote` + the four narrative kinds, #438) whose material genuinely
+# spans consecutive physical lines (#119).
 FILEPINRANGE_RE = re.compile(
     r"^(?P<path>.+):(?P<l1>\d+)-(?P<l2>\d+)@(?P<sha>[0-9a-f]{7,40})$")
 URL_RE = re.compile(r"^https?://\S+$")
@@ -60,15 +72,16 @@ def source_form_ok(source, kind):
     """Grammar-only check (no repo resolution): is `source` a syntactically valid
     SOURCE pointer FORM for `kind`? This is the single SOURCE grammar shared by
     the validator and the pipeline's `consume` step, so the two cannot diverge
-    (Story 13.8). A multi-line range `path:l1-l2@sha` is valid ONLY for `quote`;
-    every other KIND is single-line. Resolution (sha exists, line in range,
-    verbatim match) is a separate, deeper check the validator does and consume
+    (Story 13.8). A multi-line range `path:l1-l2@sha` is valid ONLY for the
+    SPAN_ELIGIBLE kinds (`quote` plus the four narrative kinds, #438); every
+    other KIND is single-line. Resolution (sha exists, line in range, verbatim
+    match) is a separate, deeper check the validator does and consume
     deliberately does not (it never re-reads sources)."""
     if URL_RE.match(source) or SHA_RE.match(source) or FILEPIN_RE.match(source):
         return True
     if DEN_RE.match(source):
         return True
-    if kind == "quote" and FILEPINRANGE_RE.match(source):
+    if kind in SPAN_ELIGIBLE and FILEPINRANGE_RE.match(source):
         return True
     return False
 
@@ -203,19 +216,20 @@ def validate_source(source, kind, claim, host, sources):
                     return None
         return f"commit {source} not found in any declared repo"
 
-    # Line-range pointer `path:line1-line2@sha` — only a `quote` may span
-    # consecutive physical lines; every other KIND is single-line (#119).
+    # Line-range pointer `path:line1-line2@sha` — the SPAN_ELIGIBLE kinds
+    # (`quote` + the four narrative kinds, #438) may span consecutive physical
+    # lines; every other KIND is single-line (#119).
     rng = FILEPINRANGE_RE.match(source)
     if rng:
         l1, l2, sha, path = int(rng["l1"]), int(rng["l2"]), rng["sha"], rng["path"]
-        if kind != "quote":
+        if kind not in SPAN_ELIGIBLE:
             return (f"SOURCE must be a single line for KIND '{kind}'; a line range is "
-                    f"only allowed for a 'quote' that spans consecutive physical lines "
-                    f"— split {l1}-{l2} into per-line pointers")
+                    f"only allowed for the span-eligible kinds (quote + the four "
+                    f"narrative kinds, #438) — split {l1}-{l2} into per-line pointers")
         if l2 < l1:
-            return f"quote range {l1}-{l2} is backwards (line1 must be <= line2)"
+            return f"span range {l1}-{l2} is backwards (line1 must be <= line2)"
         if l1 == l2:
-            return (f"quote range {l1}-{l2} spans a single line; use a single-line "
+            return (f"span range {l1}-{l2} spans a single line; use a single-line "
                     f"pointer path:{l1}@{sha}")
         lines, rel, reason = _resolve_lines(path, sha, host, sources)
         if reason:
@@ -224,12 +238,17 @@ def validate_source(source, kind, claim, host, sources):
             return None                  # not a git repo: structural pass
         if l2 > len(lines):
             return f"line {l2} out of range at {rel}@{sha} ({len(lines)} lines)"
-        span = " ".join(lines[i].strip() for i in range(l1 - 1, l2))
-        if not _quote_matches(claim, span):
-            return ("quote CLAIM must be the verbatim source text only — no label, "
-                    "attribution, or prefix, and no paraphrase; it did not match the "
-                    "spanned source lines (also check the span boundary l1-l2)"
-                    f" — source {l1}-{l2}: {span!r}")
+        # Verbatim matching is quote-specific: a `quote` CLAIM *is* the source
+        # text, so it must match; a narrative-kind span merely POINTS at the
+        # material (the CLAIM is the harvester's summary), so it is not
+        # verbatim-checked (#438) — the span only has to resolve.
+        if kind == "quote":
+            span = " ".join(lines[i].strip() for i in range(l1 - 1, l2))
+            if not _quote_matches(claim, span):
+                return ("quote CLAIM must be the verbatim source text only — no label, "
+                        "attribution, or prefix, and no paraphrase; it did not match the "
+                        "spanned source lines (also check the span boundary l1-l2)"
+                        f" — source {l1}-{l2}: {span!r}")
         return None
 
     m = FILEPIN_RE.match(source)

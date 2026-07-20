@@ -171,7 +171,7 @@ and fabricated pointers reach the sheet (the `pin-source.py` step below fixes th
   `den:<id>` without `@<run>` — every pointer pins. For every KIND **except
   `quote`**, SOURCE names a **single** commit-pinned line — `path:line@sha`,
   **not** a range (`12-19` is rejected; split it into per-line pointers).
-- **KIND** ∈ {result, decision, number, quote, event}.
+- **KIND** ∈ {result, decision, number, quote, event, chronology, motivation, cost, reversal} — the closed set of nine (#438): five atomic kinds plus four **narrative** kinds. This enumeration and `scripts/validate-fact-sheet.py`'s `KINDS` are the two enforcement copies of the closed set; they move in lockstep.
 - A `quote` entry's CLAIM is the source text **verbatim and ONLY the source text**
   — no label, attribution, or prefix (not "Decision from batch 16: …"), and never
   paraphrased. A CLAIM carrying anything beyond the quoted words is rejected.
