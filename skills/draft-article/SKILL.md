@@ -1084,6 +1084,21 @@ An **inferred** claim — beyond sources, interview, or legal derivation — car
 an inline **`[VERIFY: <reason>]`** marker exactly as before. **Never an unmarked
 assertion.**
 
+**Narrative sections source from narrative kinds (#438; Story 18.4).** A
+narrative section — a lesson's arc, a journey — is filled from the fact sheet's
+**narrative-KIND entries** (`chronology`, `motivation`, `cost`, `reversal`)
+exactly as any section is filled from its evidence: each becomes a **`sourced`**
+claim carrying the entry's pointer (`path:line@sha` / a span / URL / `den` /
+question `id`). The arc maps onto them — the *why* from `motivation`, the
+sequence from `chronology`, the price from `cost`, the superseded framing from
+`reversal`. Because the fact sheet can now **carry** this material (previously
+routed to NEEDS-OWNER), a story-shaped section is **sourced evidence, not
+invention or skeleton**: narrative-kind claims count as sourced tissue, so an
+arc built from them **satisfies** the stitched-fact-sheet /
+`>70%-sourced-with-no-tissue` gate rather than tripping it. The judgment gate is
+unchanged — harvest records the narrative evidence and the **interview still
+admits it to prose**; making the evidence available never bypasses that gate.
+
 **Owner opinion as attributed prose spans (CAP-3, #439; Story 17.1).** Owner
 opinion the interview elicited — thesis, arc, stakes, beliefs and reversals —
 may enter the draft as an **owner-attributed prose span**: a whole paragraph of
