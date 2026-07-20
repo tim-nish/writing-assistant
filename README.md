@@ -186,6 +186,9 @@ remain the normative contracts):
   what `review-article` writes and where (nothing into the host tree; accepted
   findings re-persist the canonical in place), and the commit-before-review
   convention.
+- [`docs/owner-input-model.md`](docs/owner-input-model.md) — how the owner's
+  requirements and opinions get into a draft: the gap interview is the channel,
+  not post-hoc hand-editing.
 
 ## BMAD / hand-written separation
 

@@ -129,3 +129,24 @@ line (`policy: none (generic mode)`); a run where the gateway was **unavailable
 or hit a tool-surface gap** relays its one recorded reason line. The summary is
 never silently omitted — its absence would be indistinguishable from "policy
 had no influence", which is the confusion this item exists to remove.
+
+## Where owner input was applied (informational — Story 13.98, #435)
+
+The gap interview is **the** owner-input channel (`draft-article` SKILL), so a
+**draft run** states in the informational bucket, in one place, **where the
+owner's input landed and where the owner is still expected to hand-write** —
+closing the dogfooding surprise where the owner assumed post-hoc manual
+insertion was the intended path:
+
+- each owner interview answer that reached the draft, and **how** it entered —
+  an **owner-attributed prose span** (opinion/thesis, Story 17.1) or a
+  **sourced/derived claim** (a checkable requirement);
+- any owner requirement **recorded but not yet applied** (surplus beyond this
+  run's budget, carried to the next invocation);
+- the places the framework genuinely leaves to the owner's own pen — an
+  owner-authored slot, or a `[VERIFY]`/NEEDS-OWNER item awaiting owner knowledge.
+
+The point is that hand-editing is a **deliberate remaining step named by the
+run**, never an unspoken default: the summary distinguishes what the pipeline
+already applied from what truly needs the owner. The one-place description of
+this model lives in [`docs/owner-input-model.md`](../docs/owner-input-model.md).
