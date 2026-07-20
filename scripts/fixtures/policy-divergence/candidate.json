@@ -1,0 +1,17 @@
+{
+  "id": "div-2026-07-20-001",
+  "detected": "2026-07-20",
+  "consult_point": "review:policy-consistency",
+  "direction": "outgrown",
+  "decision": {
+    "statement": "The review pass classifies findings by axis before arbitration",
+    "evidence": "specs/spec-article-review/SPEC.md:38"
+  },
+  "policy": {
+    "quote": "Findings are presented flat, newest first",
+    "pointer": "LESSONS.md:41@a1b2c3d4e5f6a7b8",
+    "pin": "product-lab@a1b2c3d4e5f6a7b8"
+  },
+  "rationale": "The tool now groups findings by axis where the policy line assumes a flat list",
+  "status": "candidate"
+}
