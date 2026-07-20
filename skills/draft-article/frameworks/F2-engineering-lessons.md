@@ -33,8 +33,11 @@ Config-bound `article` frontmatter (rendered per language from user config; see
 context to make the lesson intelligible — this is not the project intro.)}
 
 <!-- Lesson unit START — repeat this block (slots 2–6) for up to 3 lessons.
-     >3 lessons → split into two articles. Do NOT repeat Context or the pointer
-     block; each repeat is one lesson with its OWN "What actually happened" artifact. -->
+     >3 lessons is a DECLINABLE SUGGESTION to split, not a rule (CAP-8, #432):
+     depth is owner intent — surface "~N lessons; one deep-dive or split?" as an
+     owner choice, and honor a depth/scope directive (deep-dive keeps them in one
+     article). Do NOT repeat Context or the pointer block; each repeat is one
+     lesson with its OWN "What actually happened" artifact. -->
 
 ## {What I believed going in}                       (~60 words) [SKIP: omit]
 {(The reasonable-sounding assumption. Readers must recognize themselves in it.)}
