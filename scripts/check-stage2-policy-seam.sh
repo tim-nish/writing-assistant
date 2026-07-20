@@ -1,10 +1,10 @@
 #!/usr/bin/env sh
 # check-stage2-policy-seam.sh — verify the Stage-2 policy-seam integration
-# (Story 14.4, SPEC-policy-source-seam FR45/FR47/FR48, NFR15).
+# (Story 14.4, SPEC-policy-source-seam FR45/FR47/FR48, CAP-2).
 # POSIX shell + stdlib Python only.
 #
 # Covers: validated policy items join the asked set as open/policy-seed
-# questions carrying their seed (never a recommendation — NFR15); ordering is
+# questions carrying their seed (never a recommendation — SPEC-policy-source-seam CAP-2); ordering is
 # recommended > policy-seed > open and the ≤5 cap holds; the journal records
 # the seed<- field parallel to rec<- groundings; the journal ends with the
 # consulted: line in all three modes (seeded map / unset / unavailable via
@@ -44,7 +44,7 @@ assert seeded, "no policy-seeded question in the asked set"
 for q in seeded:
     assert q["outcome"] == "open", q
     assert "seed" in q and q["seed"]["pointer"], q
-    assert "grounding" not in q, "NFR15: a seeded question must not carry a recommendation"
+    assert "grounding" not in q, "SPEC-policy-source-seam CAP-2: a seeded question must not carry a recommendation"
 # SELECTION priority (rec > seed > open under the cap) is unchanged: every
 # recommended question survives alongside the seeds. PRESENTATION (Story
 # 13.30, SPEC-draft-article-ux CAP-4) now leads with the policy-seeded
@@ -129,7 +129,7 @@ grep -q 'no exit code here may abort the run' "$SKILL" && grep -q 'relay that on
   || err "SKILL missing the one-line degradation contract"
 grep -q -- '--policy-note' "$SKILL" && ok "SKILL: journal records why a run was not seeded" \
   || err "SKILL missing --policy-note wiring"
-grep -q 'questions only' "$SKILL" && ok "SKILL: NFR15 — policy supplies questions only" \
+grep -q 'questions only' "$SKILL" && ok "SKILL: SPEC-policy-source-seam CAP-2 — policy supplies questions only" \
   || err "SKILL missing the questions-only boundary"
 
 # --- 6. #299 — tension items are authored against the WHOLE consulted surface ------

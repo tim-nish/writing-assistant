@@ -2461,7 +2461,7 @@ def cmd_interview(args):
     # ASKED questions: a tension between the material and a recorded position
     # is owner-only by nature — the fact sheet cannot cover it, so suppression
     # does not apply, and the policy source supplies QUESTIONS only, never a
-    # recommended answer (NFR15). Their seed rides into the journal (`seed`)
+    # recommended answer (SPEC-policy-source-seam CAP-2). Their seed rides into the journal (`seed`)
     # and the consulted: line (Story 14.4).
     for item in seeded_candidates:
         rec = {"id": item["id"], "text": item["question"],

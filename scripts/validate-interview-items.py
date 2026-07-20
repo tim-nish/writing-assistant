@@ -78,7 +78,7 @@ own rejection classes, distinct from R1/R5:
       verification gaps that never become editorial-judgment items) is
       ineligible and its default is rejected.
   R7  a `recommended_default` on a TENSION-typed item — tension questions are
-      owner-only by nature (NFR15) and never carry a default.
+      owner-only by nature (SPEC-policy-source-seam CAP-2) and never carry a default.
   R3  also covers a `recommended_default` that is not auditable: a missing
       proposed-answer text, an empty recalled quote, or a pointer that is
       unpinned or outside the structural whitelist — the recalled position must
@@ -115,7 +115,7 @@ GAP_TYPES = NEEDS_OWNER_TAXONOMY | TENSION_TYPES | {RECONCILIATION_TYPE}
 # The editorial-judgment classes eligible for a policy-recalled recommended
 # default (SPEC-policy-editorial-direction CAP-6, Story 13.59). A subset of the
 # NEEDS-OWNER taxonomy: `motivation` and `retrospective` are deliberately out,
-# and every tension type is out (owner-only, NFR15).
+# and every tension type is out (owner-only, SPEC-policy-source-seam CAP-2).
 ELIGIBLE_DEFAULT_TYPES = {
     "opinion", "significance", "surprise", "tradeoff", "warning", "audience",
 }
@@ -296,7 +296,7 @@ def validate_items(items):
             # list, and is checked once.
             if gap_type in TENSION_TYPES:
                 rej("R7", f"a recommended default on tension type {gap_type!r} is "
-                          "rejected — tension questions are owner-only (NFR15) and "
+                          "rejected — tension questions are owner-only (SPEC-policy-source-seam CAP-2) and "
                           "never carry a default")
             elif gap_type not in ELIGIBLE_DEFAULT_TYPES:
                 rej("R6", f"a recommended default on gap type {gap_type!r} is "
