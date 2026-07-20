@@ -22,7 +22,7 @@ stage 0        harvest        gap interview     framework fill    verify        
 - **Stage 0 — invocation.** Validates configuration and classifies the source
   tokens (path / glob / commit-range); emits the run-state harvest consumes.
 - **Stage 1 — harvest.** Builds the **fact sheet** — candidate claims each
-  carrying a resolvable source pointer (see the 5-KIND vocabulary below).
+  carrying a resolvable source pointer (see the nine-KIND vocabulary below).
 - **Stage 2 — gap interview.** At most five questions covering only what the
   sources cannot answer; answers return as owner input for Stage 3.
 - **Stage 3 — fill.** Populates the framework's slots from the fact sheet and
@@ -36,6 +36,17 @@ stage 0        harvest        gap interview     framework fill    verify        
 
 Stage 3 is where source facts and owner judgment become prose. Its contract is
 CAP-3 of the pipeline spec.
+
+**Stage 3 opens with an argument-plan sub-step (#440/#434).** Before filling any
+slot, it composes an explicit **argument plan** — thesis, arc, per-section
+content intents — from the fact sheet (including the narrative kinds) and the
+interview, then fills **from that plan**, so the article is an argument rather
+than a framework skeleton stitched from fact-sheet prose. A framework governs
+each section's **content obligations, not a literal heading skeleton** — a
+multi-lesson article is one arc, not the skeleton repeated per lesson. The plan
+is a run-workspace intermediate, owner-visible; at completion the plan-record
+`plans/<slug>.md` projects the thesis/arc from it. The Stage 3→4 quality gate
+fails stitched-fact-sheet and per-lesson-skeleton drafts **before** review.
 
 - **Inputs:** the fact sheet (Stage 1) and the interview answers (Stage 2).
 - **Outputs:** a slot-filled draft with schema-conformant frontmatter, plus a
@@ -57,10 +68,11 @@ CAP-3 of the pipeline spec.
   claim/narration boundary — `verify-provenance` runs in an isolated subagent
   (NFR13).
 
-## The closed 5-KIND fact-sheet vocabulary
+## The closed nine-KIND fact-sheet vocabulary
 
-Every fact-sheet entry declares exactly one **KIND** from a **closed set**
-(`pipeline-stages.md`):
+Every fact-sheet entry declares exactly one **KIND** from a **closed set** of
+nine (`pipeline-stages.md`) — five atomic kinds plus four **narrative** kinds
+(added 2026-07-20, #438):
 
 | KIND | Means |
 |---|---|
@@ -69,9 +81,14 @@ Every fact-sheet entry declares exactly one **KIND** from a **closed set**
 | `number` | A measured or counted quantity. |
 | `quote` | Verbatim source text (may span consecutive physical lines). |
 | `event` | Something that happened at a point in time (a release, a fix). |
+| `chronology` | An ordered sequence of events — a timeline. |
+| `motivation` | The *why*: the problem/gap, or free-standing decision rationale. |
+| `cost` | A recorded price or tradeoff paid. |
+| `reversal` | A superseded position (a struck decision, a Declined line). |
 
-Anything the author wants that does not fit one of these five KINDs cannot
-enter the fact sheet — it routes elsewhere (below).
+The four narrative kinds admit **pointer-backed** narrative material and may use
+a multi-line span pointer like `quote`. Anything that does not fit one of these
+nine KINDs cannot enter the fact sheet — it routes elsewhere (below).
 
 ## Where information is narrowed, discarded, or routed
 
@@ -81,12 +98,14 @@ its output auditable.
 - **Harvest → fact sheet.** Only source-pointable material becomes a fact-sheet
   entry. Facts the harvester wants but cannot source go to a **`NEEDS-OWNER`**
   list, never into the draft unmarked.
-- **Narrative dimensions route off the sheet.** The narrative dimensions —
-  **surprise, significance, tradeoff, warning, opinion** — are owner judgment,
-  not source-checkable facts, so they route to `NEEDS-OWNER` and reach the
-  draft (if at all) through the **interview**, which is the gate between
-  evidence and prose. (Extending the KIND set with pointer-backed narrative
-  kinds is tracked as an open design decision, issue #438.)
+- **Owner-judgment dimensions route off the sheet.** Owner judgment —
+  **surprise, significance, tradeoff, warning, opinion** — is not source-checkable,
+  so it routes to `NEEDS-OWNER` and reaches the draft (if at all) through the
+  **interview**, the gate between evidence and prose. **Pointer-backed narrative
+  material** (chronology, problem statements, motivation, failure/cost, reversals)
+  is different: since #438 it **does** enter the fact sheet, under the four
+  narrative KINDs above — the interview stays the judgment gate, but the
+  narrative *evidence* is now harvestable rather than routed off.
 - **Interview → draft.** An **approved** recommended answer keeps its source
   pointers and grounds sourced claims like a fact-sheet entry; **modified** or
   **replaced** answers become interview-sourced material.

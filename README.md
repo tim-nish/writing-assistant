@@ -180,7 +180,7 @@ Reader-facing guides, derived from the implementation and specs (the specs
 remain the normative contracts):
 
 - [`docs/pipeline-vocabulary.md`](docs/pipeline-vocabulary.md) — the pipeline's
-  working vocabulary and data flow: what Stage 3 is, the closed 5-KIND fact
+  working vocabulary and data flow: what Stage 3 is, the closed nine-KIND fact
   sheet, and where information is narrowed or routed.
 - [`docs/review-artifact-lifecycle.md`](docs/review-artifact-lifecycle.md) —
   what `review-article` writes and where (nothing into the host tree; accepted
