@@ -263,6 +263,13 @@ bound BMAD story), or `triage:spec` (changes an invariant; the governing spec is
 amended first). Producer labels such as `tanuki` mark provenance, not queue
 state.
 
+**Story-lineage routing (#483).** Issue-routed work — anything picked up from a
+GitHub issue via triage — **decomposes as triage-convention stories**
+(`umbrella: <issue>`, under the current triage epic); **bmad-epics deltas are
+for spec-corpus planning only**, never for issue-routed work. This line is the
+authority for the routing rule: `/triage-gh` and the BMAD workflows honor it,
+and specs (e.g. `SPEC-spec-sitting`) cite it rather than restating it.
+
 **Epic-number allocation (#189).** Epic numbers are minted in two lanes —
 `_bmad-output/planning-artifacts/epics.md` delta sections *and* triage-created
 stories that never get an epics.md section (Epic 13 is such a bucket) — so the
