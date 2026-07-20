@@ -58,6 +58,14 @@ JUDGE_ECHO = re.compile(r'^(?P<pos>[^~:]+)~\s*"(?P<quote>[^"]*)"\s*:\s*(?P<reaso
 # Positions may carry a line anchor — `P1.S1[L7]` (#304). This parser stays
 # independent of the pipeline's (NFR13: the drafting context never grades its
 # own map), so the grammar is mirrored here deliberately, not imported.
+# The position is INTENTIONALLY freeform (`[^\s:\[]+`): a bare paragraph-level
+# `P<n>` — no `.S<n>` — carrying an interview question-id pointer is a valid
+# OWNER-ATTRIBUTED PROSE SPAN (CAP-3, #439; Story 17.2), the paragraph-granularity
+# attribution for owner opinion. Do NOT tighten this to require `.S<n>`: that
+# would reject a whole class of legitimate sourced attribution. Such a span is a
+# `sourced` claim like any other — its question-id pointer must resolve to the
+# declared pointer set (mechanical layer below), and it carries no narration/
+# derived worklist entry to grade.
 PROV_LINE = re.compile(
     r"^(?P<pos>[^\s:\[]+)(?:\[L(?P<anchor>\d+)\])?"
     r":\s*(?P<cls>sourced|derived|narration|verify)"
