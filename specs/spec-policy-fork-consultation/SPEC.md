@@ -12,7 +12,14 @@ sources:
   # Tracking issue: #480.
 ---
 
-> **Draft 2026-07-20, awaiting owner ratification as written.**
+> **Ratified 2026-07-20 (#480).** Owner-ratified as authored hub-side; the design
+> forks (consult-per-fork → covered-FYI / uncovered-gate / miss-feedback) were
+> resolved in the decision record, not inline. The one external dependency — the
+> hub §3.1 staging-file intake shape CAP-4 emits into — is **settled**: this spec
+> is the **second emitter** SPEC-policy-divergence-detector (#436) anticipates and
+> cites the **same hub §3.1 authority and declared precedence** (ratified this
+> sitting). **Do not implement yet** — implementation follows owner scheduling,
+> per the #436 precedent (ratify ≠ implement).
 
 > **Canonical contract.** This SPEC is the complete, preservation-validated
 > contract for what to build, test, and validate. Source documents listed in
