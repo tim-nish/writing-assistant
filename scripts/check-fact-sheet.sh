@@ -24,6 +24,16 @@ python3 -c "import py_compile; py_compile.compile('$root/$VAL', doraise=True)" 2
 # 1. Contract documented in the skill (format, KIND set, pinning, verbatim quote).
 grep -q 'CLAIM / SOURCE / KIND' "$SKILL" && ok "skill documents CLAIM / SOURCE / KIND format" || err "format not documented"
 grep -q 'result, decision, number, quote, event' "$SKILL" && ok "skill documents the KIND set" || err "KIND set not documented"
+# Two-places-together (#438): the harvest SKILL enumeration and the validator's
+# KINDS set are the two enforcement copies of the closed set — both must carry
+# the four narrative kinds, or they have drifted (a defect).
+for nk in chronology motivation cost reversal; do
+  grep -q "$nk" "$SKILL" || err "harvest SKILL missing narrative KIND: $nk"
+  grep -q "\"$nk\"" "$VAL" || err "validate-fact-sheet.py KINDS missing narrative KIND: $nk"
+done
+grep -q 'chronology' "$SKILL" && grep -q '"chronology"' "$VAL" \
+  && ok "narrative KINDs enforced in lockstep (harvest SKILL + validate-fact-sheet.py, #438)" \
+  || err "narrative KINDs not enforced in both places (two-places-together, #438)"
 grep -q 'path:line@sha' "$SKILL" && ok "skill documents commit-pinned pointers" || err "pinning not documented"
 grep -q 'verbatim' "$SKILL" && ok "skill requires verbatim quotes" || err "verbatim rule not documented"
 grep -q 'validate-fact-sheet.py' "$SKILL" && ok "skill wires in the validator" || err "validator not referenced"
@@ -102,6 +112,17 @@ emit '- "wrapped" / notes.md:5-4@'"$sha"' / quote'
 reason | grep -q 'backwards' && ok "reject: backwards quote range" || err "backwards range accepted"
 emit "- Unpinned range / notes.md:4-5 / quote"
 reason | grep -q 'not pinned to a commit' && ok "reject: unpinned line range" || err "unpinned range accepted"
+
+# 5c. Narrative KINDs (#438): the closed set is nine; the four narrative kinds
+#     accept a span pointer like quote; an out-of-set KIND is still rejected.
+emit "- Chose backoff because throughput doubled / notes.md:2@$sha / motivation"
+V && ok "valid: narrative KIND (motivation) with a single-line pointer (#438)" || err "narrative single-line rejected"
+emit "- Rollout unfolded over two steps / notes.md:4-5@$sha / chronology"
+V && ok "valid: narrative KIND (chronology) may span physical lines (#438)" || err "narrative span rejected"
+emit "- Ranged rationale / notes.md:2-3@$sha / motivation"
+V && ok "valid: 2-3 range accepted for motivation though rejected for result (span-eligibility, #438)" || err "narrative KIND span on real lines rejected"
+emit "- Bad / notes.md:2@$sha / narrative"
+reason | grep -q "invalid KIND" && ok "reject: a KIND outside the nine is still rejected (#438)" || err "out-of-set KIND accepted"
 
 # 5d. Verbatim REJECT names the cause + prefixed quotes are rejected (#137).
 emit '- Decision from batch 16: "exact quoted words" / notes.md:3@'"$sha"' / quote'
