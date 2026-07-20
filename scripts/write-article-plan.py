@@ -100,8 +100,35 @@ OPTIONAL_KEYS = ("audience", "audience_id", "policy_seeded", "seed", "relates",
                  # ordered movement the draft realizes. Thesis projects into the
                  # existing `claim` field. C2: the plan-record is the
                  # projection-of-record; the intermediate is not persisted here.
-                 "arc")
+                 "arc",
+                 # `consumed` (CAP-9/#430, Story 18.9): the story-element ids
+                 # this article's draft consumed. This is the ONLY consumption
+                 # record — no second store (C1). Lesson-based selection reads
+                 # it across every plan (consult's `consumed_index`, a view
+                 # regenerated from the plans on each call) and defaults to the
+                 # unconsumed elements. Keyed by element id, so it survives
+                 # re-harvest pointer drift (the id is identity, 18.8).
+                 "consumed")
 PLAN_STATUSES = ("outlined", "drafted", "superseded")
+
+# A story-element id (CAP-9/#428): identity for an evidence cluster. The
+# persisted form a plan's `consumed` list carries — a stable token, never a
+# pointer set (pointers are derived payload under the id, 18.8). Kept
+# deliberately permissive on internal shape (`lesson:retry-storm`, a hash) but
+# closed against whitespace/prose so a `consumed` list can never smuggle free
+# text past the schema.
+ELEMENT_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9:._-]*$")
+
+
+def parse_id_list(raw):
+    """A `consumed:` frontmatter value → the list of element ids it names.
+    Accepts an optionally-bracketed, comma-separated scalar (the flat
+    frontmatter parser stores lists as strings): `[a, b]` or `a, b` or ``.
+    Returns [] for an empty value."""
+    s = str(raw).strip()
+    if s.startswith("[") and s.endswith("]"):
+        s = s[1:-1]
+    return [t.strip().strip('"').strip("'") for t in s.split(",") if t.strip()]
 
 # The CAP-4 conformance trio (Story 13.76): optional in general, required as a
 # set when the plan is policy-seeded — recorded by `conformance --write`.
@@ -281,6 +308,22 @@ def validate_plan(text, path):
                             "(SPEC-article-plan CAP-4) to record the consulted "
                             "pin, configVersion, and status")
 
+    # `consumed` (CAP-9/#430): a list of well-formed story-element ids. Each id
+    # is identity (18.8); a malformed or prose-bearing entry is refused so the
+    # single consumption record can never drift into free text.
+    if "consumed" in fields:
+        ids = parse_id_list(fields["consumed"])
+        for tok in ids:
+            if not ELEMENT_ID_RE.match(tok):
+                yield ("consumed", f"malformed story-element id {tok!r} — each "
+                                   "entry is a stable id token "
+                                   "([A-Za-z0-9][A-Za-z0-9:._-]*), never a "
+                                   "pointer set or prose (the id is identity, "
+                                   "the pointers are derived payload)")
+        if len(set(ids)) != len(ids):
+            yield ("consumed", "duplicate story-element id — consumption is a "
+                               "set keyed by id, list each element at most once")
+
     # Forbidden fields.
     for key in fields:
         if key in DRAFT_OWNED:
@@ -438,7 +481,10 @@ def _read_plan_summary(path):
     return {"slug": slug, "intent": fields.get("intent"),
             "claim": fields.get("claim"), "status": fields.get("status"),
             "pin": fields.get("pin"), "relates": fields.get("relates"),
-            "policy_seeded": fields.get("policy_seeded")}
+            "policy_seeded": fields.get("policy_seeded"),
+            # CAP-9/#430: the story-element ids this plan's draft consumed, so
+            # consultation can exclude them from a new lesson-based selection.
+            "consumed": parse_id_list(fields.get("consumed", ""))}
 
 
 def cmd_consult(args):
@@ -464,8 +510,18 @@ def cmd_consult(args):
         s = _read_plan_summary(os.path.join(plans_dir, name))
         if s is not None:
             summaries.append(s)
+    # CAP-9/#430: the consumption-exclusion view — every story-element id any
+    # plan records as consumed, mapped to the plans that consumed it. This is a
+    # MECHANICALLY REGENERATED VIEW over `plans/*.md`, rebuilt on each call from
+    # the plans alone; it is never a stored second ledger (C1). Lesson-based
+    # selection defaults to elements NOT in this index; the owner may override
+    # to re-cover one.
+    consumed_index = {}
+    for s in summaries:
+        for eid in s.get("consumed", []):
+            consumed_index.setdefault(eid, []).append(s["slug"])
     print(json.dumps({"plans": summaries, "articles_repo": repo,
-                      "degraded": None}))
+                      "consumed_index": consumed_index, "degraded": None}))
     return 0
 
 

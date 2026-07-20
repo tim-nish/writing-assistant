@@ -212,6 +212,27 @@ CAP-9 adds is that the rule is **stated, not implicit**:
 An element the run selected but whose reason cannot be stated is a defect, not a
 silent omission — disclosure is required wherever selection ran.
 
+**Consumption exclusion — default to unconsumed (CAP-9, #430).** Lesson-based
+selection **defaults to the elements no prior draft has consumed**, so drafting
+repeatedly from one repo does not reselect covered material by chance:
+
+- A completed draft **records the story-element ids it consumed** in **its
+  article plan** (`plans/<slug>.md`, the `consumed:` frontmatter key —
+  SPEC-article-plan). This is the **only** consumption record: **no new store**.
+- Selection computes "already consumed" from the **`consumed_index`** the plan
+  consultation returns (`write-article-plan.py consult` — see below) — a view
+  **regenerated from every `plans/*.md` on each call**, never a hand-maintained
+  ledger. An element whose id appears there is excluded from the default
+  selection.
+- Because consumption is keyed by **element id** (identity, 18.8), it **survives
+  re-harvest**: a moved pin or re-pointed entry changes the payload, not the id,
+  so a consumed element stays consumed.
+- The exclusion is an **owner-overridable default**, never a hard filter: the
+  owner may **re-cover** a consumed element (surface it as a proposal under the
+  [proposal contract](../owner-facing-proposal-contract.md); a re-cover is the
+  owner's to ratify). With **no plans**, nothing is excluded and selection is
+  exactly as today.
+
 ### Depth/scope directive (CAP-8, #432)
 
 Article depth is **owner intent, never a tool default**. If the owner's
@@ -253,7 +274,12 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/write-article-plan.py consult --root <host
 ```
 
 It returns each prior plan's discovery surface (slug, intent, claim, status,
-pin, relates). From these you **may surface plan-grounded proposals** — each
+pin, relates, **consumed**) plus a **`consumed_index`** — every story-element id
+any plan records as consumed, mapped to the plans that consumed it. The
+`consumed_index` is the **consumption-exclusion input** (CAP-9/#430): it is a
+**view regenerated from `plans/*.md` on each call**, so lesson-based selection
+defaults to the elements **absent** from it (see "Story-element selection"
+above). From this surface you **may surface plan-grounded proposals** — each
 under the [owner-facing proposal contract](../owner-facing-proposal-contract.md),
 **none auto-applied**:
 
