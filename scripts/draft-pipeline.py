@@ -374,6 +374,10 @@ QG_LONG_SENTENCE_FRACTION = 0.25
 QG_PARA_MAX_SENTENCES = 8
 QG_PARA_MAX_WORDS = 160
 QG_STITCH_SOURCED_FRACTION = 0.70
+# Per-lesson skeleton repetition (#434): the same section heading reproduced
+# verbatim this many times is the mechanical signature of a list-like,
+# non-arc multi-lesson draft (the framework skeleton repeated per unit).
+QG_SKELETON_REPEAT = 3
 _SENT_SPLIT = re.compile(r"(?<=[.!?])\s+")
 
 
@@ -602,6 +606,21 @@ def _dimension4(draft_text, prov_entries):
             fails.append("stitched fact sheet: all sourced claims, no derived/narration tissue")
         elif total and sourced / total > QG_STITCH_SOURCED_FRACTION and tissue == 0:
             fails.append(f"stitched fact sheet: {sourced}/{total} sourced, no connective tissue")
+    # Per-lesson skeleton repetition (#434, #440): the framework skeleton
+    # reproduced verbatim per unit — the same section heading repeated
+    # >=QG_SKELETON_REPEAT times — is the mechanical signature of a list-like,
+    # non-arc multi-lesson draft. An arc composed from the argument plan varies
+    # each section's structure, so it does not repeat an identical heading set.
+    heading_counts = {}
+    for h in re.findall(r"^#{2,6}\s+(.+?)\s*$", draft_text, re.MULTILINE):
+        key = re.sub(r"\s+", " ", h).strip().lower()
+        heading_counts[key] = heading_counts.get(key, 0) + 1
+    repeated = {h: c for h, c in heading_counts.items() if c >= QG_SKELETON_REPEAT}
+    if repeated:
+        worst = max(repeated, key=repeated.get)
+        fails.append(f"per-lesson skeleton repetition: heading '{worst}' repeated "
+                     f"{repeated[worst]} times — vary each section's structure from the "
+                     f"argument plan, do not reproduce the skeleton per unit (#434)")
     return fails
 
 

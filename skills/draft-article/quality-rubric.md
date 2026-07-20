@@ -26,6 +26,24 @@ The article advances **one claim**, and every section advances it.
 - **The arc is stated:** the draft's **first section commits to the one claim**
   the cold read must later recover. A draft whose opening states a topic, not a
   claim, fails this dimension.
+- **Stitched fact sheet fails (strengthened 2026-07-20, #440/#434).** A draft
+  that reads as fact-sheet prose stitched into the framework skeleton — no
+  argument, sections that merely list evidence — **fails**: it does not advance
+  one claim, it enumerates. (The mechanical stitched-fact-sheet signature is a
+  zero-token backstop; this dimension catches the interpretive case the
+  mechanical check cannot.)
+- **Per-lesson skeleton repetition fails (#434).** A multi-lesson article that
+  reproduces the framework's section skeleton **verbatim per lesson** (the same
+  heading set repeated) is a list, not an arc — **fail**. One arc: shared
+  context, distinct and *varied* lesson sections, one synthesis. (A mechanical
+  detector flags an identical heading repeated ≥3×; this dimension owns the
+  varied-structure judgment.)
+- **Plan-conformance (#440).** When the run composed an argument plan
+  (`$WS/argument-plan.md`: thesis, arc, section intents), the draft must
+  **advance that thesis** — a section that does not serve the planned thesis, or
+  that fills its slot with a single under-evidenced sentence, **fails**. This
+  makes skeleton drafts fail the Stage 3→4 gate **before** review; review is a
+  second net.
 
 ## Dimension 2 — Paragraph flow
 

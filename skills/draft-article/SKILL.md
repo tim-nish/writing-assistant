@@ -1432,6 +1432,19 @@ review finding: **Stage 3 does not complete until the gate passes**, so the
 owner's ~4-minute budget never lands on a draft that reads like a stitched fact
 sheet.
 
+**Strengthened for the argument plan (#440/#434).** The gate is now a real
+second-net *before* review, not after: the **narrative-arc dimension fails**
+stitched-fact-sheet and **per-lesson-skeleton** drafts (a framework skeleton
+reproduced verbatim per lesson), and a **plan-conformance** check requires the
+draft to advance the argument plan's thesis (Stage-3 sub-step above). A
+mechanical **per-lesson skeleton detector** (an identical `##` heading repeated
+≥3×) is the zero-token backstop; the dim1 judge owns the varied-structure and
+plan-conformance judgment. **This contract lives in three enforcement copies
+that move in lockstep** — `scripts/draft-pipeline.py` (the mechanical
+skeleton/stitched checks), [`quality-rubric.md`](quality-rubric.md) (the dim1
+contract the judge grades against), and this section — a change to one without
+the others is a defect.
+
 ```
 python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py quality-gate \
   --draft <draft> --map "$WS/provenance-map.txt" --judge "$WS/rubric-verdicts.txt" \
