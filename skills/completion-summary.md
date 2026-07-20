@@ -130,6 +130,24 @@ or hit a tool-surface gap** relays its one recorded reason line. The summary is
 never silently omitted — its absence would be indistinguishable from "policy
 had no influence", which is the confusion this item exists to remove.
 
+## Why each story element was selected (informational — CAP-9, #428)
+
+A **lesson-based draft run** states, in the informational bucket, **which story
+elements the article covers and the rule that selected each** — the element
+**id** and its declared reason (e.g. "Journey-bearing cluster, unconsumed,
+matched framework slot X"). This makes selection **legible without opening a run
+artifact**: the owner sees why each element is in the article, the same reasons
+the interview journal recorded (`draft-article` SKILL — the journal is the
+source, this is the always-shown digest of it).
+
+**Presentation layer only — disclosure, not a decision.** The reasons are read
+straight from the journal's per-element selection record; surfacing them changes
+nothing about what was selected (#428 is disclosure-only). A run over the same
+fact sheet selects the same elements with the same reasons. A **non-lesson run**
+(or one with no selected elements) omits this item — there is nothing to
+disclose. When selection ran, the item is never silently dropped: an element
+present in the draft with no stated selection reason is a defect, surfaced here.
+
 ## Where owner input was applied (informational — Story 13.98, #435)
 
 The gap interview is **the** owner-input channel (`draft-article` SKILL), so a

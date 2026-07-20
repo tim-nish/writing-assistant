@@ -11,6 +11,14 @@ defined once in [`CONVENTIONS.md`](CONVENTIONS.md) — F2 reuses them and does n
 re-implement them. `Context` and the pointer block appear **exactly once**; the
 lesson unit between them repeats. Section order is load-bearing.
 
+**Each lesson is a story element** (CAP-9/#428) — one case of the general
+evidence cluster defined in the [SKILL](../SKILL.md#story-element-selection--the-model-and-its-disclosure-cap-9-428):
+a cluster of fact-sheet entries with a **stable id** (id is identity, the
+evidence pointers are derived payload). Selection of which lessons the article
+covers is disclosed per element (the interview journal + completion summary
+state the id and the rule that selected it); this framework does not re-specify
+that — it just names lessons as the elements F2 selects over.
+
 ## Visual slot (SPEC-article-visuals CAP-1)
 
 **F2 declares one optional before/after or timeline visual** — showing the change
