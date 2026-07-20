@@ -242,6 +242,24 @@ grep -qi 'fresh subagent that never saw the drafting turn' "$SKILL" \
   && grep -qi 'never grades its own rubric pass' "$SKILL" \
   && ok "SKILL: CAP-7 rubric judge runs in an isolated subagent (NFR13)" || err "SKILL missing rubric-judge isolation"
 
+# Per-lesson skeleton repetition (#434/#440): the same section heading repeated
+# >=3 times fails the mechanical gate; varied headings do not.
+RUBRIC="skills/draft-article/quality-rubric.md"
+printf '# T\n\n## Context\ncc.\n\n## What I believed\naa.\n\n## What I believed\nbb.\n\n## What I believed\ndd.\n' > "$work/skeleton.md"
+python3 "$DP" quality-gate --draft "$work/skeleton.md" 2>&1 | grep -qi 'skeleton repetition' \
+  && ok "per-lesson skeleton repetition is detected mechanically (#434)" || err "skeleton repetition not detected"
+printf '# T\n\n## Context\ncc.\n\n## The setup\naa.\n\n## The turn\nbb.\n\n## The lesson\ndd.\n' > "$work/varied.md"
+python3 "$DP" quality-gate --draft "$work/varied.md" 2>&1 | grep -qi 'skeleton repetition' \
+  && err "varied section headings wrongly flagged as skeleton" || ok "varied section headings are not flagged as skeleton"
+
+# Two/three-places-together (#440/#434): the strengthened-gate contract lives in
+# three enforcement copies that must move in lockstep.
+grep -qi 'skeleton repetition' "$DP" && grep -qi 'skeleton repetition' "$RUBRIC" && grep -qi 'skeleton' "$SKILL" \
+  && ok "skeleton contract in lockstep (draft-pipeline.py + quality-rubric.md + SKILL, #440/#434)" \
+  || err "skeleton contract not in all three enforcement copies"
+grep -qi 'plan-conformance' "$RUBRIC" && grep -qi 'plan-conformance' "$SKILL" \
+  && ok "plan-conformance contract present in rubric + SKILL (#440)" || err "plan-conformance contract missing"
+
 if [ "$fail" -eq 0 ]; then
   printf '\nAll quality-gate checks passed.\n'; exit 0
 else
