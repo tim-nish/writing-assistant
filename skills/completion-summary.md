@@ -92,3 +92,40 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/reading-time.py --language <en|ja> <file>
 
 A **standalone harvest** run has **no article body to measure and omits** the
 reading-time estimate — it has a fact sheet, not prose.
+
+## Policy consultation summary (informational — Story 13.100, #437)
+
+Every consultation of the policy gateway is already recorded (the interview
+journal's `consulted:` line, seed pointers and `editorial_anchor`; the review
+pass's `consulted:` line; the run's pin), but during dogfooding the owner
+could not see any of it without opening run artifacts. So the **informational
+notes** bucket carries a **readable, structured summary of the run's policy
+consultations — not a raw record dump** — that lets the owner see at a glance:
+
+- **whether the policy gateway was consulted at all this run**, including the
+  **degraded / generic-mode** case (unavailable or no `policy_source`);
+- **which policy areas** (surfaces / topics) influenced the run;
+- **how** the policy affected the run — which interview questions it **seeded**,
+  the **classification outcomes**, and what the **editorial anchor** took from
+  it;
+- the **pin** the run used (`<policy-source>@<commit>`);
+- that the information was **queried fresh for this run** — state the
+  fresh-query fact plainly; **no cache exists** and none is implied.
+
+**Presentation layer only — no new store, no cache, no copying of upstream
+policy content.** Aggregate strictly from artifacts the run already wrote: the
+journal `consulted:` line, `editorial_anchor`, and `seed<-` pointers; the
+policy-result classification output; the review `consulted:` line; and the pin.
+These are the **same inputs** the on-request policy-influence report
+([`policy-influence-report.md`](policy-influence-report.md)) reads — **reuse
+that view**, do not add a second source. This summary is the *automatic,
+always-shown* completion-time digest; the full line-by-line influence report
+stays **on request only** (an unread per-run dossier trains ignoring), so keep
+this digest short — a few lines, with a pointer that "show the policy influence
+report" produces the full view.
+
+A run whose host declares **no `policy_source`** states exactly that in one
+line (`policy: none (generic mode)`); a run where the gateway was **unavailable
+or hit a tool-surface gap** relays its one recorded reason line. The summary is
+never silently omitted — its absence would be indistinguishable from "policy
+had no influence", which is the confusion this item exists to remove.
