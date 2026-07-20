@@ -44,13 +44,27 @@ progress per turn instead of exhausting the budget on orchestration overhead.
 ```
 - CLAIM: <one sentence>
   SOURCE: <path:line@sha | commit sha | URL>
-  KIND: result | decision | number | quote | event
+  KIND: result | decision | number | quote | event | chronology | motivation | cost | reversal
 ```
 
+The KIND set is a **closed set of nine** (amended 2026-07-20, #438): the five
+atomic kinds `result | decision | number | quote | event` plus four
+**narrative** kinds `chronology | motivation | cost | reversal`. The narrative
+kinds admit **pointer-backed** narrative material — a timeline (`chronology`),
+the *why*/problem behind work or a **free-standing** decision rationale
+(`motivation`), a recorded price or tradeoff (`cost`), a superseded position
+(`reversal`) — that was previously routed off the sheet into NEEDS-OWNER.
+Rationale bound to a specific harvested `decision` fact may stay with the atomic
+`decision` kind; the narrative kind is not forced where the atomic one already
+fits. The set stays **fixed at nine** — no subtype axis, no free-text kind;
+material fitting none of the nine is a spec decision, never an in-place widening.
+
 SOURCE is a **single** commit-pinned line (`path:line@sha`, not a range) for
-every KIND except `quote`; a `quote` SOURCE may span consecutive physical lines
-(`path:line1-line2@sha`) when the quoted text does (e.g. a wrapped table cell),
-so a natural quote boundary is never forced to fold in unrelated adjacent text.
+`result`, `decision`, `number`, and `event`; `quote` **and the four narrative
+kinds** may span consecutive physical lines (`path:line1-line2@sha`) when the
+material does (e.g. a wrapped table cell, a rationale paragraph, a chronology
+block), so a natural boundary is never forced to fold in unrelated adjacent
+text.
 Quote matching is **whitespace-normalized** (amended 2026-07-13, #154): the
 CLAIM matches when its whitespace-collapsed text is a contiguous span of the
 whitespace-collapsed source, so a sentence that wraps is quotable by its real
