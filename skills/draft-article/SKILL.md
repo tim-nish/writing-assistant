@@ -406,6 +406,23 @@ story needs. When the fact sheet already carries the thesis as a sourced claim,
 the item is suppressed like any covered question; when it does not, the owner's
 answer is the article's spine.
 
+### The gap interview is *the* owner-input channel (Story 13.98, #435)
+
+Beyond the thesis/arc/stakes items above, the interview **explicitly invites the
+owner's free-form requirements and material** — a constraint to honor, a
+paragraph the owner wants included, an emphasis, a correction — as **first-class
+interview items**, not only answers to source-gap questions. This is the
+**designed channel for owner input into the draft**: an owner requirement enters
+here and reaches the draft as an **owner-attributed prose span** (opinion,
+thesis, arc — Story 17.1) or a **sourced/derived claim** (a checkable
+requirement), never through post-hoc hand-editing outside the pipeline. Free-form
+material rides the same ≤5 budget and journal machinery; a requirement beyond a
+single run's budget is recorded as a NEEDS-OWNER-style item for the next
+invocation, never dropped. **Make the channel visible:** when opening the
+interview, say that free-form owner requirements are welcome *here*, so the owner
+does not assume manual insertion afterward is the intended workflow (the
+dogfooding surprise this closes).
+
 ### Policy-seeded tension questions (Story 14.4)
 
 Before selecting questions, probe the host repo's optional `policy_source`
