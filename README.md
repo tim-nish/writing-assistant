@@ -174,6 +174,15 @@ The authoritative layout and rationale live in
 [`specs/spec-writing-assistant/plugin-layout.md`](specs/spec-writing-assistant/plugin-layout.md)
 and [`specs/spec-writing-assistant/SPEC.md`](specs/spec-writing-assistant/SPEC.md).
 
+## Documentation
+
+Reader-facing guides, derived from the implementation and specs (the specs
+remain the normative contracts):
+
+- [`docs/pipeline-vocabulary.md`](docs/pipeline-vocabulary.md) — the pipeline's
+  working vocabulary and data flow: what Stage 3 is, the closed 5-KIND fact
+  sheet, and where information is narrowed or routed.
+
 ## BMAD / hand-written separation
 
 This repo is BMAD-managed. BMAD's footprint is confined to exactly `_bmad/`,
