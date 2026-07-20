@@ -1,0 +1,13 @@
+{
+  "entries": [
+    {
+      "key": "LESSONS.md:41|outgrown|specs/spec-article-review/SPEC.md:38",
+      "first_seen": "2026-07-20",
+      "disposition": "dismissed",
+      "ref": null,
+      "reason": "consumer-side grouping is an implementation detail, not a policy conflict",
+      "pin_at_disposition": "product-lab@a1b2c3d4e5f6a7b8",
+      "occurrences": 2
+    }
+  ]
+}
