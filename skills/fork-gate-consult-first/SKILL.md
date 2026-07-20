@@ -68,24 +68,42 @@ The **upstream hub is never written**; the copy is a manual, approved owner step
 
 ## Carrier — every fork-presenting stop point (no orphan mechanism)
 
-Each site in this repo that presents a policy/architecture/prior-decision fork
-table **resolves to an invocation of this skill or a declared exemption**:
+The stop points that raise **policy/architecture/prior-decision fork tables** are
+the spec-lane authoring tools — and they **all live outside this repo**
+(installed skills or userSettings). This repo carries the **mechanism**
+(`fork-consult.py`) and this **reference**; the actual call site is an
+**owner-side edit** to the installed skill. The repo's own skills present **no**
+such fork tables — they are exemptions. Every stop point resolves to an
+**owner-side invocation** or an **in-repo exemption** (Story 18.13, #484):
 
-- **Invocation — triage spec-lane re-offer** (`/triage-gh` step 6d, the
-  alternatives AskUserQuestion): in-scope by definition (it presents
-  policy/architecture/prior-decision alternatives) → runs this pass; covered
-  alternatives demote to FYI, uncovered stay gates.
-- **Invocation — spec-run fork tables** (bmad-spec / bmad-architecture fork
-  decisions): in-scope → runs this pass before the fork table is shown.
-- **Exemption — the gap interview** (`draft-article` Stage 2): already applies
-  consult-first natively (Story 14.4 policy-seeded tension items + the
-  editorial anchor) — its own consult path stands; not re-wrapped here.
-- **Exemption — /commit-groups, /repo-cleanup, /publish-issues gates**: present
-  **mechanical** choices (commit grouping, deletion approval, board mapping),
-  never policy/architecture/prior-decision forks → out of scope, skip.
+**Owner-side invocations — out-of-repo fork-presenters (wire in the installed skill):**
+- **`/triage-gh` spec-lane re-offer** — userSettings (not a repo file). Its
+  alternatives AskUserQuestion (step 6d) presents policy/architecture/
+  prior-decision alternatives; run this pass before it — covered → FYI,
+  uncovered → gate.
+- **bmad-spec** — installed skill, gitignored (`.claude/skills/bmad-*/`). Before
+  surfacing an unresolved either/or, run this pass.
+- **bmad-architecture** — installed skill, gitignored. Before showing a
+  load-bearing-call fork (paradigm / stack / boundaries), run this pass.
 
-Adding a new fork-presenting stop point without an invocation or an exemption
-row here is the orphan-mechanism defect the carrier check catches.
+These are **owner-side** because their files are not in this repo; the carrier
+check **cannot** assert them mechanically (greping gitignored/absent files would
+pass locally and fail on a fresh checkout) — it asserts the **in-repo** side is
+clean and that these three are documented here as the owner-side wiring.
+
+**In-repo exemptions — no policy/architecture/prior-decision fork table:**
+- **The gap interview** (`draft-article` Stage 2) — already applies consult-first
+  natively (Story 14.4 policy-seeded tension items + the editorial anchor); its
+  own consult path stands, not re-wrapped here.
+- **Review arbitration** (`review-article`) — presents the article's own review
+  findings (reject-only arbitration), not a policy/architecture/prior-decision
+  fork → out of scope.
+- **Mechanical gates** (`/commit-groups`, `/repo-cleanup`, `/publish-issues`) —
+  commit grouping, deletion approval, board mapping; never policy forks → skip.
+
+A **new in-repo skill** that raises a policy/architecture/prior-decision fork
+table without either running this pass or carrying an exemption row here is the
+orphan-mechanism defect the carrier check catches.
 
 ## Invariants
 
