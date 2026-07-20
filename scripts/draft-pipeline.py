@@ -3081,7 +3081,8 @@ def cmd_consume(args):
 
 def cmd_start(args):
     _rp = _load("resolve-paths.py")
-    state, code = _run_state(args.framework, args.sources, _rp.host_root(args.root))
+    state, code = _run_state(args.framework, args.sources, _rp.host_root(args.root),
+                             depth=getattr(args, "depth", None))
     if state is None:
         return code
     print(json.dumps(state, indent=2))
@@ -3308,7 +3309,10 @@ def _entry_gate_ok(key, framework_file, root):
     return True, ""
 
 
-def _run_state(framework, sources, root=None):
+DEPTH_LEVELS = {"deep-dive", "standard", "note"}
+
+
+def _run_state(framework, sources, root=None, depth=None):
     # `root` MUST already be resolved (resolve-paths host_root) — the entry gate
     # below runs git against it, and a raw --root string or None would reopen
     # the side channel #309 closed. Callers resolve once, then pass it down.
@@ -3343,6 +3347,14 @@ def _run_state(framework, sources, root=None):
     }
     if key in SLIM_PROFILE_FRAMEWORKS:
         state["profile"] = "slim"
+    if depth:
+        # CAP-8 (#432): an optional per-run depth/scope directive — a level
+        # (deep-dive|standard|note) or an explicit one-line scope statement —
+        # recorded for Stage-3 fill to consume. Absent, the run behaves exactly
+        # as before; it is an enhancer, never a required gate.
+        d = depth.strip()
+        state["depth"] = ({"level": d.lower()} if d.lower() in DEPTH_LEVELS
+                          else {"scope": d})
     return state, 0
 
 
@@ -3695,7 +3707,8 @@ def cmd_stage0(args):
     rp = _load("resolve-paths.py")
     root = rp.host_root(args.root)
     # 2. Framework check + entry-gate precondition (before minting a workspace).
-    run_state, code = _run_state(args.framework, args.sources, root)
+    run_state, code = _run_state(args.framework, args.sources, root,
+                                 depth=getattr(args, "depth", None))
     if run_state is None:
         return code
     # 3. Workspace autostart (mint or resume).
@@ -3714,6 +3727,7 @@ def main(argv=None):
     sp = sub.add_parser("start")
     sp.add_argument("framework")
     sp.add_argument("sources", nargs="*")
+    sp.add_argument("--depth", help="optional depth/scope directive (deep-dive|standard|note, or an explicit scope statement) — CAP-8, #432")
     sp.add_argument("--root", help="host-repo root, for the framework entry-gate check "
                                    "(default: cwd; e.g. F1 requires a tagged release)")
     sp = sub.add_parser("consume")
@@ -3770,6 +3784,7 @@ def main(argv=None):
     sp = sub.add_parser("stage0", help="fold Stage 0 into one call: config validation + framework + autostart (Story 13.13)")
     sp.add_argument("framework")
     sp.add_argument("sources", nargs="*")
+    sp.add_argument("--depth", help="optional depth/scope directive (deep-dive|standard|note, or an explicit scope statement) — CAP-8, #432")
     sp.add_argument("--root", help="host-repo root (default: git top-level of cwd; errors outside a git repo)")
     sp = sub.add_parser("classify-policy",
                         help="CAP-7 policy-result classification: a mechanical "

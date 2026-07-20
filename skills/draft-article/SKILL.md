@@ -179,6 +179,33 @@ scripts (`stage0`/checkpoints, `journal`, `complete`,
 `write-article-plan.py`) are exempt — the precondition applies only to the
 Write tool, and burning retry turns on it is a known budget leak (#388).
 
+### Depth/scope directive (CAP-8, #432)
+
+Article depth is **owner intent, never a tool default**. If the owner's
+invocation names a depth or scope — a level (`deep-dive` | `standard` | `note`)
+or a one-line scope statement ("just the retry bug, deeply") — pass it to
+stage 0 so the run records it:
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py stage0 <framework> <sources...> --depth "<level or scope>" --root <host-repo>
+```
+
+The run-state then carries `depth: {"level": …}` or `depth: {"scope": …}`. If
+the owner gave **no** directive, do not invent one — **offer it once as a
+Stage-2 interview item** ("How deep — a quick note, a standard piece, or a
+deep-dive? Or name a scope.") under the proposal contract, and record the
+answer; absent an answer, the run proceeds exactly as before.
+
+**At Stage 3, fill consumes the directive** (`state.depth`): it governs **how
+much each slot elaborates and how many story elements the draft carries** — not
+a word count or reading-time target. A **deep-dive** keeps material a
+framework's split hint (e.g. F2's ">3 lessons") would otherwise cut in **one**
+article; a **note** stays tight. When a framework's count/length split hint
+would fire, surface it as an **owner choice** ("~N lessons — one deep-dive, or
+split?"), **never an automatic split** (the hint is a declinable suggestion per
+CAP-8). With **no directive**, fill behaves exactly as before, and the
+reading-time estimate stays informational — it drives no split.
+
 ### Plan consultation at draft start (SPEC-article-plan CAP-3, Story 13.57)
 
 After Stage 0, before the interview, **consult existing article plans** in the
