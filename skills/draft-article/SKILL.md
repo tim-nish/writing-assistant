@@ -179,6 +179,39 @@ scripts (`stage0`/checkpoints, `journal`, `complete`,
 `write-article-plan.py`) are exempt — the precondition applies only to the
 Write tool, and burning retry turns on it is a known budget leak (#388).
 
+### Story-element selection — the model and its disclosure (CAP-9, #428)
+
+A lesson-based article covers **story elements**. A **story element** is a
+general **evidence cluster** — a set of fact-sheet entries grouped by a
+**declared, deterministic membership rule** (a shared `## Journey` lesson unit,
+a shared framework slot, a co-pointed evidence set); an F2 lesson is **one
+case** of a cluster, not the only one. Membership is **reproducible from the
+declared rule** — the same fact sheet yields the same clusters — and **never a
+taste judgment**.
+
+Each element carries a **stable id**. The relation is explicit: the **id is
+identity** (two elements are the same iff their ids match), the
+**evidence-pointer set is derived payload** *under* the id, and **pointer drift
+on re-harvest never changes identity** — a moved pin or a re-pointed entry
+updates what the element points at, not what the element *is*. Anything keyed on
+the id (consumption, CAP-3) survives re-harvest.
+
+Selection chooses which elements the article covers, **upstream of the argument
+plan** (CAP-3/#440 composes *from* the selected elements). The **selection rule
+is #428 disclosure-only**: surfacing it changes **nothing** about what gets
+selected — with the same fact sheet, two runs select the same elements. What
+CAP-9 adds is that the rule is **stated, not implicit**:
+
+- the **interview journal** records, **per selected element, the rule that
+  selected it** (id + the declared reason — e.g. "Journey-bearing cluster,
+  unconsumed, matched framework slot X"); and
+- the **completion summary** repeats the per-element selection reasons in its
+  informational bucket, so the owner sees *why each element is in the article*
+  without opening a run artifact ([`completion-summary.md`](../completion-summary.md)).
+
+An element the run selected but whose reason cannot be stated is a defect, not a
+silent omission — disclosure is required wherever selection ran.
+
 ### Depth/scope directive (CAP-8, #432)
 
 Article depth is **owner intent, never a tool default**. If the owner's
@@ -862,6 +895,16 @@ then attributable from the journal — harvest scope gap vs. de-dup miss vs.
 triage error — without owner intervention. The command **fails closed** if an
 asked question has no recorded disposition, so an unattributable interview
 never ships.
+
+**Story-element selection is disclosed in the journal (CAP-9, #428).** For a
+lesson-based run, the journal also records, **per selected story element, the
+rule that selected it** — the element **id** and its declared reason (e.g.
+"Journey-bearing cluster, unconsumed, matched framework slot X"). This is the
+audit trail that makes selection reproducible: the same fact sheet selects the
+same elements with the same stated reasons. Disclosure only — recording the
+reason never changes which elements were selected. A run that selected an
+element without a recordable reason fails the same way an undisposed question
+does; the completion summary then repeats these reasons for the owner.
 
 **Editorial anchor (SPEC-policy-editorial-direction CAP-2, Story 13.38).** The
 journal also records the run's **editorial anchor** — the claim/angle answer:

@@ -12,6 +12,8 @@ sources:
 
 > **Adopted 2026-07-14.** Promoted from `_bmad-output/specs/spec-policy-consistency-pass/` (BMAD-generated, owner-approved 2026-07-14, implemented as Epic 15, issues #197–#200, PRs #201–#204) per the canonical-spec promotion convention (README "BMAD / hand-written separation", #188); **this copy is now the canonical version**. The BMAD memlog stays with the generating workspace — process state, not contract.
 
+> **Amended 2026-07-20 (#436)** per the owner decision record 2026-07-20 (consumer-triggered policy feedback): the "no third consumer of the seam" non-goal below is **superseded** — the consumer-side policy-divergence detector (SPEC-policy-divergence-detector) is sanctioned as the seam plumbing's third consumer, detection-only and proposal-only. This pass's own contract is unchanged.
+
 > **Canonical contract.** This SPEC and the files in `companions:` are the complete, preservation-validated contract for what to build, test, and validate. Source documents listed in frontmatter are for traceability only — consult them only if you need narrative rationale or prose color this contract intentionally omits.
 
 # Policy-Consistency Review Pass (A2)
@@ -52,7 +54,7 @@ The ratified 2026-07-14 seam decision ordered two consumers of one read/pin/cons
 - Automated writes into the policy hub (staging emission stays proposal-only, workspace-only).
 - Extending the cold read's context (it remains isolation-by-design; the policy surface is never shown to it).
 - Semantic search, embeddings, additional policy repos, or any read beyond the seam's whitelist.
-- A third consumer of the seam — nothing here generalizes the plumbing beyond its two ratified users.
+- ~~A third consumer of the seam — nothing here generalizes the plumbing beyond its two ratified users.~~ **Superseded 2026-07-20** (top-of-file amendment, #436): the policy-divergence detector is the sanctioned third consumer.
 
 ## Success signal
 
