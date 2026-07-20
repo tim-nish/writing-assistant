@@ -388,6 +388,24 @@ here runs exactly as the full pipeline does:
 
 ## Stage 2 — bounded gap interview
 
+### Owner thesis, arc, and stakes as first-class items (Story 17.1, #439)
+
+The gap interview is not only a hole-filler for what the sources cannot answer;
+it is **the owner-input channel for the article's story**. Alongside the
+NEEDS-OWNER gaps, the interview **explicitly elicits the owner's thesis, arc,
+and stakes** — the one claim the piece exists to make, the misconception→turn
+it narrates, and why it matters — as **first-class items**, not only when a
+NEEDS-OWNER entry happens to name them. These items ride the **same ≤5 question
+budget** and the same journal/disposition machinery as every other question;
+they are owner judgment (opinion), so they are **`open`** items (owner-only
+knowledge, [`SPEC-policy-source-seam CAP-2`](../../specs/spec-policy-source-seam/SPEC.md)),
+never a source-pointed recommendation. Their answers come back as **owner
+opinion** and reach the draft as **attributed prose spans** (Stage 3 below),
+not as atomic sourced claims — this is the prose-shaped channel the owner's
+story needs. When the fact sheet already carries the thesis as a sourced claim,
+the item is suppressed like any covered question; when it does not, the owner's
+answer is the article's spine.
+
 ### Policy-seeded tension questions (Story 14.4)
 
 Before selecting questions, probe the host repo's optional `policy_source`
@@ -986,6 +1004,24 @@ level while connective reasoning is legal at the **paragraph** level:
 An **inferred** claim — beyond sources, interview, or legal derivation — carries
 an inline **`[VERIFY: <reason>]`** marker exactly as before. **Never an unmarked
 assertion.**
+
+**Owner opinion as attributed prose spans (CAP-3, #439; Story 17.1).** Owner
+opinion the interview elicited — thesis, arc, stakes, beliefs and reversals —
+may enter the draft as an **owner-attributed prose span**: a whole paragraph of
+the owner's judgment, classified **`sourced`** and pointed at the interview
+answer that carries it. Record it in the map as a **single paragraph-level
+entry** carrying a **paragraph-granularity** question-id pointer —
+`P<n>[L<line>]: sourced <- q<id>` (a bare `P<n>`, no `.S<n>`), the anchor being
+the paragraph's first line — rather than one pointer per sentence. This is the
+prose channel for the owner's story, distinct from flattening it into atomic
+sourced claims. The **falsifiability contract is unchanged**: such prose
+asserts nothing source-checkable and must not, so it stays compatible with the
+narration rule while remaining explicitly attributed to its answer.
+`verify-provenance` accepts the paragraph-granularity question-id pointer as
+valid `sourced` attribution for the span it covers (Story 17.2). Use it **only
+for a genuine owner-opinion paragraph**; a paragraph that mixes owner opinion
+with checkable claims stays per-sentence (`P<n>.S<n>`), each claim classed on
+its own.
 
 **The sidecar provenance map.** Stage 3 maintains a **sidecar provenance map**
 in the run workspace, appended per section as the fill progresses (Story
