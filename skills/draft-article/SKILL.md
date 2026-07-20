@@ -437,7 +437,7 @@ dependency; no exit code here may abort the run**:
   `missing-rationale`, or `reversal-candidate`, each carrying its seed
   `{quote, pointer: file:line@commit}` quoted **verbatim** from the surface at
   the pinned commit. The policy source supplies **questions only** — never an
-  answer, never a recommendation (NFR15: triage and recommendations stay a
+  answer, never a recommendation (SPEC-policy-source-seam CAP-2: triage and recommendations stay a
   view over harvest output). A question that merely restates its seed will be
   rejected (R4) — ask the tension, not the quote.
 
@@ -580,7 +580,7 @@ Validated policy items join the candidate set as **asked** questions
 (`outcome: open`, `rationale: policy-seed`, their `seed` carried through): a
 tension between the material and a recorded position is owner-only by nature,
 so suppression does not apply — and there is never a recommended answer for
-one (NFR15).
+one (SPEC-policy-source-seam CAP-2).
 
 The surviving (non-suppressed) questions are returned as `questions`, and are:
 

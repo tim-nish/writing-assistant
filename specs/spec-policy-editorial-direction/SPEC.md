@@ -24,7 +24,7 @@ Three properties made it safe *and* effective, and they are the invariants
 every extension below must preserve:
 
 1. **Policy proposes; the owner ratifies.** A recorded position generates a
-   question or a recommended default — never a silent decision (NFR15's
+   question or a recommended default — never a silent decision (SPEC-policy-source-seam CAP-2's
    generalization).
 2. **Policy never supplies facts.** Provenance classes are untouched: an
    editorial direction is not a source pointer, and no policy line ever
@@ -82,7 +82,7 @@ every extension below must preserve:
     ineligible class is a **named validator rejection** (same posture as the
     Story-14.3 pre-filled-answer / confirmation-shaped-seed classes). A
     policy-seeded *tension* question is ineligible and never carries a default
-    (NFR15 — owner-only by nature).
+    (SPEC-policy-source-seam CAP-2 — owner-only by nature).
   - **A default is never an answer and never evidence** (invariant 2). The item's
     `owner_answer` stays structurally empty at generation; a ratified default is
     recorded as interview-sourced owner judgment (the modified/replaced
