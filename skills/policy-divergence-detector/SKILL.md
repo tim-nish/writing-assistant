@@ -59,8 +59,8 @@ Where/Why/Effect, a journal entry per disposition — `detector-formats.md` §3)
 - **Effect — the three choices:**
   - **report upstream** — emit the proposal: a **tracker issue in this repo**
     carrying the record, or a **staging-schema block** in the run workspace. The
-    staging block is a **conformance copy of the hub §3.1 schema** (product-lab
-    `specs/knowledge-architecture.md` §3.1 — the authority; hub wins on any
+    staging block is a **conformance copy of the hub §3.1 schema** (the
+    configured policy hub's §3.1 schema is the authority; hub wins on any
     mismatch, `detector-formats.md` §4); the owner **copies it by hand**. The
     upstream hub is untouched.
   - **fix here** — the divergence is a consumer defect: route to this repo's

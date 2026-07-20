@@ -60,7 +60,7 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/fork-consult.py emit-miss \
 ```
 
 The block is a **conformance copy** of the hub §3.1 staging-file schema
-(product-lab `specs/knowledge-architecture.md` §3.1 — the authority; hub wins on
+(the configured policy hub's §3.1 is the authority; hub wins on
 any mismatch, a mismatch is a defect of this spec), with **no schema of its
 own** — the same emitter the divergence detector (#436/#482) cites. This skill
 is the **second emitter** into that intake: shared envelope, distinct payload.
