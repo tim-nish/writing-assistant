@@ -211,6 +211,41 @@ repository with **no plans, or a schema-less destination, degrades silently**:
 `consult` returns an empty list with a reason, and the run behaves exactly as it
 does today — never a failure, and never a prompt about missing plans.
 
+### Continuation mode — build on a named prior article (Story 13.95, #429)
+
+The plan consultation above **discovers** how this run relates to prior work;
+**continuation mode** is the owner **directing** it. When the invocation carries
+a `continuing <prior-slug>` modifier —
+
+```
+draft article <type> from <sources> continuing <prior-slug>
+```
+
+— the owner has pinned the relation, so this run does not re-discover it:
+
+1. **Read the named prior canonical** at the resolved `output.drafts`
+   (`resolve-writing-sources.py draft-location`) and select its plan entry from
+   `write-article-plan.py consult` (which returns every prior plan's discovery
+   surface — pick the `<prior-slug>` row) — **frontmatter and `summary` only**,
+   read-only through the repo schema. The prior draft's
+   **body never enters the harvest evidence stream** (Story 13.56's fences hold
+   exactly as for plan consultation); it is *framing context*, not a source.
+2. **Constrain the lede at Stage 3** to **build on** the prior article rather
+   than restate it: the opening assumes the prior claim/summary as given and
+   advances from it, instead of re-explaining shared context. This is a directed
+   emphasis on the drafting agent, not new evidence and not a new provenance
+   class — every checkable claim stays sourced/derived as always.
+3. **Record the relation in the emitted draft's frontmatter** —
+   `related.articles: [<prior-slug>]` — and as `relates: continue <prior-slug>`
+   on the plan this run emits, so the chain is machine-legible for the next run's
+   consultation.
+
+If `<prior-slug>` resolves to **no canonical or plan**, surface it under the
+[owner-facing proposal contract](../owner-facing-proposal-contract.md) —
+"no article `<prior-slug>` found; draft standalone, or correct the slug?" —
+never a hard failure. Continuation is an **enhancer**: with no modifier the run
+behaves exactly as today (auto plan-consultation only).
+
 ### Durability — checkpoint each stage, resume from the last completed one (Story 13.5)
 
 Wall-clock is unconstrained but the **turn/compute budget is a real ceiling**, so
