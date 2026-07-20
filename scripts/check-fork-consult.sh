@@ -106,18 +106,39 @@ grep -q '<!-- staging-candidate -->' "$work/s.md" \
 python3 "$F" emit-miss --question q --decision d --slug BADSLUG --source-repo r --created 2026-07-20 >/dev/null 2>&1 \
   && err "bad slug accepted" || ok "CAP-4: the staging slug grammar is enforced"
 
-# --- Carrier check: every fork-presenting stop point -> invocation or exemption
+# --- Carrier check (Story 18.13, #484): the fork-presenters are ALL out-of-repo
+# (installed skills / userSettings), so the carrier is documented owner-side. The
+# check asserts the IN-REPO side is clean and the owner-side wiring is recorded —
+# it never greps gitignored/absent files (that would pass locally and fail on a
+# fresh checkout, the exact bug this story exists to avoid).
 norm() { tr '\n' ' ' < "$1" | tr -s ' ' | sed 's/\*\*//g; s/`//g'; }
 S=$(norm "$SKILL")
-printf '%s' "$S" | grep -qi 'triage spec-lane re-offer' \
-  && printf '%s' "$S" | grep -qi 'spec-run fork tables' \
-  && ok "carrier: the two fork-presenting stop points are enumerated as invocations" \
-  || err "carrier: a fork-presenting stop point is not enumerated"
-printf '%s' "$S" | grep -qi 'Exemption' \
-  && ok "carrier: mechanical-gate stop points carry a declared exemption (no orphan mechanism)" \
-  || err "carrier: no declared exemptions for mechanical gates"
+# 1. All three out-of-repo fork-presenters named and marked owner-side.
+missing=""
+for p in "/triage-gh" "bmad-spec" "bmad-architecture"; do
+  printf '%s' "$S" | grep -q "$p" || missing="$missing $p"
+done
+[ -z "$missing" ] && ok "carrier: all 3 spec-lane fork-presenters documented (/triage-gh, bmad-spec, bmad-architecture)" \
+  || err "carrier: out-of-repo presenter(s) not documented:$missing"
+printf '%s' "$S" | grep -qi 'owner-side invocation' \
+  && printf '%s' "$S" | grep -qi 'userSettings' && printf '%s' "$S" | grep -qi 'installed skill' \
+  && ok "carrier: the fork-presenters are marked owner-side (userSettings / installed skill)" \
+  || err "carrier: the out-of-repo presenters are not marked owner-side"
+# 2. Self-guard: the check must NOT depend on gitignored installed skills.
+grep -q '[.]claude/skills/bmad' "$0" \
+  && err "carrier: this check greps gitignored installed skills (would fail on a fresh checkout)" \
+  || ok "carrier: the check asserts only in-repo state, never gitignored installed skills"
+# 3. The in-repo exemptions name real repo skills that exist.
+printf '%s' "$S" | grep -qi 'gap interview' && printf '%s' "$S" | grep -qi 'review arbitration' \
+  && printf '%s' "$S" | grep -qi 'mechanical gates' \
+  && ok "carrier: in-repo exemptions declared (gap interview, review arbitration, mechanical gates)" \
+  || err "carrier: in-repo exemptions incomplete"
+[ -f skills/draft-article/SKILL.md ] && [ -f skills/review-article/SKILL.md ] \
+  && ok "carrier: the exempted in-repo skills exist (draft-article, review-article)" \
+  || err "carrier: a named in-repo exemption points at a missing skill"
+# 4. The orphan-mechanism rule for new IN-REPO skills.
 printf '%s' "$S" | grep -qi 'orphan-mechanism defect the carrier check catches' \
-  && ok "carrier: the SKILL states the orphan-mechanism rule" \
+  && ok "carrier: the SKILL states the orphan-mechanism rule for new in-repo skills" \
   || err "carrier: orphan-mechanism rule missing"
 
 if [ "$fail" -eq 0 ]; then
