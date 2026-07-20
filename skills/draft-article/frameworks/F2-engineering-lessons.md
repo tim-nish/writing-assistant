@@ -32,7 +32,14 @@ Config-bound `article` frontmatter (rendered per language from user config; see
 {(What you were building and why; link the project record. Only enough
 context to make the lesson intelligible — this is not the project intro.)}
 
-<!-- Lesson unit START — repeat this block (slots 2–6) for up to 3 lessons.
+<!-- Lesson unit — these slots are each lesson's CONTENT OBLIGATIONS, not a
+     literal heading skeleton to reproduce verbatim per lesson (CAP-3/#440/#434).
+     Fill each lesson FROM the run's argument plan ($WS/argument-plan.md): the
+     whole article is one ARC (shared context → distinct, varied lesson sections
+     → one synthesis), and a section's structure varies with its content — a
+     lesson may fold or reorder these obligations rather than emit five identical
+     headings. A slot met with a single under-evidenced sentence fails the
+     Stage 3→4 gate.
      >3 lessons is a DECLINABLE SUGGESTION to split, not a rule (CAP-8, #432):
      depth is owner intent — surface "~N lessons; one deep-dive or split?" as an
      owner choice, and honor a depth/scope directive (deep-dive keeps them in one

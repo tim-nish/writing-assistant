@@ -1000,6 +1000,33 @@ gate: it changes nothing about the quality gate or `[VERIFY]` markers.
 
 Fill the chosen framework's slots from the fact sheet and the interview answers.
 
+**Stage 3 opens with an argument-plan sub-step (CAP-1, #440/#434).** Before
+filling any slot, compose an explicit **argument plan** from the fact sheet
+(including the narrative kinds — `chronology | motivation | cost | reversal`,
+#438) and the interview answers, and write it to the run workspace
+(`$WS/argument-plan.md`):
+
+- **thesis** — the one claim the article advances; every section must serve it.
+- **arc** — the ordered movement across the whole article. For a multi-lesson
+  piece this is a **single arc** — shared context → distinct lesson sections →
+  one synthesis — **not** the framework's section skeleton repeated verbatim per
+  lesson (#434).
+- **section intents** — per section, its **content obligation** (what it must
+  establish and the evidence type behind it) and the fact-sheet entries (by
+  pointer) it will draw on. A framework governs each section's **content
+  obligations, not its literal heading structure**.
+
+Then fill **from the plan** — each section realizes its intent, drawing the
+named entries — rather than populating slots directly. This is a **sub-step**,
+not a new pipeline stage, and **provenance is unchanged**: every checkable claim
+is still sourced/derived, synthesis stays legal in connective tissue. The plan
+is a **run-workspace intermediate** and is **owner-visible** — the completion
+summary names the thesis and arc the draft was composed from (CAP-2), and at
+completion the plan-record `plans/<slug>.md` projects them from this finalized
+plan (SPEC-article-plan, unchanged). A section whose intent is under-evidenced
+(its named entries are thin) is visible **here, before fill**; the Stage 3→4
+gate fails a slot that ships as a single under-evidenced sentence.
+
 **Per-section progress recording (Story 13.84, #388).** Stage 3 is a long
 stage: an evidence-heavy fill can exceed one invocation's budget by itself, so
 it persists per section, in framework slot order, using the same sub-stage
