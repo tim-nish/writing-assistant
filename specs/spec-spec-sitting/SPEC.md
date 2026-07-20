@@ -8,11 +8,12 @@ sources:
   # in #485) for the covered-FYI / uncovered-gate triage of step 2's design forks.
 ---
 
-> **Draft 2026-07-20 (#483), awaiting owner ratification as written.**
-> Hand-authored from the issue's already-settled contract (transcription, not new
-> design). **Implementation schedules at the arrival of the next `triage:spec`
-> issue after ratification** — the first manual sitting this command would
-> replace is both the demand trigger and the first dogfood. Ratify ≠ implement.
+> **Ratified 2026-07-20 (#483).** Owner-ratified as authored — the design forks
+> were pre-settled in the tracking issue and transcribed here (no inline design).
+> **Condition-bound hold — do not implement yet:** **implementation schedules at
+> the arrival of the next `triage:spec` issue after ratification** — the first
+> manual sitting this command would replace is both the demand trigger and the
+> first dogfood. Ratify ≠ implement; not decomposed this sitting.
 
 > **Canonical contract.** This SPEC is the complete, preservation-validated
 > contract for what to build, test, and validate. Source documents listed in
