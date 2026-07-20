@@ -168,10 +168,33 @@ and fabricated pointers reach the sheet (the `pin-source.py` step below fixes th
     rather than a commit, because the Den ledger is not a git tree.
 
   A bare `path:line` without `@sha` is not accepted, and neither is a bare
-  `den:<id>` without `@<run>` — every pointer pins. For every KIND **except
-  `quote`**, SOURCE names a **single** commit-pinned line — `path:line@sha`,
-  **not** a range (`12-19` is rejected; split it into per-line pointers).
+  `den:<id>` without `@<run>` — every pointer pins. For every KIND **except the
+  span-eligible kinds** (`quote` + the four narrative kinds, #438), SOURCE names
+  a **single** commit-pinned line — `path:line@sha`, **not** a range (`12-19` is
+  rejected; split it into per-line pointers).
 - **KIND** ∈ {result, decision, number, quote, event, chronology, motivation, cost, reversal} — the closed set of nine (#438): five atomic kinds plus four **narrative** kinds. This enumeration and `scripts/validate-fact-sheet.py`'s `KINDS` are the two enforcement copies of the closed set; they move in lockstep.
+- **The four narrative kinds (#438) — record pointer-backed narrative material.**
+  Material that was previously routed off the sheet into NEEDS-OWNER is now
+  harvestable **when it carries a pointer**:
+  - **`chronology`** — an ordered sequence / timeline of how something unfolded
+    (a dogfood log or issue thread giving the order of failures and fixes).
+  - **`motivation`** — the *why*: the problem/gap addressed, and **free-standing**
+    reasoning behind work or a decision (a commit body "…because the retry
+    deadlocked under load"; an issue's problem statement). **Refinement:**
+    rationale **bound to a specific harvested `decision` fact may stay with the
+    atomic `decision` kind** — do not force `motivation` where the atomic one
+    already fits; use `motivation` for the free-standing why.
+  - **`cost`** — a recorded price or tradeoff paid (a dogfood finding "the fixture
+    rebuild added ~40s per run") — recorded, not opined.
+  - **`reversal`** — a superseded position: a struck-through decision, a
+    topic-thread Declined line, what an earlier choice reversed to.
+  Like `quote`, a narrative kind may use a **span** SOURCE (`path:l1-l2@sha`)
+  when the material is a multi-line passage (a rationale paragraph, a chronology
+  block) — but **unlike `quote`, its CLAIM is your summary, not verbatim**, so it
+  is not whitespace-matched; the span only has to resolve. Narrative kinds admit
+  **only pointer-backed** material — unsourceable owner judgment (opinion,
+  significance, surprise) still routes to **NEEDS-OWNER** (§4), never onto the
+  sheet through a narrative kind.
 - A `quote` entry's CLAIM is the source text **verbatim and ONLY the source text**
   — no label, attribution, or prefix (not "Decision from batch 16: …"), and never
   paraphrased. A CLAIM carrying anything beyond the quoted words is rejected.
