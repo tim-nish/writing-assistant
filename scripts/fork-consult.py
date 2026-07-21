@@ -66,9 +66,23 @@ def _served_ok(pointer):
     return bool(core.POLICY_PTR_RE.match(str(pointer)))
 
 
-def classify(forks, pin, policy_available):
+# The two dispositions a per-fork receipt records (#519): what the gate DID with
+# the consultation. The access log proves a consult happened but cannot observe
+# this, so the field makes covered-fork auto-resolutions mechanically countable
+# for the impact-statistics view. Closed two-value set — no consumer-local
+# extension, so it survives the D3 promotion to a shared versioned contract.
+OUTCOMES = ("auto-resolved-FYI", "escalated")
+
+
+def classify(forks, pin, policy_available, overridden=None):
     """Return (report, defects). report partitions every fork; defects is a list
-    of (fork_id, reason) that make the payload malformed (fail-closed)."""
+    of (fork_id, reason) that make the payload malformed (fail-closed).
+
+    Each per-fork receipt (fyi/gate) carries an `outcome` (#519): a covered FYI
+    is `auto-resolved-FYI`; a gate is `escalated`. A fork id in `overridden` is
+    an FYI the owner overrode inline — the override reopened it as a gate, so its
+    receipt records `escalated` (the disposition, not the origin)."""
+    overridden = set(overridden or ())
     report = {"pin": pin, "degraded": None, "fyis": [], "gates": [],
               "misses": [], "skipped": []}
     defects = []
@@ -91,6 +105,7 @@ def classify(forks, pin, policy_available):
 
         if not policy_available:
             gate["reason"] = "degraded — policy_source unavailable"
+            gate["outcome"] = "escalated"
             gate["candidates"] = f.get("consult", {}).get("candidates", []) or []
             report["gates"].append(gate)
             report["misses"].append({"id": fid, "question": f.get("question"),
@@ -112,10 +127,17 @@ def classify(forks, pin, policy_available):
                 defects.append((fid, "FYI pin is not <policy-source>@<commit>"))
             if not str(c.get("quote", "")).strip():
                 defects.append((fid, "a covered FYI must carry the verbatim served quote"))
-            report["fyis"].append({
+            fyi = {
                 "id": fid, "chosen_option": c.get("chosen_option"),
                 "quote": c.get("quote"), "pointer": ptr,
-                "pin": c.get("pin", pin), "overrideable": True})
+                "pin": c.get("pin", pin), "overrideable": True,
+                "outcome": "auto-resolved-FYI"}
+            if fid in overridden:
+                # The owner overrode the FYI inline; it reopened as a gate, so the
+                # receipt records the disposition it ended at, not where it began.
+                fyi["outcome"] = "escalated"
+                fyi["overridden"] = True
+            report["fyis"].append(fyi)
             continue
 
         # Coverage is STRICT: covered-but-topical (does not discriminate) stays a
@@ -123,14 +145,21 @@ def classify(forks, pin, policy_available):
         gate["reason"] = ("covered but only topical — the quote does not "
                           "discriminate the options"
                           if covered else "uncovered by any served line")
+        gate["outcome"] = "escalated"
         gate["candidates"] = c.get("candidates", []) or []
         report["gates"].append(gate)
         report["misses"].append({"id": fid, "question": f.get("question"),
                                  "reason": gate["reason"]})
         _check_gate(gate, defects)
 
+    # The outcome split is countable from the receipts alone (#519), so the
+    # impact-statistics view never re-derives it from the FYI/gate sections.
+    auto = sum(1 for r in report["fyis"] if r.get("outcome") == "auto-resolved-FYI")
+    escalated = (sum(1 for r in report["fyis"] if r.get("outcome") == "escalated")
+                 + len(report["gates"]))
     report["counts"] = {"fyis": len(report["fyis"]), "gates": len(report["gates"]),
-                        "misses": len(report["misses"]), "skipped": len(report["skipped"])}
+                        "misses": len(report["misses"]), "skipped": len(report["skipped"]),
+                        "auto_resolved_fyi": auto, "escalated": escalated}
     return report, defects
 
 
@@ -161,13 +190,36 @@ def cmd_present(args):
                          "(fresh per run; no consultation cache)\n")
         return REFUSED
     report, defects = classify(forks, args.pin,
-                               _truthy(args.policy_source_available))
+                               _truthy(args.policy_source_available),
+                               overridden=args.overridden or [])
     print(json.dumps(report, indent=2))
     if defects:
         sys.stderr.write(f"REFUSED: {len(defects)} malformed-payload defect(s):\n")
         for fid, r in defects:
             sys.stderr.write(f"  [{fid}] {r}\n")
         return REFUSED
+    return 0
+
+
+def cmd_lint(args):
+    """Receipt-lint (#519): every in-scope receipt (fyi/gate) must carry a valid
+    `outcome`. A receipt missing it — or carrying a value outside the closed set —
+    is a lintable defect, the same shape as the 'fork gate with no preceding
+    gateway hit' lint. Reads a `present` report JSON; exit 1 on any defect."""
+    text = sys.stdin.read() if args.input == "-" else open(args.input, encoding="utf-8").read()
+    report = json.loads(text)
+    bad = []
+    for kind in ("fyis", "gates"):
+        for r in report.get(kind, []):
+            oc = r.get("outcome")
+            if oc not in OUTCOMES:
+                bad.append((r.get("id", "?"), kind, oc))
+    if bad:
+        sys.stderr.write(f"REJECT: {len(bad)} receipt(s) with a missing/invalid outcome "
+                         f"(must be one of {list(OUTCOMES)}):\n")
+        for fid, kind, oc in bad:
+            sys.stderr.write(f"  [{fid}] {kind}: outcome={oc!r}\n")
+        return 1
     return 0
 
 
@@ -207,7 +259,13 @@ def main(argv=None):
     pr.add_argument("--pin", required=True, help="<policy-source>@<commit>, fresh per run")
     pr.add_argument("--policy-source-available", default="true",
                     help="false => degraded: all in-scope forks are gates")
+    pr.add_argument("--overridden", action="append", metavar="FORK_ID",
+                    help="an FYI the owner overrode inline — its receipt records "
+                         "outcome=escalated (reopened as a gate); repeatable")
     pr.set_defaults(fn=cmd_present)
+    ln = sub.add_parser("lint")
+    ln.add_argument("--input", required=True, help="a present report JSON, or - for stdin")
+    ln.set_defaults(fn=cmd_lint)
     em = sub.add_parser("emit-miss")
     em.add_argument("--question", required=True)
     em.add_argument("--decision", required=True)

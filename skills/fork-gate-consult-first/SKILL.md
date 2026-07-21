@@ -56,6 +56,22 @@ At a fork-presenting stop point, before showing the table:
 3. **Fresh pin per run — no consultation cache.** The `--pin` is supplied per
    run; nothing caches a consult result between runs.
 
+**Receipt outcome (#519).** Every per-fork receipt `present` emits carries an
+**`outcome`** ∈ `{auto-resolved-FYI | escalated}` — what the gate *did* with the
+consultation: a covered FYI is `auto-resolved-FYI`; a gate (uncovered,
+covered-but-topical, or degraded) is `escalated`. An FYI the owner **overrides**
+reopens as a gate, so re-run `present` with `--overridden <fork-id>` and its
+receipt records `escalated` (the disposition, not the origin). The access log
+proves a consult *occurred* but cannot observe this disposition, so the field is
+what makes covered-fork auto-resolutions **mechanically countable** for the
+ratified impact-statistics view (`report.counts.auto_resolved_fyi` /
+`.escalated`, countable from receipts alone). A receipt missing a valid
+`outcome` is a lintable defect:
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/fork-consult.py lint --input "$WS/receipts.json"
+```
+
 ## Miss feedback (CAP-4) — proposal-only
 
 Every uncovered in-scope fork is a **consult miss** (a distill-bug signal in the
