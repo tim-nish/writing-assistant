@@ -48,7 +48,12 @@ cat > "$work/cfg.json" <<'JSON'
  "syndication":{"policy":{"en":{"mode":"canonical","variants":["devto"]},"ja":{"mode":"external","variants":["zenn"]}},"variants":{"devto":{"canonical_url_base":"https://ada.dev/articles"},"zenn":{"external_record_max_lines":20}}}}
 JSON
 RPBX="python3 $root/$RPB --config-json $work/cfg.json"
-RFMX="python3 $root/$RFM --config-json $work/cfg.json"
+# #530: platform-specific frontmatter is stamped ONLY for a RESOLVABLE target.
+# Stage a resolvable dev.to profile so the stamp assertions below exercise the
+# emittable path (the non-emittable path is asserted separately at the end).
+mkdir -p "$work/pp"
+cp config/platform-profiles/devto.example.yaml "$work/pp/devto.yaml"
+RFMX="python3 $root/$RFM --config-json $work/cfg.json --profiles-dir $work/pp"
 
 # AC2: config-bound frontmatter, both modes, no hardcoded site schema.
 $RFMX --language en > "$work/fm_en"
@@ -56,6 +61,22 @@ grep -q '^mode: canonical' "$work/fm_en" && ok "frontmatter EN: mode canonical" 
 grep -q '^syndication:' "$work/fm_en" && ok "frontmatter EN: syndication block present" || err "EN syndication missing"
 grep -q 'canonical_url: https://ada.dev/articles/{slug}' "$work/fm_en" \
   && ok "frontmatter EN: canonical_url from config (not hardcoded)" || err "EN canonical_url not config-derived"
+
+# #530: a declared variant whose profile does NOT resolve (empty profiles dir)
+# must NOT have its platform-specific block stamped into the canonical draft —
+# the canonical draft carries no field for a target that cannot emit.
+mkdir -p "$work/pp_empty"
+$RFMX --language en --profiles-dir "$work/pp_empty" > "$work/fm_en_noprof"
+grep -q '^syndication:' "$work/fm_en_noprof" \
+  && err "#530: dev.to block stamped for a non-emittable target (profile unresolved)" \
+  || ok "#530: no platform block stamped when the dev.to profile does not resolve"
+grep -q 'canonical_url' "$work/fm_en_noprof" \
+  && err "#530: canonical_url stamped for a target that cannot emit" \
+  || ok "#530: no canonical_url for a non-emittable target"
+# Sanity: the resolvable-profile render still carries the block (regression guard).
+grep -q '^syndication:' "$work/fm_en" \
+  && ok "#530: resolvable profile still stamps the platform block (behavior unchanged)" \
+  || err "#530: resolvable profile lost its platform block"
 $RFMX --language ja > "$work/fm_ja"
 grep -q '^mode: external' "$work/fm_ja" && ok "frontmatter JA: mode external" || err "JA mode wrong"
 grep -q 'body forbidden' "$work/fm_ja" && ok "frontmatter JA: body-forbidden note" || err "JA note missing"

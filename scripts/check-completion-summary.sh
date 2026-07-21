@@ -31,6 +31,11 @@ hasc() { grep -qi -- "$1" "$CONV" && ok "$2" || err "$2 — missing from convent
 hasc 'informational notes'  "bucket: informational notes"
 hasc 'publish blockers'     "bucket: publish blockers"
 hasc 'optional cleanup'     "bucket: optional cleanup"
+
+# 1z. Story 18.36 (#530): a declared syndication variant with no resolvable
+# platform profile is a publish blocker naming the exact missing profile path.
+hasc 'no resolvable platform profile' "declared-variant/no-profile is a publish blocker (#530)"
+hasc 'exact missing profile path'     "the missing-profile blocker names the exact path (#530)"
 hasc 'next step'            "explicit next step"
 hasc 'here and nowhere else\|nowhere else' "a blocker appears in exactly one bucket"
 hasc '200 wpm'              "reading time: ~200 wpm EN"

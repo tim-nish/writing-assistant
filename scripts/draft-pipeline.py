@@ -4344,11 +4344,16 @@ def _syndication_profile_warnings(root, config_json=None, profiles_dir_override=
         if plat in profiles:
             continue                       # resolvable → no warning
         langs = sorted(declared[plat])
+        missing_path = os.path.join(pdir, f"{plat}.yaml")
         warnings.append({
             "bucket": "informational",
             "platform": plat,
             "languages": langs,
             "profiles_dir": pdir,
+            # The exact missing profile path (#530): the same value the publish
+            # blocker names, so the informational note and the blocker never
+            # disagree on where the owner must act.
+            "missing_profile_path": missing_path,
             "warning": (
                 f"syndication.policy declares variant '{plat}' for language(s) "
                 f"{', '.join(langs)} but no resolvable platform profile "
@@ -4358,6 +4363,39 @@ def _syndication_profile_warnings(root, config_json=None, profiles_dir_override=
                 "variant. Informational only — draft start is not blocked."),
         })
     return warnings
+
+
+def _syndication_profile_blockers(warnings):
+    """Story 18.36 (#530): the SAME declared-variant/no-resolvable-profile finding
+    that draft START surfaces informationally (Story 18.19, above) is ALSO an
+    actionable **publish blocker** — variant emission WILL fail at the post-review
+    publish/variant boundary, so it belongs in the completion summary's
+    publish-blocker bucket (CAP-6), naming the exact missing profile path, not
+    only as a per-run re-discovered post-review emission failure. Derived from the
+    same warning list (one resolver pass, one source of truth) so the two views
+    can never diverge; draft start stays non-blocking (config_ok/next_stage are
+    unchanged — 18.19 holds)."""
+    blockers = []
+    for w in warnings:
+        plat = w["platform"]
+        path = w["missing_profile_path"]
+        langs = w["languages"]
+        blockers.append({
+            "bucket": "publish-blocker",
+            "action": "publish-blocker",
+            "platform": plat,
+            "languages": langs,
+            "missing_profile_path": path,
+            "blocker": "declared-variant-no-resolvable-profile",
+            "detail": (
+                f"syndication.policy declares variant '{plat}' for language(s) "
+                f"{', '.join(langs)} but no resolvable platform profile exists at "
+                f"{path}; variant emission WILL fail. Fix: copy "
+                f"config/platform-profiles/{plat}.example.yaml to {path}, or drop "
+                "the declared variant. Draft start is not blocked (Story 18.19); "
+                "this is the publish/variant-boundary blocker."),
+        })
+    return blockers
 
 
 def cmd_stage0(args):
@@ -4405,6 +4443,12 @@ def cmd_stage0(args):
         profiles_dir_override=getattr(args, "profiles_dir", None))
     if warnings:
         out["syndication_warnings"] = warnings
+        # Story 18.36 (#530): surface the SAME finding as an actionable publish
+        # blocker (naming the exact missing profile path) so it is routed to the
+        # completion summary's publish-blocker bucket instead of being silently
+        # re-discovered at the post-review emission step every run. This does NOT
+        # halt draft start (config_ok/next_stage above are untouched — 18.19).
+        out["publish_blockers"] = _syndication_profile_blockers(warnings)
     print(json.dumps(out, indent=2))
     return 0
 
