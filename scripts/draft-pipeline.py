@@ -3908,6 +3908,164 @@ def cmd_review_reentry(args):
     return 0
 
 
+def _git_toplevel(path):
+    """Return the git top-level of the repo containing `path`, or None when the
+    path is not inside a git working tree. READ-ONLY — `rev-parse` never writes."""
+    d = path if os.path.isdir(path) else os.path.dirname(os.path.abspath(path))
+    r = subprocess.run(["git", "-C", d, "rev-parse", "--show-toplevel"],
+                       capture_output=True, text=True)
+    if r.returncode != 0:
+        return None
+    return r.stdout.strip() or None
+
+
+def cmd_review_checkpoint_proposal(args):
+    """At review START, surface a one-line CHECKPOINT PROPOSAL when the canonical
+    draft is UNTRACKED or DIRTY in its destination (articles) repo — so the owner
+    can commit the pre-review state and git becomes the durable before/after
+    comparison surface (Story 18.25, #495; SPEC-article-review CAP-6, Alt A).
+
+    The pipeline PROPOSES; the owner COMMITS. This command NEVER writes the
+    destination repo — it runs only READ-ONLY git (`rev-parse`, `status`) and
+    prints a proposal string for the owner to run (or decline). Declining is
+    allowed: the run's in-conversation before/after diff (`review-diff`) still
+    shows what review did this run.
+
+    tracked_state in {untracked, dirty, clean, absent, not-a-repo}; a proposal is
+    surfaced only for untracked/dirty (clean already has the pre-review state in
+    git; the pipeline-proposes/owner-commits stance, hub topics/articles.md
+    2026-07-18)."""
+    draft = os.path.abspath(args.draft)
+    slug = args.slug or os.path.splitext(os.path.basename(draft))[0]
+
+    def emit(state, proposed, proposal, note):
+        print(json.dumps({
+            "stage": "review-checkpoint-proposal",
+            "draft": draft,
+            "slug": slug,
+            "repo": repo,
+            "tracked_state": state,
+            "checkpoint_proposed": proposed,
+            "proposal": proposal,
+            "declinable": True,
+            "writes_destination_repo": False,
+            "note": note,
+        }, indent=2))
+        return 0
+
+    repo = _git_toplevel(draft)
+    if repo is None:
+        return emit(
+            "not-a-repo", False, None,
+            "the draft's destination is not a git working tree — git cannot be "
+            "the before/after surface; the in-conversation diff still shows this "
+            "run's edits. The pipeline writes nothing.")
+    if not os.path.exists(draft):
+        return emit(
+            "absent", False, None,
+            "no canonical draft at the destination path yet — nothing to "
+            "checkpoint. The pipeline writes nothing.")
+
+    # READ-ONLY porcelain status for just this file. `??` = untracked; any other
+    # non-empty XY = tracked-but-modified (staged and/or worktree); empty = clean.
+    r = subprocess.run(
+        ["git", "-C", repo, "status", "--porcelain", "--untracked-files=all",
+         "--", draft],
+        capture_output=True, text=True)
+    line = r.stdout.rstrip("\n")
+    if line == "":
+        return emit(
+            "clean", False, None,
+            "the canonical draft is committed and unmodified in its destination "
+            "repo — git already holds the pre-review state, so no checkpoint is "
+            "needed.")
+    state = "untracked" if line[:2] == "??" else "dirty"
+    try:
+        rel = os.path.relpath(draft, repo)
+    except ValueError:  # pragma: no cover - different drive on Windows
+        rel = draft
+    proposal = (f'(cd "{repo}" && git add "{rel}" && '
+                f'git commit -m "pre-review checkpoint: {slug}")')
+    note = (
+        f"the canonical draft is {state} in its destination repo. Proposal only: "
+        "run the one-liner above to commit the pre-review state (owner commits; "
+        "the pipeline never writes the destination repo — footprint invariant). "
+        "Declining is fine — the in-conversation before/after diff still shows "
+        "this run's edits.")
+    return emit(state, True, proposal, note)
+
+
+def _diff_change_list(before_lines, after_lines):
+    """Fold a difflib opcode stream into a compact applied-change list — one
+    entry per replaced/inserted/deleted block, each carrying its removed/added
+    lines and an anchor into the AFTER draft (owner-facing, for in-conversation
+    display alongside the unified diff)."""
+    import difflib
+    sm = difflib.SequenceMatcher(a=before_lines, b=after_lines, autojunk=False)
+    changes = []
+    for tag, i1, i2, j1, j2 in sm.get_opcodes():
+        if tag == "equal":
+            continue
+        changes.append({
+            "kind": tag,                       # replace | insert | delete
+            "after_line": j1 + 1,              # 1-based anchor into the AFTER draft
+            "removed": before_lines[i1:i2],
+            "added": after_lines[j1:j2],
+        })
+    return changes
+
+
+def cmd_review_diff(args):
+    """Produce the owner-facing BEFORE/AFTER comparison for an arbitration round
+    that applied edits: a unified diff of the pre-arbitration workspace snapshot
+    (BEFORE) against the applied draft (AFTER), plus the applied change list —
+    both for IN-CONVERSATION display (interaction contract #226; the run-workspace
+    snapshot underlies it, artifact paths printed informationally only). Story
+    18.25, #495; SPEC-article-review CAP-6.
+
+    Reads only the two inputs; writes NOTHING — never the destination repo, never
+    a reviews/ artifact. Emission trailers are stripped so a persistence-only
+    hash change never reads as an edit."""
+    before = os.path.abspath(args.before)
+    after = os.path.abspath(args.after)
+    slug = args.slug or os.path.splitext(os.path.basename(after))[0]
+    before_text = _strip_emission_trailer(_read_text(before))
+    after_text = _strip_emission_trailer(_read_text(after))
+    before_lines = before_text.splitlines()
+    after_lines = after_text.splitlines()
+
+    identical = before_lines == after_lines
+    change_list = [] if identical else _diff_change_list(before_lines, after_lines)
+    added = sum(len(c["added"]) for c in change_list)
+    removed = sum(len(c["removed"]) for c in change_list)
+
+    import difflib
+    diff = "" if identical else "".join(difflib.unified_diff(
+        [l + "\n" for l in before_lines],
+        [l + "\n" for l in after_lines],
+        fromfile=f"before/{slug} (pre-arbitration snapshot)",
+        tofile=f"after/{slug} (this run's edits)",
+        lineterm="\n"))
+
+    out = {
+        "stage": "review-diff",
+        "before": before,
+        "after": after,
+        "slug": slug,
+        "identical": identical,
+        "added": added,
+        "removed": removed,
+        "diff": diff,
+        "change_list": change_list,
+        "note": "before/after diff + change list are presented IN-CONVERSATION "
+                "(interaction contract #226); the snapshot/draft paths above are "
+                "informational only — no artifact is written to the destination "
+                "repo. An empty diff means arbitration applied no edit this run.",
+    }
+    print(json.dumps(out, indent=2, ensure_ascii=False))
+    return 0
+
+
 def _syndication_profile_warnings(root, config_json=None, profiles_dir_override=None):
     """Story 18.19 (#494): when user config's `syndication.policy.<lang>.variants`
     declares a platform, WARN (informational — never a hard fail) if that
@@ -4309,6 +4467,27 @@ def main(argv=None):
     sr.add_argument("--global-config")
     sr.add_argument("--repo-config")
     sr.add_argument("--ws", help="run workspace for the proposal (never the site tree)")
+
+    cp = sub.add_parser("review-checkpoint-proposal",
+                        help="at review START, propose a pre-review git checkpoint "
+                             "when the canonical draft is untracked/dirty in its "
+                             "destination repo (Story 18.25, #495; CAP-6). READ-ONLY "
+                             "git; never writes the destination repo")
+    cp.add_argument("--draft", required=True,
+                    help="the canonical draft path in its destination (articles) repo")
+    cp.add_argument("--slug", help="draft slug for the proposal (default: draft filename stem)")
+
+    rd = sub.add_parser("review-diff",
+                        help="owner-facing before/after comparison: unified diff + "
+                             "change list of the pre-arbitration snapshot vs the "
+                             "applied draft, for in-conversation display (Story 18.25, "
+                             "#495; CAP-6). Reads only its inputs; writes nothing")
+    rd.add_argument("--before", required=True,
+                    help="the pre-arbitration workspace snapshot (BEFORE)")
+    rd.add_argument("--after", required=True,
+                    help="the applied (edited) draft (AFTER)")
+    rd.add_argument("--slug", help="draft slug for the diff labels (default: AFTER filename stem)")
+
     args = p.parse_args(argv)
     return {
         "start": cmd_start, "consume": cmd_consume, "interview": cmd_interview,
@@ -4318,6 +4497,8 @@ def main(argv=None):
         "classify-policy": cmd_classify_policy,
         "policy-block-check": cmd_policy_block_check,
         "review-reentry": cmd_review_reentry,
+        "review-checkpoint-proposal": cmd_review_checkpoint_proposal,
+        "review-diff": cmd_review_diff,
         "answer": cmd_answer, "journal": cmd_journal, "provenance": cmd_provenance,
         "staging-candidates": cmd_staging_candidates,
         "review-consulted": cmd_review_consulted,
