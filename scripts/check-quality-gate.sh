@@ -260,6 +260,50 @@ grep -qi 'skeleton repetition' "$DP" && grep -qi 'skeleton repetition' "$RUBRIC"
 grep -qi 'plan-conformance' "$RUBRIC" && grep -qi 'plan-conformance' "$SKILL" \
   && ok "plan-conformance contract present in rubric + SKILL (#440)" || err "plan-conformance contract missing"
 
+# Story 18.18 (#492) — the gate WRITES the complete four-dimension verdict
+# record: dim1/dim2, dim3 WITH its inventory stamp, dim4 WITH measured values.
+# A run must not reach `stage: complete` over a partial record.
+printf 'dim1: pass\ndim2: pass\n' > "$work/judge-pass2.txt"
+python3 "$DP" quality-gate --draft "$work/good.md" --map "$work/good-map.txt" \
+  --judge "$work/judge-pass2.txt" --verdicts-out "$work/rubric-verdicts.txt" >/dev/null
+rv="$work/rubric-verdicts.txt"
+[ -f "$rv" ] && ok "--verdicts-out writes the verdict record" || err "verdict record not written"
+for d in 'dim1:' 'dim2:' 'dim3:' 'dim4:'; do
+  grep -q "^$d" "$rv" && ok "verdict record carries $d" || err "verdict record missing $d"
+done
+grep -q '^dim3:.*dim3_inventory:.*registered_terms=' "$rv" \
+  && ok "dim3 verdict is stamped with its inventory (version + counts)" \
+  || err "dim3 verdict missing its inventory stamp"
+grep -Eq '^dim4:.*sentence_mean_words=.*sourced_density=' "$rv" \
+  && ok "dim4 verdict carries measured mechanical values" \
+  || err "dim4 verdict missing measured values"
+# The JSON surfaces the dim4 measures symmetrically with dim3_inventory.
+python3 "$DP" quality-gate --draft "$work/good.md" --map "$work/good-map.txt" --judge "$work/judge-pass2.txt" \
+  | jget '"headings" in d["dim4_inventory"] and "sourced_density" in d["dim4_inventory"]' | grep -q True \
+  && ok "gate JSON carries dim4_inventory measures" || err "gate JSON missing dim4_inventory"
+
+# The completion gate BLOCKS on a partial verdict record (dim1/dim2 only — the
+# #492 regression) and writes no checkpoint; a complete record clears the block.
+wsp="$work/wsp"; mkdir -p "$wsp"
+printf 'dim1: pass\ndim2: pass\n' > "$wsp/rubric-verdicts.txt"
+if python3 "$DP" complete --draft "$work/good.md" --slug t --ws "$wsp" >/dev/null 2>"$work/e_rv"; then
+  err "a partial verdict record did not block completion"
+else
+  grep -q 'verdict record is partial' "$work/e_rv" && grep -q 'dim3, dim4' "$work/e_rv" \
+    && ok "a partial verdict record blocks reaching stage: complete (names the gap)" \
+    || err "partial-record block message wrong: $(cat "$work/e_rv")"
+fi
+[ ! -f "$wsp/checkpoint.json" ] && ok "no done-checkpoint over a partial verdict record" \
+  || err "checkpoint written despite a partial verdict record"
+# A COMPLETE record does not trigger the verdict-record block (it proceeds past
+# it — any later error is a different product, never the partial-record message).
+wsc="$work/wsc"; mkdir -p "$wsc"
+cp "$rv" "$wsc/rubric-verdicts.txt"
+python3 "$DP" complete --draft "$work/good.md" --slug t --ws "$wsc" >/dev/null 2>"$work/e_rvc" || true
+grep -q 'verdict record is partial' "$work/e_rvc" \
+  && err "a complete verdict record wrongly tripped the partial-record block" \
+  || ok "a complete four-dimension record clears the completion verdict gate"
+
 if [ "$fail" -eq 0 ]; then
   printf '\nAll quality-gate checks passed.\n'; exit 0
 else
