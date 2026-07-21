@@ -525,6 +525,172 @@ def cmd_consult(args):
     return 0
 
 
+# --- Differential context: prior-coverage digest (Story 18.23, #504) ----------
+# When prior published/drafted articles share the project, the argument plan
+# should not re-explain what those articles already carry. This computes a
+# READ-ONLY prior-coverage digest — built on the SAME carriers as plan
+# consultation (plans/*.md) and continuation mode (the canonical's frontmatter +
+# framing spans) — so Stage 3 can compress-and-link repeated context instead of
+# re-introducing it. The prior body NEVER enters the harvest evidence stream
+# (Story 13.56's fences hold): this is framing context, exactly like
+# continuation mode, computed automatically rather than only on an explicit
+# `continuing <slug>`. No new store, no schema change (C1) — the project a plan
+# belongs to is the repo component of its already-recorded `pin`.
+
+def _plan_project(pin):
+    """The project a plan belongs to: the source-repo component of its `pin`
+    (`<source-repo>@<commit>`). This is the `related.projects` proxy already
+    carried by every plan — no new field."""
+    if not pin:
+        return None
+    return pin.split("@", 1)[0].strip() or None
+
+
+def _canonical_dir(root):
+    """The declared `output.drafts` directory (where continuation mode reads a
+    named prior canonical), or None when none is declared."""
+    rws = _load_sources()
+    val = rws.get_output_drafts(rws.read_lines(root))
+    if not val:
+        return None
+    return rws.resolve_drafts_dir(val, root)
+
+
+_CONTEXT_HEADING_RE = re.compile(r"^\s{0,3}#{1,6}\s*\{?\s*context\b", re.IGNORECASE)
+_HEADING_RE = re.compile(r"^\s{0,3}#{1,6}\s")
+# Warning-callout / admonition spans a prior article carries — the tissue the
+# owner does not want repeated verbatim. GitHub-style callouts plus a small set
+# of plain-prose warning cues, matched deterministically in document order.
+_WARN_CALLOUT_RE = re.compile(r"^\s{0,3}>?\s*\[!(?:WARNING|CAUTION|IMPORTANT)\]", re.IGNORECASE)
+_WARN_PROSE_RE = re.compile(r"\b(warning|caveat|gotcha|do not|don't|limitation|pitfall)\b",
+                            re.IGNORECASE)
+_SPAN_CAP = 500
+
+
+def _split_frontmatter_body(text):
+    fields, body, _ = split_frontmatter(text)
+    return fields, body
+
+
+def _blocks(body):
+    """Body split into blank-line-delimited blocks, each a (list-of-lines)."""
+    out, cur = [], []
+    for ln in body.split("\n"):
+        if ln.strip() == "":
+            if cur:
+                out.append(cur); cur = []
+        else:
+            cur.append(ln)
+    if cur:
+        out.append(cur)
+    return out
+
+
+def _context_span(body):
+    """The text of the first section whose heading names Context — the shared
+    setup a second article should recap-and-link rather than re-explain. None
+    when the article has no such section."""
+    lines = body.split("\n")
+    start = None
+    for i, ln in enumerate(lines):
+        if _CONTEXT_HEADING_RE.match(ln):
+            start = i + 1
+            break
+    if start is None:
+        return None
+    span = []
+    for ln in lines[start:]:
+        if _HEADING_RE.match(ln):
+            break
+        span.append(ln)
+    text = re.sub(r"\s+", " ", "\n".join(span)).strip()
+    return text[:_SPAN_CAP] or None if text else None
+
+
+def _warning_spans(body):
+    """Every warning/caveat span in the article body, in document order, deduped
+    — the warnings a second article repeats only when load-bearing for its own
+    claim (the SKILL owns that judgment; here we surface them)."""
+    spans, seen = [], set()
+    for block in _blocks(body):
+        head = block[0]
+        if _WARN_CALLOUT_RE.match(head) or _WARN_PROSE_RE.search(" ".join(block)):
+            # strip leading blockquote/callout markers for a clean recap unit
+            cleaned = []
+            for ln in block:
+                ln = re.sub(r"^\s{0,3}>\s?", "", ln)
+                ln = re.sub(r"^\s*\[!(?:WARNING|CAUTION|IMPORTANT)\]\s*", "", ln,
+                            flags=re.IGNORECASE)
+                if ln.strip():
+                    cleaned.append(ln.strip())
+            text = re.sub(r"\s+", " ", " ".join(cleaned)).strip()[:_SPAN_CAP]
+            if text and text not in seen:
+                seen.add(text)
+                spans.append(text)
+    return spans
+
+
+def cmd_differential_context(args):
+    """Emit the prior-coverage digest for the run's project (Story 18.23). READ-
+    ONLY, silent-degrading exactly like `consult`: no articles-repo schema, or no
+    plans/ directory, yields an empty digest with a reason — never a failure.
+
+    Membership: every prior plan whose project (the repo component of its `pin`)
+    equals `--project`. For each, the digest carries the plan's slug/claim/status
+    plus — read from the canonical at `output.drafts/<slug>.md`, framing context
+    like continuation mode — the article's `summary` and its Context / warning
+    spans. The prior body is used ONLY to build this framing digest; it never
+    enters the harvest evidence stream. No prior article sharing the project ->
+    an empty `prior_coverage` (unchanged behavior; no digest)."""
+    root = rp.host_root(args.root)
+    project = (args.project or "").strip() or _plan_project(
+        f"{os.path.basename(os.path.realpath(root))}@")
+    repo = articles_repo_root(root)
+    if not has_articles_schema(repo):
+        print(json.dumps({"project": project, "prior_coverage": [], "degraded":
+                          "destination has no articles-repo schema; "
+                          "differential context is skipped (today's behavior)"}))
+        return 0
+    plans_dir = os.path.join(repo, PLAN_DIR)
+    if not os.path.isdir(plans_dir):
+        print(json.dumps({"project": project, "prior_coverage": [], "degraded":
+                          "no plans/ directory in the articles repo"}))
+        return 0
+    drafts_dir = _canonical_dir(root)
+    coverage = []
+    for name in sorted(os.listdir(plans_dir)):
+        if not name.endswith(".md"):
+            continue
+        s = _read_plan_summary(os.path.join(plans_dir, name))
+        if s is None:
+            continue
+        if _plan_project(s.get("pin")) != project:
+            continue
+        entry = {"slug": s["slug"], "claim": s.get("claim"),
+                 "intent": s.get("intent"), "status": s.get("status"),
+                 "pin": s.get("pin"), "summary": None,
+                 "context_span": None, "warnings": []}
+        # Framing context (continuation-mode read): the canonical's frontmatter
+        # summary + its Context/warning spans. Read-only; body-fenced from harvest.
+        if drafts_dir:
+            canon = os.path.join(drafts_dir, f"{s['slug']}.md")
+            if os.path.isfile(canon):
+                try:
+                    fields, body = _split_frontmatter_body(
+                        open(canon, encoding="utf-8").read())
+                    entry["summary"] = fields.get("summary")
+                    entry["context_span"] = _context_span(body)
+                    entry["warnings"] = _warning_spans(body)
+                except OSError:
+                    pass
+        if entry["summary"] is None:      # canonical absent: the plan's claim is
+            entry["summary"] = entry["claim"]   # the only framing available
+        coverage.append(entry)
+    print(json.dumps({"project": project, "articles_repo": repo,
+                      "prior_coverage": coverage, "degraded": None}, indent=2))
+    return 0
+
+
 # --- CAP-4 policy-conformance gate (Story 13.76, #365) ------------------------
 
 # A commit-pinned policy pointer in the seam whitelist grammar
@@ -831,6 +997,11 @@ def main(argv=None):
 
     sub.add_parser("consult", parents=[root_parent])
 
+    sp = sub.add_parser("differential-context", parents=[root_parent])
+    sp.add_argument("--project", help="the run's project (related.projects); "
+                    "prior plans whose pin names this source repo share it. "
+                    "Default: the host repo's basename.")
+
     sp = sub.add_parser("conformance", parents=[root_parent])
     sp.add_argument("--plan", required=True, help="the plan file to validate")
     sp.add_argument("--surface", required=True,
@@ -855,6 +1026,7 @@ def main(argv=None):
         args.root = None
     return {"validate": cmd_validate, "dest": cmd_dest,
             "write": cmd_write, "consult": cmd_consult,
+            "differential-context": cmd_differential_context,
             "conformance": cmd_conformance}[args.cmd](args)
 
 

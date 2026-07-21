@@ -356,6 +356,42 @@ If `<prior-slug>` resolves to **no canonical or plan**, surface it under the
 never a hard failure. Continuation is an **enhancer**: with no modifier the run
 behaves exactly as today (auto plan-consultation only).
 
+### Differential context — compress-and-link prior-article coverage (Story 18.23, #504)
+
+Consumption exclusion (CAP-9/#430) stops the run re-covering a story **element**
+the owner already published; **differential context** stops it repeating the
+surrounding **tissue** — the same introductions, shared setup, and warnings a
+prior article on the **same project** already carries. This is **automatic**,
+like continuation mode, not gated on an explicit `continuing <slug>`: whenever
+prior published/drafted articles **share the project** (`related.projects`), the
+argument plan receives a **prior-coverage digest**. Compute it after Stage 0,
+alongside plan consultation, over the **existing carriers** — `plans/*.md` and
+the prior canonicals — **never** the policy hub, and with **no schema change**
+(the project a plan belongs to is the repo component of its recorded `pin`):
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/write-article-plan.py differential-context --root <host-repo> --project <related.projects>
+```
+
+It returns, for each prior article sharing the project, a `prior_coverage` entry
+— **slug + summary + its Context span + its warning spans** — read from the
+plan and the canonical's frontmatter/body exactly as continuation mode reads a
+named prior article. **The prior body never enters the harvest evidence stream**
+(Story 13.56's fences hold exactly as for plan consultation): the digest is
+**framing context**, not a source, and no checkable claim is ever sourced to it.
+
+At Stage 3, the argument plan treats repeated context as **compress-and-link**,
+not re-explanation: where this article would re-introduce shared setup a prior
+article already established, write a **one-sentence recap plus a pointer** to
+that article (`related.articles`) instead of re-explaining it. A **warning
+repeats only when it is load-bearing for THIS article's claim** — a caveat the
+digest already carries is otherwise linked, not restated. This is a directed
+emphasis on the drafting agent, not new evidence and not a new provenance class.
+
+With **no prior article sharing the project**, the digest is **empty** and the
+run behaves **exactly as today** — the compress-and-link machinery never fires,
+and nothing about a first article on a project changes.
+
 ### Durability — checkpoint each stage, resume from the last completed one (Story 13.5)
 
 Wall-clock is unconstrained but the **turn/compute budget is a real ceiling**, so
