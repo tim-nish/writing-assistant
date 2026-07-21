@@ -7,6 +7,7 @@ language: en
 summary: A worked starter draft that passes lint-article unchanged — replace every field and section with your own before running review, then swap the pointer block for your rendered one.
 topics: [ci, testing, developer-experience]
 related: { projects: [], publications: [], products: [] }
+generated_by: writing-assistant@0.1.0+0000000   # immutable birth record — the pipeline writes this at creation; a real draft carries the run's tool@version+commit
 ---
 
 <!--

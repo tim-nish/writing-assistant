@@ -155,6 +155,27 @@ def check_frontmatter(fm, cfg, findings):
                          f"summary is {len(summary.strip())} chars (> {SUMMARY_MAX})"))
 
 
+# Birth-record shape (hub decision 2026-07-16): <tool>@<version>+<commit>.
+_GENERATED_BY_RE = re.compile(r"^[\w.-]+@[\w.\-+]+\+\S+$")
+
+
+def check_generated_by(fm, findings):
+    """Every canonical draft carries the immutable `generated_by` birth record
+    (hub decision 2026-07-16). It can only legitimately be written at Stage-3
+    creation, so its absence at review time is a generation defect, not a
+    review fix — the lint surfaces it here (the review boundary must never
+    compensate for a missing gate)."""
+    val = fm.get("generated_by")
+    if not isinstance(val, str) or not val.strip():
+        findings.append((1, "birth-record",
+                         "missing immutable generated_by birth record "
+                         "(<tool>@<version>+<commit>, written at Stage-3 creation)"))
+        return
+    if not _GENERATED_BY_RE.match(val.strip()):
+        findings.append((1, "birth-record",
+                         f"generated_by={val!r} is not <tool>@<version>+<commit>"))
+
+
 def check_title(fm, findings):
     title = fm.get("title")
     if not isinstance(title, str) or not title.strip():
@@ -310,6 +331,7 @@ def lint_file(path, cfg, check_http):
                              + " (config `frontmatter.schema`; see config/user-config.example.yaml)"))
     if fm is not None:
         check_frontmatter(fm, cfg, findings)
+        check_generated_by(fm, findings)
         check_title(fm, findings)
     check_pointer_block(text, cfg, len(lines), findings)
     check_heading_density(lines, body_start, findings)

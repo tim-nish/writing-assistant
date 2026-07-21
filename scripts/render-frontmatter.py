@@ -22,6 +22,44 @@ import subprocess
 import sys
 
 
+def plugin_provenance():
+    """The plugin's `(tool, version, commit)` birth-record source (hub decision
+    2026-07-16). `tool`/`version` come from the plugin manifest
+    (`.claude-plugin/plugin.json`, the single version declaration the manifest
+    check already governs); `commit` is the plugin repo's HEAD (short sha). No
+    new versioning mechanism is invented — this reads the same manifest field
+    the packaging gate validates and the same `git rev-parse` the other scripts
+    use. Resolution is best-effort but never silent: a missing manifest/commit
+    degrades to an explicit `0.0.0` / `unknown` token, still a well-formed
+    birth record whose gap is visible rather than absent.
+    """
+    here = os.path.dirname(os.path.realpath(__file__))
+    plugin_root = os.path.dirname(here)          # scripts/ -> plugin root
+    tool, version = "writing-assistant", "0.0.0"
+    try:
+        with open(os.path.join(plugin_root, ".claude-plugin", "plugin.json"),
+                  encoding="utf-8") as fh:
+            m = json.load(fh)
+        tool = m.get("name") or tool
+        version = m.get("version") or version
+    except (OSError, ValueError):
+        pass
+    commit = "unknown"
+    r = subprocess.run(["git", "-C", plugin_root, "rev-parse", "--short", "HEAD"],
+                       capture_output=True, text=True)
+    if r.returncode == 0 and r.stdout.strip():
+        commit = r.stdout.strip()
+    return tool, version, commit
+
+
+def generated_by_value():
+    """The immutable birth record `<tool>@<version>+<commit>`, written ONCE at
+    creation into the canonical draft's frontmatter and never rewritten by a
+    later stage (hub decision 2026-07-16)."""
+    tool, version, commit = plugin_provenance()
+    return f"{tool}@{version}+{commit}"
+
+
 def load_config(args):
     if args.config_json:
         raw = sys.stdin.read() if args.config_json == "-" else open(args.config_json, encoding="utf-8").read()
@@ -72,6 +110,13 @@ def render(cfg, lang):
             # of the site schema in user config.
             out.append("audience: {audience}   # pipeline-internal — stripped at packaging")
             out.append("audience_id: {audience_id}   # pipeline-internal compatibility id (Story 13.71) — stripped at packaging")
+
+    # Immutable birth record (hub decision 2026-07-16): the tool@version+commit
+    # that generated this canonical draft, resolved AT CREATION from the plugin
+    # manifest + repo HEAD and never rewritten by a later stage. Unlike the
+    # `{slot}` fields above this is a real value, not a fill target — the run,
+    # not the author, owns it.
+    out.append(f"generated_by: {generated_by_value()}   # immutable birth record — set at creation, never updated")
 
     variants = cfg.get("syndication", {}).get("variants", {})
     if mode == "canonical":

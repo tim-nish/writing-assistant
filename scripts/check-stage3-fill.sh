@@ -65,6 +65,67 @@ python3 "$DP" verify-markers "$work/clean.md" >/dev/null 2>&1 \
 python3 "$DP" verify-markers --count "$work/good.md" | grep -qx 2 \
   && ok "--count is a Stage-4 exit signal (resolve until 0)" || err "count signal wrong"
 
+# 7. Birth record (Story 18.17, hub decision 2026-07-16): the frontmatter
+#    render path emits an immutable `generated_by: <tool>@<version>+<commit>`
+#    AT CREATION (a real value, not a `{slot}` the author fills), and the lint
+#    validates its presence on a canonical draft.
+RFM="$root/scripts/render-frontmatter.py"
+LINT="$root/scripts/lint-article"
+cat > "$work/cfg.json" <<'EOF'
+{"owner":{"site_url":"https://ada.dev"},
+ "frontmatter":{"schema":["slug","title","date","mode","language","summary","topics","related"],
+   "related_keys":["projects","publications","products"]},
+ "syndication":{"policy":{"en":{"mode":"canonical","variants":["devto"]},
+   "ja":{"mode":"external","variants":["zenn"]}},
+   "variants":{"devto":{"canonical_url_base":"https://ada.dev/articles"},
+   "zenn":{"external_record_max_lines":20}}}}
+EOF
+fm_en=$(python3 "$RFM" --config-json "$work/cfg.json" --language en)
+printf '%s\n' "$fm_en" | grep -Eq '^generated_by: [^ ]+@[^ ]+\+[^ ]+' \
+  && ok "render path emits generated_by <tool>@<version>+<commit> at creation" \
+  || err "render path did not emit a well-formed generated_by"
+# It is a resolved value, never an author-filled {slot}.
+printf '%s\n' "$fm_en" | grep -q '^generated_by: {' \
+  && err "generated_by rendered as an unfilled {slot} (must be resolved at creation)" \
+  || ok "generated_by is a resolved birth record, not a {slot}"
+# The birth record rides on the external-mode (ja) draft too.
+python3 "$RFM" --config-json "$work/cfg.json" --language ja | grep -q '^generated_by: ' \
+  && ok "generated_by present on the external-mode draft too" || err "generated_by missing on ja draft"
+
+# Lint validates presence: a draft WITHOUT generated_by is a defect; WITH it, clean.
+cat > "$work/nb.md" <<'EOF'
+---
+slug: nb
+title: "A draft that forgot to record its birth today"
+date: 2026-07-09
+mode: canonical
+language: en
+summary: s.
+topics: [a]
+related: { projects: [], publications: [], products: [] }
+---
+
+## H
+
+Body more at [ada.dev](https://ada.dev).
+EOF
+python3 "$LINT" "$work/nb.md" --config-json "$work/cfg.json" 2>/dev/null | grep -q '\[birth-record\]' \
+  && ok "lint flags a canonical draft missing generated_by" || err "lint did not flag missing generated_by"
+# Same draft, now carrying a well-formed birth record from the render path: no birth-record defect.
+printf 'generated_by: writing-assistant@0.1.0+abc1234\n' > "$work/inject"
+python3 - "$work/nb.md" "$work/inject" > "$work/wb.md" <<'PY'
+import sys
+lines = open(sys.argv[1]).read().split("\n")
+inj = open(sys.argv[2]).read().strip()
+# insert the birth record just before the closing frontmatter fence
+close = [i for i, l in enumerate(lines) if l.strip() == "---"][1]
+lines.insert(close, inj)
+sys.stdout.write("\n".join(lines))
+PY
+python3 "$LINT" "$work/wb.md" --config-json "$work/cfg.json" 2>/dev/null | grep -q '\[birth-record\]' \
+  && err "lint flagged a draft that carries a valid generated_by" \
+  || ok "a draft carrying a valid generated_by has no birth-record defect"
+
 if [ "$fail" -eq 0 ]; then
   printf '\nAll stage-3 fill checks passed.\n'; exit 0
 else
