@@ -89,6 +89,15 @@ covr='{"fact_sheet":[{"claim":"a surprising unexpected finding; we gave up speed
 iv "$covr" F2 | jget 'any(q["id"]=="q8" for q in d["questions"])' | grep -q False \
   && ok "a number/result fact present -> q8 not asked (condition-gated)" || err "q8 asked despite evidence"
 
+# 10b. Story 18.27 (#506, CAP-8 clause) — the depth question MAY offer suggested
+#      reading-time bands as the owner's depth-choice unit, recorded AS the depth
+#      directive (never a reading-time target).
+grep -qiE 'reading-time band|reading time band' "$SKILL" \
+  && ok "SKILL: the depth question may offer reading-time bands (#506)" || err "SKILL missing reading-time bands"
+grep -qiE 'recorded as the depth directive|as the depth directive' "$SKILL" \
+  && ok "SKILL: the band pick is recorded AS the depth directive, not a target (#506)" \
+  || err "SKILL missing the recorded-as-directive rule"
+
 # 11. Journal echoes the presentation order (attributable mis-ordering).
 ivout=$(iv "$s" F4)
 ans=$(printf '%s' "$ivout" | jget 'json.dumps([{"id": q["id"], "disposition": "skipped"} for q in d["questions"]])')
