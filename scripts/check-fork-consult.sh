@@ -13,7 +13,7 @@ cd "$root"
 
 F="scripts/fork-consult.py"
 SKILL="skills/fork-gate-consult-first/SKILL.md"
-PIN="product-lab@a1b2c3d4e5f6a7b8"
+PIN="policy-hub@8f3c2d1e4a5b6c7d"
 
 fail=0
 err() { printf 'FAIL: %s\n' "$1" >&2; fail=1; }
@@ -32,9 +32,9 @@ cat > "$work/f.json" <<JSON
 {"forks": [
   {"id":"cov","question":"independent or syndicated?","in_scope":true,
    "consult":{"covered":true,"discriminates":true,"chosen_option":"independent",
-     "quote":"Website stays independent","pointer":"topics/articles.md:17@a1b2c3d4e5f6a7b8","pin":"$PIN"}},
+     "quote":"Website stays independent","pointer":"topics/articles.md:17@8f3c2d1e4a5b6c7d","pin":"$PIN"}},
   {"id":"top","question":"which CSS framework?","in_scope":true,
-   "consult":{"covered":true,"discriminates":false,"quote":"the site should look clean","pointer":"topics/articles.md:9@a1b2c3d4e5f6a7b8",
+   "consult":{"covered":true,"discriminates":false,"quote":"the site should look clean","pointer":"topics/articles.md:9@8f3c2d1e4a5b6c7d",
      "candidates":[{"answer":"Tailwind","grounding":[]}]}},
   {"id":"unc","question":"publish cadence?","in_scope":true,
    "consult":{"covered":false,"candidates":[{"answer":"weekly","grounding":[]},{"answer":"on-ready","grounding":[]}]}},

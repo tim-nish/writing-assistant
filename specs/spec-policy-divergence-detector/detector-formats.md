@@ -81,8 +81,8 @@ authority is the **hub staging-file schema**, never this repo:
 
 - **Staging-schema block — a conformance copy of hub §3.1.** The block's
   **envelope** (container fields, naming, structure) conforms to the hub
-  staging-file schema, **product-lab `specs/knowledge-architecture.md` §3.1**,
-  pinned at the hub commit the run consulted (`product-lab@<commit>`).
+  staging-file schema, **`knowledge-architecture.md` §3.1**,
+  pinned at the hub commit the run consulted (`<policy-hub>@<commit>`).
   **Precedence: the hub schema is the authority — it wins on any mismatch, and a
   mismatch is a defect of THIS spec (or its seam carrier), never of the hub.**
   This spec defines only the **detector-specific payload** placed inside that
