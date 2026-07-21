@@ -616,8 +616,10 @@ as a **raw dogfood event** — this is how the reviewer gets calibrated against
 its own acceptance history (a chronically-rejected criterion surfaces through
 the dogfood tool's recurrence bar as a "tune or demote this pass" proposal;
 that analysis never runs here). Build one JSON line per arbitrated finding —
-`{"pass", "criterion", "severity", "disposition", "reason"?}`, `reason`
-required on `rejected` — and emit:
+`{"pass", "criterion", "severity", "disposition", "reason"?, "anchor"?}`,
+`reason` required on `rejected` and `anchor` the finding's location (e.g.
+`L64:exploration-axes`) so distinct findings stay distinct and recurrence
+collapses correctly (#497) — and emit:
 
 ```
 python3 ${CLAUDE_PLUGIN_ROOT}/scripts/emit-arbitration-events.py <dispositions.jsonl> \

@@ -80,6 +80,40 @@ grep -q "emit-arbitration-events.py" "$SKILL" \
 grep -qi "enhancer, never a dependency" "$SKILL" \
   && ok "SKILL documents the graceful-degrade contract" || err "SKILL degrade contract missing"
 
+# 5. Stable finding identity (#497): distinct findings emit distinct events, but
+#    true cross-run recurrence (same criterion at the same anchor) still
+#    collapses. Two accepted findings with identical pass|criterion|severity|
+#    disposition but DIFFERENT anchors must NOT emit byte-identical detail
+#    (they would collapse under Tanuki's scenario|type|detail exact-dupe key).
+mkdir -p "$work/a" "$work/b"
+cat > "$work/two.jsonl" <<'EOF'
+{"pass":"cold-read","criterion":"assumed-knowledge","severity":"should","disposition":"accepted","anchor":"L64:exploration-axes"}
+{"pass":"cold-read","criterion":"assumed-knowledge","severity":"should","disposition":"accepted","anchor":"L32:sonnet-tier"}
+EOF
+python3 "$EMIT" "$work/two.jsonl" --ws "$work/a" --scenario t --run-id r1 --ingest-cmd "" >/dev/null 2>&1
+python3 - "$work/a/arbitration-events.jsonl" <<'PY' && ok "distinct findings (differing anchor) emit distinct detail (#497)" || err "distinct findings collapsed to identical detail"
+import json,sys
+ev=[json.loads(l) for l in open(sys.argv[1]) if l.strip()]
+assert len(ev)==2, ev
+assert ev[0]["detail"]!=ev[1]["detail"], ev
+# the identity must let the event be joined back to its originating edit offline
+assert "L64:exploration-axes" in ev[0]["detail"] and "L32:sonnet-tier" in ev[1]["detail"], ev
+PY
+
+# Same criterion at the same anchor across two SEPARATE runs -> identical detail
+# (recurrence still collapses; detail must be run-independent).
+printf '%s\n' '{"pass":"cold-read","criterion":"assumed-knowledge","severity":"should","disposition":"accepted","anchor":"L64:exploration-axes"}' > "$work/one.jsonl"
+mkdir -p "$work/a2" "$work/b2"
+python3 "$EMIT" "$work/one.jsonl" --ws "$work/a2" --scenario t --run-id r1 --ingest-cmd "" >/dev/null 2>&1
+python3 "$EMIT" "$work/one.jsonl" --ws "$work/b2" --scenario t --run-id r2 --ingest-cmd "" >/dev/null 2>&1
+python3 - "$work/a2/arbitration-events.jsonl" "$work/b2/arbitration-events.jsonl" <<'PY' && ok "same criterion+anchor across runs keeps identical detail (recurrence collapses, #497)" || err "cross-run recurrence detail diverged"
+import json,sys
+a=[json.loads(l) for l in open(sys.argv[1]) if l.strip()]
+b=[json.loads(l) for l in open(sys.argv[2]) if l.strip()]
+assert a[-1]["detail"]==b[-1]["detail"], (a[-1]["detail"], b[-1]["detail"])
+assert a[-1]["run"]!=b[-1]["run"]  # different runs, same detail
+PY
+
 if [ "$fail" -eq 0 ]; then
   printf '\nAll arbitration-event checks passed.\n'; exit 0
 else
