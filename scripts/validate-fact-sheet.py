@@ -67,6 +67,101 @@ URL_RE = re.compile(r"^https?://\S+$")
 # the pin is what a later audit resolves to the exact finding.
 DEN_RE = re.compile(r"^den:(?P<ledger>[A-Za-z0-9._-]+)@(?P<run>[A-Za-z0-9._-]+)$")
 
+# --- Coverage manifest (#514) ------------------------------------------------
+# The fact sheet opens with a machine-checkable coverage manifest so a silent
+# source-coverage collapse is impossible to ship: it discloses the pin, how many
+# declared files the scope resolver matched, the per-file entry counts of the
+# files READ, and an explicit SKIPPED list (or `skipped: none`). The accounting
+# is closed — read files + skipped files must equal the matched count, so a file
+# that was neither read nor disclosed as skipped is a rejection, not a silent
+# omission. The section uses `key: value` lines (never `- ` bullets), so entry
+# parsing never mistakes it for a `CLAIM / SOURCE / KIND` entry. See
+# `skills/harvest/SKILL.md` (output contract) and pipeline-stages.md
+# (§"Harvest coverage disclosure").
+COVERAGE_HEADING_RE = re.compile(r"^#+\s*Coverage\b", re.I)
+COV_PIN_RE = re.compile(r"^pin:\s*(?P<pin>\S+)\s*$")
+COV_MATCHED_RE = re.compile(r"^matched:\s*(?P<n>\d+)\s*$")
+COV_READ_RE = re.compile(r"^read:\s*(?P<file>.+?)\s*\((?P<n>\d+)\)\s*$")
+COV_SKIPPED_NONE_RE = re.compile(r"^skipped:\s*none\s*$", re.I)
+COV_SKIPPED_RE = re.compile(r"^skipped:\s*(?P<file>.+?)\s*\((?P<reason>.+)\)\s*$")
+
+
+def _coverage_section(text):
+    """Return the lines of the `## Coverage` section (heading excluded), or None
+    if the fact sheet carries no coverage manifest. The section runs from its
+    heading to the next markdown heading (or EOF)."""
+    lines = text.split("\n")
+    start = None
+    for i, ln in enumerate(lines):
+        if COVERAGE_HEADING_RE.match(ln):
+            start = i
+            break
+    if start is None:
+        return None
+    body = []
+    for ln in lines[start + 1:]:
+        # The manifest ends at the next heading or the first fact-sheet entry
+        # (`- ` bullet) — the manifest itself never uses bullets, so entries and
+        # the NEEDS-OWNER list are never swallowed into the section.
+        if ln.startswith("#") or ln.startswith("- "):
+            break
+        body.append(ln)
+    return body
+
+
+def validate_coverage(text):
+    """Validate the coverage manifest (#514) if present. Returns None when the
+    manifest is well-formed (or absent — absence is handled by the caller under
+    --require-coverage), else a single rejection reason string.
+
+    A well-formed manifest has exactly one `pin:` and one `matched: <int>`, a
+    `read: <file> (<count>)` line per file read, and either `skipped: none` or a
+    `skipped: <file> (<reason>)` line per skipped file — with the closed
+    accounting `#read + #skipped == matched` so every matched file is disclosed
+    as read or skipped, never silently dropped."""
+    body = _coverage_section(text)
+    if body is None:
+        return None
+    pins, matched = [], []
+    reads, skips = [], []
+    skipped_none = False
+    for ln in body:
+        s = ln.strip()
+        if s == "":
+            continue
+        m = COV_PIN_RE.match(s)
+        if m:
+            pins.append(m["pin"]); continue
+        m = COV_MATCHED_RE.match(s)
+        if m:
+            matched.append(int(m["n"])); continue
+        m = COV_READ_RE.match(s)
+        if m:
+            reads.append((m["file"], int(m["n"]))); continue
+        if COV_SKIPPED_NONE_RE.match(s):
+            skipped_none = True; continue
+        m = COV_SKIPPED_RE.match(s)
+        if m:
+            skips.append((m["file"], m["reason"])); continue
+        return (f"coverage manifest: unrecognized line {s!r} — allowed lines are "
+                "`pin: <ref>`, `matched: <int>`, `read: <file> (<count>)`, and "
+                "`skipped: <file> (<reason>)` or `skipped: none`")
+    if len(pins) != 1:
+        return f"coverage manifest: expected exactly one `pin:` line, found {len(pins)}"
+    if len(matched) != 1:
+        return f"coverage manifest: expected exactly one `matched: <int>` line, found {len(matched)}"
+    if skipped_none and skips:
+        return ("coverage manifest: `skipped: none` cannot coexist with a "
+                "`skipped: <file>` line — list every skipped file or state none")
+    if not skipped_none and not skips and not reads:
+        return "coverage manifest: no `read:` or `skipped:` lines — disclose what was covered"
+    accounted = len(reads) + len(skips)
+    if accounted != matched[0]:
+        return (f"coverage manifest: accounting does not close — {len(reads)} read + "
+                f"{len(skips)} skipped = {accounted}, but matched: {matched[0]} "
+                "(every matched file must be disclosed as read or skipped)")
+    return None
+
 
 def source_form_ok(source, kind):
     """Grammar-only check (no repo resolution): is `source` a syntactically valid
@@ -293,6 +388,10 @@ def main(argv=None):
     p.add_argument("factsheet", nargs="?", default="-", help="fact-sheet file, or - for stdin")
     p.add_argument("--root", help="host-repo root (default: git top-level of cwd; errors outside a git repo)")
     p.add_argument("--rejected", action="store_true", help="print only rejected entries (for the needs-owner list)")
+    p.add_argument("--require-coverage", action="store_true",
+                   help="require a well-formed `## Coverage` manifest header (#514) — "
+                        "the pipeline/harvest invocation passes this so a sheet with no "
+                        "coverage disclosure is rejected")
     args = p.parse_args(argv)
 
     host = rws.host_root(args.root)
@@ -315,6 +414,20 @@ def main(argv=None):
         print(f"error: {ws_path}: {e}", file=sys.stderr)
         return 2
     text = sys.stdin.read() if args.factsheet == "-" else open(args.factsheet, encoding="utf-8").read()
+
+    # Coverage manifest (#514): a well-formed manifest is validated whenever it is
+    # present; under --require-coverage its absence is itself a rejection, so a
+    # sheet that discloses nothing about read-vs-skipped sources fails the gate.
+    cov_reason = validate_coverage(text)
+    cov_present = _coverage_section(text) is not None
+    if cov_reason is not None:
+        print(f"REJECT  coverage manifest\n        -> {cov_reason}")
+        return 1
+    if args.require_coverage and not cov_present:
+        print("REJECT  coverage manifest\n        -> missing `## Coverage` manifest "
+              "header (#514): disclose pin, matched count, per-file read counts, and "
+              "skipped files (or `skipped: none`)")
+        return 1
 
     # Only the fact-sheet section: stop at the NEEDS-OWNER list (Story 3.3),
     # whose entries use a different `CANDIDATE / REASON / TOPIC` schema.

@@ -80,6 +80,34 @@ sources are declared, name the machine-global path where the file belongs
 in the host repo, #211), and point the owner at
 `config/writing-sources.example.yaml`. Never widen scope to compensate.
 
+## 2a. Cover every declared source — or disclose the omission (#514)
+
+The resolved list from §1 is a **lower** bound as well as an upper bound: harvest
+**visits every declared in-scope source or discloses that it did not**. Coverage
+must never narrow silently as the corpus grows (the #514 failure: a ~4× corpus
+growth collapsed a 106-entry/~15-file harvest to 33/5 with zero disclosure).
+
+- **Emit a coverage manifest** at the top of the fact sheet (see the output
+  contract below) built from the deterministic enumeration — the pin, the count
+  of files `resolve-writing-sources.py files` matched, a `read: <file> (<count>)`
+  line per file you extracted from, and either `skipped: none` or a
+  `skipped: <file> (<reason>)` line per file you did not read. The accounting is
+  **closed**: read files + skipped files must equal the matched count, so a file
+  that is neither read nor disclosed as skipped is a validator rejection, not a
+  silent gap.
+- **At the read ceiling, behave deterministically — never silently sample.**
+  When the declared corpus is larger than one pass can read within the
+  turn/compute ceiling, either **chunk to completion** across resumed
+  invocations (the per-source checkpoint below, #388) or **stop and surface the
+  overflow as an owner decision** (which sources to prioritize or exclude),
+  presented as the in-conversation CAP-6 choice / a publish blocker. Do **not**
+  read an attention-bounded subset and present the result as a full harvest.
+
+This section is enforced in lockstep with `scripts/validate-fact-sheet.py`
+(`--require-coverage`); the governing contract is
+`specs/spec-article-draft-pipeline/pipeline-stages.md`
+§"Harvest coverage disclosure (stage 1)".
+
 ## 2b. Declared non-file sources — `github-issues` (Story 13.50)
 
 Source entries carry an optional `type` (Story 13.49). Enumerate the typed
@@ -249,12 +277,15 @@ it routes to the **NEEDS-OWNER** list below. Then run the validator **once, as a
 confirmation pass** over the emitted sheet:
 
 ```
-python3 ${CLAUDE_PLUGIN_ROOT}/scripts/validate-fact-sheet.py <harvest-doc> --root <host-repo>
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/validate-fact-sheet.py <harvest-doc> --root <host-repo> --require-coverage
 ```
 
 (`--root` defaults to the git top-level of cwd; the validator errors if the
 resolved host has no `writing-sources.yaml`, rather than mass-rejecting every
-pointer against an empty source list.)
+pointer against an empty source list.) `--require-coverage` makes the
+`## Coverage` manifest (§2a, #514) mandatory and checks its accounting closes
+(read + skipped == matched); a sheet that discloses nothing about coverage is
+rejected just like an unsourced entry.
 
 Every entry must pass; the rejects are exactly what the NEEDS-OWNER list captures.
 
@@ -344,11 +375,18 @@ products land in the host repo (at `output.drafts`), and harvest produces none.
 ## Harvest output contract
 
 Identical whether invoked standalone or as pipeline stage 1, so the pipeline
-consumes it unchanged — the fact sheet followed by the always-present
-NEEDS-OWNER list:
+consumes it unchanged — the **coverage manifest**, then the fact sheet, then the
+always-present NEEDS-OWNER list:
 
 ```markdown
 # Fact sheet: {subject}
+
+## Coverage
+pin: a1b2c3d
+matched: 3
+read: bench/results.md (4)
+read: README.md (1)
+skipped: docs/appendix.md (over the read ceiling — surfaced to owner)
 
 - Throughput rose 2x on the 10k-scenario suite / bench/results.md:42@a1b2c3d / result
 - Chose JAX over PyTorch for vmap composability / a1b2c3d / decision
