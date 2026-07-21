@@ -3218,6 +3218,99 @@ def cmd_consume(args):
     return 0
 
 
+# --- F2 narrative-structure choice (Story 18.26, SPEC-article-frameworks CAP-4)
+# The argument-plan sub-step proposes 2-3 candidate STRUCTURES for the selected
+# elements — sibling-lessons (the F2 default), chronological journey, single-
+# incident deep thread, thematic braid — each with a one-line rationale grounded
+# in the selected elements' evidence kinds. Combining elements into ONE narrative
+# thread is a supported structure: this is COMPOSITION, not selection — element
+# selection and its CAP-9 disclosure are unchanged, and every selected element
+# survives as a beat of the chosen thread. The owner picks or counter-proposes
+# under the proposal contract; with no choice the default is sibling-lessons.
+# Generation still owns coherence: whichever structure is chosen must pass the
+# existing Stage 3->4 gate (dim1 narrative arc; the #434 skeleton-variation
+# rules). This proposer is deterministic — the same selected elements yield the
+# same candidates.
+
+def _narrative_structures(elements):
+    ids = [e.get("id") for e in elements if e.get("id")]
+    n = len(ids)
+    kinds_per = [set(e.get("kinds", []) or []) for e in elements]
+    chrono = sum(1 for ks in kinds_per if "chronology" in ks)
+    dominant = [e.get("id") for e in elements if e.get("dominant_incident")]
+    freq = {}
+    for ks in kinds_per:
+        for k in ks:
+            freq[k] = freq.get(k, 0) + 1
+    shared = sorted(k for k, c in freq.items() if c >= 2)
+
+    # sibling-lessons: always offered, always the default — one section per
+    # element (composition = sections), never elements-as-beats.
+    candidates = [{
+        "structure": "sibling-lessons", "default": True,
+        "composition": "sections", "sections": ids,
+        "rationale": (f"each of the {n} lesson clusters stands on its own — one "
+                      "section per lesson (the current F2 default)."),
+    }]
+
+    # Candidate alternatives, in fixed preference order, each qualified by the
+    # selected elements' evidence kinds. Every alternative composes the elements
+    # as BEATS of one thread (composition, not selection).
+    alts = []
+    if n and (chrono / n >= 0.5):
+        alts.append(("chronological-journey",
+                     f"{chrono} of {n} clusters carry chronology — tell one "
+                     "chronological journey with the lessons as beats.", chrono))
+    if len(dominant) == 1 or n == 1:
+        dom = dominant[0] if dominant else ids[0]
+        alts.append(("single-incident-deep-thread",
+                     f"cluster '{dom}' reads as one dominant incident — a deep "
+                     "thread with the other lessons as its consequences.", 3))
+    if n >= 2 and shared:
+        alts.append(("thematic-braid",
+                     f"the clusters share {', '.join(shared)} — braid them by "
+                     "theme rather than listing them as siblings.", len(shared)))
+
+    # Guarantee >=2 candidates (never a single hardened shape): if the evidence
+    # signalled no alternative, offer one generic composition anyway.
+    if not alts:
+        if n >= 2:
+            alts.append(("thematic-braid",
+                         "no single kind dominates — braid the lesson clusters "
+                         "into one piece by theme rather than listing them.", 0))
+        else:
+            alts.append(("single-incident-deep-thread",
+                         "one cluster carries the whole piece — a single deep "
+                         "thread.", 0))
+
+    # Keep the 2-3 strongest (CAP-4: 2-3 candidates), sibling-lessons + up to 2.
+    alts.sort(key=lambda a: (-a[2], a[0]))
+    for name, rationale, _score in alts[:2]:
+        candidates.append({"structure": name, "default": False,
+                           "composition": "beats", "beats": ids,
+                           "rationale": rationale})
+    return {"candidates": candidates, "default": "sibling-lessons"}
+
+
+def cmd_structures(args):
+    """Propose F2 candidate narrative structures for the selected elements
+    (Story 18.26, CAP-4). Reads a selected-elements JSON — `{"elements":
+    [{"id":…, "kinds":[chronology|motivation|cost|reversal…],
+    "dominant_incident":bool}, …]}` — from a file or stdin, and prints 2-3
+    candidate structures, each with a one-line element-grounded rationale, the
+    default (sibling-lessons) marked. Deterministic; selection is unchanged
+    (composition only)."""
+    raw = sys.stdin.read() if args.selected == "-" else open(
+        args.selected, encoding="utf-8").read()
+    try:
+        data = json.loads(raw) if raw.strip() else {}
+    except json.JSONDecodeError as e:
+        sys.stderr.write(f"error: selected-elements input is not valid JSON: {e}\n")
+        return 2
+    print(json.dumps(_narrative_structures(data.get("elements", [])), indent=2))
+    return 0
+
+
 def cmd_start(args):
     _rp = _load("resolve-paths.py")
     state, code = _run_state(args.framework, args.sources, _rp.host_root(args.root),
@@ -4356,6 +4449,13 @@ def main(argv=None):
     sp.add_argument("--items", help="candidate interview-item JSON (e.g. policy-seeded questions); "
                                     "schema-validated before triage — invalid items halt the stage")
     sp.add_argument("state", nargs="?", default="-", help="stage-1 pipeline state JSON, or - for stdin")
+    sp = sub.add_parser("structures",
+                        help="propose 2-3 candidate narrative structures for the selected "
+                             "elements (F2 CAP-4, Story 18.26): sibling-lessons (default), "
+                             "chronological journey, single-incident deep thread, thematic braid")
+    sp.add_argument("selected", nargs="?", default="-",
+                    help="selected-elements JSON ({\"elements\":[{id,kinds,dominant_incident}]}), "
+                         "or - for stdin")
     sp = sub.add_parser("answer")
     sp.add_argument("--id", help="the question id this answer keys to (single-answer form)")
     sp.add_argument("--disposition",
@@ -4539,6 +4639,7 @@ def main(argv=None):
     args = p.parse_args(argv)
     return {
         "start": cmd_start, "consume": cmd_consume, "interview": cmd_interview,
+        "structures": cmd_structures,
         "checkpoint": cmd_checkpoint, "resume": cmd_resume, "autostart": cmd_autostart,
         "progress": cmd_progress,
         "stage0": cmd_stage0, "complete": cmd_complete,
