@@ -273,6 +273,50 @@ out=$(printf 'doc.md:4\ndoc.md:5\n' | python3 "$PIN" --root "$pin" --emit-entry 
 [ "$out" = "2" ] && ok "emit-entry: stdin pointers emit one entry each" \
   || err "emit-entry: expected 2 entries from stdin, got $out"
 
+# 9. Per-source budgeted extraction + deterministic merge (Story 18.30, #516,
+#    CAP-10): the SKILL runs extraction per source under a budget CONTRACT
+#    (floors/caps in code, not the prompt), surfaces a named diagnostic on a
+#    budget-clipped source, and merges deterministically in enumeration order
+#    with (CLAIM,SOURCE,KIND) dedupe.
+has "harvest-budget.py" "skill consults the per-source budget helper"
+has "one source at a time" "skill extracts one source at a time (not whole-corpus skim)"
+has "in enumeration order" "skill merges in enumeration order"
+has "dedupe on" "skill dedupes on (CLAIM, SOURCE, KIND)"
+has "entry budget" "skill surfaces a named budget diagnostic"
+has "boundedness-is-a-contract-not-curation" "budget is framed as a contract, not curation"
+# The budget floors/caps are code, never a number restated in the prompt.
+grep -Eq 'budget of [0-9]+|budget = [0-9]+|at most [0-9]+ (entries|facts) per' "$SKILL" \
+  && err "budget constant restated as a number in the prompt (must live in code)" \
+  || ok "budget constants are not hard-coded as numbers in the prompt"
+
+BUD="$root/scripts/harvest-budget.py"
+python3 -c "import py_compile; py_compile.compile('$BUD', doraise=True)" 2>/dev/null \
+  && ok "harvest-budget.py is stdlib-only Python (compiles)" || err "harvest-budget.py syntax error"
+
+# behavioral: reuse the §-behavioral fixture host (host/src/a.py is 1 non-blank
+# line -> the FLOOR budget; research-notes files are also tiny -> FLOOR).
+bjson=$(python3 "$BUD" --root "$work/host" --json 2>/dev/null)
+printf '%s' "$bjson" | python3 -c "import json,sys; d=json.load(sys.stdin); assert d['floor']==3 and d['cap']==40, d" 2>/dev/null \
+  && ok "budget contract exposes floor=3 / cap=40 (the code-side constants)" \
+  || err "budget --json floor/cap wrong: $bjson"
+printf '%s' "$bjson" | python3 -c "import json,sys; d=json.load(sys.stdin); assert all(r['budget']>=3 for r in d['files']), d; assert any(r['budget']==3 for r in d['files']), 'a tiny source should floor to 3'" 2>/dev/null \
+  && ok "a tiny source floors to the minimum budget (never 0)" \
+  || err "budget floor not applied: $bjson"
+# plain mode emits a per-file line and a total, in enumeration order (first line
+# is the enumerator's first file).
+bplain=$(python3 "$BUD" --root "$work/host" 2>/dev/null)
+first_enum=$(python3 "$root/$RES" --root "$work/host" files 2>/dev/null | head -1)
+printf '%s\n' "$bplain" | grep -q "total-budget:" && ok "budget plain output carries a total-budget line" || err "no total-budget line"
+printf '%s\n' "$bplain" | head -1 | grep -qF "budget: $first_enum " \
+  && ok "budget lines follow the enumerator order (single source of truth)" \
+  || err "budget order does not match the enumerator: '$(printf '%s\n' "$bplain" | head -1)' vs '$first_enum'"
+# a source at the CAP: a 400+ non-blank-line file budgets to the cap (40), not more.
+big="$work/host/src/big.md"; yes 'a fact line' 2>/dev/null | head -400 > "$big"
+bigb=$(python3 "$BUD" --root "$work/host" "$big" 2>/dev/null | grep -F "$big" | awk '{print $NF}')
+[ "$bigb" = "40" ] && ok "a large source is capped at the maximum budget (40)" \
+  || err "cap not applied: 400-line file got budget '$bigb' (expected 40)"
+rm -f "$big"
+
 if [ "$fail" -eq 0 ]; then
   printf '\nAll harvest checks passed.\n'; exit 0
 else

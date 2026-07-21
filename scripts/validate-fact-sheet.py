@@ -437,6 +437,28 @@ def main(argv=None):
             break
         fs_lines.append(ln)
     entries = [ln[2:] for ln in fs_lines if ln.startswith("- ")]
+
+    # Deterministic-merge dedupe (#516, CAP-10): the per-source extractions are
+    # concatenated and deduped on `(CLAIM, SOURCE, KIND)` identity in stable
+    # enumeration order. A duplicate entry means the merge did not dedupe (or did
+    # not run) — a defect, not a stylistic nit — so a fact sheet carrying two
+    # byte-identical entries is rejected here, the same lockstep gate the KIND
+    # set and coverage manifest use. (Distinct entries that merely share a SOURCE
+    # or CLAIM are fine — only a full triple-identical repeat is a merge failure.)
+    seen = {}
+    for e in entries:
+        key = tuple(p.strip() for p in e.rsplit(" / ", 2))
+        if len(key) == 3:
+            seen[key] = seen.get(key, 0) + 1
+    dupes = {k: c for k, c in seen.items() if c > 1}
+    if dupes:
+        for (claim, source, kind), c in sorted(dupes.items()):
+            print(f"REJECT  {claim} / {source} / {kind}\n"
+                  f"        -> duplicate entry appears {c}× — the deterministic "
+                  f"merge (#516) dedupes on (CLAIM, SOURCE, KIND); a repeat means "
+                  f"the merge did not run")
+        return 1
+
     rejected = 0
     for raw, reason in (validate_entry(e, host, sources) for e in entries):
         if reason is None:

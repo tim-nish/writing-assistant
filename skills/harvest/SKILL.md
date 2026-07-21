@@ -177,6 +177,41 @@ state because it happens to exist on disk.
 
 ## 3. Extract facts, each as `CLAIM / SOURCE / KIND`
 
+**Extract one source at a time, under its budget, then merge deterministically
+(#516, CAP-10).** Do **not** read the whole corpus in one attention-bounded pass
+and skim — that is the mechanism behind the #514 coverage collapse and the
+run-to-run variance CAP-10 exists to remove. Instead, walk the enumerated sources
+(§1) **in enumeration order**, and for each file:
+
+- **Get the file's entry budget** from the budget contract (floors/caps live in
+  code, never in this prompt):
+
+  ```
+  python3 ${CLAUDE_PLUGIN_ROOT}/scripts/harvest-budget.py --root <host-repo>
+  # → one `budget: <file> <n>` line per source, in enumeration order (plus total-budget)
+  ```
+
+  The budget is **relative to the source's own size** (the product-lab
+  corpus-intake scheme) — a soft extraction target for that one file, not a hard
+  cap the validator enforces. Extract that file's facts up to its budget.
+- **If a source's genuine facts exceed its budget, do not silently drop them —
+  surface a diagnostic naming that source** (`harvest: <file> reached its
+  entry budget (<n>); <k> candidate facts not extracted` in the completion
+  summary's informational notes) so a budget-clipped source is disclosed, never presented
+  as complete in the dark (boundedness-is-a-contract-not-curation). A source
+  comfortably under budget needs no diagnostic.
+- **Merge deterministically.** Append each source's entries to the fact sheet **in
+  enumeration order, then in-file order**, and **dedupe on `(CLAIM, SOURCE,
+  KIND)` identity** — never emit the same triple twice (the validator rejects a
+  duplicate as a merge failure). Because enumeration order is fixed and the merge
+  is mechanical, two runs over unchanged sources produce the **same** sheet.
+
+This per-source discipline is what makes coverage reproducible at any corpus
+size: growth adds sources (each with its own budget), it never silently shrinks
+what an already-declared source contributes. The blob-keyed cache that reuses an
+unchanged source's extraction across runs is the companion concern (#516 Story
+18.31); it does not change this per-source procedure.
+
 Read the in-scope files and extract facts. **Read every file you cite fresh with
 a line-numbered tool (the `Read` tool) at harvest time, and take each line number
 from what that tool shows you — never cite a line number from memory, from an

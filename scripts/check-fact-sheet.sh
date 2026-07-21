@@ -208,6 +208,22 @@ python3 "$root/$VAL" "$work/fs.md" --root "$h" >/dev/null 2>&1 && err "exit 0 de
 python3 "$root/$VAL" "$work/fs.md" --root "$h" --rejected 2>/dev/null | grep -q 'Bad' \
   && ok "--rejected lists the rejects (feeds the needs-owner list, Story 3.3)" || err "--rejected did not list rejects"
 
+# 7. Deterministic-merge dedupe (Story 18.30, #516, CAP-10): the merge dedupes
+#    on (CLAIM, SOURCE, KIND) identity, so a fact sheet carrying the same triple
+#    twice is a merge failure and is rejected. Distinct entries sharing only a
+#    SOURCE or only a CLAIM stay valid.
+printf -- '- Throughput doubled under load / notes.md:2@%s / result\n- Throughput doubled under load / notes.md:2@%s / result\n' "$sha" "$sha" > "$work/fs.md"
+python3 "$root/$VAL" "$work/fs.md" --root "$h" 2>&1 | grep -q 'duplicate entry' \
+  && ok "reject: a duplicate (CLAIM,SOURCE,KIND) entry is a merge failure (#516)" \
+  || err "duplicate entry accepted (merge dedupe not enforced)"
+python3 "$root/$VAL" "$work/fs.md" --root "$h" >/dev/null 2>&1 \
+  && err "exit 0 despite a duplicate entry" || ok "non-zero exit on a duplicate entry (hard gate)"
+# distinct entries that merely share a SOURCE are NOT duplicates
+printf -- '- Throughput doubled under load / notes.md:2@%s / result\n- Chose backoff because throughput doubled / notes.md:2@%s / motivation\n' "$sha" "$sha" > "$work/fs.md"
+python3 "$root/$VAL" "$work/fs.md" --root "$h" >/dev/null 2>&1 \
+  && ok "two distinct entries sharing one SOURCE are not a duplicate" \
+  || err "false-positive dedupe on distinct entries sharing a SOURCE"
+
 if [ "$fail" -eq 0 ]; then
   printf '\nAll fact-sheet checks passed.\n'; exit 0
 else
