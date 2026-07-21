@@ -49,6 +49,14 @@ grep -q 'never hand-write the checkpoint' "$SKILL" \
 grep -q 'Zero applied edits' "$SKILL" \
   && ok "zero-edit rounds keep the hand-written reviewed checkpoint" \
   || err "zero-edit checkpoint branch missing"
+# Story 18.21 (#496): the SKILL wires the versioned v2 verdict persistence and
+# states the re-entry gate refuses PASS over a missing/partial v2 record.
+grep -q 'rubric-verdicts-v2.txt' "$SKILL" \
+  && ok "SKILL wires the versioned rubric-verdicts-v2.txt persistence" \
+  || err "SKILL does not wire the v2 verdict record"
+grep -q 'verdicts-out' "$SKILL" \
+  && ok "SKILL runs the re-run gate with --verdicts-out (reuse cmd_quality_gate)" \
+  || err "SKILL missing the --verdicts-out re-run gate call"
 
 # --- Fixture: host + articles repo, an OLD variant, an edited draft + map ----
 work=$(mktemp -d); trap 'rm -rf "$work"' EXIT
@@ -89,6 +97,53 @@ EOF
 v_before=$(python3 -c "import hashlib; print(hashlib.sha256(open('$variant','rb').read()).hexdigest())")
 m_before=$(python3 -c "import os; print(os.stat('$variant').st_mtime_ns)")
 
+# --- Story 18.21 (#496): --rubric-applied requires a PERSISTED, COMPLETE
+# versioned verdict record (rubric-verdicts-v2.txt). Missing → refuse, no
+# checkpoint; the re-entry may not claim PASS over an unpersisted record.
+wsv="$work/wsv"; mkdir -p "$wsv"
+if python3 "$DP" review-reentry --draft "$ws/edited.md" --map "$ws/map.txt" \
+     --slug "$slug" --root "$h" --ws "$wsv" --applied 2 --rubric-applied \
+     >/dev/null 2>"$work/e_v2missing"; then
+  err "review-reentry claimed PASS with no rubric-verdicts-v2.txt"
+else
+  grep -q 'rubric-verdicts-v2.txt' "$work/e_v2missing" \
+    && grep -q 'not persisted' "$work/e_v2missing" \
+    && ok "re-entry refuses --rubric-applied over a missing v2 verdict record" \
+    || err "missing-v2 refusal message wrong: $(cat "$work/e_v2missing")"
+fi
+[ ! -f "$wsv/checkpoint.json" ] && ok "no checkpoint over a missing v2 verdict record" \
+  || err "checkpoint written despite a missing v2 verdict record"
+# A PARTIAL v2 record (the #492 dim1/dim2-only shape) is refused just the same.
+printf 'dim1: pass\ndim2: pass\n' > "$wsv/rubric-verdicts-v2.txt"
+if python3 "$DP" review-reentry --draft "$ws/edited.md" --map "$ws/map.txt" \
+     --slug "$slug" --root "$h" --ws "$wsv" --applied 2 --rubric-applied \
+     >/dev/null 2>"$work/e_v2partial"; then
+  err "review-reentry claimed PASS over a partial v2 verdict record"
+else
+  grep -q 'verdict record is partial' "$work/e_v2partial" \
+    && grep -q 'dim3, dim4' "$work/e_v2partial" \
+    && ok "re-entry refuses a partial v2 verdict record (names the gap)" \
+    || err "partial-v2 refusal message wrong: $(cat "$work/e_v2partial")"
+fi
+[ ! -f "$wsv/checkpoint.json" ] && ok "no checkpoint over a partial v2 verdict record" \
+  || err "checkpoint written despite a partial v2 verdict record"
+
+# Persist a COMPLETE v2 record via the SAME gate path the SKILL prescribes
+# (reuse cmd_quality_gate --verdicts-out): all four dims, dim3 inventory stamp,
+# dim4 measures. The gate may exit non-zero on this fixture (no audience) but
+# still writes the complete record — completeness, not all-pass, is the contract.
+python3 "$DP" quality-gate --draft "$ws/edited.md" --map "$ws/map.txt" \
+  --verdicts-out "$ws/rubric-verdicts-v2.txt" >/dev/null 2>&1 || true
+[ -f "$ws/rubric-verdicts-v2.txt" ] \
+  && ok "step-3 gate persisted the versioned v2 verdict record" \
+  || err "v2 verdict record not written by the gate"
+for d in 'dim1:' 'dim2:' 'dim3:' 'dim4:'; do
+  grep -q "^$d" "$ws/rubric-verdicts-v2.txt" || err "v2 record missing $d"
+done
+grep -q '^dim3:.*dim3_inventory:' "$ws/rubric-verdicts-v2.txt" \
+  && ok "v2 record is complete (four dims + dim3 inventory stamp)" \
+  || err "v2 record missing its dim3 inventory stamp"
+
 # --- (a) full sequence success ----------------------------------------------
 out=$(python3 "$DP" review-reentry --draft "$ws/edited.md" --map "$ws/map.txt" \
         --slug "$slug" --root "$h" --ws "$ws" --applied 2 --rubric-applied) \
@@ -110,8 +165,19 @@ assert all(v['status']=='stale' for v in d['stale_variants']), d
 assert d['emitted_variants']==[], d
 assert 'variants --slug $slug' in d['re_emission'], d
 assert d['checkpoint'], d
-" && ok "re-entry JSON: valid map, scoped checks, stale variant listed, nothing emitted" \
+assert os.path.isabs(d['verdicts_v2']) and d['verdicts_v2'].endswith('rubric-verdicts-v2.txt'), d
+" && ok "re-entry JSON: valid map, scoped checks, stale variant listed, nothing emitted, v2 record path" \
   || err "re-entry JSON shape wrong"
+# Story 18.21 (#496): the summary's dimension count is the RUBRIC's own, carried
+# as rubric_dimensions — never a hardcoded literal. It must equal the count of
+# `## Dimension N` sections in quality-rubric.md (four).
+rn=$(grep -cE '^## Dimension [0-9]' "$root/skills/draft-article/quality-rubric.md")
+printf '%s' "$out" | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+assert d['rubric_dimensions']==$rn, (d.get('rubric_dimensions'), $rn)
+" && ok "re-entry surfaces rubric_dimensions from the rubric ($rn), not a literal" \
+  || err "rubric_dimensions does not match the rubric's dimension count"
 # The canonical carries the completion gate's trailer convention: the trailer
 # hash equals sha256 over the trailer-stripped content (one write path).
 python3 - "$a/drafts/$slug.md" <<'EOF' && ok "canonical trailer follows the complete-gate hash convention" || err "trailer convention broken"

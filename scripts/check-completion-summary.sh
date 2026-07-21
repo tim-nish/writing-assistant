@@ -101,6 +101,27 @@ grep -qi 'budget-triage signal fires' "$DRAFT" \
   && ok "draft SKILL surfaces the orderly stop + partial-progress reporting" \
   || err "draft SKILL missing budget-triage/partial-progress wiring"
 
+# 5a. Quality-gate dimension count comes from the rubric, never a literal
+# (Story 18.21, #496). The convention states the rule and gives the mechanical
+# count; the review SKILL points the re-entry summary at rubric_dimensions.
+RUBRIC="skills/draft-article/quality-rubric.md"
+grep -qi 'never a hardcoded literal' "$CONV" \
+  && ok "convention: dimension count is never a hardcoded literal" \
+  || err "convention missing the 'never a hardcoded literal' rule"
+grep -q 'quality-rubric.md' "$CONV" \
+  && ok "convention derives the dimension count from quality-rubric.md" \
+  || err "convention does not point the count at quality-rubric.md"
+grep -q 'grep -cE .\^## Dimension' "$CONV" \
+  && ok "convention gives the mechanical rubric-dimension count command" \
+  || err "convention missing the mechanical dimension-count command"
+grep -qi 'rubric_dimensions' "$REVIEW" \
+  && ok "review SKILL points the re-entry summary at rubric_dimensions" \
+  || err "review SKILL does not source the count from rubric_dimensions"
+# The convention's own count must agree with the rubric it cites (four).
+rn=$(grep -cE '^## Dimension [0-9]' "$RUBRIC")
+[ "$rn" -eq 4 ] && ok "rubric defines four dimensions (the count the summary must quote)" \
+  || err "rubric dimension count unexpected: $rn"
+
 # 6. Editor's assessment leads the review summary (Story 13.33, SPEC-review-ux CAP-4).
 grep -qi "editor's assessment" "$REVIEW" && ok "review summary leads with the editor's assessment" \
   || err "editor's assessment missing from review SKILL"
