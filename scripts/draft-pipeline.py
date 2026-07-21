@@ -659,6 +659,28 @@ def _dimension4_measures(draft_text, prov_entries):
 # gate that never recorded dim3/dim4).
 _DIM_LINE_RE = re.compile(r"^\s*(dim[1-4])\s*:", re.IGNORECASE)
 
+# The versioned rubric is the single authority for HOW MANY dimensions exist.
+# A completion summary that reports the quality-gate outcome quotes THIS count,
+# never a hardcoded literal (#496: a re-entry summary claimed "all six
+# dimensions" over a four-dimension rubric — the report and the contract
+# disagreed). The count is derived from the rubric's `## Dimension N` sections,
+# exactly as check-quality-rubric.sh counts them, so the two can never drift.
+RUBRIC_ASSET = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                            "skills", "draft-article", "quality-rubric.md")
+_RUBRIC_DIM_RE = re.compile(r"^## Dimension [0-9]", re.MULTILINE)
+
+
+def _rubric_dimension_count(path=None):
+    """How many dimensions the VERSIONED rubric defines — counted from
+    quality-rubric.md's `## Dimension N` sections, never a hardcoded number. The
+    completion summary quotes this so a gate report can never miscount the
+    rubric (#496). A missing/unreadable rubric raises (OSError) rather than
+    inventing a count: a summary that cannot read the rubric must not assert
+    one."""
+    p = path or RUBRIC_ASSET
+    with open(p, encoding="utf-8") as fh:
+        return len(_RUBRIC_DIM_RE.findall(fh.read()))
+
 
 def _render_verdict_record(results, vocab_stamp, dim4_measures):
     """Serialize the complete four-dimension verdict record. dim3 carries its
@@ -3735,6 +3757,46 @@ def cmd_review_reentry(args):
         sys.stderr.write(f"error: run workspace does not exist: {args.ws}\n")
         return 1
 
+    # Precondition (Story 18.21, #496) — the re-entry verdict RECORD. When a
+    # rubric-mapped finding was applied, SKILL step 3 re-ran the quality gate
+    # over the edited draft; that gate must have PERSISTED its full four-
+    # dimension record as the VERSIONED `rubric-verdicts-v2.txt` in this
+    # workspace — dim3 with its inventory stamp, dim4 with measured values — the
+    # SAME completeness contract the draft-flow gate owes `rubric-verdicts.txt`
+    # (#492/Story 18.18). A re-entry may NOT report done/reviewed (PASS) over a
+    # missing or partial v2 record: the re-run gate's outcome must be verifiable
+    # from an artifact, never asserted in the completion summary's prose alone
+    # (the #496 failure — "PASS (all six dimensions)" over an untouched partial
+    # dim1/dim2 record). Checked before any product is persisted and before any
+    # checkpoint is written; no checkpoint is written on refusal.
+    verdicts_v2_path = os.path.join(args.ws, "rubric-verdicts-v2.txt")
+    if args.rubric_applied:
+        if not os.path.isfile(verdicts_v2_path):
+            sys.stderr.write(
+                "error: review-reentry: re-entry verdict record not persisted — "
+                "a rubric-mapped finding was applied, so the re-run quality gate "
+                "must write its full four-dimension record to "
+                f"{verdicts_v2_path} (`quality-gate --draft <edited> --map "
+                "<rebuilt> --verdicts-out <ws>/rubric-verdicts-v2.txt`) before "
+                "re-entry may report done/reviewed. No checkpoint written.\n")
+            return 1
+        try:
+            v2_gaps = _verdict_record_gaps(_read_text(verdicts_v2_path))
+        except OSError as e:
+            sys.stderr.write(
+                "error: review-reentry: cannot read the re-entry verdict record "
+                f"{verdicts_v2_path}: {e}\n")
+            return 1
+        if v2_gaps:
+            sys.stderr.write(
+                "error: review-reentry: the re-entry verdict record is partial "
+                "— missing " + ", ".join(v2_gaps) + "; the re-run gate must "
+                "write all four dimension verdicts (dim3 with its inventory "
+                "stamp, dim4 with measured values) to rubric-verdicts-v2.txt "
+                "before re-entry may report done/reviewed. No checkpoint "
+                "written.\n")
+            return 1
+
     # (a) Persist the reviewed canonical — the completion gate's write path.
     try:
         text = _read_text(args.draft)
@@ -3787,7 +3849,10 @@ def cmd_review_reentry(args):
             "check": "quality-gate-mechanical",
             "reason": "a rubric-mapped finding was applied — re-run the "
                       "quality gate's mechanical dimensions on the edited "
-                      "draft (`quality-gate --draft --map`)",
+                      "draft and PERSIST the full four-dimension verdict record "
+                      "(`quality-gate --draft --map --verdicts-out "
+                      "<ws>/rubric-verdicts-v2.txt`); re-entry refuses "
+                      "done/reviewed over a missing or partial v2 record (#496)",
         })
 
     # (d) Mark existing variants stale — the staleness comparison, reused,
@@ -3820,6 +3885,11 @@ def cmd_review_reentry(args):
                       "canonical_sha256": canonical_sha},
         "map_validation": {"ok": True, "entries": len(entries),
                            "tally": tally},
+        # The rubric's OWN dimension count (from quality-rubric.md) — the
+        # completion summary quotes THIS when it reports the quality-gate
+        # outcome, never a hardcoded literal (#496: "all six dimensions" over a
+        # four-dimension rubric).
+        "rubric_dimensions": _rubric_dimension_count(),
         "required_checks": required_checks,
         "stale_variants": stale_variants,
         # Review never emits or re-emits a variant (CAP-3) — re-emission is a
@@ -3829,6 +3899,11 @@ def cmd_review_reentry(args):
                        "(owner publish decision; skills/draft-article/variants.md)",
         "checkpoint": checkpoint_path,
     }
+    # The versioned re-entry verdict record the run persisted (Story 18.21) —
+    # its presence-and-completeness was the precondition above, so a done/
+    # reviewed re-entry ALWAYS carries a verifiable v2 record path here.
+    if args.rubric_applied:
+        out["verdicts_v2"] = os.path.abspath(verdicts_v2_path)
     print(json.dumps(out, indent=2))
     return 0
 

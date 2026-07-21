@@ -93,6 +93,24 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/reading-time.py --language <en|ja> <file>
 A **standalone harvest** run has **no article body to measure and omits** the
 reading-time estimate — it has a fact sheet, not prose.
 
+## Quality-gate dimension count — from the rubric, never a literal (Story 18.21, #496)
+
+When the summary reports the quality-gate outcome (e.g. "quality gate PASS"),
+**the number of dimensions is the rubric's own count — derived from
+`skills/draft-article/quality-rubric.md` (its `## Dimension N` sections),
+never a hardcoded literal.** The re-entry gate surfaces this authoritative
+number as its `rubric_dimensions` field, and the versioned rubric currently
+defines **four** dimensions. A summary that writes "all six dimensions" (or any
+number the rubric does not define) is the #496 defect: the report and the
+versioned contract must agree. Count the rubric, never guess:
+
+```
+grep -cE '^## Dimension [0-9]' ${CLAUDE_PLUGIN_ROOT}/skills/draft-article/quality-rubric.md
+```
+
+Non-rubric passes (lint, provenance) are reported as their own named checks —
+they are **never** bundled into the rubric dimension count.
+
 ## Policy consultation summary (informational — Story 13.100, #437)
 
 Every consultation of the policy gateway is already recorded (the interview

@@ -707,17 +707,33 @@ the accepted findings:
    verdicts file to the draft's content hash — the pre-edit judge's
    attestation no longer matches the edited draft, so **a fresh judge run is
    the only way back to PASS**; re-presenting the old verdicts fails closed.
-3. **Re-run the quality gate's mechanical dimensions** when a
-   **rubric-mapped** finding was applied (`draft-pipeline.py quality-gate
-   --draft <edited> --map <rebuilt>` — mechanical dims only; the dim1-2 judge
-   verdicts are not re-bought). Any failure from step 2 or 3 surfaces as a
-   **publish blocker**, never silently.
+3. **Re-run the quality gate's mechanical dimensions AND persist the versioned
+   verdict record** when a **rubric-mapped** finding was applied. The re-run
+   gate writes its **full four-dimension verdict record** (dim1/dim2, dim3 with
+   its inventory stamp, dim4 with measured values — the same completeness
+   contract as the draft-flow gate's `rubric-verdicts.txt`, Story 18.18/#492)
+   to the **versioned** `rubric-verdicts-v2.txt` in the run workspace, so the
+   re-run gate's outcome is verifiable from an artifact and never asserted in
+   the completion summary's prose alone (#496):
+
+   ```
+   python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py quality-gate \
+     --draft <edited> --map <rebuilt> \
+     --verdicts-out "$WS/rubric-verdicts-v2.txt"
+   ```
+
+   The mechanical dims (3-4) are re-scanned; the dim1-2 judge verdicts are not
+   re-bought. Any failure from step 2 or 3 surfaces as a **publish blocker**,
+   never silently.
 4. **Invoke the re-entry gate**, which persists the reviewed canonical (the
    same write path and emission-trailer convention as the draft flow's
    `complete` gate), structurally validates the rebuilt map against the edited
    draft, reports the required scoped checks, marks existing variants stale,
    and writes the `done/reviewed` checkpoint — **refusing (non-zero, no
-   checkpoint) when the map is invalid**:
+   checkpoint) when the map is invalid, or when `--rubric-applied` but the
+   versioned `rubric-verdicts-v2.txt` from step 3 is missing or partial** (a
+   re-entry may not claim PASS over an unpersisted/partial verdict record,
+   #496):
 
    ```
    python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py review-reentry \
@@ -725,7 +741,8 @@ the accepted findings:
      --root <host-repo> --ws "$WS" --applied <n> [--rubric-applied]
    ```
 
-   Pass `--rubric-applied` when a rubric-mapped finding was applied. With
+   Pass `--rubric-applied` when a rubric-mapped finding was applied — the gate
+   then requires the complete `rubric-verdicts-v2.txt` written in step 3. With
    `--applied 0` the command is a strict no-op — but a zero-edit round should
    use the hand-written checkpoint above and skip this section entirely.
 5. **STOP. Review never emits or re-emits a variant** (SPEC-platform-variants
@@ -780,3 +797,13 @@ path: `variants --slug <slug>` (the standalone flow,
 `skills/draft-article/variants.md`) — re-emission is the **owner's fresh
 explicit publish decision**, never something review performs. The review run
 emitted no variant; it never does.
+
+**Quality-gate dimension count (Story 18.21, #496).** When the summary reports
+the re-entry quality-gate outcome, the dimension count is **the rubric's own**
+— quote `review-reentry`'s `rubric_dimensions` field (derived from
+`skills/draft-article/quality-rubric.md`, currently **four**), **never a
+hardcoded literal** like "all six dimensions". The re-run gate's verdicts live
+in the versioned `rubric-verdicts-v2.txt` it persisted; a PASS claim over a
+missing or partial v2 record is impossible because the re-entry gate refused
+before writing the checkpoint. See
+[`completion-summary.md`](../completion-summary.md).
