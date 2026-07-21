@@ -41,6 +41,7 @@ language: en
 summary: How an innocuous retry policy doubled load and what we changed.
 topics: [llm-ops, reliability]
 related: { projects: [], publications: [], products: [] }
+generated_by: writing-assistant@0.1.0+abc1234
 ---
 
 ## The retry storm
@@ -130,6 +131,7 @@ language: en
 summary: s.
 topics: [a]
 related: { projects: [], publications: [], products: [] }
+generated_by: writing-assistant@0.1.0+abc1234
 ---
 
 ## H
@@ -191,6 +193,7 @@ language: en
 summary: s.
 topics: [a]
 related: { projects: [], publications: [], products: [] }
+generated_by: writing-assistant@0.1.0+abc1234
 ---
 
 ## H
@@ -213,6 +216,54 @@ if printf '%s\n' "$clout" | grep -Eq 'ideas/<slug>.md|fenced-missing.md'; then
   err "#160: link syntax inside code (span/fence) flagged as a dead link"
 else
   ok "#160: link syntax inside inline code + fenced blocks is exempt from the dead-link check"
+fi
+
+# 6. Birth record (hub 2026-07-16): an otherwise-clean canonical draft that is
+#    missing the immutable `generated_by` record is a generation defect the lint
+#    surfaces; a well-formed record lints clean.
+cat > "$work/nobirth.md" <<'EOF'
+---
+slug: nobirth
+title: "This draft never recorded how it was born"
+date: 2026-07-09
+mode: canonical
+language: en
+summary: s.
+topics: [a]
+related: { projects: [], publications: [], products: [] }
+---
+
+## H
+
+Body more at [example.com](https://example.com).
+EOF
+if python3 "$LINT" "$work/nobirth.md" --config-json "$work/cfg.json" 2>/dev/null | grep -q '\[birth-record\].*generated_by'; then
+  ok "missing generated_by birth record is flagged at lint"
+else
+  err "missing generated_by not flagged"
+fi
+# A malformed birth record (not <tool>@<version>+<commit>) is flagged too.
+cat > "$work/badbirth.md" <<'EOF'
+---
+slug: badbirth
+title: "This draft recorded a malformed birth record today"
+date: 2026-07-09
+mode: canonical
+language: en
+summary: s.
+topics: [a]
+related: { projects: [], publications: [], products: [] }
+generated_by: not-a-birth-record
+---
+
+## H
+
+Body more at [example.com](https://example.com).
+EOF
+if python3 "$LINT" "$work/badbirth.md" --config-json "$work/cfg.json" 2>/dev/null | grep -q '\[birth-record\]'; then
+  ok "malformed generated_by is flagged at lint"
+else
+  err "malformed generated_by not flagged"
 fi
 
 if [ "$fail" -eq 0 ]; then
