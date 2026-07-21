@@ -141,6 +141,58 @@ printf '%s' "$S" | grep -qi 'orphan-mechanism defect the carrier check catches' 
   && ok "carrier: the SKILL states the orphan-mechanism rule for new in-repo skills" \
   || err "carrier: orphan-mechanism rule missing"
 
+# --- #519: the consultation-outcome receipt field ----------------------------
+# Each per-fork receipt records what the gate DID: a covered FYI is
+# auto-resolved-FYI; a gate is escalated. The split is countable from receipts
+# alone; an overridden FYI flips to escalated; a missing outcome is lintable.
+# Re-establish the clean partition fixture (earlier tests mutate f.json).
+cat > "$work/f.json" <<JSON
+{"forks": [
+  {"id":"cov","question":"independent or syndicated?","in_scope":true,
+   "consult":{"covered":true,"discriminates":true,"chosen_option":"independent",
+     "quote":"Website stays independent","pointer":"topics/articles.md:17@8f3c2d1e4a5b6c7d","pin":"$PIN"}},
+  {"id":"top","question":"which CSS framework?","in_scope":true,
+   "consult":{"covered":true,"discriminates":false,"quote":"the site should look clean","pointer":"topics/articles.md:9@8f3c2d1e4a5b6c7d",
+     "candidates":[{"answer":"Tailwind","grounding":[]}]}},
+  {"id":"unc","question":"publish cadence?","in_scope":true,
+   "consult":{"covered":false,"candidates":[{"answer":"weekly","grounding":[]},{"answer":"on-ready","grounding":[]}]}},
+  {"id":"mech","question":"tabs or spaces?","in_scope":false}
+]}
+JSON
+present || err "present exited non-zero (outcome fixture)"
+[ "$(q "['fyis'][0]['outcome']")" = "auto-resolved-FYI" ] \
+  && ok "#519: a covered FYI's receipt records outcome=auto-resolved-FYI" \
+  || err "#519: FYI outcome wrong: $(q "['fyis'][0]['outcome']")"
+python3 -c "import json;r=json.load(open('$work/o.json'));assert all(g['outcome']=='escalated' for g in r['gates']),r" 2>/dev/null \
+  && ok "#519: every gate receipt records outcome=escalated (uncovered + topical)" \
+  || err "#519: a gate receipt is not escalated"
+[ "$(q "['counts']['auto_resolved_fyi']")" = "1" ] && [ "$(q "['counts']['escalated']")" = "2" ] \
+  && ok "#519: the outcome split is countable from receipts (1 auto-resolved, 2 escalated)" \
+  || err "#519: counts wrong: $(q "['counts']")"
+# a clean report passes the receipt lint
+python3 "$F" lint --input "$work/o.json" >/dev/null 2>&1 \
+  && ok "#519: lint passes when every in-scope receipt carries a valid outcome" \
+  || err "#519: lint rejected a well-formed report"
+
+# an overridden FYI reopens as a gate -> its receipt records escalated
+present "--overridden cov" || err "present exited non-zero (override)"
+[ "$(q "['fyis'][0]['outcome']")" = "escalated" ] && [ "$(q "['fyis'][0]['overridden']")" = "True" ] \
+  && ok "#519: an overridden FYI's receipt records outcome=escalated (disposition, not origin)" \
+  || err "#519: override did not flip the FYI outcome: $(q "['fyis'][0]")"
+[ "$(q "['counts']['auto_resolved_fyi']")" = "0" ] && [ "$(q "['counts']['escalated']")" = "3" ] \
+  && ok "#519: override recounts (0 auto-resolved, 3 escalated)" \
+  || err "#519: override counts wrong: $(q "['counts']")"
+
+# lint REJECTS a report whose receipt is missing a valid outcome
+python3 -c "
+import json
+r=json.load(open('$work/o.json')); r['fyis'][0].pop('outcome',None)
+json.dump(r,open('$work/bad.json','w'))
+"
+python3 "$F" lint --input "$work/bad.json" >/dev/null 2>&1 \
+  && err "#519: lint accepted a receipt with no outcome" \
+  || ok "#519: lint rejects a receipt missing a valid outcome (lockstep gate)"
+
 if [ "$fail" -eq 0 ]; then
   printf '\nAll fork-consult checks passed.\n'; exit 0
 else

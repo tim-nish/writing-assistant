@@ -21,6 +21,27 @@ sources:
 > sitting). **Do not implement yet** — implementation follows owner scheduling,
 > per the #436 precedent (ratify ≠ implement).
 
+> **Amended 2026-07-21 (triage, #519)** per /triage-gh on the consultation-outcome
+> receipt finding: each per-fork consulted-receipt line gains an **`outcome`
+> field** ∈ `{auto-resolved-FYI | escalated}`, recording **what the gate did**
+> with the consultation. The server-side access log proves a consultation
+> *occurred* but cannot observe its disposition (tsurezure-gateway spec §6), so
+> covered-fork auto-resolutions were mechanically uncountable; this one field
+> makes them countable, enabling the ratified **impact-statistics view**
+> (product-lab `q_a/2026-07-21-tsurezure-impact-stats-and-tanuki-consumer` D1:
+> counts assembled **on demand** from access log + receipts + tracker emissions,
+> **never a stored second ledger**). `auto-resolved-FYI` = a covered fork demoted
+> to an FYI (CAP-2); `escalated` = an uncovered fork presented as a gate (CAP-3)
+> **or** an FYI the owner overrode (an override reopens the fork as a gate, so it
+> counts as escalated — the disposition, not the origin, is recorded). The field
+> is per-fork on the existing receipt line; no new receipt entity, no cap change
+> (every in-scope fork already carries a receipt line). **Promotion note (D3,
+> ratified 2026-07-21):** second-consumer adoption is the trigger to graduate
+> this spec from writing-assistant-local to a **shared versioned consumer-contract**
+> document consumers point at (never copy) — **recorded, not executed here**; the
+> `outcome` vocabulary is authored to survive that promotion (a closed two-value
+> set, no consumer-local extension).
+
 > **Canonical contract.** This SPEC is the complete, preservation-validated
 > contract for what to build, test, and validate. Source documents listed in
 > frontmatter are for traceability only.
@@ -57,7 +78,10 @@ intake as a **proposal only**.
     consult surface is added — only new call sites at fork gates.
   - **success:** A run's receipts show one gateway hit per in-scope fork,
     each preceding the stop point; a fork table with zero in-scope forks adds
-    zero gateway reads.
+    zero gateway reads. Each per-fork receipt line records its **`outcome`**
+    (`auto-resolved-FYI | escalated`, #519), so the covered vs. escalated split
+    is countable from receipts alone without re-deriving it from the FYI/gate
+    sections.
 - **CAP-2** — covered fork → overrideable FYI with source receipts
   - **intent:** A fork whose discriminating question is answered by a served
     line is resolved machine-side and moved to a distinct **FYI section** of
@@ -71,7 +95,9 @@ intake as a **proposal only**.
   - **success:** A fixture fork covered by a served line presents as one FYI
     (option + quote + pin) and no gate; overriding it re-presents the fork as
     a gate in the same sitting; a fixture with a topical-but-non-discriminating
-    quote presents as a gate, not an FYI.
+    quote presents as a gate, not an FYI. The FYI's receipt line records
+    `outcome: auto-resolved-FYI` (#519); an overridden FYI's receipt records
+    `outcome: escalated`, since the override reopened it as a gate.
 - **CAP-3** — uncovered fork → owner gate with pinned candidates
   - **intent:** A fork not covered stays an owner gate, presented with 1–3
     machine-proposed candidate answers — each carrying its partial grounding
