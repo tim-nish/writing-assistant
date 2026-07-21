@@ -377,6 +377,30 @@ A useful candidate you cannot attach a resolvable source to goes to the
   - **audience** — who the piece is for and what they should do after reading;
   - **other** — a real gap that fits none of the above.
 
+**No confabulated premise (#526).** A NEEDS-OWNER item may pose an *unsourceable
+question* — that is precisely why it is on the list — but it must **never assert
+an unsourced factual premise as established fact**. Any factual ground an item
+carries is a declared **optional trailing `premise:` clause**, appended after the
+TOPIC — `CANDIDATE / REASON / TOPIC / premise: <…>`. The **sanctioned form** is
+exactly one of:
+
+- **`premise: unverified`** — the literal marker: you are flagging an open
+  question, not asserting fact. Use this whenever the factual setup is your own
+  framing with no source behind it.
+- **`premise: path:line@sha`** — a resolvable, commit-pinned file pointer in the
+  **same grammar a fact-sheet SOURCE uses** (sha 7–40 hex). Use this when the
+  factual ground *is* in a declared source — then it belongs pointered.
+
+Anything else is a **named validator rejection**: prose asserted as fact →
+`confabulated-premise`; an unpinned `path:line` or malformed pointer →
+`unpinned-premise-pointer`. Do **not** smuggle a factual premise into the
+CANDIDATE prose (e.g. *… described internally as "the Tanuki demo" …*) — the
+grammar only sees a declared `premise:` clause, so an unsourced factual setup
+must be either pointer-backed or marked `unverified`, never asserted. An item
+with **no** `premise:` clause (a bare unsourceable question) still passes. This
+rule is held **in lockstep** with `scripts/validate-needs-owner.py` — changing
+one without the other is a defect (the same lockstep §3's nine-KIND set carries).
+
 Partition rule: a candidate lands in **exactly one** of the fact sheet or
 NEEDS-OWNER — never both. **Always emit the `# NEEDS-OWNER` heading**, even when
 the list is empty, so the pipeline can rely on its presence. Validate with:

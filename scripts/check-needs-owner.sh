@@ -27,6 +27,12 @@ grep -q 'surprise, significance, opinion, warning, tradeoff, audience' "$SKILL" 
 grep -q 'exactly one' "$SKILL" && ok "skill states the strict partition rule" || err "partition rule not stated"
 grep -q 'even when' "$SKILL" && ok "skill requires emitting the section even when empty" || err "always-emit rule not stated"
 
+# 1a. LOCKSTEP (#526): §4 documents the premise-clause rule AND the sanctioned form.
+grep -q 'premise:' "$SKILL" && ok "skill documents the premise: clause (#526)" || err "premise: clause rule not documented"
+grep -q 'premise: unverified' "$SKILL" && ok "skill documents the sanctioned unverified marker" || err "unverified marker not documented"
+grep -q 'confabulated' "$SKILL" && ok "skill names the confabulated-premise rejection" || err "confabulated-premise rule not documented"
+grep -q 'lockstep' "$SKILL" && ok "skill states the validator↔skill lockstep for premises" || err "premise lockstep not stated"
+
 # --- fixtures --------------------------------------------------------------
 work=$(mktemp -d); trap 'rm -rf "$work"' EXIT
 NO() { python3 "$root/$VNO" "$1" >/dev/null 2>&1; }   # exit 0 = valid
@@ -84,6 +90,34 @@ printf 'sources:\n  - path: .\n' > "$work/writing-sources.yaml"
 n=$(python3 "$root/$VFS" "$work/ok.md" --root "$work" 2>/dev/null | grep -c 'entries,' || true)
 python3 "$root/$VFS" "$work/ok.md" --root "$work" 2>/dev/null | grep -q '^2 entries,' \
   && ok "fact-sheet validator reads only the fact-sheet section (2, not 4)" || err "fact-sheet validator leaked into NEEDS-OWNER"
+
+# 9. No confabulated premise (#526): a declared factual premise must be
+#    pointer-backed or `premise: unverified`, else a NAMED rejection. The grammar
+#    gate runs WITHOUT --root (the check harness has no hub).
+# 9a. The exact #526 tanuki-run confabulation (committed regression fixture) is
+#     rejected with the confabulated-premise class.
+FIX="$root/scripts/fixtures/needs-owner/tanuki-run-confabulated-premise.md"
+grep -q 'described internally as "the Tanuki demo" for personal-policy influence' "$FIX" \
+  && ok "regression fixture reproduces the exact #526 tanuki-run line" || err "fixture drifted from the #526 line"
+reason "$FIX" | grep -q 'confabulated-premise' \
+  && ok "reject: #526 confabulated premise (prose asserted as fact)" || err "confabulated premise accepted"
+
+# 9b. `premise: unverified` — an open question, not a claim — passes.
+printf '# Fact sheet: x\n\n# NEEDS-OWNER\n- Why did we frame it that way / owner framing / significance / premise: unverified\n' > "$work/prem-unverified.md"
+NO "$work/prem-unverified.md" && ok "accept: premise: unverified (open question, not fact)" || err "premise: unverified rejected"
+
+# 9c. A pinned `premise: path:line@sha` passes the structural grammar (no --root).
+printf '# Fact sheet: x\n\n# NEEDS-OWNER\n- Why this design / owner framing / opinion / premise: docs/a.md:12@a1b2c3d\n' > "$work/prem-pinned.md"
+NO "$work/prem-pinned.md" && ok "accept: premise: path:line@sha (fact-sheet SOURCE grammar)" || err "pinned premise pointer rejected"
+
+# 9d. An unpinned `premise: path:line` (no @sha) is rejected — same rule as a SOURCE.
+printf '# Fact sheet: x\n\n# NEEDS-OWNER\n- Why this design / owner framing / opinion / premise: docs/a.md:12\n' > "$work/prem-unpinned.md"
+reason "$work/prem-unpinned.md" | grep -q 'unpinned-premise-pointer' \
+  && ok "reject: unpinned premise pointer (path:line with no @sha)" || err "unpinned premise pointer accepted"
+
+# 9e. An item with NO premise clause still parses byte-identically — passes.
+printf '# Fact sheet: x\n\n# NEEDS-OWNER\n- A bare unsourceable question / not in declared sources / surprise\n' > "$work/prem-none.md"
+NO "$work/prem-none.md" && ok "accept: no premise clause (bare unsourceable question, AC3)" || err "no-premise item rejected"
 
 if [ "$fail" -eq 0 ]; then
   printf '\nAll NEEDS-OWNER checks passed.\n'; exit 0
