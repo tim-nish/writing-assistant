@@ -60,6 +60,24 @@ grep -qi 'pointer drift' "$SKILL" && grep -qi 'never changes identity' "$SKILL" 
   && ok "SKILL: pointer drift on re-harvest never changes identity" \
   || err "SKILL missing the drift-preserves-identity rule"
 
+# Story 18.35/#529: the "stable id" is not merely asserted — it is DERIVED by a
+# concrete, reproducible rule the SKILL documents and a helper implements.
+grep -qi 'element-id' "$SKILL" && grep -qiE 'declared membership anchor|membership anchor' "$SKILL" \
+  && ok "SKILL: the stable id is derived from the declared membership anchor (element-id)" \
+  || err "SKILL asserts stability but gives no reproducible id-derivation rule"
+# The helper reproduces byte-identically and is anchor-keyed (identity == anchor).
+W="$root/scripts/write-article-plan.py"
+python3 - "$W" <<'PYEOF' && ok "element-id helper: derivation is reproducible and anchor-keyed" || err "element-id helper is not deterministic"
+import json, subprocess, sys
+W = sys.argv[1]
+def eid(a):
+    return json.loads(subprocess.run([sys.executable, W, "element-id", a],
+                      capture_output=True, text=True).stdout)["elements"][0]["id"]
+assert eid("Weak driver") == eid("Weak driver") == "el-weak-driver"   # reproducible
+assert eid("weak-driver") == eid("el-weak-driver") == "el-weak-driver"  # spellings reconcile
+assert eid("kill switch") != eid("weak driver")                       # distinct anchors, distinct ids
+PYEOF
+
 # --- 3. Selection is upstream of the argument plan, and disclosure-only ----------
 grep -qi 'upstream of the argument plan' "$SKILL" \
   && ok "SKILL: selection is upstream of the argument plan (CAP-3/#440)" \

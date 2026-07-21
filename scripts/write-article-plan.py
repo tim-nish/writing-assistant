@@ -56,15 +56,26 @@ Subcommands (each takes --root; default: the git top-level of cwd):
       source repo. A non-conforming destination falls back to user-scoped
       state and NO `plans/` directory is created there. Prints the result JSON.
 
-  consult [--root R]
+  consult [--project P] [--root R]
       Read existing article plans for consultation at draft start (CAP-3,
       Story 13.57). READ-ONLY: it reads `plans/*.md` from the articles repo
       through the schema and creates/modifies NOTHING. Emits each plan's
       discovery surface (slug, intent, claim, status, pin, relates) as JSON so
-      the run can surface plan-grounded proposals under the proposal contract.
+      the run can surface plan-grounded proposals under the proposal contract,
+      plus the consumption-exclusion views (CAP-9/#430): `consumed_index` (all
+      plans) and, scoped to `--project` (default: host basename) by the pin's
+      repo component (`_plan_project`), `project_plans` / `project_consumed_index`
+      and the scanned location (`plans/*.md`) — so a "first article on this
+      project" claim is a project-scoped, evidenced fact (Story 18.35/#529).
       A repo with no plans, or a schema-less destination, degrades silently:
       it prints an empty plan list with a `degraded` reason — never a failure,
       never a prompt about missing plans.
+
+  element-id ANCHOR [ANCHOR ...] [--root R]
+      Derive stable story-element ids (CAP-9/#428) from declared membership
+      anchors. A PURE function: the same anchor always yields byte-identical
+      output, so element ids reproduce across runs and id-keyed consumption
+      exclusion fires (Story 18.35/#529). Read-only — touches no file.
 
   conformance --plan plans/<slug>.md --surface <policy-surface>
               [--config-json J | --root R] [--config-version V]
@@ -124,6 +135,38 @@ PLAN_STATUSES = ("outlined", "drafted", "superseded")
 # closed against whitespace/prose so a `consumed` list can never smuggle free
 # text past the schema.
 ELEMENT_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9:._-]*$")
+
+# A story-element id is derived MECHANICALLY from the cluster's declared
+# membership anchor (CAP-9/#428, Story 18.35/#529): the id is identity, derived
+# from the *declared membership rule*, never from harvest pointers (which drift)
+# or a run timestamp. Everything that is not [a-z0-9] in the anchor collapses to
+# a single `-`.
+_ANCHOR_SLUG_RE = re.compile(r"[^a-z0-9]+")
+
+
+def derive_element_id(anchor):
+    """A cluster's DECLARED membership anchor -> its stable story-element id.
+
+    A PURE, byte-identical function of the anchor text: two runs that read the
+    same declared anchor from the same fact sheet mint the SAME id, so id-keyed
+    consumption exclusion (CAP-9/#430) fires across runs — the #529 root cause
+    (`el-weak-driver` in one run, `weak-driver` in the next) is a mechanical
+    derivation problem, fixed by deriving instead of free-choosing the token
+    (CAP-10 `deterministic-tool-over-llm-in-loop`).
+
+    Normalization: casefold; drop an already-derived `el-` prefix so a bare
+    anchor and its id form reconcile to one identity (`el-weak-driver` ==
+    `weak-driver`); slugify (non-alphanumeric runs -> `-`); collapse and trim;
+    re-prefix `el-`. Returns None for an anchor with no alphanumeric content
+    (the caller must surface that as a defect, never mint a nameless element).
+    """
+    s = str(anchor).strip().lower()
+    if s.startswith("el-"):
+        s = s[3:]
+    s = _ANCHOR_SLUG_RE.sub("-", s).strip("-")
+    if not s:
+        return None
+    return f"el-{s}"
 
 
 def parse_id_list(raw):
@@ -506,15 +549,28 @@ def cmd_consult(args):
     silent-degrading: no articles-repo schema, or no plans/ directory, yields
     an empty list with a reason — never a failure, never a side effect."""
     root = rp.host_root(args.root)
+    # The run's project: the source repo whose consumed elements a new
+    # lesson-based selection must exclude (CAP-9/#430). Same proxy as
+    # differential-context — the `pin`'s repo component (`_plan_project`),
+    # defaulting to the host repo's basename. Named explicitly so the
+    # "first article on this project" claim is a PROJECT-scoped fact
+    # (Story 18.35/#529), not "no plan anywhere consumed anything".
+    project = (getattr(args, "project", None) or "").strip() or _plan_project(
+        f"{os.path.basename(os.path.realpath(root))}@")
+    scanned = os.path.join(PLAN_DIR, "*.md")
     repo = articles_repo_root(root)
     if not has_articles_schema(repo):
-        print(json.dumps({"plans": [], "degraded":
+        print(json.dumps({"plans": [], "project": project, "scanned": scanned,
+                          "project_plans": [], "project_consumed_index": {},
+                          "consumed_index": {}, "degraded":
                           "destination has no articles-repo schema; "
                           "consultation is skipped (today's behavior)"}))
         return 0
     plans_dir = os.path.join(repo, PLAN_DIR)
     if not os.path.isdir(plans_dir):
-        print(json.dumps({"plans": [], "degraded":
+        print(json.dumps({"plans": [], "project": project, "scanned": scanned,
+                          "project_plans": [], "project_consumed_index": {},
+                          "consumed_index": {}, "degraded":
                           "no plans/ directory in the articles repo"}))
         return 0
     summaries = []
@@ -534,8 +590,42 @@ def cmd_consult(args):
     for s in summaries:
         for eid in s.get("consumed", []):
             consumed_index.setdefault(eid, []).append(s["slug"])
+    # PROJECT-scoped views (Story 18.35/#529). A prior plan belongs to this run's
+    # project iff its `_plan_project` (pin's repo component) equals `project` —
+    # the SAME membership rule differential-context uses, NOT a pin-sha or slug
+    # match. `project_consumed_index` is the exclusion input a new lesson-based
+    # selection defaults away from; `project_plans` lets the SKILL distinguish
+    # "no prior plan for this project" (-> the first-article claim is emittable)
+    # from "prior plans exist but none consumed an overlapping element".
+    project_plans, project_consumed_index = [], {}
+    for s in summaries:
+        if _plan_project(s.get("pin")) != project:
+            continue
+        project_plans.append(s["slug"])
+        for eid in s.get("consumed", []):
+            project_consumed_index.setdefault(eid, []).append(s["slug"])
     print(json.dumps({"plans": summaries, "articles_repo": repo,
+                      "project": project, "scanned": scanned,
+                      "project_plans": project_plans,
+                      "project_consumed_index": project_consumed_index,
                       "consumed_index": consumed_index, "degraded": None}))
+    return 0
+
+
+def cmd_element_id(args):
+    """Derive stable story-element ids from declared membership anchors
+    (CAP-9/#428, Story 18.35/#529). The id-minting tool the draft SKILL calls so
+    ids REPRODUCE across runs instead of being free-chosen LLM tokens: the same
+    anchor always yields byte-identical output (CAP-10
+    `deterministic-tool-over-llm-in-loop`). Read-only — no file is touched. An
+    anchor with no alphanumeric content is reported `ok: false` (a nameless
+    element is a defect, never a minted id)."""
+    out = []
+    for anchor in args.anchor:
+        eid = derive_element_id(anchor)
+        out.append({"anchor": anchor, "id": eid,
+                    "ok": bool(eid) and bool(ELEMENT_ID_RE.match(eid))})
+    print(json.dumps({"elements": out}))
     return 0
 
 
@@ -1009,7 +1099,18 @@ def main(argv=None):
     sp.add_argument("plan", nargs="?", default="-")
     sp.add_argument("--slug", required=True)
 
-    sub.add_parser("consult", parents=[root_parent])
+    sp = sub.add_parser("consult", parents=[root_parent])
+    sp.add_argument("--project", help="the run's project (related.projects); a "
+                    "prior plan whose pin names this source repo is scoped to it "
+                    "(project_consumed_index / project_plans). "
+                    "Default: the host repo's basename.")
+
+    sp = sub.add_parser("element-id", parents=[root_parent])
+    sp.add_argument("anchor", nargs="+",
+                    help="a cluster's declared membership anchor; each is "
+                         "deterministically slugified to a stable el-<slug> "
+                         "story-element id (CAP-9: id derived from the declared "
+                         "membership rule, never from harvest pointers)")
 
     sp = sub.add_parser("differential-context", parents=[root_parent])
     sp.add_argument("--project", help="the run's project (related.projects); "
@@ -1040,6 +1141,7 @@ def main(argv=None):
         args.root = None
     return {"validate": cmd_validate, "dest": cmd_dest,
             "write": cmd_write, "consult": cmd_consult,
+            "element-id": cmd_element_id,
             "differential-context": cmd_differential_context,
             "conformance": cmd_conformance}[args.cmd](args)
 

@@ -14,10 +14,14 @@ lesson unit between them repeats. Section order is load-bearing.
 **Each lesson is a story element** (CAP-9/#428) — one case of the general
 evidence cluster defined in the [SKILL](../SKILL.md#story-element-selection--the-model-and-its-disclosure-cap-9-428):
 a cluster of fact-sheet entries with a **stable id** (id is identity, the
-evidence pointers are derived payload). Selection of which lessons the article
-covers is disclosed per element (the interview journal + completion summary
-state the id and the rule that selected it); this framework does not re-specify
-that — it just names lessons as the elements F2 selects over.
+evidence pointers are derived payload). Each lesson's stable id is **derived
+mechanically** from its **declared title/claim** (the lesson's membership
+anchor) via `write-article-plan.py element-id "<lesson title>"` — never a
+free-chosen token, so the same lesson resolves to the same id across runs
+(#529). Selection of which lessons the article covers is disclosed per element
+(the interview journal + completion summary state the id and the rule that
+selected it); this framework does not re-specify that — it just names lessons as
+the elements F2 selects over.
 
 ## Visual slot (SPEC-article-visuals CAP-1)
 

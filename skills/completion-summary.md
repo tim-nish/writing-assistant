@@ -166,6 +166,17 @@ fact sheet selects the same elements with the same reasons. A **non-lesson run**
 disclose. When selection ran, the item is never silently dropped: an element
 present in the draft with no stated selection reason is a defect, surfaced here.
 
+**Elements skipped because a prior article already covered them (CAP-9/#430,
+#529).** When the default-to-unconsumed rule **excluded** an element, the summary
+also lists **each skipped element's id and the prior plan that already covered
+it** (`plans/<slug>.md`, from the project-scoped exclusion view) — a
+defaulted-away element is disclosed with its reason, never silently omitted, the
+same per-element discipline the selection disclosure follows. This scan is
+**project-scoped**: the summary states **"first article on this project"** only
+when the `plans/*.md` scan found **no** prior plan for the project — the claim
+**names the scanned location** (`plans/*.md`), and it is never emitted when a
+project plan exists (a claim the scan cannot substantiate is a defect).
+
 ## Where owner input was applied (informational — Story 13.98, #435)
 
 The gap interview is **the** owner-input channel (`draft-article` SKILL), so a
