@@ -16,10 +16,47 @@ Config source: --config-json FILE (or - for stdin); else resolve-user-config.py.
 """
 
 import argparse
+import importlib.util
 import json
 import os
 import subprocess
 import sys
+
+
+def _load_mod(fn):
+    """Load a sibling script as a module (the resolve-*.py idiom)."""
+    here = os.path.dirname(os.path.realpath(__file__))
+    name = fn.replace(".py", "").replace("-", "_")
+    spec = importlib.util.spec_from_file_location(name, os.path.join(here, fn))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def resolvable_platforms(args):
+    """The set of platform ids whose profile RESOLVES for this repo (Story 18.36,
+    #530). Platform-specific frontmatter (e.g. dev.to's `canonical_url` block) is
+    stamped into the canonical draft ONLY for a target that can actually emit —
+    i.e. one whose `platform-profiles/<platform>.yaml` resolves. A declared
+    variant with only a `*.example.yaml` (no real profile) MUST NOT have its block
+    stamped: the canonical draft carries no field for a target that cannot emit.
+
+    Best-effort: when profiles cannot be resolved at all (no profiles dir, not in
+    a git repo and no override), returns an empty set — nothing platform-specific
+    is stamped for an unconfirmed target, which is the conservative #530 stance."""
+    pp = _load_mod("resolve-platform-profiles.py")
+    root = None
+    try:
+        root = pp.host_root(args.root)
+    except SystemExit:
+        if not args.profiles_dir:
+            return set()
+    try:
+        pdir = pp.profiles_dir(root, args.profiles_dir)
+        profiles, _ = pp.load_profiles(pdir)
+        return set(profiles)
+    except Exception:  # pragma: no cover - defensive (degrade to nothing stamped)
+        return set()
 
 
 def plugin_provenance():
@@ -74,7 +111,7 @@ def load_config(args):
     return json.loads(subprocess.run(cmd, capture_output=True, text=True, check=True).stdout)
 
 
-def render(cfg, lang):
+def render(cfg, lang, resolvable=None):
     fm = cfg.get("frontmatter", {})
     schema = fm.get("schema")
     if not schema:
@@ -121,8 +158,15 @@ def render(cfg, lang):
     variants = cfg.get("syndication", {}).get("variants", {})
     if mode == "canonical":
         # dev.to syndication: canonical_url points back at the site page.
-        base = variants.get("devto", {}).get("canonical_url_base", "{site_url}/articles")
-        out += ["syndication:", "  devto:", f"    canonical_url: {base}/{{slug}}"]
+        # Story 18.36 (#530): stamp this platform-specific block ONLY when dev.to
+        # can actually emit — i.e. its platform profile resolves. A declared
+        # variant with no resolvable profile (only a `*.example.yaml`) cannot
+        # emit, so the canonical draft must carry NO field for it. `resolvable`
+        # is the resolvable-platform set; None means "do not gate" (a programmatic
+        # caller that passed no set — preserves the pre-#530 behavior).
+        if resolvable is None or "devto" in resolvable:
+            base = variants.get("devto", {}).get("canonical_url_base", "{site_url}/articles")
+            out += ["syndication:", "  devto:", f"    canonical_url: {base}/{{slug}}"]
     elif mode == "external":
         # Site-record constants live in the owner's `site_record` block (#282);
         # a legacy `syndication.variants.zenn` block is still honoured during
@@ -142,8 +186,14 @@ def main(argv=None):
     p.add_argument("--global-config")
     p.add_argument("--repo-config")
     p.add_argument("--language", choices=["en", "ja"], default="en")
+    p.add_argument("--profiles-dir",
+                   help="override the platform-profiles directory used to decide "
+                        "which platform-specific frontmatter blocks are stamped "
+                        "(#530: only resolvable/emittable targets; tests / "
+                        "non-default locations)")
     args = p.parse_args(argv)
-    sys.stdout.write(render(load_config(args), args.language))
+    sys.stdout.write(render(load_config(args), args.language,
+                            resolvable=resolvable_platforms(args)))
     return 0
 
 

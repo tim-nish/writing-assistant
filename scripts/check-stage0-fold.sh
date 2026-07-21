@@ -146,6 +146,41 @@ out=$(python3 "$DP" stage0 F2 specs/ --root "$host" \
 echo "$out" | jget '"syndication_warnings" in d' | grep -q False \
   && ok "no declared variants → no syndication warning key (prior output shape)" \
   || err "syndication warning key appeared with no declared variants"
+
+# 7b. Story 18.36 (#530) — the SAME declared-variant/no-resolvable-profile
+#     finding is ALSO surfaced as an actionable PUBLISH BLOCKER naming the exact
+#     missing profile path (routed to the completion summary's publish-blocker
+#     bucket), while draft start stays non-blocking (config_ok/next_stage
+#     unchanged — 18.19 holds).
+out=$(python3 "$DP" stage0 F2 specs/ --root "$host" \
+        --config-json "$work/synd-cfg.json" --profiles-dir "$work/pp_empty")
+echo "$out" | jget '[b["platform"] for b in d.get("publish_blockers", [])]' | grep -q devto \
+  && ok "#530 unresolvable declared variant → publish_blockers entry (devto)" \
+  || err "#530 no publish blocker for an unresolvable declared variant"
+echo "$out" | jget 'd.get("publish_blockers",[{}])[0].get("missing_profile_path","")' \
+  | grep -Eq 'pp_empty/devto\.yaml$' \
+  && ok "#530 publish blocker names the EXACT missing profile path (<dir>/devto.yaml)" \
+  || err "#530 publish blocker path wrong: $(echo "$out" | jget 'd.get("publish_blockers")')"
+echo "$out" | jget 'd.get("publish_blockers",[{}])[0].get("bucket")' | grep -q publish-blocker \
+  && ok "#530 blocker is tagged for the publish-blocker bucket" || err "#530 blocker bucket wrong"
+echo "$out" | jget 'd["config_ok"]' | grep -q True \
+  && ok "#530 config_ok stays True (draft start not blocked — 18.19 preserved)" || err "#530 blocker flipped config_ok"
+echo "$out" | jget 'd["next_stage"]' | grep -q harvest \
+  && ok "#530 next_stage still harvest (blocker is publish-boundary, not a halt)" || err "#530 blocker changed next_stage"
+
+# A declared variant WITH a resolvable profile → no publish blocker (unchanged).
+out=$(python3 "$DP" stage0 F2 specs/ --root "$host" \
+        --config-json "$work/synd-cfg.json" --profiles-dir "$work/pp_full")
+echo "$out" | jget '"publish_blockers" in d' | grep -q False \
+  && ok "#530 resolvable declared variant → no publish blocker" \
+  || err "#530 resolvable declared variant still produced a publish blocker"
+
+# No declared variants → no publish blocker key at all.
+out=$(python3 "$DP" stage0 F2 specs/ --root "$host" \
+        --config-json "$work/nosynd.json" --profiles-dir "$work/pp_empty")
+echo "$out" | jget '"publish_blockers" in d' | grep -q False \
+  && ok "#530 no declared variants → no publish blocker key" \
+  || err "#530 publish blocker key appeared with no declared variants"
 unset XDG_STATE_HOME
 
 if [ "$fail" -eq 0 ]; then

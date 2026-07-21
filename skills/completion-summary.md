@@ -24,7 +24,16 @@ Partition everything the run surfaced into exactly three labelled buckets:
    (`stale-variant` / `unrecorded-canonical-hash`, FR60): the canonical draft
    moved since emission, so route the change to the draft; re-emission is the
    owner's explicit publish decision through the standalone variants flow
-   (`variants --slug <slug>`), never something a review run performs. A
+   (`variants --slug <slug>`), never something a review run performs; or a
+   **declared syndication variant with no resolvable platform profile** — a
+   `publish_blockers` entry from Stage 0 (`stage0`,
+   `declared-variant-no-resolvable-profile`, #530): `syndication.policy` declares
+   a variant (e.g. `devto`) whose `platform-profiles/<platform>.yaml` does not
+   resolve (only a `*.example.yaml` exists), so variant emission **will** fail.
+   The blocker **names the exact missing profile path**; the fix is to copy the
+   example profile to that path or drop the declared variant. Draft start is not
+   blocked (Story 18.19) — this surfaces the SAME finding at the publish/variant
+   boundary so it stops being silently re-discovered every run. A
    blocker appears **here and nowhere else** — never also under informational
    notes or optional cleanup.
 3. **Optional cleanup** — nice-to-have polish the owner may skip.
