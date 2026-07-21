@@ -3833,6 +3833,67 @@ def cmd_review_reentry(args):
     return 0
 
 
+def _syndication_profile_warnings(root, config_json=None, profiles_dir_override=None):
+    """Story 18.19 (#494): when user config's `syndication.policy.<lang>.variants`
+    declares a platform, WARN (informational — never a hard fail) if that
+    platform has no resolvable profile for this repo, so the owner learns at
+    draft START, not at publish time (a platform declared in the language's
+    `variants` list with no matching `platform-profiles/<platform>.yaml`). A
+    resolvable platform produces no warning. Tag-cap/charset checks stay variant-stage lint
+    (out of scope). Best-effort: a config that will not resolve was already
+    halted by validate-config, so an unresolvable config here degrades to no
+    warning rather than a second error."""
+    here = os.path.dirname(os.path.realpath(__file__))
+    if config_json:
+        try:
+            raw = sys.stdin.read() if config_json == "-" \
+                else open(config_json, encoding="utf-8").read()
+            cfg = json.loads(raw)
+        except (OSError, ValueError):
+            return []
+    else:
+        r = subprocess.run(
+            [sys.executable, os.path.join(here, "resolve-user-config.py"),
+             "--root", root, "resolved"], capture_output=True, text=True)
+        if r.returncode != 0 or not r.stdout.strip():
+            return []
+        try:
+            cfg = json.loads(r.stdout)
+        except json.JSONDecodeError:
+            return []
+    policy = ((cfg.get("syndication") or {}).get("policy") or {})
+    declared = {}   # platform -> {languages that declare it}
+    for lang, pol in policy.items():
+        if not isinstance(pol, dict):
+            continue
+        for plat in (pol.get("variants") or []):
+            declared.setdefault(plat, set()).add(lang)
+    if not declared:
+        return []
+    pp = _load("resolve-platform-profiles.py")
+    pdir = pp.profiles_dir(root, profiles_dir_override)
+    profiles, _ = pp.load_profiles(pdir)
+    warnings = []
+    for plat in sorted(declared):
+        if plat in profiles:
+            continue                       # resolvable → no warning
+        langs = sorted(declared[plat])
+        warnings.append({
+            "bucket": "informational",
+            "platform": plat,
+            "languages": langs,
+            "profiles_dir": pdir,
+            "warning": (
+                f"syndication.policy declares variant '{plat}' for language(s) "
+                f"{', '.join(langs)} but no resolvable platform profile "
+                f"'{plat}.yaml' exists under {pdir}; variant emission would fail "
+                "at publish time. Add the profile (see "
+                "config/platform-profiles/*.example.yaml) or drop the declared "
+                "variant. Informational only — draft start is not blocked."),
+        })
+    return warnings
+
+
 def cmd_stage0(args):
     """Story 13.13: fold the whole of Stage 0 into ONE invocation instead of
     three — configuration validation (CAP-5), framework check, and workspace
@@ -3869,6 +3930,14 @@ def cmd_stage0(args):
     # before scope is read, a workspace is minted, or a token is spent (#309).
     out = {"config_ok": True, "target": root, "run_state": run_state}
     out.update(_autostart(root))
+    # Informational (Story 18.19, #494): a declared syndication variant with no
+    # resolvable platform profile is surfaced at draft start — NOT a hard fail,
+    # so `config_ok`/`next_stage` are unchanged and the run proceeds.
+    warnings = _syndication_profile_warnings(
+        root, config_json=getattr(args, "config_json", None),
+        profiles_dir_override=getattr(args, "profiles_dir", None))
+    if warnings:
+        out["syndication_warnings"] = warnings
     print(json.dumps(out, indent=2))
     return 0
 
@@ -3944,6 +4013,13 @@ def main(argv=None):
                                       "selection is pinned to it, harvest scopes to that element alone "
                                       "without widening the source boundary — CAP-9, #431")
     sp.add_argument("--root", help="host-repo root (default: git top-level of cwd; errors outside a git repo)")
+    sp.add_argument("--config-json",
+                    help="resolved config JSON (FILE or - for stdin) for the "
+                         "declared-syndication-variant profile-resolvability warning "
+                         "(Story 18.19); default: resolve from --root")
+    sp.add_argument("--profiles-dir",
+                    help="override the platform-profiles directory for the "
+                         "resolvability warning (tests / non-default locations)")
     sp = sub.add_parser("classify-policy",
                         help="CAP-7 policy-result classification: a mechanical "
                              "pre-step between the policy read and `interview` "

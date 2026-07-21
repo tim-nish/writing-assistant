@@ -91,6 +91,47 @@ echo "$out" | jget "'depth' in d" | grep -q False \
 grep -qi 'depth/scope directive' "$SKILL" && grep -q 'CAP-8' "$SKILL" \
   && ok "SKILL documents the depth/scope directive (CAP-8)" || err "SKILL missing depth/scope guidance"
 
+# 7. Story 18.19 (#494) — a declared syndication variant with no resolvable
+#    platform profile WARNS (informational bucket), never a hard fail; a
+#    resolvable platform produces no warning.
+export XDG_STATE_HOME="$work/state7"
+cat > "$work/synd-cfg.json" <<'JSON'
+{"owner":{"name":"X","site_url":"https://x"},
+ "frontmatter":{"schema":["slug"]},
+ "syndication":{"policy":{"en":{"mode":"canonical","variants":["devto"]}}}}
+JSON
+mkdir -p "$work/pp_empty"        # no devto.yaml → devto is unresolvable
+out=$(python3 "$DP" stage0 F2 specs/ --root "$host" \
+        --config-json "$work/synd-cfg.json" --profiles-dir "$work/pp_empty") \
+  && ok "stage0 still succeeds (exit 0) with an unresolvable declared variant" \
+  || err "stage0 hard-failed on an unresolvable declared variant (must warn, not fail)"
+echo "$out" | jget '[w["platform"] for w in d.get("syndication_warnings", [])]' | grep -q devto \
+  && ok "declared variant with no profile is surfaced as a stage-0 warning (devto)" \
+  || err "unresolvable declared variant produced no warning"
+echo "$out" | jget 'd.get("syndication_warnings",[{}])[0].get("bucket")' | grep -q informational \
+  && ok "the warning is in the informational bucket (not a hard fail)" || err "warning bucket wrong"
+echo "$out" | jget 'd["config_ok"]' | grep -q True \
+  && ok "config_ok stays True under the informational warning" || err "warning flipped config_ok"
+echo "$out" | jget 'd["next_stage"]' | grep -q harvest \
+  && ok "next_stage still harvest under the informational warning" || err "warning changed next_stage"
+
+mkdir -p "$work/pp_full"         # devto.yaml resolves → no warning
+cp config/platform-profiles/devto.example.yaml "$work/pp_full/devto.yaml"
+out=$(python3 "$DP" stage0 F2 specs/ --root "$host" \
+        --config-json "$work/synd-cfg.json" --profiles-dir "$work/pp_full")
+echo "$out" | jget '"syndication_warnings" in d' | grep -q False \
+  && ok "a declared variant WITH a resolvable profile produces no warning" \
+  || err "a resolvable declared variant still warned"
+
+# A config declaring no syndication variants never adds the warning key at all.
+printf '{"owner":{"name":"X"},"frontmatter":{"schema":["slug"]}}' > "$work/nosynd.json"
+out=$(python3 "$DP" stage0 F2 specs/ --root "$host" \
+        --config-json "$work/nosynd.json" --profiles-dir "$work/pp_empty")
+echo "$out" | jget '"syndication_warnings" in d' | grep -q False \
+  && ok "no declared variants → no syndication warning key (prior output shape)" \
+  || err "syndication warning key appeared with no declared variants"
+unset XDG_STATE_HOME
+
 if [ "$fail" -eq 0 ]; then
   printf '\nAll stage0-fold checks passed.\n'; exit 0
 else
