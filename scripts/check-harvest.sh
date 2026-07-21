@@ -317,6 +317,78 @@ bigb=$(python3 "$BUD" --root "$work/host" "$big" 2>/dev/null | grep -F "$big" | 
   || err "cap not applied: 400-line file got budget '$bigb' (expected 40)"
 rm -f "$big"
 
+# 10. Blob-keyed extraction cache (Story 18.31, #516, CAP-10): re-harvest reuses
+#     an unchanged source's extraction; the key (path, blob-sha, extractor-version)
+#     in the state root invalidates structurally on a content or contract change;
+#     a cold cache is a first harvest.
+has "harvest-cache.py" "skill consults the blob-keyed extraction cache"
+has "changed blobs" "skill states only changed blobs re-extract"
+has "cache hit" "skill documents the cache-hit reuse path"
+has "different key" "skill states a changed blob/contract yields a different key (structural invalidation)"
+has "cold cache" "skill documents cold-cache = first harvest"
+
+HC="$root/scripts/harvest-cache.py"
+python3 -c "import py_compile; py_compile.compile('$HC', doraise=True)" 2>/dev/null \
+  && ok "harvest-cache.py is stdlib-only Python (compiles)" || err "harvest-cache.py syntax error"
+
+# blob-sha equals git hash-object (the git blob object id, computed in-process)
+cf="$work/host/src/a.py"   # committed? no — a.py exists in the §-behavioral fixture
+gsha=$(git -C "$work/host" hash-object "$cf" 2>/dev/null || git hash-object "$cf")
+hsha=$(python3 "$HC" blob-sha --path "$cf" 2>/dev/null)
+[ "$gsha" = "$hsha" ] && ok "blob-sha matches git hash-object (content identity)" \
+  || err "blob-sha mismatch: git=$gsha cache=$hsha"
+
+# extractor-version: deterministic 12-hex, and the key changes when it changes
+ev1=$(python3 "$HC" extractor-version 2>/dev/null)
+ev2=$(python3 "$HC" extractor-version 2>/dev/null)
+printf '%s' "$ev1" | grep -Eq '^[0-9a-f]{12}$' && ok "extractor-version is a stable 12-hex contract hash" \
+  || err "extractor-version format wrong: '$ev1'"
+[ "$ev1" = "$ev2" ] && ok "extractor-version is deterministic across calls" || err "extractor-version non-deterministic"
+python3 -c "
+import importlib.util
+spec=importlib.util.spec_from_file_location('hc','$HC'); m=importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+assert m.key_hash('f','SHA','v1') != m.key_hash('f','SHA','v2'), 'version must be part of the key'
+assert m.key_hash('f','A','v') != m.key_hash('f','B','v'), 'blob-sha must be part of the key'
+" 2>/dev/null && ok "cache key changes with extractor-version AND blob-sha (declared-precedence invalidation)" \
+  || err "cache key does not incorporate version/blob-sha"
+
+# a contract change (edit a CONTRACT_FILE) bumps extractor-version — the lockstep
+plug="$work/plugin"; mkdir -p "$plug/scripts" "$plug/skills/harvest"
+cp "$HC" "$plug/scripts/harvest-cache.py"
+printf 'validator v1\n' > "$plug/scripts/validate-fact-sheet.py"
+printf 'skill v1\n'     > "$plug/skills/harvest/SKILL.md"
+pev1=$(python3 "$plug/scripts/harvest-cache.py" extractor-version 2>/dev/null)
+printf 'skill v2 CHANGED\n' >> "$plug/skills/harvest/SKILL.md"    # a §3/KIND-set change
+pev2=$(python3 "$plug/scripts/harvest-cache.py" extractor-version 2>/dev/null)
+[ -n "$pev1" ] && [ "$pev1" != "$pev2" ] \
+  && ok "editing the extraction contract bumps extractor-version (cache invalidates in lockstep)" \
+  || err "contract change did not change extractor-version ($pev1 -> $pev2)"
+
+# get/put round-trip in an ISOLATED state root (never the real cache)
+cstate="$work/cachestate"; mkdir -p "$cstate"
+CG() { XDG_STATE_HOME="$cstate" python3 "$HC" "$@"; }
+# cache dir resolves under the state root, not the host tree
+cdir=$(CG path --root "$work/host" 2>/dev/null)
+case "$cdir" in
+  "$cstate"/*) ok "cache dir lives under the state root (not the host working tree)";;
+  *) err "cache dir not under state root: $cdir";;
+esac
+# miss on empty cache (exit 1)
+CG get --root "$work/host" --path "$cf" >/dev/null 2>&1 && err "cold cache reported a hit" \
+  || ok "cold cache is a miss (exit 1) — a first harvest"
+# put then get -> hit with identical bytes
+printf -- '- fact one / a.py:1@deadbee / result\n- fact two / a.py:1@deadbee / number\n' \
+  | CG put --root "$work/host" --path "$cf" 2>/dev/null
+got=$(CG get --root "$work/host" --path "$cf" 2>/dev/null)
+[ "$got" = "- fact one / a.py:1@deadbee / result
+- fact two / a.py:1@deadbee / number" ] \
+  && ok "cache hit returns the stored entries verbatim (run-to-run identity)" \
+  || err "cache hit did not return stored entries: '$got'"
+# a changed blob-sha -> the OLD key is never served (structural invalidation)
+CG get --root "$work/host" --path "$cf" --blob-sha 0000000000000000000000000000000000000000 >/dev/null 2>&1 \
+  && err "stale blob-sha key was served" \
+  || ok "a changed blob-sha misses the old key (stale extraction never served)"
+
 if [ "$fail" -eq 0 ]; then
   printf '\nAll harvest checks passed.\n'; exit 0
 else

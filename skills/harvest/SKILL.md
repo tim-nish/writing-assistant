@@ -183,6 +183,24 @@ and skim — that is the mechanism behind the #514 coverage collapse and the
 run-to-run variance CAP-10 exists to remove. Instead, walk the enumerated sources
 (§1) **in enumeration order**, and for each file:
 
+- **Check the blob-keyed cache first (#516 Story 18.31).** An unchanged source's
+  extraction is reused verbatim across runs — so a re-harvest re-extracts only
+  changed blobs, and unchanged files contribute **identical** entries:
+
+  ```
+  python3 ${CLAUDE_PLUGIN_ROOT}/scripts/harvest-cache.py get --root <host-repo> --path <file>
+  # exit 0: prints the cached `- CLAIM / SOURCE / KIND` entries — append them to
+  #         the sheet unchanged and SKIP extraction for this file (a cache hit).
+  # exit 1: a miss — extract this file (below), then store the result:
+  #   … extract entries … | python3 ${CLAUDE_PLUGIN_ROOT}/scripts/harvest-cache.py put --root <host-repo> --path <file>
+  ```
+
+  The cache key is `(path, blob-sha, extractor-version)` in the resolver's state
+  root (never the host tree): a changed file (new blob-sha) or a changed
+  extraction contract (bumped extractor-version — the hash of this SKILL §3 and
+  the validator) yields a **different key**, so a stale extraction is never
+  served — invalidation is structural, not a judgment call. A cold cache (fresh
+  clone) simply misses every file and this is a first harvest under the budget.
 - **Get the file's entry budget** from the budget contract (floors/caps live in
   code, never in this prompt):
 
@@ -208,9 +226,13 @@ run-to-run variance CAP-10 exists to remove. Instead, walk the enumerated source
 
 This per-source discipline is what makes coverage reproducible at any corpus
 size: growth adds sources (each with its own budget), it never silently shrinks
-what an already-declared source contributes. The blob-keyed cache that reuses an
-unchanged source's extraction across runs is the companion concern (#516 Story
-18.31); it does not change this per-source procedure.
+what an already-declared source contributes. The blob-keyed cache above makes
+that reproducibility hold **across runs** — an unchanged source yields the same
+entries every harvest — while the per-source budget and deterministic merge make
+it hold **within** a run. The cache composes with the #388 per-source checkpoint
+(intra-run resume) and the #514 coverage manifest (per-file disclosure): three
+axes over the one enumeration, never in conflict — a cache **hit** still counts
+toward the manifest's `read: <file> (<n>)` line exactly like a fresh extraction.
 
 Read the in-scope files and extract facts. **Read every file you cite fresh with
 a line-numbered tool (the `Read` tool) at harvest time, and take each line number
