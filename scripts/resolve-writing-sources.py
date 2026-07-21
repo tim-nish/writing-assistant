@@ -61,6 +61,10 @@ git repo the script errors rather than silently resolving against cwd):
                             Whether the GATEWAY is usable is deliberately not
                             checked here: an unreachable gateway is a
                             read-time degradation, never a config error.
+                            An optional nested `track_topics:` mapping (#525,
+                            articles-track → hub-topic name[s]) is parsed and,
+                            when present, echoed in the JSON as `track_topics`;
+                            a malformed mapping is a per-key stage-0 error too.
 
   set-policy-source [--disable]
                             Write the presence toggle (`policy_source:` +
@@ -75,6 +79,11 @@ git repo the script errors rather than silently resolving against cwd):
                             legacy-file migration. The result is validated
                             BEFORE writing. `--disable` removes the block
                             entirely (same semantics as never declaring it).
+                            `--track-topics` additionally records the optional
+                            track→topic mapping (#525) fed as JSON on stdin
+                            (owner-approved, agent-fed; an empty {} = declined,
+                            bare toggle written); it replaces — never revives —
+                            the removed `--track/--topics` value flags.
                             Prints {"declared": true|false}.
 
   set-sources               Declaratively REPLACE the `sources:` block from a
@@ -317,17 +326,23 @@ def _block_span(lines, header_re):
     return start, end
 
 
-def set_policy_source(lines, enabled=True):
+def set_policy_source(lines, enabled=True, track_topics=None):
     """Return (new_lines, changed). Declarative replace of the whole
     `policy_source` block with the presence toggle (Story 13.73, #366:
     `enabled: true` — the consumer holds no hub filesystem path; the
-    gateway's operator config owns the hub location). Like set_sources,
-    comments INSIDE the old block do not survive the replace (declarative
-    semantics — deliberately so: this is also the sanctioned migration path
-    for a legacy `path:` / `track:` / `topics:` block); comments outside it
-    do. With enabled=False the block is removed entirely (same semantics as
-    never declaring it)."""
-    block = ["policy_source:", "  enabled: true"] if enabled else []
+    gateway's operator config owns the hub location). An optional
+    `track_topics` mapping (#525) is rendered as a nested sub-block under the
+    toggle. Like set_sources, comments INSIDE the old block do not survive the
+    replace (declarative semantics — deliberately so: this is also the
+    sanctioned migration path for a legacy `path:` / `track:` / `topics:`
+    block); comments outside it do. With enabled=False the block is removed
+    entirely (same semantics as never declaring it)."""
+    if enabled:
+        block = ["policy_source:", "  enabled: true"]
+        if track_topics:
+            block += render_track_topics(track_topics)
+    else:
+        block = []
     start, end = _block_span(lines, r"^policy_source:\s*(#.*)?$")
     if start is None:
         if not enabled:
@@ -557,17 +572,136 @@ def get_sources(lines, root):
             for e in get_typed_sources(lines, root) if e["type"] == "path"]
 
 
+def _parse_track_topics(lines, hdr_idx, hdr_indent):
+    """Parse a nested `track_topics:` sub-block (#525, SPEC-policy-topic-at-draft
+    CAP-5). Returns (mapping, errors, next_idx) where mapping maps an
+    articles-repo track name to a list of hub topic name(s). A value may be a
+    bare string (→ a single-element list), an inline list (`[a, b]`), or a
+    block list of `- item` lines. A malformed entry — a non-`key: value` line
+    where a mapping was expected, or a value that is neither a string nor a
+    non-empty list of strings — appends a (key, message) stage-0 config error
+    (same shape as the other `policy_source.*` errors → the resolver exits 4).
+    next_idx is the first index at or below the header indent (the line after
+    the sub-block)."""
+    mapping = {}
+    errors = []
+    n = len(lines)
+    j = hdr_idx + 1
+    while j < n:
+        ln = lines[j]
+        if ln.strip() == "" or ln.lstrip().startswith("#"):
+            j += 1
+            continue
+        if _indent(ln) <= hdr_indent:
+            break  # left the track_topics sub-block
+        m = re.match(r"^(\s+)([^:#]+?)\s*:\s*(.*)$", ln)
+        if not m:
+            errors.append(("policy_source.track_topics",
+                           f"unreadable mapping line {ln.strip()!r} — track_topics "
+                           "is a mapping of articles-repo track name to hub topic "
+                           "name(s). Fix: `<track>: <topic>` or "
+                           "`<track>: [<t1>, <t2>]`."))
+            j += 1
+            continue
+        entry_indent = len(m.group(1))
+        key = m.group(2).strip().strip('"').strip("'")
+        raw = re.sub(r"\s+#.*$", "", m.group(3)).strip()
+        j += 1
+        if raw.startswith("[") and raw.endswith("]"):
+            items = [x.strip().strip('"').strip("'") for x in raw[1:-1].split(",")]
+            items = [x for x in items if x]
+            if items:
+                mapping[key] = items
+            else:
+                errors.append((f"policy_source.track_topics.{key}",
+                               "value is an empty list — a track must map to at "
+                               "least one hub topic. Fix: `<track>: <topic>` or a "
+                               "non-empty `[<t1>, <t2>]` list."))
+            continue
+        if raw:
+            mapping[key] = [raw.strip('"').strip("'")]
+            continue
+        # empty inline value → look ahead for a block list of `- item` lines
+        items = []
+        while j < n:
+            sub = lines[j]
+            if sub.strip() == "" or sub.lstrip().startswith("#"):
+                j += 1
+                continue
+            if _indent(sub) <= entry_indent:
+                break
+            lm = re.match(r"^\s*-\s*(.*?)\s*$", sub)
+            if not lm:
+                break
+            item = re.sub(r"\s+#.*$", "", lm.group(1)).strip().strip('"').strip("'")
+            if item:
+                items.append(item)
+            j += 1
+        if items:
+            mapping[key] = items
+        else:
+            errors.append((f"policy_source.track_topics.{key}",
+                           "value is neither a topic name nor a list of topic "
+                           "names. Fix: `<track>: <topic>`, `<track>: [<t1>, <t2>]`, "
+                           "or a `- <topic>` block list."))
+    return mapping, errors, j
+
+
+def validate_track_topics(mapping):
+    """Fail-closed write-time validation for a `track_topics` mapping fed to
+    `set-policy-source --track-topics` (JSON on stdin, like set-sources).
+    Returns a list of error strings; empty means writable. An empty mapping is
+    valid (a declined offer — the caller writes the bare toggle)."""
+    errors = []
+    if not isinstance(mapping, dict):
+        return ['track_topics must be a JSON object mapping "<track>": '
+                '"<topic>" | ["<t1>", "<t2>"]']
+    for track, val in mapping.items():
+        if not isinstance(track, str) or not track.strip():
+            errors.append(f"track_topics: a non-empty string track name is "
+                          f"required (got {track!r})")
+            continue
+        if isinstance(val, str):
+            if not val.strip():
+                errors.append(f"track_topics.{track}: the topic name must be a "
+                              "non-empty string")
+        elif isinstance(val, list):
+            if not val or any(not isinstance(t, str) or not t.strip() for t in val):
+                errors.append(f"track_topics.{track}: must be a non-empty list of "
+                              "non-empty topic-name strings")
+        else:
+            errors.append(f"track_topics.{track}: value must be a topic name or a "
+                          "list of topic names")
+    return errors
+
+
+def render_track_topics(mapping):
+    """The nested `track_topics:` lines for a policy_source block (#525) — a
+    single topic renders inline (`track: topic`), multiple render as the inline
+    list form (`track: [a, b]`), byte-consistent with the reader."""
+    out = ["  track_topics:"]
+    for track, topics in mapping.items():
+        if len(topics) == 1:
+            out.append(f"    {track}: {topics[0]}")
+        else:
+            out.append(f"    {track}: [{', '.join(topics)}]")
+    return out
+
+
 def get_policy_source(lines, root):
     """Parse the optional `policy_source` block (presence toggle — Story
     13.73, #366).
 
     Returns (None, []) when the block is absent, else (block, errors) where
     block = {"enabled": bool-or-None} and errors is a list of (key, message)
-    pairs for a malformed block. The RETIRED `path` key (13.73) and the
-    removed `track`/`topics` keys (13.36) are named configuration errors
-    carrying a migration notice — NEVER silently honored. Whether the
-    gateway is usable is deliberately not checked here: an unreachable
-    gateway is a read-time degradation, never a config error."""
+    pairs for a malformed block. An optional nested `track_topics:` mapping
+    (#525, SPEC-policy-topic-at-draft CAP-5) is parsed into
+    block["track_topics"] = {track: [topic, ...]} WHEN PRESENT (absent =
+    byte-identical to before — the key is simply not added). The RETIRED
+    `path` key (13.73) and the removed `track`/`topics` keys (13.36) are named
+    configuration errors carrying a migration notice — NEVER silently honored.
+    Whether the gateway is usable is deliberately not checked here: an
+    unreachable gateway is a read-time degradation, never a config error."""
     start = None
     for i, ln in enumerate(lines):
         if re.match(r"^policy_source:\s*(#.*)?$", ln):
@@ -600,6 +734,23 @@ def get_policy_source(lines, root):
                 errors.append(("policy_source.enabled",
                                f"unreadable value {raw!r} — the presence toggle "
                                "takes `true` or `false` (#366)."))
+            continue
+        # Optional `track_topics:` mapping (#525): parse the nested sub-block and
+        # skip past it. Absent = the key is never added (byte-identical to today).
+        mt = re.match(r"^\s+track_topics:\s*(.*)$", ln)
+        if mt:
+            rest = re.sub(r"\s+#.*$", "", mt.group(1)).strip()
+            hdr_indent = _indent(ln)
+            if rest:
+                errors.append(("policy_source.track_topics",
+                               "track_topics is a nested mapping — put entries on "
+                               "the following indented lines. Fix: `track_topics:` "
+                               "then `  <track>: <topic>`."))
+            mapping, terrs, nxt = _parse_track_topics(lines, j - 1, hdr_indent)
+            if mapping:
+                block["track_topics"] = mapping
+            errors.extend(terrs)
+            j = nxt
             continue
         # `path:` is RETIRED (Story 13.73, #366): the consumer holds no hub
         # filesystem location — the gateway's operator config owns it. A
@@ -766,13 +917,43 @@ def cmd_set_policy_source(args):
     root = host_root(args.root)
     lines = read_lines(root)
     enabled = not args.disable
-    new_lines, changed = set_policy_source(lines, enabled=enabled)
+    # Optional track_topics mapping (#525), fed as JSON on stdin (like
+    # set-sources) — opt-in via --track-topics so a plain toggle write never
+    # blocks on stdin. An empty object is a DECLINED offer: write the bare
+    # toggle, nothing extra.
+    mapping = None
+    if getattr(args, "track_topics", False):
+        if not enabled:
+            sys.stderr.write("set-policy-source: --track-topics cannot combine with "
+                             "--disable\nrefused: nothing was written\n")
+            return POLICY_MALFORMED
+        try:
+            raw = json.loads(sys.stdin.read())
+        except json.JSONDecodeError as e:
+            sys.stderr.write(f"set-policy-source: --track-topics stdin is not valid "
+                             f"JSON: {e}\nrefused: nothing was written\n")
+            return POLICY_MALFORMED
+        errors = validate_track_topics(raw)
+        if errors:
+            for msg in errors:
+                sys.stderr.write(f"[{SOURCES_FILE}] {msg}\n")
+            sys.stderr.write("refused: nothing was written\n")
+            return POLICY_MALFORMED
+        if raw:  # non-empty; empty {} = declined → bare toggle
+            mapping = {k: ([v] if isinstance(v, str) else list(v))
+                       for k, v in raw.items()}
+    new_lines, changed = set_policy_source(lines, enabled=enabled, track_topics=mapping)
     # Validate the RESULT before any write — a malformed block never lands.
     block, errors = get_policy_source(new_lines, root)
     if enabled and (block is None or errors or not block["enabled"]):
         for key, msg in errors or [("policy_source", "block failed to parse after surgery")]:
             sys.stderr.write(f"[{SOURCES_FILE}] {key}: {msg}\n")
         sys.stderr.write("refused: nothing was written\n")
+        return POLICY_MALFORMED
+    if mapping is not None and block.get("track_topics") != mapping:
+        sys.stderr.write(f"[{SOURCES_FILE}] policy_source.track_topics: the written "
+                         "mapping did not round-trip through the parser\n"
+                         "refused: nothing was written\n")
         return POLICY_MALFORMED
     if not enabled and (block is not None or errors):
         sys.stderr.write(f"[{SOURCES_FILE}] policy_source: block survived removal surgery\n"
@@ -781,7 +962,10 @@ def cmd_set_policy_source(args):
     # --disable with no config file at all: nothing to remove, create nothing.
     if not (args.disable and not changed and sources_path(root)[1] == "none"):
         _write_back(root, new_lines, changed, "policy_source")
-    print(json.dumps({"declared": enabled}))
+    out = {"declared": enabled}
+    if mapping is not None:
+        out["track_topics"] = mapping
+    print(json.dumps(out))
     return 0
 
 
@@ -881,7 +1065,10 @@ def cmd_policy_source(args):
         for key, msg in errors:
             sys.stderr.write(f"[{SOURCES_FILE}] {key}: {msg}\n")
         return POLICY_MALFORMED
-    print(json.dumps({"declared": bool(block["enabled"])}))
+    out = {"declared": bool(block["enabled"])}
+    if block.get("track_topics"):  # #525: expose the mapping when present
+        out["track_topics"] = block["track_topics"]
+    print(json.dumps(out))
     return 0
 
 
@@ -911,6 +1098,12 @@ def main(argv=None):
     sp.add_argument("--disable", action="store_true",
                     help="remove the policy_source block entirely "
                          "(same semantics as never declaring it)")
+    sp.add_argument("--track-topics", action="store_true", dest="track_topics",
+                    help="also record a track_topics mapping (#525): read a JSON "
+                         'object {"<track>": "<topic>" | ["<t1>", "<t2>"]} from '
+                         "stdin (like set-sources). An empty {} is a declined "
+                         "offer — the bare toggle is written. Owner-approved, "
+                         "agent-fed; replaces the removed --track/--topics flags.")
     sub.add_parser("set-sources", parents=[root_parent])
     args = p.parse_args(argv)
     if not hasattr(args, "root"):

@@ -168,6 +168,98 @@ if [ "$rc" -eq 0 ]; then ok "clean valid profile adds no blocking finding (exit 
 else err "clean valid profile blocked stage 0 (rc=$rc, out='$out')"; fi
 rm "$ppdir/devto.yaml"
 
+# 8. Story 18.33 (#525) — track_topics existence lint + stale-mapping warning.
+#    The topic-existence lint enumerates hub topics via read-policy-source.py
+#    list-topics; stub the gateway with the documented WRITING_ASSISTANT_GATEWAY_CMD
+#    seam. The stub enumerates {benchmark-engineering, kagamios}.
+unset XDG_CONFIG_HOME
+STUB="scripts/fixtures/policy-gateway-stub.py"
+SHA=8f3c2d1e4a5b6c7d8e9f0a1b2c3d4e5f60718293
+printf '{"pin":"product-lab@%s","surface":{"topics":["benchmark-engineering","kagamios"]}}\n' \
+  "$SHA" > "$work/topics-fx.json"
+
+# An articles repo (drafts + backlog) so the stale check is reachable; one
+# backlog item declares track: eval-engineering.
+mkdir -p "$work/articles/drafts" "$work/articles/backlog"
+cat > "$work/articles/backlog/one.md" <<'MD'
+---
+track: eval-engineering
+title: sample
+---
+body
+MD
+
+# 8a. A mapped topic ABSENT from the enumeration is a blocking existence defect.
+mkdir -p "$work/maproot"
+cat > "$work/maproot/writing-sources.yaml" <<YAML
+sources:
+  - path: .
+output:
+  drafts: $work/articles/drafts/
+policy_source:
+  enabled: true
+  track_topics:
+    eval-engineering: benchmark-engineering
+    ghost-track: nonexistent-topic
+YAML
+set +e
+out=$(WRITING_ASSISTANT_GATEWAY_CMD="python3 $PWD/$STUB $work/topics-fx.json" \
+      python3 "$VAL" --repo-config /dev/null --root "$work/maproot" \
+      --global-config "$work/clean.yaml" 2>&1); rc=$?
+set -e
+if [ "$rc" -ne 0 ] \
+   && printf '%s' "$out" | grep -q 'policy_source.track_topics.ghost-track' \
+   && printf '%s' "$out" | grep -qi "authoritative"; then
+  ok "existence lint: a mapped topic absent from the hub enumeration is a stage-0 defect"
+else err "existence lint not raised (rc=$rc, out='$out')"; fi
+
+# 8b. A mapping TRACK absent from every backlog track: value is a non-blocking
+#     WARNING (ghost-track) relayed as a notice; a mapped-and-existing topic for
+#     a KNOWN track raises no finding on its own.
+if printf '%s' "$out" | grep -q 'notice: stale mapping'; then
+  ok "stale-mapping warning: an unknown track is relayed as a notice"
+else err "stale-mapping warning not relayed (out='$out')"; fi
+
+# 8c. A clean mapping (topic exists, track in backlog) passes with exit 0 and
+#     emits no stale warning.
+mkdir -p "$work/cleanmap"
+cat > "$work/cleanmap/writing-sources.yaml" <<YAML
+sources:
+  - path: .
+output:
+  drafts: $work/articles/drafts/
+policy_source:
+  enabled: true
+  track_topics:
+    eval-engineering: benchmark-engineering
+YAML
+set +e
+out=$(WRITING_ASSISTANT_GATEWAY_CMD="python3 $PWD/$STUB $work/topics-fx.json" \
+      python3 "$VAL" --repo-config /dev/null --root "$work/cleanmap" \
+      --global-config "$work/clean.yaml" 2>&1); rc=$?
+set -e
+if [ "$rc" -eq 0 ] && ! printf '%s' "$out" | grep -q 'stale mapping'; then
+  ok "clean mapping (topic exists, track known): exit 0, no warning"
+else err "clean mapping not silent/zero (rc=$rc, out='$out')"; fi
+
+# 8d. Gateway unreachable → existence lint degrades (cannot verify → no defect);
+#     validation is not hard-failed by an unreachable gateway (CAP-6).
+set +e
+out=$(WRITING_ASSISTANT_GATEWAY_CMD="$work/no-such-gateway-binary" \
+      python3 "$VAL" --repo-config /dev/null --root "$work/maproot" \
+      --global-config "$work/clean.yaml" 2>&1); rc=$?
+set -e
+if ! printf '%s' "$out" | grep -q 'policy_source.track_topics.ghost-track'; then
+  ok "existence lint degrades when the gateway cannot enumerate (unreachable ≠ config error)"
+else err "existence lint hard-failed on an unreachable gateway (out='$out')"; fi
+
+# 8e. The draft SKILL documents the mapped default-recommendation behavior.
+grep -q 'track_topics' "$DRAFT" \
+  && grep -qi 'default recommendation' "$DRAFT" \
+  && grep -qi 'never.*silently\|approves/overrides' "$DRAFT" \
+  && ok "draft SKILL documents the mapped default recommendation (never silently applied)" \
+  || err "draft SKILL missing the track_topics default-recommendation contract"
+
 if [ "$fail" -eq 0 ]; then
   printf '\nAll config-validation checks passed.\n'; exit 0
 else
