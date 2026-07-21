@@ -108,7 +108,13 @@ OPTIONAL_KEYS = ("audience", "audience_id", "policy_seeded", "seed", "relates",
                  # regenerated from the plans on each call) and defaults to the
                  # unconsumed elements. Keyed by element id, so it survives
                  # re-harvest pointer drift (the id is identity, 18.8).
-                 "consumed")
+                 "consumed",
+                 # `brief_provenance` (Story 18.24, #505): records that this
+                 # plan was shaped by a free-form OWNER coverage brief. The only
+                 # accepted value is `owner-authored` — the brief is the owner's
+                 # own words (like an interview answer), never a tool-invented
+                 # scope, so a non-owner provenance is refused.
+                 "brief_provenance")
 PLAN_STATUSES = ("outlined", "drafted", "superseded")
 
 # A story-element id (CAP-9/#428): identity for an evidence cluster. The
@@ -323,6 +329,14 @@ def validate_plan(text, path):
         if len(set(ids)) != len(ids):
             yield ("consumed", "duplicate story-element id — consumption is a "
                                "set keyed by id, list each element at most once")
+
+    # `brief_provenance` (Story 18.24/#505): the owner coverage brief is the
+    # owner's own words — the only accepted provenance is owner-authored.
+    bp = fields.get("brief_provenance")
+    if bp and bp != "owner-authored":
+        yield ("brief_provenance",
+               f"must be 'owner-authored' (got {bp!r}) — a coverage brief is the "
+               "owner's own words, never a tool-invented scope")
 
     # Forbidden fields.
     for key in fields:

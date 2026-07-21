@@ -3222,7 +3222,8 @@ def cmd_start(args):
     _rp = _load("resolve-paths.py")
     state, code = _run_state(args.framework, args.sources, _rp.host_root(args.root),
                              depth=getattr(args, "depth", None),
-                             element=getattr(args, "element", None))
+                             element=getattr(args, "element", None),
+                             brief=getattr(args, "brief", None))
     if state is None:
         return code
     print(json.dumps(state, indent=2))
@@ -3452,7 +3453,31 @@ def _entry_gate_ok(key, framework_file, root):
 DEPTH_LEVELS = {"deep-dive", "standard", "note"}
 
 
-def _run_state(framework, sources, root=None, depth=None, element=None):
+def _read_brief(raw):
+    """Resolve a free-form coverage brief (Story 18.24, #505) into its recorded
+    form. A value that is an existing file path is read (origin `file`, source
+    path retained for provenance); anything else is the brief text inline
+    (origin `inline`). Provenance is always owner-authored — like an interview
+    answer, the brief is the owner's own words. Returns None for an empty
+    value."""
+    if raw is None:
+        return None
+    val = raw.strip()
+    if not val:
+        return None
+    if os.path.isfile(val):
+        try:
+            text = open(val, encoding="utf-8").read().strip()
+        except OSError:
+            text = val
+        else:
+            return {"text": text, "provenance": "owner-authored",
+                    "origin": "file", "source": os.path.abspath(val)}
+    return {"text": val, "provenance": "owner-authored", "origin": "inline"}
+
+
+def _run_state(framework, sources, root=None, depth=None, element=None,
+               brief=None):
     # `root` MUST already be resolved (resolve-paths host_root) — the entry gate
     # below runs git against it, and a raw --root string or None would reopen
     # the side channel #309 closed. Callers resolve once, then pass it down.
@@ -3504,6 +3529,16 @@ def _run_state(framework, sources, root=None, depth=None, element=None):
         # declared-source boundary — harvest still reads only writing-sources
         # files (the sources selection above), just gathered for one element.
         state["element"] = {"name": element.strip()}
+    brief_state = _read_brief(brief)
+    if brief_state:
+        # CAP-9-aligned owner coverage brief (#505): a free-form "what this
+        # article should cover" in the owner's words, recorded with
+        # owner-authored provenance. It maps to story-element clusters and
+        # supplies the argument plan's thesis candidate (SKILL), and its harvest
+        # emphasis follows the brief WITHIN the declared sources — it is a
+        # filter/emphasis, NEVER a scope widener (the #431 pin rule), so it does
+        # NOT touch `sources` above and never widens the source boundary.
+        state["brief"] = brief_state
     return state, 0
 
 
@@ -4154,7 +4189,8 @@ def cmd_stage0(args):
     # 2. Framework check + entry-gate precondition (before minting a workspace).
     run_state, code = _run_state(args.framework, args.sources, root,
                                  depth=getattr(args, "depth", None),
-                                 element=getattr(args, "element", None))
+                                 element=getattr(args, "element", None),
+                                 brief=getattr(args, "brief", None))
     if run_state is None:
         return code
     # 3. Workspace autostart (mint or resume).
@@ -4185,6 +4221,12 @@ def main(argv=None):
     sp.add_argument("--element", help="pin the run to one named story element (\"write about <element>\"): "
                                       "selection is pinned to it, harvest scopes to that element alone "
                                       "without widening the source boundary — CAP-9, #431")
+    sp.add_argument("--brief", help="optional free-form owner coverage brief (\"what this article "
+                                    "should cover\", TEXT or a FILE path): recorded with "
+                                    "owner-authored provenance, maps to story-element clusters, "
+                                    "seeds the argument-plan thesis candidate and harvest emphasis "
+                                    "WITHIN the declared sources — a filter, never a scope widener "
+                                    "(the #431 pin rule) — CAP-9, #505")
     sp.add_argument("--root", help="host-repo root, for the framework entry-gate check "
                                    "(default: cwd; e.g. F1 requires a tagged release)")
     sp = sub.add_parser("consume")
@@ -4245,6 +4287,12 @@ def main(argv=None):
     sp.add_argument("--element", help="pin the run to one named story element (\"write about <element>\"): "
                                       "selection is pinned to it, harvest scopes to that element alone "
                                       "without widening the source boundary — CAP-9, #431")
+    sp.add_argument("--brief", help="optional free-form owner coverage brief (\"what this article "
+                                    "should cover\", TEXT or a FILE path): recorded with "
+                                    "owner-authored provenance, maps to story-element clusters, "
+                                    "seeds the argument-plan thesis candidate and harvest emphasis "
+                                    "WITHIN the declared sources — a filter, never a scope widener "
+                                    "(the #431 pin rule) — CAP-9, #505")
     sp.add_argument("--root", help="host-repo root (default: git top-level of cwd; errors outside a git repo)")
     sp.add_argument("--config-json",
                     help="resolved config JSON (FILE or - for stdin) for the "
