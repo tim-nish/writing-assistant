@@ -11,8 +11,10 @@
 # `enabled: true`); the code whitelist and exit-5 refusals unchanged; served
 # misses as answers (exit 0), distinguishable from unavailability; exit 11
 # one-liner when the gateway is unreachable (old 12 collapses into it);
-# exit 13 for the named tool-surface gaps (list-topics enumeration,
-# whole-GLOSSARY read); exit 10 for an absent toggle or `enabled: false`;
+# surface_names (Story 18.16): list-topics enumerates and whole-GLOSSARY
+# composes on a current gateway, with the exit-13 gaps kept ONLY as the
+# older-gateway fallback (tools/list lacks surface_names); exit 10 for an
+# absent toggle or `enabled: false`;
 # exit 4 for a malformed block INCLUDING the retired path/track/topics keys
 # (the resolver's migration notice relayed, never silently honored).
 
@@ -60,6 +62,14 @@ cat > "$work/fixture.json" <<JSON
     "unrelated": [
       ["topics/unrelated.md", 1, "# unrelated"]
     ]
+  },
+  "glossary": {
+    "report-trust": [["GLOSSARY.md", 2, "report-trust: trust is structural."]],
+    "consult-first": [["GLOSSARY.md", 5, "consult-first: surface the miss."]]
+  },
+  "surface": {
+    "topics": ["eval-alpha", "unrelated"],
+    "glossary": ["report-trust", "consult-first"]
   }
 }
 JSON
@@ -127,17 +137,62 @@ set +e; $PY --root "$host" read --topics a.md b.md c.md >/dev/null 2>&1; rc=$?; 
 set +e; $PY --root "$host" read --topics ../q_a/secret.md >/dev/null 2>&1; rc=$?; set -e
 [ "$rc" -eq 5 ] && ok "read --topics refuses a non-basename (exit 5)" || err "non-basename accepted: rc=$rc"
 
-# --- 6. Named tool-surface gaps: exit 13, one line, never a file read ---------
-set +e; msg=$($PY --root "$host" list-topics 2>&1 >/dev/null); rc=$?; set -e
+# --- 6. surface_names: list-topics enumerates, read composes whole GLOSSARY ----
+# tsurezure-gateway#41 shipped surface_names (bounded enumeration, identifiers
+# only); the reader adopts it (Story 18.16) so the exit-13 degradation is gone
+# on a current gateway. The cite grammar is preserved: the composed GLOSSARY
+# section carries the gateway's own line numbers, one `=== GLOSSARY.md @ sha`.
+lt=$($PY --root "$host" list-topics)
+printf '%s\n' "$lt" | grep -qx 'eval-alpha' && printf '%s\n' "$lt" | grep -qx 'unrelated' \
+  && ok "list-topics enumerates topic identifiers via surface_names (no exit 13)" \
+  || err "list-topics did not enumerate: $lt"
+
+gout=$($PY --root "$host" read --only GLOSSARY.md)
+printf '%s\n' "$gout" | head -1 | grep -qx "pin: product-lab@$SHA" \
+  && printf '%s\n' "$gout" | grep -qx "=== GLOSSARY.md @ $SHA" \
+  && printf '%s\n' "$gout" | grep -qx '2: report-trust: trust is structural.' \
+  && printf '%s\n' "$gout" | grep -qx '5: consult-first: surface the miss.' \
+  && ok "read composes whole GLOSSARY from surface_names + glossary_entry (cites preserved)" \
+  || err "whole-GLOSSARY not composed: $gout"
+
+# The composed GLOSSARY section is line-sorted (file's true order), single header
+[ "$(printf '%s\n' "$gout" | grep -c '=== GLOSSARY.md')" -eq 1 ] \
+  && [ "$(printf '%s\n' "$gout" | grep -n '^2:' | cut -d: -f1)" \
+       -lt "$(printf '%s\n' "$gout" | grep -n '^5:' | cut -d: -f1)" ] \
+  && ok "whole GLOSSARY is one section, entries in true line order" \
+  || err "GLOSSARY composition not single/ordered: $gout"
+
+# Default read (GLOSSARY + LESSONS) now serves both — exit-13 degradation closed
+dout=$($PY --root "$host" read)
+printf '%s\n' "$dout" | head -1 | grep -qx "pin: product-lab@$SHA" \
+  && printf '%s\n' "$dout" | grep -qx "=== GLOSSARY.md @ $SHA" \
+  && printf '%s\n' "$dout" | grep -qx "=== LESSONS.md @ $SHA" \
+  && ok "default read serves GLOSSARY and LESSONS together (no exit 13)" \
+  || err "default read did not serve both sections: $dout"
+
+# --- 6b. Older gateway lacking surface_names: exit-13 fallback preserved -------
+# tools/list omits surface_names → the reader degrades to the named gap, one
+# line, never a file read (degrade, don't crash for a pre-#41 gateway).
+cat > "$work/old-fixture.json" <<JSON
+{
+  "pin": "product-lab@$SHA",
+  "tools": ["glossary_entry", "lessons_index", "topic_thread", "policy_lookup"],
+  "lessons": [["LESSONS.md", 3, "x"]],
+  "glossary": {"report-trust": [["GLOSSARY.md", 2, "y"]]},
+  "surface": {"topics": ["eval-alpha"], "glossary": ["report-trust"]}
+}
+JSON
+OLDCMD="python3 $root/$STUB $work/old-fixture.json"
+set +e; msg=$(WRITING_ASSISTANT_GATEWAY_CMD="$OLDCMD" $PY --root "$host" list-topics 2>&1 >/dev/null); rc=$?; set -e
 [ "$rc" -eq 13 ] && [ "$(printf '%s\n' "$msg" | wc -l)" -eq 1 ] \
   && printf '%s' "$msg" | grep -q 'cannot enumerate topics' \
-  && ok "list-topics: exit 13, one line naming the enumeration gap" \
-  || err "list-topics gap: rc=$rc msg='$msg'"
-set +e; msg=$($PY --root "$host" read 2>&1 >/dev/null); rc=$?; set -e
+  && ok "older gateway: list-topics falls back to exit 13, one line naming the gap" \
+  || err "list-topics fallback: rc=$rc msg='$msg'"
+set +e; msg=$(WRITING_ASSISTANT_GATEWAY_CMD="$OLDCMD" $PY --root "$host" read 2>&1 >/dev/null); rc=$?; set -e
 [ "$rc" -eq 13 ] && [ "$(printf '%s\n' "$msg" | wc -l)" -eq 1 ] \
   && printf '%s' "$msg" | grep -q 'GLOSSARY.md whole' \
-  && ok "read incl. GLOSSARY.md: exit 13, one line naming the whole-file gap" \
-  || err "whole-GLOSSARY gap: rc=$rc msg='$msg'"
+  && ok "older gateway: whole-GLOSSARY read falls back to exit 13, one line" \
+  || err "whole-GLOSSARY fallback: rc=$rc msg='$msg'"
 
 # --- 7. Served miss: an answer under the pin (exit 0), not unavailability -----
 cat > "$work/miss-fixture.json" <<JSON
