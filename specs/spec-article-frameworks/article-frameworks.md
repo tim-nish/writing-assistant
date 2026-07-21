@@ -66,6 +66,7 @@ This slot empty = article not publishable (AP-10).)}
 
 **Use when:** sharing lessons, design decisions, failure findings from development.
 **GATE (entry):** at least one real surprise/failure with an artifact you can show (log excerpt, diff, measurement).
+**Narrative structure:** the sibling-lessons skeleton below is F2's **default** shape; the plan may offer alternative structures (chronological journey, single-incident deep thread, thematic braid, or combining the lessons into one thread) as an owner choice per SPEC-article-frameworks CAP-4 (#503) — each still fulfilling these slots' editorial purposes and passing the Stage 3→4 gate.
 
 ```markdown
 ---
