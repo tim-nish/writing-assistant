@@ -685,13 +685,39 @@ files is a **per-article decision made now, not a per-repo config**
    tool-surface gap, Story 13.72), ask the owner for the topic names under
    the proposal contract instead; the ≤2 cap is unchanged.
 
-2. **Propose ≤2 topics for THIS article** under the proposal contract: draft
-   the recommendation from the chosen article intent and the host repo (e.g.
-   an evaluation-methodology article from a benchmark repo → the
-   benchmark-engineering topic), the owner approves or overrides. Declining
-   is valid: the read proceeds with GLOSSARY + LESSONS only — still
-   policy-seeded, recorded as track-less. Then read with the approved
-   selection:
+2. **Propose ≤2 topics for THIS article** under the proposal contract. The
+   **default recommendation** is drawn as follows, the owner approves or
+   overrides either way:
+
+   - **Mapped default (#525, SPEC-policy-topic-at-draft CAP-5).** When this
+     draft is built from a backlog item that carries a `track:` frontmatter
+     value, and the host repo's `policy_source` block declares a
+     `track_topics` mapping whose keys include that track, the mapped topic(s)
+     are the **default recommendation**. Read the mapping from the resolver's
+     JSON — it exposes a `track_topics` field when present:
+
+     ```
+     python3 ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-writing-sources.py --root "$HOST" policy-source
+     ```
+
+     Look up the backlog item's `track:` value in that object; its value (a
+     topic name or list) is the recommended `--topics` selection. The mapping
+     only widens **which** topics the recommendation names — it **never**
+     applies silently (the owner still approves/overrides under the proposal
+     contract), never widens the **≤2 cap**, and never touches the
+     code-enforced whitelist. A mapped topic that names no hub topic file was
+     already caught at stage 0 (topic-existence lint), so the recommendation
+     is trustworthy by the time it is presented here.
+
+   - **Intent-driven default (unchanged, today's behavior).** When there is
+     **no mapping**, **no track** on the draft, or the track has **no mapping
+     entry**, draft the recommendation from the chosen article intent and the
+     host repo (e.g. an evaluation-methodology article from a benchmark repo →
+     the benchmark-engineering topic) exactly as before — zero behavior change.
+
+   Declining is valid in either case: the read proceeds with GLOSSARY +
+   LESSONS only — still policy-seeded, recorded as track-less. Then read with
+   the approved selection:
 
    ```
    python3 ${CLAUDE_PLUGIN_ROOT}/scripts/read-policy-source.py --root "$HOST" read --topics <a.md> [<b.md>] > "$WS/policy-surface.txt"
