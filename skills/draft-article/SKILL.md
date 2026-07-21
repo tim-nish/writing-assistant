@@ -274,6 +274,28 @@ Stage-2 interview item** ("How deep — a quick note, a standard piece, or a
 deep-dive? Or name a scope.") under the proposal contract, and record the
 answer; absent an answer, the run proceeds exactly as before.
 
+**Reading-time bands as the depth-choice unit (CAP-8 clause, Story 18.27,
+#506).** The stage-0 / stage-2 depth question **may** present **suggested
+reading-time bands** derived from the selected elements — `~3 min note / ~7 min
+standard / ~15 min deep-dive` — **plus a custom value** the owner can type when
+no band fits. Get the bands (scaled by the selected-element count) from:
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/reading-time.py --bands --elements <selected-element-count>
+```
+
+The owner's pick is **recorded AS the depth directive** — each band maps to a
+level (`{"level": "deep-dive"}`), captured exactly like a `--depth` answer —
+and is **never a reading-time target**. Reading-time is only the *unit in which
+the owner expresses* the depth choice; fill still elaborates by depth semantics
+(above), the reading-time estimate stays **informational** (CAP-6), and
+**nothing auto-splits or auto-trims** to hit the number. A large miss between
+the chosen band and the finished estimate surfaces as an **informational FYI**
+(pass the chosen band to the estimator, `reading-time.py … --band-minutes <N>`;
+the owner decides), never an automatic cut. With **no directive** at all, the
+run is **byte-for-byte the behavior before CAP-8** — the bands are an optional
+way to *ask*, never a new gate.
+
 **At Stage 3, fill consumes the directive** (`state.depth`): it governs **how
 much each slot elaborates and how many story elements the draft carries** — not
 a word count or reading-time target. A **deep-dive** keeps material a
