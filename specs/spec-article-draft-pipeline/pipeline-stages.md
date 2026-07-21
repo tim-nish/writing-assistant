@@ -64,14 +64,84 @@ disclosure).
   samples** a subset and presents the result as a full harvest.
 - **Scope of this contract.** It governs **coverage disclosure and ceiling
   behavior only**. Run-to-run extraction determinism at a fixed pin *below* the
-  ceiling (identical facts from an identical blob) is a separate, **deferred**
-  architectural concern (#516: per-source budgeted extraction + blob-keyed cache
-  + deterministic merge), not addressed here.
+  ceiling (identical facts from an identical blob) is the **companion** concern
+  of #516 — per-source budgeted extraction + blob-keyed cache + deterministic
+  merge — specified in §"Harvest extraction determinism (stage 1)" below (CAP-10,
+  ratified 2026-07-21). Coverage disclosure and extraction determinism are two
+  faces of one contract: this section makes a collapse **visible**; #516 makes it
+  **not happen**.
 
 Enforced in lockstep at `skills/harvest/SKILL.md` (the harvest procedure and the
 fact-sheet output contract) and `scripts/validate-fact-sheet.py` (the manifest is
 present and its per-file counts/skips are well-formed) — a change to one without
 the other is a defect (the same lockstep rule the KIND set carries).
+
+## Harvest extraction determinism (stage 1)
+
+The companion to coverage disclosure above (CAP-10, #516, ratified 2026-07-21).
+Coverage disclosure makes a silent narrowing **visible**; this section makes it
+**not happen** — harvest is restructured from one attention-bounded pass over the
+whole corpus (the mechanism behind the #514 collapse and the observed
+run-to-run variance, tanuki eef36490 → 7d9f2034) into three deterministic
+mechanisms with the model confined to per-source judgment. The result is a
+**reproducible best-effort fact sheet at any corpus size**.
+
+- **Per-source budgeted extraction.** The model extracts **one source file at a
+  time**, each under an explicit **relative per-file entry budget** (the
+  product-lab corpus-intake relative scheme — a budget derived from the source's
+  own size, not a corpus-wide attention pool). Corpus growth therefore scales
+  extraction cost; it never silently shrinks per-file coverage. The budget is an
+  **explicit contract** — floors and caps live in code or config, **not** in a
+  prompt instruction — paired with a **diagnostic that names the source that hit
+  its budget** (the boundedness-is-a-contract rule: a bound living in
+  hand-curation breaks silently the first time the corpus grows). A source at its
+  budget is surfaced, never truncated in the dark.
+- **Blob-keyed extraction cache.** Extraction is memoized by the key
+  `(path, blob-sha, extractor-version)` in the path resolver's **state root**
+  (`docs/storage-architecture.md`; never the host working tree). A re-harvest
+  **re-extracts only changed blobs** — an unchanged file is a **cache hit** whose
+  entries are reused verbatim, so unchanged sources contribute **identical**
+  entries and "one harvest" becomes an **incremental refresh**. The cache is a
+  conformance copy of extractions whose **authority is the blob**: it carries
+  **declared precedence** — a changed `blob-sha` (content moved) or a bumped
+  `extractor-version` (the extraction contract changed) **invalidates the key**,
+  so a stale extraction is **never served** — plus a mechanical check, so the
+  cache never becomes a second authority drifting from the sources. `extractor-version`
+  changes whenever the extraction contract does (the §3 procedure, the KIND set,
+  or the validator) — the lockstep rule below fixes what bumps it.
+- **Deterministic merge.** Per-source extractions **concatenate and dedupe in a
+  stable order** — the `resolve-writing-sources.py files` enumeration order, then
+  each file's in-file order — into the fact sheet. Dedupe is on the entry's
+  `(CLAIM, SOURCE, KIND)` identity, not a model judgment. The #514 **coverage
+  manifest is projected from the same enumeration**, so the manifest's per-file
+  counts and the merged entries are two views of one deterministic pass and
+  cannot disagree.
+
+**What is deterministic vs. modeled.** Enumeration, cache lookup, dedupe, and
+merge are deterministic tools yielding ground truth; the model is paid for
+**only** where no cheap oracle exists — per-source extraction judgment
+(deterministic-tool-over-llm-in-loop). The **determinism promise** is thus
+**run-to-run identity for unchanged blobs at a fixed pin**: the only variance
+that remains is where blob content actually changed. A **cold cache** (fresh
+clone, empty state root) behaves as a first harvest under the per-source budget —
+the cache amortizes re-reads, it is never a correctness precondition.
+
+**Boundary preserved.** Harvest stays **evidence assembly** — the interview
+remains the sole judgment gate (the generate-then-filter rejection is not
+discriminated by this change), the closed nine-KIND set and four SOURCE forms and
+stage-3 provenance are unchanged, and only declared products land in the host
+repo (the cache and all intermediates live in the state root, the existing
+footprint invariant). This composes with the #388 per-source checkpoint (which
+records *within a run* which sources are done) and the #514 manifest (which
+*discloses* per-file coverage): #388 is intra-run resume, the blob cache is
+cross-run reuse, and the manifest reports the union — three axes, one enumeration.
+
+Enforced in lockstep at `skills/harvest/SKILL.md §3` (the extraction procedure,
+the per-source budget, and the cache/merge contract) and
+`scripts/validate-fact-sheet.py` (the fact-sheet shape the merge must produce) —
+a change to one without the other is a defect (the same lockstep rule the KIND
+set and the coverage manifest carry), and a change to the extraction contract
+bumps `extractor-version` so the cache invalidates.
 
 ## Fact-sheet entry format (stage 1)
 
