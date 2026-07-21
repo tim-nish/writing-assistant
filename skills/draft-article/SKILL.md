@@ -284,6 +284,47 @@ split?"), **never an automatic split** (the hint is a declinable suggestion per
 CAP-8). With **no directive**, fill behaves exactly as before, and the
 reading-time estimate stays informational — it drives no split.
 
+### Owner coverage brief (CAP-9-aligned, Story 18.24, #505)
+
+Beyond the one-element `--element` pin and the one-line `--depth` scope, the
+owner may hand the run a **free-form coverage brief** — "what this article
+should cover", in their own words. Pass it to stage 0 as **text or a file
+path**:
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py stage0 <framework> <sources...> --brief "cover the retry storm and how the judge missed it" --root <host-repo>
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py stage0 <framework> <sources...> --brief path/to/brief.md --root <host-repo>
+```
+
+The run-state then carries `brief: {"text": …, "provenance": "owner-authored",
+"origin": "inline"|"file"}` — recorded with **owner-authored provenance**, like
+an interview answer; the brief is the owner's words, never a tool-invented
+scope. The brief then shapes three stages, all **inside the existing
+boundaries**:
+
+- **Selection** — the brief **maps to story-element clusters** (CAP-9): each
+  brief item selects its matching cluster, disclosed per element exactly as any
+  selection is (interview journal + completion summary). A **brief item matching
+  no cluster is never silently dropped** — it surfaces as a **NEEDS-OWNER gap**
+  or an interview question ("the brief asks for X but no evidence cluster
+  covers it — is it out of scope, or a gap to fill?").
+- **Argument plan** — the brief **supplies the owner's thesis candidate** (the
+  thesis the owner already holds), fed into the Stage-3 argument-plan sub-step.
+  The disclosure trail is **unchanged**: the thesis is still owner-attributed,
+  and every checkable claim stays sourced/derived.
+- **Directed gathering** — harvest **emphasis follows the brief WITHIN the
+  writing-sources-declared files**. The brief **must not widen the source
+  boundary**: exactly like the #431 `--element` pin, it is a **filter/emphasis,
+  never a scope widener** — it never adds a file, never reaches past the
+  declared sources, and the **promotion-gated `q_a` staging area stays
+  unreachable** (promotion is the only path in). A brief item whose evidence is
+  not in the declared sources is a
+  NEEDS-OWNER gap, not a reason to read further.
+
+At completion, record `brief_provenance: owner-authored` on the emitted plan so
+the brief's influence is auditable. With **no** `--brief`, the run behaves
+exactly as before — the brief is an optional owner input, never a required gate.
+
 ### Plan consultation at draft start (SPEC-article-plan CAP-3, Story 13.57)
 
 After Stage 0, before the interview, **consult existing article plans** in the

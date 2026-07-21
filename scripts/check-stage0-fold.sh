@@ -91,6 +91,22 @@ echo "$out" | jget "'depth' in d" | grep -q False \
 grep -qi 'depth/scope directive' "$SKILL" && grep -q 'CAP-8' "$SKILL" \
   && ok "SKILL documents the depth/scope directive (CAP-8)" || err "SKILL missing depth/scope guidance"
 
+# 6b. Story 18.24 (#505) — an optional free-form owner coverage brief rides the
+#     same stage-0 call: recorded with owner-authored provenance, and it NEVER
+#     widens the classified source set (a filter, never a scope widener).
+out=$(python3 "$DP" start F2 specs/ --root "$host" --brief "cover the retry storm")
+echo "$out" | jget "d.get('brief',{}).get('provenance')" | grep -q owner-authored \
+  && ok "coverage brief captured with owner-authored provenance (#505)" || err "brief provenance not captured"
+base_src=$(python3 "$DP" start F2 specs/ --root "$host" | jget 'json.dumps(d["sources"])')
+brief_src=$(echo "$out" | jget 'json.dumps(d["sources"])')
+[ "$base_src" = "$brief_src" ] \
+  && ok "the brief leaves the source set identical (never a scope widener)" || err "brief widened the source set"
+out=$(python3 "$DP" start F2 specs/ --root "$host")
+echo "$out" | jget "'brief' in d" | grep -q False \
+  && ok "no --brief -> no brief key (prior behavior unchanged)" || err "brief key present without a brief"
+grep -qi 'coverage brief' "$SKILL" \
+  && ok "SKILL documents the owner coverage brief (#505)" || err "SKILL missing coverage-brief guidance"
+
 # 7. Story 18.19 (#494) — a declared syndication variant with no resolvable
 #    platform profile WARNS (informational bucket), never a hard fail; a
 #    resolvable platform produces no warning.
