@@ -39,7 +39,9 @@ whitelist, CAP-6 degradation) are untouched.
   probe becomes a two-step: (1) the reader lists available topic files under
   `policy_source.path/topics/` (names only — a whitelist listing, not a
   content read); (2) the pipeline proposes ≤2 track-matched topics for THIS
-  article — recommendation drafted from the chosen article intent and the
+  article — "track-matched" per **CAP-5** (the optional per-repo
+  `track_topics` mapping when present, otherwise intent-driven judgment) —
+  recommendation drafted from the chosen article intent and the
   host repo, owner approves/overrides under the proposal contract — and
   passes the approved selection to the reader at read time
   (`read-policy-source.py read --topics a.md [b.md]` — a new input that
@@ -57,11 +59,36 @@ whitelist, CAP-6 degradation) are untouched.
   files seeded which questions at which pin; per-run selection needs no new
   audit grammar — the selected topics simply appear (or close as
   `(no conflict)` in review).
+- **CAP-5 — optional per-repo `track_topics` mapping seeds the proposal**
+  (added 2026-07-21, #525). "Track-matched" in CAP-2 is given a concrete,
+  consumer-owned mechanism: a host repo may declare an optional
+  `policy_source.track_topics` mapping in `writing-sources.yaml`
+  (SPEC-policy-source-seam CAP-1) — articles-repo **track name** → hub
+  **topic name(s)**. When the article's backlog item carries a `track:`
+  frontmatter value with a mapping entry, that entry becomes the CAP-2
+  **default recommendation** for the ≤2-topic proposal; when it is absent
+  (no mapping, or no matching entry, or a track-less draft), CAP-2 falls
+  back to intent-driven judgment exactly as today. The mapping only
+  *parameterizes which topics the recommendation names* — it never widens
+  the ≤2 cap, never bypasses the code-enforced whitelist, and never applies
+  silently: the owner still approves/overrides under the proposal contract
+  (a mapping is a smarter default, not an auto-selection). **Ownership &
+  precedence:** track names are owned by the articles repo (its backlog
+  `track:` frontmatter is the API — no new upstream schema artifact, per the
+  ratified deferral, topics/articles.md:20); hub topic files are
+  authoritative for topic existence. A mapped topic that resolves to no hub
+  topic file is a **consumer-config defect** (topic-existence lint,
+  SPEC-policy-source-seam CAP-1); a mapping track absent from every backlog
+  `track:` value is a **warning** (stale mapping), not an error. Absent
+  mapping = zero behavior change (generic and intent-driven modes both
+  unchanged).
 
 ## Constraints
 
 - The reader's whitelist stays code-enforced; per-run selection widens *which
-  two* topic files, never *how many* or *what else* is readable.
+  two* topic files, never *how many* or *what else* is readable. The CAP-5
+  `track_topics` mapping is subject to this same bound — it seeds *which*
+  topics the proposal names, never *how many* or *what else*.
 - A run where the owner declines topic selection reads GLOSSARY + LESSONS
   only — still policy-seeded, just track-less; recorded as such.
 - Zero new interaction when `policy_source` is unset (generic mode

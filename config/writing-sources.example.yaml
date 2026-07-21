@@ -66,3 +66,17 @@ output:
 # configuration error with a migration notice.
 # policy_source:
 #   enabled: true                        # presence toggle — no path; the gateway owns the hub location
+#   # Optional (#525): seed the per-article topic proposal from a track→topic
+#   # mapping. Articles-repo TRACK name (the backlog item's `track:` frontmatter,
+#   # which the articles repo OWNS) → hub TOPIC name(s). When a draft's backlog
+#   # item carries a mapped track, its topics become the default recommendation
+#   # for the ≤2-topic proposal (draft-article Stage 2); the owner still
+#   # approves/overrides. Absent = intent-driven proposal, exactly as before.
+#   # Declared precedence: hub topic files are authoritative — a mapped topic
+#   # that names no hub topic file is a config defect (topic-existence lint); a
+#   # track absent from all backlog `track:` values is a stale-mapping warning.
+#   track_topics:
+#     kagamios-lessons: kagamios
+#     eval-engineering: benchmark-engineering
+#     signature-research: signature-research
+#     claude-code-ops: claude-code-ops

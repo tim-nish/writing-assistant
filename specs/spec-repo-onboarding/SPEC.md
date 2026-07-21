@@ -64,6 +64,15 @@ degraded interview when `policy_source` was never considered.
   same contract as the existing `set-draft-location`: comment-preserving line
   surgery, machine-global destination via the resolver, legacy-file migration
   semantics unchanged. These are the only write paths CAP-1 may use.
+  **Amended 2026-07-21 (#525):** `set-policy-source` also gains an optional
+  `track_topics` mapping writer (a declarative replace of the `track_topics`
+  block, same comment-preserving contract) — the config-write path onboarding
+  uses to record the optional articles-track → hub-topic mapping
+  (SPEC-policy-source-seam CAP-1). The mapping is optional; onboarding
+  proposes it (owner-approved, agent-fed per C3) and writes nothing when the
+  owner declines. This *replaces* the removed `--track/--topics` value flags
+  (SPEC-policy-topic-at-draft CAP-3) rather than reviving them — the mapping
+  is a per-repo track→topic table, not a per-run topic value.
 - **CAP-3 — user-config first run.** `setup` also checks the user-level
   config (`resolve-user-config.py`): unresolved example placeholders are
   reported with the same ask-and-write-back pattern, so both configuration
