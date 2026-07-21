@@ -224,6 +224,15 @@ slot that keeps a survey within AP-10. Link your preprint/repo.)}
 {JA counterpart exists → "日本語版は Zenn にあります: {url}" / EN counterpart exists → link it.}
 ```
 
+The template is the **complete authority** on block structure: every *standing*
+line the renderer computes (the newsletter line always; the related and
+counterpart lines when supplied) must be consumed by a `{…}` placeholder in the
+template. An unconsumed standing line is a config defect — the renderer emits
+the same `NOT PUBLISHABLE` GATE marker it uses for a missing identity value, and
+never silently drops the line. (Consumption is verified against the rendered
+output, not the raw template, so a placeholder that resolves to empty on a
+*conditional* line — no related/counterpart supplied — is not a defect.)
+
 Syndication notes (2026-07-16: platform packaging is declared by platform
 profiles per SPEC-platform-variants — the dev.to note and the Zenn repo-sync
 clause below describe the intended *contents* of those two profiles, not

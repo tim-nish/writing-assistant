@@ -116,7 +116,11 @@ The block is **state-dependent and conditional**, not a single static line:
 
 If a required identity value is missing from config, the renderer emits a
 `NOT PUBLISHABLE` GATE marker instead of a silently blank block — so the pointer
-GATE, too, is unambiguous by inspection.
+GATE, too, is unambiguous by inspection. The same GATE fires when the template
+fails to *consume* a standing line the renderer computed (the newsletter line
+always; a supplied related/counterpart line): the template is the complete
+authority on block structure, so an unconsumed standing line is a config defect,
+never a silent drop.
 
 ## Visual slots (SPEC-article-visuals CAP-1)
 
