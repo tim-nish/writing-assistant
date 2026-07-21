@@ -202,6 +202,28 @@ on re-harvest never changes identity** — a moved pin or a re-pointed entry
 updates what the element points at, not what the element *is*. Anything keyed on
 the id (consumption, CAP-3) survives re-harvest.
 
+**Mint the id mechanically — never free-choose the token (CAP-9/#428, #529).**
+The id is a **deterministic function of the cluster's declared membership
+anchor**, derived by the tool, never a token you invent per run (that is the
+#529 root cause: one run wrote `el-weak-driver`, the next `weak-driver`, so
+id-keyed exclusion could never fire). Derive every element's id with:
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/write-article-plan.py element-id "<the cluster's declared membership anchor>"
+```
+
+The **anchor** is the cluster's **primary declared identity in the fact sheet** —
+the label the declared, deterministic membership rule names the cluster by (for
+an F2 lesson: the lesson unit's declared title/claim as harvested, e.g.
+`Weak driver`). The tool casefolds, drops an already-derived `el-` prefix, and
+slugifies it to `el-<slug>` — a **byte-identical** result for the same anchor
+(`Weak driver`, `weak-driver`, and `el-weak-driver` all resolve to
+`el-weak-driver`). Because the anchor is read from the fact sheet, not chosen
+freshly, **two runs over the same fact sheet mint the same ids** and id-keyed
+consumption exclusion fires across runs. An anchor the tool cannot slugify
+(`ok: false`) is a **defect** — fix the declared membership rule, never hand-mint
+a nameless id.
+
 Selection chooses which elements the article covers, **upstream of the argument
 plan** (CAP-3/#440 composes *from* the selected elements). The **selection rule
 is #428 disclosure-only**: surfacing it changes **nothing** about what gets
@@ -225,19 +247,36 @@ repeatedly from one repo does not reselect covered material by chance:
 - A completed draft **records the story-element ids it consumed** in **its
   article plan** (`plans/<slug>.md`, the `consumed:` frontmatter key —
   SPEC-article-plan). This is the **only** consumption record: **no new store**.
-- Selection computes "already consumed" from the **`consumed_index`** the plan
-  consultation returns (`write-article-plan.py consult` — see below) — a view
-  **regenerated from every `plans/*.md` on each call**, never a hand-maintained
-  ledger. An element whose id appears there is excluded from the default
-  selection.
+- Selection computes "already consumed" from the **`project_consumed_index`** the
+  plan consultation returns (`write-article-plan.py consult --project <project>`
+  — see below) — a view **regenerated from every `plans/*.md` on each call**,
+  scoped to plans that belong to **this run's project** (the pin's repo
+  component, `_plan_project` — the SAME membership rule differential-context
+  uses, **not** a pin-sha or exact-slug match, #529). An element whose id appears
+  there is excluded from the default selection.
 - Because consumption is keyed by **element id** (identity, 18.8), it **survives
   re-harvest**: a moved pin or re-pointed entry changes the payload, not the id,
-  so a consumed element stays consumed.
+  so a consumed element stays consumed. Mint every candidate element's id with
+  `element-id` (above) so the id it is keyed on **reproduces across runs** —
+  without the mechanical derivation, the same cluster gets a different id each
+  run and exclusion can never fire (#529).
+- **The "first article on this project" claim is PROJECT-scoped and evidenced
+  (#529).** State it **only** when the `plans/*.md` scan finds **no** plan for
+  this project — mechanically, when `consult`'s `project_plans` is empty. The
+  claim **names the scanned location** (`plans/*.md`). When `project_plans` is
+  **non-empty** you may **not** claim a first article: exclusion was checked
+  against those plans, whether or not any element was skipped.
+- **When exclusion DOES fire, disclose it.** Every element skipped because a
+  prior article on this project already consumed it is disclosed in the interview
+  journal and the completion summary — the skipped element's **id** and the plan
+  that consumed it (from `project_consumed_index`) — so a defaulted-away element
+  is stated, never silently dropped (the same per-element disclosure the
+  selection rule requires above).
 - The exclusion is an **owner-overridable default**, never a hard filter: the
   owner may **re-cover** a consumed element (surface it as a proposal under the
   [proposal contract](../owner-facing-proposal-contract.md); a re-cover is the
-  owner's to ratify). With **no plans**, nothing is excluded and selection is
-  exactly as today.
+  owner's to ratify). With **no plans for this project**, nothing is excluded and
+  selection is exactly as today.
 
 **Named-element pin — scope the whole run to one element (CAP-9, #431).** The
 owner can say **"write the article about *this* element"** by passing
@@ -357,16 +396,22 @@ consultation, and plan content **never enters the harvest evidence stream**
 (Story 13.56's fences apply):
 
 ```
-python3 ${CLAUDE_PLUGIN_ROOT}/scripts/write-article-plan.py consult --root <host-repo>
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/write-article-plan.py consult --root <host-repo> --project <related.projects>
 ```
 
 It returns each prior plan's discovery surface (slug, intent, claim, status,
 pin, relates, **consumed**) plus a **`consumed_index`** — every story-element id
-any plan records as consumed, mapped to the plans that consumed it. The
-`consumed_index` is the **consumption-exclusion input** (CAP-9/#430): it is a
-**view regenerated from `plans/*.md` on each call**, so lesson-based selection
-defaults to the elements **absent** from it (see "Story-element selection"
-above). From this surface you **may surface plan-grounded proposals** — each
+any plan records as consumed, mapped to the plans that consumed it — and, scoped
+to **this run's project** (`--project`, defaulting to the host repo basename): a
+**`project_plans`** list (the plans whose `_plan_project` matches, the projected
+scan of `plans/*.md`), a **`project_consumed_index`** (the same map restricted to
+those plans), and **`scanned`** (`plans/*.md`, the location any first-article
+claim must name). The **`project_consumed_index`** is the **consumption-exclusion
+input** (CAP-9/#430): it is a **view regenerated from `plans/*.md` on each
+call**, so lesson-based selection defaults to the elements **absent** from it
+(see "Story-element selection" above); `project_plans` being **empty** is what
+licenses the "first article on this project" claim, and non-empty forbids it.
+From this surface you **may surface plan-grounded proposals** — each
 under the [owner-facing proposal contract](../owner-facing-proposal-contract.md),
 **none auto-applied**:
 
