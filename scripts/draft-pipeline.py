@@ -624,6 +624,80 @@ def _dimension4(draft_text, prov_entries):
     return fails
 
 
+def _dimension4_measures(draft_text, prov_entries):
+    """The MEASURED dim4 mechanics behind the verdict (Story 18.18): the same
+    quantities `_dimension4` thresholds, reported as values so the verdict
+    record carries what was measured, not only pass/fail. Reusing `_dimension4`'s
+    exact substrate (`_draft_body`/`_sentences`) keeps the stamp honest — it can
+    never disagree with the verdict it accompanies."""
+    paragraphs = _draft_body(draft_text)
+    sentences = [s for p in paragraphs for s in _sentences(p)]
+    lens = [len(s.split()) for s in sentences]
+    mean = round(sum(lens) / len(lens), 1) if lens else 0
+    long = sum(1 for n in lens if n > QG_LONG_SENTENCE_WORDS)
+    long_frac = round(long / len(lens), 3) if lens else 0
+    para_max_sent = max((len(_sentences(p)) for p in paragraphs), default=0)
+    para_max_words = max((len(p.split()) for p in paragraphs), default=0)
+    headings = len(re.findall(r"^\s{0,3}#{1,6}\s", draft_text, re.MULTILINE))
+    total = len(prov_entries)
+    sourced = sum(1 for _, c, _, _ in prov_entries if c == "sourced")
+    sourced_density = round(sourced / total, 3) if total else 0
+    return {"sentence_mean_words": mean,
+            "long_sentence_fraction": long_frac,
+            "paragraph_max_sentences": para_max_sent,
+            "paragraph_max_words": para_max_words,
+            "headings": headings,
+            "sourced_density": sourced_density}
+
+
+# --- Stage 3->4 verdict RECORD (Story 18.18) --------------------------------
+# The gate writes an authoritative FOUR-dimension verdict record: dim1/dim2 (the
+# judge verdicts), dim3 stamped with the inventory that produced it, and dim4
+# with its measured mechanical values. A run may not reach `stage: complete`
+# over a record missing any of the four dimensions or the dim3 inventory stamp
+# (#492: the dim1/dim2-only regression where review silently compensated for a
+# gate that never recorded dim3/dim4).
+_DIM_LINE_RE = re.compile(r"^\s*(dim[1-4])\s*:", re.IGNORECASE)
+
+
+def _render_verdict_record(results, vocab_stamp, dim4_measures):
+    """Serialize the complete four-dimension verdict record. dim3 carries its
+    `dim3_inventory` stamp (version + counts); dim4 carries the measured
+    mechanics. Verdict tokens (pass/fail/waived) come straight from the gate's
+    own `results`, so the record cannot diverge from the gate that wrote it."""
+    def verdict(dim):
+        return results.get(dim, ("missing", ""))[0]
+    lines = ["# Stage 3->4 quality-gate verdict record — all four dimensions "
+             "(dim3 inventory + dim4 measures stamped, Story 18.18).",
+             f"dim1: {verdict('dim1')}",
+             f"dim2: {verdict('dim2')}"]
+    stamp = ""
+    if vocab_stamp:
+        stamp = ("  [dim3_inventory: "
+                 f"vocabulary_version={vocab_stamp.get('vocabulary_version')} "
+                 f"registered_terms={vocab_stamp.get('registered_terms')} "
+                 f"registered_patterns={vocab_stamp.get('registered_patterns')}]")
+    lines.append(f"dim3: {verdict('dim3')}{stamp}")
+    measures = "  [" + " ".join(f"{k}={v}" for k, v in dim4_measures.items()) + "]"
+    lines.append(f"dim4: {verdict('dim4')}{measures}")
+    return "\n".join(lines) + "\n"
+
+
+def _verdict_record_gaps(text):
+    """Completeness gaps in a verdict record: any of the four dimensions absent,
+    or the dim3 line missing its inventory stamp. Empty list == complete. This
+    is the predicate the completion gate blocks on (#492)."""
+    dims = {}
+    for ln in text.splitlines():
+        m = _DIM_LINE_RE.match(ln)
+        if m:
+            dims[m.group(1).lower()] = ln
+    gaps = [d for d in ("dim1", "dim2", "dim3", "dim4") if d not in dims]
+    if "dim3" in dims and "dim3_inventory" not in dims["dim3"]:
+        gaps.append("dim3_inventory")
+    return gaps
+
+
 def _loc_set(s):
     """Normalize a locations string (judge `[locations]` or --prior-locations)
     into a comparable set: split on `;`/`[`/`]`, drop brackets, lowercase,
@@ -735,7 +809,10 @@ def cmd_quality_gate(args):
     # mechanically below and the judge's opinion of it never gates.
     judged = {}
     if args.judge:
-        bad, verdict_re = [], re.compile(r"^(dim[123])\s*:\s*(pass|fail)\b(.*)$", re.IGNORECASE)
+        # dim1/dim2 are judged; a dim3 line is advisory and a dim4 line is
+        # tolerated-and-ignored (both are scanned mechanically) so the gate's own
+        # complete verdict record (Story 18.18) is safe if it is fed back here.
+        bad, verdict_re = [], re.compile(r"^(dim[1234])\s*:\s*(pass|fail)\b(.*)$", re.IGNORECASE)
         for lineno, ln in enumerate(_read_text(args.judge).splitlines(), 1):
             ln = ln.strip()
             if not ln or ln.startswith("#"):
@@ -817,9 +894,12 @@ def cmd_quality_gate(args):
     except (OSError, json.JSONDecodeError):
         vocab_stamp = None
 
-    # Dimension 4: mechanical.
+    # Dimension 4: mechanical. The measured mechanics behind the verdict are
+    # kept beside it (Story 18.18) so the verdict RECORD can stamp dim4 with
+    # what was measured, symmetrically with dim3's inventory stamp.
     d4 = _dimension4(draft, prov_entries)
     results["dim4"] = ("pass", "") if not d4 else ("fail", "; ".join(d4))
+    dim4_measures = _dimension4_measures(draft, prov_entries)
 
     # Audience presence — a stage-progression precondition (Story 13.41,
     # SPEC-platform-variants CAP-4). `audience` is born at stage-3 fill, so this
@@ -923,6 +1003,7 @@ def cmd_quality_gate(args):
            "failing_dimensions": failing}
     if vocab_stamp:
         out["dim3_inventory"] = vocab_stamp
+    out["dim4_inventory"] = dim4_measures
     if evidence_checked:
         out["evidence_types"] = {
             "checked": True,
@@ -953,6 +1034,23 @@ def cmd_quality_gate(args):
         out["advisories"] = [{"dimension": "dim3", "source": "rubric-judge",
                               "verdict": verdict, "locations": locations,
                               "note": "advisory only — dim3 is gated by the mechanical scan"}]
+
+    # The authoritative Stage 3->4 verdict RECORD (Story 18.18): the gate writes
+    # ALL FOUR dimensions — dim3 with its inventory stamp, dim4 with measured
+    # values — so the recorded verdicts can never be the dim1/dim2-only partial
+    # that let review compensate for an unrun gate (#492). This is the file the
+    # completion gate blocks on when partial.
+    if getattr(args, "verdicts_out", None):
+        record = _render_verdict_record(results, vocab_stamp, dim4_measures)
+        try:
+            with open(args.verdicts_out, "w", encoding="utf-8") as fh:
+                fh.write(record)
+            out["verdicts_written"] = os.path.abspath(args.verdicts_out)
+        except OSError as e:
+            sys.stderr.write(f"error: could not write --verdicts-out "
+                             f"{args.verdicts_out}: {e}\n")
+            return 2
+
     print(json.dumps(out, indent=2))
     return 0 if not failing else 1
 
@@ -3495,6 +3593,30 @@ def cmd_complete(args):
             "checkpoint does not record `next_stage: done`.\n")
         return 1
 
+    # Precondition (Story 18.18, #492) — the Stage 3->4 verdict RECORD. When the
+    # run recorded quality-gate verdicts in its workspace, they must be
+    # COMPLETE: all four dimensions, dim3 carrying its inventory stamp. A partial
+    # record (the dim1/dim2-only regression that let review compensate for a gate
+    # that never recorded dim3/dim4) blocks completion here, before any product
+    # is persisted and before any checkpoint is written. A run with no recorded
+    # verdict file is unaffected — the two-product gate below still governs.
+    if getattr(args, "ws", None):
+        verdict_path = os.path.join(args.ws, "rubric-verdicts.txt")
+        if os.path.isfile(verdict_path):
+            try:
+                gaps = _verdict_record_gaps(_read_text(verdict_path))
+            except OSError as e:
+                return product_error(
+                    "quality verdict record (rubric-verdicts.txt)", verdict_path,
+                    f"cannot read the recorded verdicts: {e}")
+            if gaps:
+                return product_error(
+                    "quality verdict record (rubric-verdicts.txt)", verdict_path,
+                    "the Stage 3->4 verdict record is partial — missing "
+                    + ", ".join(gaps) + "; the gate must write all four dimension "
+                    "verdicts (dim3 with its inventory stamp, dim4 with measured "
+                    "values) before the run may complete")
+
     # Product 1 — the canonical draft at <output.drafts>/<slug>.md.
     try:
         text = _read_text(args.draft)
@@ -3947,6 +4069,11 @@ def main(argv=None):
     sp.add_argument("--prior-locations", metavar="LOCS",
                     help="cycle-1's failing dim1/dim2 locations (`;`-separated); on cycle 2, a "
                          "dim1/dim2 fail outside these is suppressed as interpretive drift")
+    sp.add_argument("--verdicts-out", dest="verdicts_out", metavar="PATH",
+                    help="write the authoritative FOUR-dimension verdict record (Story "
+                         "18.18) to PATH — dim1/dim2 verdicts, dim3 with its inventory "
+                         "stamp, dim4 with measured values. The completion gate blocks "
+                         "on a partial record (`rubric-verdicts.txt` in the run workspace)")
     sp = sub.add_parser("verify-markers")
     sp.add_argument("draft", nargs="?", default="-", help="draft file, or - for stdin")
     sp.add_argument("--count", action="store_true", help="print the count of well-formed markers")
