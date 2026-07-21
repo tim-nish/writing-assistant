@@ -157,6 +157,42 @@ After a review run the host repo's `git status` shows **nothing new** — no
 `scratch/`, no stray intermediate. The plugin's only host-tree footprint across
 the whole pipeline is the declared draft products at `output.drafts`.
 
+## Review start — pre-review checkpoint proposal (CAP-6)
+
+Arbitration edits the canonical draft **in place** at `output.drafts`, so unless
+the pre-review text lives somewhere the owner is meant to look, judging *what
+review did* is impossible (#495). Git is that surface — but only if the draft is
+already committed. **At review start, check whether the canonical draft is
+untracked or dirty in its destination repo** and, if so, surface a one-line
+**checkpoint proposal** so the owner can commit the pre-review state:
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py review-checkpoint-proposal \
+  --draft <output.drafts>/<slug>.md --slug <slug>
+```
+
+The command runs **read-only git** (`rev-parse`, `status`) and
+**never writes the destination repo** — the pipeline PROPOSES, the owner COMMITS (the ratified
+pipeline-proposes/owner-commits stance, hub `topics/articles.md` 2026-07-18;
+footprint invariant, `docs/storage-architecture.md` D1). When
+`checkpoint_proposed` is true (an **untracked or dirty** draft), present its
+`proposal` one-liner to the owner in-conversation as a single offered choice —
+its concrete effect stated (owner-facing proposal contract): "commit the
+pre-review draft so git is your before/after surface / skip". **Declining is
+allowed** — the run's in-conversation before/after diff (below) still shows this
+run's edits regardless. A **clean** (committed, unmodified) draft already holds
+the pre-review state in git, so no proposal is surfaced; the offer is made
+**exactly once**, at review start.
+
+**Before applying any accepted finding, snapshot the pre-arbitration draft into
+the run workspace** — this machine-state snapshot is the BEFORE side the report's
+diff is computed from, and it is the run-workspace copy the design keeps out of
+the host tree:
+
+```
+cp <output.drafts>/<slug>.md "$WS/pre-arbitration-<slug>.md"
+```
+
 ## Stage 0 — configuration validation
 
 Before any review pass, validate the resolved configuration (CAP-5):
@@ -759,6 +795,27 @@ the accepted findings:
    ```
 
 A run that skips any of these steps may not report the draft "publishable".
+
+## Before/after comparison (report time — CAP-6)
+
+A round that applied edits owes the owner a concrete answer to *what did review
+do?* — not the change-list prose (which reports **intent**, not the actual
+edits, #495). Compute the **before/after diff** from the pre-arbitration
+workspace snapshot taken at review start against the applied draft, and present
+it **in-conversation** with the applied change list:
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py review-diff \
+  --before "$WS/pre-arbitration-<slug>.md" --after <edited-draft> --slug <slug>
+```
+
+The command **reads only its two inputs and writes nothing** — it **never writes
+the destination repo** and creates no `reviews/` artifact (footprint invariant).
+Show the returned `diff` and `change_list` **in the conversation** — this is the
+owner's comparison surface (interaction contract, CAP-6/#226); the snapshot and
+draft **paths are printed informationally only**, never a file the owner must
+open to proceed. The diff underlies the completion summary's change list below;
+an `identical` result means arbitration applied no edit this run.
 
 ## Completion summary
 
