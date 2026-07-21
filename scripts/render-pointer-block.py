@@ -103,6 +103,24 @@ def render(cfg, args):
         "counterpart_line": counterpart_line,
     })
 
+    # The template is the complete authority on block structure: every STANDING
+    # line the renderer computed must be consumed by the template. The newsletter
+    # line is always standing; related/counterpart are standing only when supplied
+    # (non-empty). A standing line the template failed to consume is a config
+    # defect — emit the same NOT PUBLISHABLE GATE rather than silently drop it.
+    # Consumption is verified against the RENDERED output (not the raw template),
+    # so a conditional placeholder that resolved to empty is not a defect.
+    standing = {"newsletter_line": newsletter_line}
+    if related_line:
+        standing["related_line"] = related_line
+    if counterpart_line:
+        standing["counterpart_line"] = counterpart_line
+    unconsumed = [name for name, val in standing.items() if val and val not in rendered]
+    if unconsumed:
+        dropped = ", ".join(sorted(unconsumed))
+        return (f"<!-- GATE {{Pointer block}}: NOT PUBLISHABLE — template dropped standing line(s): {dropped} -->\n",
+                GATE_UNFILLED_EXIT)
+
     # Drop conditional lines that resolved to empty (e.g. no related / counterpart).
     kept = [ln for ln in rendered.split("\n") if ln.strip().strip("*").strip() != ""]
     return "\n".join(kept) + "\n", 0

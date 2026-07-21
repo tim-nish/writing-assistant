@@ -90,6 +90,39 @@ out=$(printf '{"owner":{},"pointer_block":{"template":"x"}}' | python3 "$root/$R
 set -e
 { [ "$rc" -eq 3 ] && printf '%s' "$out" | grep -q 'NOT PUBLISHABLE'; } \
   && ok "unfilled pointer GATE -> NOT PUBLISHABLE marker + exit 3" || err "pointer GATE not flagged"
+
+# (a2) unconsumed STANDING line: template drops the always-standing newsletter
+# line (no {newsletter_line} placeholder) -> NOT PUBLISHABLE + exit 3, never a
+# silent drop (spec §3; #493).
+NEWS_DROP='{"owner":{"focus_areas":"e","site_name":"s","site_url":"u"},"pointer_block":{"template":"---\n*{focus_areas}*\n","newsletter":{"status":"coming-soon","rss_url":"r","follow_url":"f"},"lines":{"newsletter_coming_soon":"RSS {rss_url}"}}}'
+set +e
+out=$(printf '%s' "$NEWS_DROP" | python3 "$root/$RPB" --config-json -); rc=$?
+set -e
+{ [ "$rc" -eq 3 ] && printf '%s' "$out" | grep -q 'NOT PUBLISHABLE'; } \
+  && ok "unconsumed newsletter line -> NOT PUBLISHABLE + exit 3 (no silent drop)" || err "dropped newsletter line not GATEd"
+
+# (b2) unconsumed SUPPLIED related line: template lacks {related_line} but a
+# related title+url are supplied (making related a standing line) -> GATE.
+REL_DROP='{"owner":{"focus_areas":"e","site_name":"s","site_url":"u"},"pointer_block":{"template":"---\n*{focus_areas}*\n*{newsletter_line}*\n","newsletter":{"status":"coming-soon","rss_url":"r","follow_url":"f"},"lines":{"newsletter_coming_soon":"RSS {rss_url}","related":"Related {title} {url}"}}}'
+set +e
+out=$(printf '%s' "$REL_DROP" | python3 "$root/$RPB" --config-json - --related-title T --related-url http://u); rc=$?
+set -e
+{ [ "$rc" -eq 3 ] && printf '%s' "$out" | grep -q 'NOT PUBLISHABLE'; } \
+  && ok "unconsumed supplied related line -> NOT PUBLISHABLE + exit 3" || err "dropped supplied related line not GATEd"
+
+# (c2) same template as (b2), but related NOT supplied: the conditional line
+# resolved to empty and its placeholder is legitimately absent -> NO gate.
+set +e
+out=$(printf '%s' "$REL_DROP" | python3 "$root/$RPB" --config-json -); rc=$?
+set -e
+{ [ "$rc" -eq 0 ] && ! printf '%s' "$out" | grep -q 'NOT PUBLISHABLE' && printf '%s' "$out" | grep -q 'RSS r'; } \
+  && ok "empty conditional line (absent placeholder) -> no gate (verified vs rendered output)" || err "empty conditional line wrongly GATEd"
+
+# (d2) the shipped-shape template (mirrors user-config.example.yaml; carries
+# {newsletter_line}) renders with no new gate — unchanged behaviour.
+grep -q 'NOT PUBLISHABLE' "$work/pb_cs" && err "example-shape template spuriously GATEd" \
+  || ok "example-shape template (has {newsletter_line}) renders with no new gate"
+
 # (b) an evidence GATE still showing its prompt is detectable by inspection
 printf '## GATE {Evidence}\n{(A result... This slot empty = not publishable.)}\n' > "$work/draft.md"
 grep -Eq '## GATE \{[^}]+\}' "$work/draft.md" && grep -q '{(' "$work/draft.md" \
