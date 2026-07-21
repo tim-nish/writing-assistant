@@ -87,7 +87,7 @@ intake as a **proposal only**.
     as a distill-bug signal in the run receipts, and — at the owner's gate
     disposition, mirroring the detector's "report upstream" choice — emitted
     as a staging-schema block in the run workspace, **conforming to the hub
-    staging-file schema** (product-lab `specs/knowledge-architecture.md`
+    staging-file schema** (the configured policy hub's
     §3.1, the authority — the hub schema wins on any mismatch, and a mismatch
     is a defect of THIS spec). This spec owns only the fork-specific payload
     inside that envelope: the fork as asked, the options, the owner's answer,

@@ -35,12 +35,12 @@ cat > "$work/f.json" <<'JSON'
   { "consult_point": "review:policy-consistency", "direction": "outgrown",
     "rationale": "The tool groups findings by axis where the line assumes a flat list",
     "decision": {"statement": "The review pass classifies findings by axis", "evidence": "specs/spec-article-review/SPEC.md:38"},
-    "policy": {"quote": "Findings are presented flat", "pointer": "LESSONS.md:41@a1b2c3d4e5f6a7b8", "pin": "product-lab@a1b2c3d4e5f6a7b8"},
+    "policy": {"quote": "Findings are presented flat", "pointer": "LESSONS.md:41@8f3c2d1e4a5b6c7d", "pin": "policy-hub@8f3c2d1e4a5b6c7d"},
     "current_line": "Findings are presented flat" },
   { "consult_point": "interview:seeding", "direction": "contradiction",
     "rationale": "This tool syndicates where the line kept the site independent",
     "decision": {"statement": "The site syndicates to three platforms", "evidence": "specs/spec-platform-variants/SPEC.md:12"},
-    "policy": {"quote": "Website stays independent", "pointer": "topics/articles.md:17@a1b2c3d4e5f6a7b8", "pin": "product-lab@a1b2c3d4e5f6a7b8"},
+    "policy": {"quote": "Website stays independent", "pointer": "topics/articles.md:17@8f3c2d1e4a5b6c7d", "pin": "policy-hub@8f3c2d1e4a5b6c7d"},
     "current_line": "Site syndicates everywhere now" }
 ]
 JSON
@@ -61,7 +61,7 @@ PY
 cat > "$work/f.json" <<'JSON'
 [ { "consult_point": "review:policy-consistency", "direction": "outgrown",
     "rationale": "one sentence", "decision": {"statement": "a decision", "evidence": "specs/x.md:1"},
-    "policy": {"quote": "q", "pointer": "NOT-PINNED", "pin": "product-lab@a1b2c3d4e5f6a7b8"},
+    "policy": {"quote": "q", "pointer": "NOT-PINNED", "pin": "policy-hub@8f3c2d1e4a5b6c7d"},
     "current_line": "q" } ]
 JSON
 run > "$work/o.json" 2>/dev/null && err "driver accepted an unvalidatable flag (should exit 4)" \
@@ -73,7 +73,7 @@ cat > "$work/f.json" <<'JSON'
 [ { "consult_point": "review:policy-consistency", "direction": "outgrown",
     "rationale": "The tool groups findings by axis where the line assumes a flat list",
     "decision": {"statement": "The review pass classifies findings by axis", "evidence": "specs/spec-article-review/SPEC.md:38"},
-    "policy": {"quote": "Findings are presented flat", "pointer": "LESSONS.md:41@a1b2c3d4e5f6a7b8", "pin": "product-lab@a1b2c3d4e5f6a7b8"},
+    "policy": {"quote": "Findings are presented flat", "pointer": "LESSONS.md:41@8f3c2d1e4a5b6c7d", "pin": "policy-hub@8f3c2d1e4a5b6c7d"},
     "current_line": "Findings are presented flat" } ]
 JSON
 cp scripts/fixtures/policy-divergence/ledger.json "$work/l.json"   # already holds this key
@@ -90,7 +90,7 @@ python3 - <<'PY' > "$work/f.json"
 import json
 base=lambda i:{"consult_point":"session:consult-first","direction":"contradiction","rationale":"one sentence here",
   "decision":{"statement":f"decision {i}","evidence":f"specs/s.md:{i}"},
-  "policy":{"quote":f"line {i}","pointer":f"P.md:{i}@a1b2c3d4e5f6a7b8","pin":"product-lab@a1b2c3d4e5f6a7b8"},
+  "policy":{"quote":f"line {i}","pointer":f"P.md:{i}@8f3c2d1e4a5b6c7d","pin":"policy-hub@8f3c2d1e4a5b6c7d"},
   "current_line":f"line {i}"}
 print(json.dumps([base(i) for i in range(1,6)]))
 PY
@@ -105,13 +105,13 @@ PY
 printf '{"entries": []}' > "$work/l2.json"
 python3 "$D" disposition --ledger "$work/l2.json" \
   --key "LESSONS.md:41|outgrown|specs/spec-article-review/SPEC.md:38" \
-  --disposition reported --ref "#500" --pin "product-lab@a1b2c3d4e5f6a7b8" --detected 2026-07-20 >/dev/null \
+  --disposition reported --ref "#500" --pin "policy-hub@8f3c2d1e4a5b6c7d" --detected 2026-07-20 >/dev/null \
   && python3 "$V" ledger "$work/l2.json" >/dev/null 2>&1 \
   && ok "CAP-3: a 'reported' disposition appends a schema-valid ledger entry" \
   || err "disposition append produced an invalid ledger"
 # dismissed without reason is refused (CAP-4 remembers dismissals with a reason).
 python3 "$D" disposition --ledger "$work/l2.json" --key "a:1|outgrown|b:2" \
-  --disposition dismissed --pin "product-lab@a1b2c3d4e5f6a7b8" >/dev/null 2>&1 \
+  --disposition dismissed --pin "policy-hub@8f3c2d1e4a5b6c7d" >/dev/null 2>&1 \
   && err "dismissed without --reason accepted" \
   || ok "CAP-3: 'dismissed' without a reason is refused"
 
