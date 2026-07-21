@@ -1186,16 +1186,47 @@ filling any slot, compose an explicit **argument plan** from the fact sheet
   pointer) it will draw on. A framework governs each section's **content
   obligations, not its literal heading structure**.
 
-Then fill **from the plan** — each section realizes its intent, drawing the
-named entries — rather than populating slots directly. This is a **sub-step**,
-not a new pipeline stage, and **provenance is unchanged**: every checkable claim
-is still sourced/derived, synthesis stays legal in connective tissue. The plan
-is a **run-workspace intermediate** and is **owner-visible** — the completion
-summary names the thesis and arc the draft was composed from (CAP-2), and at
-completion the plan-record `plans/<slug>.md` projects them from this finalized
-plan (SPEC-article-plan, unchanged). A section whose intent is under-evidenced
-(its named entries are thin) is visible **here, before fill**; the Stage 3→4
-gate fails a slot that ships as a single under-evidenced sentence.
+**Narrative-structure choice — propose 2-3 candidate structures (CAP-4, Story
+18.26, #503).** A framework's **narrative structure is owner editorial intent
+per artifact, never a hardened tool default**. Before settling the arc, the
+sub-step **proposes 2-3 candidate structures** for the selected elements and
+lets the owner choose. Get the candidates from the selected elements' evidence
+kinds:
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py structures <<< '{"elements":[{"id":…,"kinds":["chronology",…],"dominant_incident":false}, …]}'
+```
+
+For F2 the shapes are **sibling-lessons** (the current default), **chronological
+journey**, **single-incident deep thread**, and **thematic braid** — each
+returned with a one-line **rationale grounded in the selected elements' evidence
+kinds** (chronology-rich clusters suggest the journey; one dominant incident
+suggests the deep thread; shared themes suggest the braid). Present them under
+the [owner-facing proposal contract](../owner-facing-proposal-contract.md): the
+owner **picks one, or counter-proposes free-form**. **Combining multiple
+selected elements into one narrative thread is a supported structure** — the
+journey/deep-thread/braid compose the elements as **beats** of one thread rather
+than one section each. This is **composition, not selection**: element selection
+and its **CAP-9 disclosure are unchanged**, and every selected element survives
+as a beat of the chosen thread (the candidates echo the full element set). With
+**no choice**, the **default is sibling-lessons** — the run never hardens into a
+single shape, but it never blocks on the question either.
+
+Whichever structure is chosen, record it in the argument plan (`arc`) and
+compose Stage 3 from it. **Generation still owns coherence:** the chosen
+structure must **pass the existing Stage 3→4 gate** (dim1 narrative arc; the
+#434 skeleton-variation rules), and review never reconstructs structure.
+
+Then fill **from the plan** — each section (or beat) realizes its intent,
+drawing the named entries — rather than populating slots directly. This is a
+**sub-step**, not a new pipeline stage, and **provenance is unchanged**: every
+checkable claim is still sourced/derived, synthesis stays legal in connective
+tissue. The plan is a **run-workspace intermediate** and is **owner-visible** —
+the completion summary names the thesis and arc the draft was composed from
+(CAP-2), and at completion the plan-record `plans/<slug>.md` projects them from
+this finalized plan (SPEC-article-plan, unchanged). A section whose intent is
+under-evidenced (its named entries are thin) is visible **here, before fill**;
+the Stage 3→4 gate fails a slot that ships as a single under-evidenced sentence.
 
 **Per-section progress recording (Story 13.84, #388).** Stage 3 is a long
 stage: an evidence-heavy fill can exceed one invocation's budget by itself, so
