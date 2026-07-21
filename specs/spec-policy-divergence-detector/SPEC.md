@@ -17,7 +17,7 @@ sources:
 > of SPEC-policy-consistency-pass (amendment recorded there); nothing else in the
 > two ratified seam consumers changes. **Ratification condition (CAP-3):** the
 > staging block is a **conformance copy** of the hub staging-file schema
-> (the configured policy hub's §3.1) with declared precedence —
+> (product-lab `specs/knowledge-architecture.md` §3.1) with declared precedence —
 > the hub schema is the authority, it wins on any mismatch, and a mismatch is a
 > defect of this spec; this spec owns only the detector-specific divergence
 > payload, and never assumes it is the sole emitter into that intake (see CAP-3,
@@ -87,8 +87,8 @@ pipeline, nothing machine-final.
     with three effect-stating choices mirroring the consistency pass's
     arbitration: **report upstream** (emit the proposal — a tracker issue in
     this repo carrying the record, or a staging-schema block in the run
-    workspace **conforming to the hub staging-file schema** (the
-    configured policy hub's §3.1, the authority — precedence and
+    workspace **conforming to the hub staging-file schema** (product-lab
+    `specs/knowledge-architecture.md` §3.1, the authority — precedence and
     payload split in `detector-formats.md` §4), offered for manual copy into the
     upstream intake), **fix here** (the divergence is a
     consumer defect — route to this repo's tracker as an ordinary issue; no
@@ -139,8 +139,8 @@ pipeline, nothing machine-final.
 - The detector never blocks or fails a run: any detector-internal error skips
   the pass with one logged line (the seam's degradation discipline).
 - Emission formats are **conformed, not invented**: the staging-schema block is a
-  **conformance copy of the hub staging-file schema** — the
-  configured policy hub's §3.1, the authority. **The hub schema wins on
+  **conformance copy of the hub staging-file schema** — product-lab
+  `specs/knowledge-architecture.md` §3.1, the authority. **The hub schema wins on
   any mismatch, and a mismatch is a defect of THIS spec (or its seam carrier),
   never of the hub.** This spec defines only the **detector-specific divergence
   payload** carried inside that envelope; the seam CAP-4 staging emitter is the

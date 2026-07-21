@@ -6,7 +6,7 @@
       "disposition": "dismissed",
       "ref": null,
       "reason": "consumer-side grouping is an implementation detail, not a policy conflict",
-      "pin_at_disposition": "policy-hub@8f3c2d1e4a5b6c7d",
+      "pin_at_disposition": "product-lab@a1b2c3d4e5f6a7b8",
       "occurrences": 2
     }
   ]
