@@ -101,7 +101,7 @@ dashes, quoting by indentation, CAPITALIZED words for emphasis, blank-line
 separation.
 
 **Forbidden markers** (never reach the owner): `**bold**` / `__underline__`,
-backtick code fences, `#` headings, `[text](url)` links. Emphasis is carried by
+backtick code fences, `#` headings, Markdown links. Emphasis is carried by
 wording or capitalization; a link is written as a bare path or URL.
 
 **Visual previews:** a visual proposal's preview is a **plain-text structural

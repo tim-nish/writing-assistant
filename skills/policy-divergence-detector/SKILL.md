@@ -1,3 +1,12 @@
+---
+name: policy-divergence-detector
+description: >
+  Flag when this tool has moved past an upstream policy line it once consulted
+  — the consumer-side counterpart to the seam's staleness machinery. A flag is
+  a divergence candidate, never a determination; emission is proposal-only and
+  the upstream hub is never written (spec-policy-divergence-detector, #436).
+---
+
 # Policy-divergence detector (consumer-side)
 
 Flag when **this tool has moved past** an upstream policy line it once consulted
@@ -50,7 +59,7 @@ silently dropped). Its output is the candidate list — nothing is emitted yet.
 ## The owner gate (CAP-3) — proposal-only, three choices
 
 Each surviving candidate enters the run's **existing owner gate under the
-[proposal contract](owner-facing-proposal-contract.md)** (selective prompts,
+[proposal contract](../owner-facing-proposal-contract.md)** (selective prompts,
 Where/Why/Effect, a journal entry per disposition — `detector-formats.md` §3):
 
 - **Where:** the consult point and the decision's evidence pointer.

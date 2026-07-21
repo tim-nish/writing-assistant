@@ -1,3 +1,13 @@
+---
+name: fork-gate-consult-first
+description: >
+  Before raising a human gate that presents policy, architecture, or
+  prior-decision forks, consult the served policy surface so covered forks
+  become overrideable FYIs and only genuinely new positions reach the owner as
+  gates. Applies the standing consult-first contract to every fork-presenting
+  stop point (spec-policy-fork-consultation, #480).
+---
+
 # Fork-gate consult-first
 
 Before raising a human gate that presents **policy, architecture, or
