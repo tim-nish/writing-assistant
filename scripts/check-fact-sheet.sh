@@ -161,6 +161,46 @@ reason | grep -q 'first half of a wrapped second half of the cell' \
   && ok "reject: multi-line mismatch REJECT shows the spanned source lines" \
   || err "multi-line mismatch REJECT does not show the span"
 
+# 5f. Coverage manifest (#514): disclose read-vs-skipped, accounting closes.
+grep -q 'require-coverage' "$SKILL" && ok "skill documents the coverage manifest / --require-coverage" || err "coverage manifest not documented in skill"
+COV_OK='# Fact sheet: t
+
+## Coverage
+pin: '"$sha"'
+matched: 2
+read: notes.md (1)
+skipped: other.md (over the read ceiling — surfaced to owner)
+
+- Throughput doubled under load / notes.md:2@'"$sha"' / result'
+# a) a well-formed manifest passes, entries still validated
+printf '%s\n' "$COV_OK" > "$work/fs.md"
+python3 "$root/$VAL" "$work/fs.md" --root "$h" --require-coverage >/dev/null 2>&1 \
+  && ok "valid: well-formed coverage manifest + entry passes under --require-coverage" \
+  || err "well-formed coverage manifest rejected"
+# b) missing manifest is rejected only under --require-coverage
+printf -- '- Throughput doubled under load / notes.md:2@%s / result\n' "$sha" > "$work/fs.md"
+python3 "$root/$VAL" "$work/fs.md" --root "$h" >/dev/null 2>&1 \
+  && ok "no manifest passes WITHOUT --require-coverage (back-compat)" \
+  || err "missing manifest rejected without the flag (back-compat broken)"
+python3 "$root/$VAL" "$work/fs.md" --root "$h" --require-coverage 2>&1 | grep -q 'missing.*Coverage' \
+  && ok "reject: missing manifest under --require-coverage names the fix" \
+  || err "missing manifest accepted under --require-coverage"
+# c) accounting must close (read + skipped == matched)
+printf '# Fact sheet: t\n\n## Coverage\npin: %s\nmatched: 5\nread: notes.md (1)\nskipped: none\n\n- Throughput doubled under load / notes.md:2@%s / result\n' "$sha" "$sha" > "$work/fs.md"
+python3 "$root/$VAL" "$work/fs.md" --root "$h" 2>&1 | grep -q 'accounting does not close' \
+  && ok "reject: coverage accounting that does not close (matched != read+skipped)" \
+  || err "unbalanced coverage accounting accepted"
+# d) `skipped: none` with a skipped file is contradictory
+printf '# Fact sheet: t\n\n## Coverage\npin: %s\nmatched: 1\nread: notes.md (1)\nskipped: none\nskipped: x.md (r)\n' "$sha" > "$work/fs.md"
+python3 "$root/$VAL" "$work/fs.md" --root "$h" 2>&1 | grep -q 'cannot coexist' \
+  && ok "reject: 'skipped: none' contradicting a skipped-file line" \
+  || err "contradictory skipped accounting accepted"
+# e) a malformed manifest line is rejected even without the flag (validate-if-present)
+printf '# Fact sheet: t\n\n## Coverage\npin: %s\nmatched: 1\nread: notes.md 1 entry\n' "$sha" > "$work/fs.md"
+python3 "$root/$VAL" "$work/fs.md" --root "$h" 2>&1 | grep -q 'unrecognized line' \
+  && ok "reject: malformed manifest line rejected even without --require-coverage" \
+  || err "malformed manifest line accepted"
+
 # 6. Exit status is a hard gate + --rejected lists rejects for Story 3.3.
 printf -- '- Good / notes.md:2@%s / result\n- Bad / nope:1 / result\n' "$sha" > "$work/fs.md"
 python3 "$root/$VAL" "$work/fs.md" --root "$h" >/dev/null 2>&1 && err "exit 0 despite a rejected entry" \
