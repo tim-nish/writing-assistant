@@ -13,8 +13,11 @@ recurrence bar, never this workflow. Input is one JSON object per line (file or
      "disposition": "rejected", "reason": "intentional hedge — claim is soft"}
 
 Required fields: pass, criterion, severity, disposition; `reason` (one line) is
-required when disposition is `rejected`. Malformed input is a per-line error
-and exit 2 — the raw-event contract is enforced mechanically.
+required when disposition is `rejected`. An optional `anchor` (the finding's
+location, e.g. `L64:exploration-axes`) — or, failing that, `summary` — gives the
+finding a STABLE identity that is folded into `detail`, so two distinct findings
+never emit byte-identical events (#497). Malformed input is a per-line error and
+exit 2 — the raw-event contract is enforced mechanically.
 
 The events are ALWAYS persisted to the run workspace
 (`$WS/arbitration-events.jsonl`) in the dogfood ledger's ingestible event shape
@@ -32,12 +35,34 @@ Stdlib-only. Prints a one-line JSON summary to stdout.
 import argparse
 import json
 import os
+import re
 import shlex
 import subprocess
 import sys
 
 REQUIRED = ("pass", "criterion", "severity", "disposition")
 DISPOSITIONS = {"accepted", "rejected", "fix-article", "position-moved", "dismissed"}
+
+
+def finding_identity(d):
+    """A STABLE per-finding identifier folded into the event so two DISTINCT
+    findings never emit byte-identical events (which would collapse under
+    Tanuki's scenario|type|detail exact-dupe key and corrupt recurrence counts,
+    #497), while a true cross-run recurrence — the same criterion at the same
+    location — keeps the same identity and still collapses correctly.
+
+    Prefer the finding's `anchor` (the location it is raised at, e.g.
+    `L64:exploration-axes`) so the event can be joined back to its originating
+    edit offline; fall back to a short slug of the finding's `summary`. Both are
+    optional — a finding with neither yields `""` (unchanged legacy behaviour)."""
+    anchor = str(d.get("anchor") or "").strip()
+    if anchor:
+        return anchor
+    summary = str(d.get("summary") or "").strip()
+    if summary:
+        slug = re.sub(r"[^a-z0-9]+", "-", summary.lower()).strip("-")
+        return slug[:48]
+    return ""
 
 
 def load_dispositions(path):
@@ -69,10 +94,14 @@ def load_dispositions(path):
 
 def to_event(d, scenario, run_id):
     """Fold one disposition into the ledger's event shape. `detail` carries the
-    full disposition for exact-dupe fingerprinting (scenario|type|detail);
-    the structured fields ride alongside, unjudged."""
+    full disposition for exact-dupe fingerprinting (scenario|type|detail); it
+    ends with a STABLE finding identity (#497) so distinct findings stay
+    distinct while true cross-run recurrence still collapses. The structured
+    fields — including `finding`, the same identity for offline joins — ride
+    alongside, unjudged."""
+    identity = finding_identity(d)
     detail = "|".join([d["pass"], d["criterion"], d["severity"], d["disposition"],
-                       d.get("reason", "")])
+                       d.get("reason", ""), identity])
     return {
         "type": "review-arbitration",
         "source": "review-arbitration",
@@ -84,6 +113,7 @@ def to_event(d, scenario, run_id):
         "severity": d["severity"],
         "disposition": d["disposition"],
         **({"reason": d["reason"]} if d.get("reason") else {}),
+        **({"finding": identity} if identity else {}),
     }
 
 
