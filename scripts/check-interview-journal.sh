@@ -162,6 +162,60 @@ assert 'editorial_anchor' not in json.load(sys.stdin)
 " && ok "no owner text -> no editorial anchor invented" \
   || err "anchor invented on an all-skipped run"
 
+# --- Offered-candidate provenance (Story 18.28, #515) ------------------------
+# The answer record + journal entry carry which candidates were offered and
+# which the owner took, and --events emits the calibration stream.
+SKILL2="skills/draft-article/SKILL.md"
+# a) answer record carries candidates + selection; selection grammar validated.
+python3 "$DP" answer --id q1 --disposition approved --text "confirmed" \
+  --pointer README.md:88@abc1234 \
+  --candidates '[{"text":"do not use on TPUs","pointers":["README.md:88@abc1234"]},{"text":"avoid TPUs"}]' \
+  --selection 'candidate:1' > "$work/a1.json"
+jget 'd["selection"]=="candidate:1" and d["candidates"][0]["order"]==1 and d["candidates"][0]["text"]=="do not use on TPUs"' < "$work/a1.json" \
+  | grep -q True && ok "answer record carries offered candidates + selection (18.28)" || err "answer candidates/selection not recorded"
+# b) out-of-range / malformed selection fails closed.
+python3 "$DP" answer --id q1 --disposition answered --text x --candidates '[{"text":"a"}]' --selection 'candidate:5' >/dev/null 2>&1 \
+  && err "out-of-range candidate selection accepted" || ok "reject: selection out of range fails closed"
+python3 "$DP" answer --id q1 --disposition answered --text x --selection 'bogus' >/dev/null 2>&1 \
+  && err "malformed selection accepted" || ok "reject: malformed selection value fails closed"
+# c) candidates offered without a selection fails closed (the choice must be recorded).
+python3 "$DP" answer --id q1 --disposition answered --text x --candidates '[{"text":"a"}]' >/dev/null 2>&1 \
+  && err "candidates without selection accepted" || ok "reject: candidates without selection fails closed"
+# d) a non-tension answer omits both fields (additive / back-compat).
+python3 "$DP" answer --id q1 --disposition answered --text "owner only" > "$work/a2.json"
+jget '"candidates" not in d and "selection" not in d' < "$work/a2.json" | grep -q True \
+  && ok "non-tension answer omits candidates/selection (additive)" || err "candidates/selection leaked onto a plain answer"
+# e) the journal carries the provenance and --events emits the calibration stream.
+STATE='{"fact_sheet":[],"needs_owner":[{"topic":"warning","candidate":"do not use on TPUs"}]}'
+printf '%s' "$STATE" | python3 "$DP" interview --framework F3 > "$work/ivc.json"
+python3 - "$work" "$DP" <<'PY'
+import json, subprocess, sys
+work, dp = sys.argv[1], sys.argv[2]
+iv = json.load(open(f"{work}/ivc.json"))
+recs = []
+for i, q in enumerate(iv["questions"]):
+    spec = {"id": q["id"], "disposition": "approved" if q["outcome"] == "recommended" else "answered",
+            "text": "confirmed", "pointers": ["README.md:88@abc1234"] if q["outcome"] == "recommended" else None}
+    if q["outcome"] == "recommended":
+        spec["candidates"] = [{"text": "do not use on TPUs", "pointers": ["README.md:88@abc1234"]},
+                              {"text": "avoid TPUs"}]
+        spec["selection"] = "candidate:2+edited"
+    r = subprocess.run([sys.executable, dp, "answer", "--batch", "-"], input=json.dumps([spec]),
+                       capture_output=True, text=True)
+    recs.extend(json.loads(r.stdout))
+json.dump(recs, open(f"{work}/ansc.json", "w"))
+PY
+python3 "$DP" journal --interview "$work/ivc.json" --answers "$work/ansc.json" \
+  --events "$work/iv-events.jsonl" > "$work/jc.json"
+jget 'any(e.get("selection")=="candidate:2+edited" and e.get("candidates") for e in d["journal"] if e["status"]=="asked")' < "$work/jc.json" \
+  | grep -q True && ok "journal entry carries candidates + selection provenance (18.28)" || err "journal missing candidate provenance"
+[ -s "$work/iv-events.jsonl" ] \
+  && python3 -c "import json,sys; e=[json.loads(l) for l in open(sys.argv[1])]; assert any(x['type']=='interview-selection' and x['selection']=='candidate:2+edited' and x['offered']==2 for x in e)" "$work/iv-events.jsonl" \
+  && ok "--events emits an interview-selection calibration event per chosen candidate" || err "interview-selection events not emitted"
+# f) documented in the SKILL.
+grep -q 'candidates' "$SKILL2" && grep -q 'owner-authored' "$SKILL2" \
+  && ok "draft-article SKILL documents candidate/selection provenance" || err "SKILL does not document 18.28 provenance"
+
 if [ "$fail" -eq 0 ]; then
   printf '\nAll interview-journal checks passed.\n'; exit 0
 else

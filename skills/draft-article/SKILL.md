@@ -1022,6 +1022,23 @@ records as a JSON list; any rejection names the offending `id` and the fix, and
 the whole batch is a hard gate (non-zero exit) so a malformed answer never
 reaches stage 3.
 
+**Offered-candidate provenance on a tension question (Story 18.28, #515).** When
+a consult-first tension question presented **1–3 pinned candidate answers**,
+record what was offered and which the owner took, so `disposition: approved` no
+longer collapses accepted-candidate / accepted-after-edit / owner-typed-from-
+scratch into one indistinguishable state. Add two fields to that answer (single
+form: `--candidates '<json>' --selection <sel>`; batch: the same keys on the
+list entry):
+
+- `candidates` — the offered options **as presented**: a JSON list of
+  `{"text", "pointers"?, "order"?}` (order defaults to the list position);
+- `selection` — `candidate:<n>` (took option n as-is) | `candidate:<n>+edited`
+  (took n then edited) | `owner-authored` (typed their own despite the options).
+
+Both are **additive** — a non-tension answer omits them and is unchanged. The
+gate stays **machine-proposed, never machine-final**: recording the choice does
+not let the machine pick it.
+
 ### Interview journal — the boundary diagnostic (Story 10.4)
 
 When Stage 2 finishes, write an **interview journal** to the run workspace, one
@@ -1031,8 +1048,18 @@ attributable from run state — never discovered by the owner mid-interview:
 ```
 python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py journal \
   --interview <interview.json> --answers <answers.json> \
-  [--policy-note "policy_source unavailable: <reason>"] > "$WS/interview-journal.json"
+  [--policy-note "policy_source unavailable: <reason>"] \
+  [--events "$WS/interview-events.jsonl"] > "$WS/interview-journal.json"
 ```
+
+Each asked question that carried offered candidates has its `candidates` and
+`selection` (Story 18.28) copied into its journal entry — the run-workspace
+record of what was offered and chosen. `--events` additionally writes an
+**interview-selection calibration event** per such question to the run workspace
+(one JSON object per line: `type`, `id`, `disposition`, `selection`, `offered`),
+so *which candidate got chosen* joins the same pass-tuning stream the review
+arbitration events feed; a later offline mining pass ingests it. Without
+`--events`, no stream is written and behavior is unchanged.
 
 Each **asked** question records its **survival rationale** (`topic-absent` /
 `needs-owner-reraise` / `owner-judgment` / `policy-seed`), the recommendation's
@@ -2069,8 +2096,8 @@ their reference lives in [`variants.md`](variants.md).
 | `progress` | durability | Record sub-stage progress (completed units inside a long stage) into the checkpoint (Story 13.83); with `--stop-note`, records an orderly budget stop (Story 13.85) | `--ws` (req) `--stage` (req) `--done` (req, 1+) `--stop-note` |
 | `consume` | 1 | Ingest the harvest fact-sheet document into pipeline state | `<harvest-doc\|->` |
 | `interview` | 2 | Build the bounded gap-interview question set for the framework | `--framework` (req) `<state\|->` |
-| `answer` | 2 | Record one owner answer (single form), or validate a batch | `--id` `--disposition` `--text` `--pointer` (repeatable) `--batch` |
-| `journal` | 2 | Write the interview journal (triage record, Story 10.4) | `--interview` (req) `--answers` |
+| `answer` | 2 | Record one owner answer (single form), or validate a batch | `--id` `--disposition` `--text` `--pointer` (repeatable) `--batch` `--candidates` `--selection` |
+| `journal` | 2 | Write the interview journal (triage record, Story 10.4) | `--interview` (req) `--answers` `--seed-extra` `--policy-note` `--events` |
 | `policy-block-check` | 2→3 | Stage-progression precondition (Story 13.77): blocks Stage 3 fill on an unresolved config↔policy conflict or a `conflict`/`stale` plan, emitting the publish-blocker payload + block checkpoint; `conformant`/`open` and generic mode proceed | `--classification` `--answers` `--plan` `--surface` `--config-json` `--root` `--config-version` `--staging` |
 | `provenance` | 3 | Parse + structurally validate the sidecar provenance map | `--map` `--count` `--draft` |
 | `quality-gate` | 3→4 | The mandatory quality gate; non-zero exit blocks Stage 4 (Story 11.4) | `--draft` `--map` `--judge` `--framework-file` `--state` `--profile` |

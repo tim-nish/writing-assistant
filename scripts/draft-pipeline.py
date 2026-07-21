@@ -2772,8 +2772,69 @@ def _validate_answer(spec):
                                    "(interview-sourced)")
             return None, f"{owner_judgment}; it carries no source pointers"
 
-    return ({"id": qid, "disposition": disposition, "provenance": provenance,
-             "answer": text or None, "pointers": pointers}, None)
+    record = {"id": qid, "disposition": disposition, "provenance": provenance,
+              "answer": text or None, "pointers": pointers}
+
+    # Offered-candidate provenance (Story 18.28, #515): a consult-first tension
+    # question presents 1-3 pinned candidate answers; `disposition: approved`
+    # alone cannot tell accepted-candidate / accepted-after-edit / owner-authored
+    # apart, so the answer record carries WHICH candidates were offered and which
+    # the owner took. Purely additive — a non-tension answer omits both and is
+    # unchanged. The gate stays machine-proposed, never machine-final.
+    cand_record, reason = _normalize_candidates(spec.get("candidates"), spec.get("selection"))
+    if reason is not None:
+        return None, reason
+    if cand_record is not None:
+        if cand_record["candidates"]:
+            record["candidates"] = cand_record["candidates"]
+        record["selection"] = cand_record["selection"]
+    return record, None
+
+
+_SELECTION_RE = re.compile(r"^(?:owner-authored|candidate:(?P<n>[1-9][0-9]*)(?:\+edited)?)$")
+
+
+def _normalize_candidates(candidates, selection):
+    """Validate and normalize the offered-candidate record (Story 18.28).
+
+    Returns (record, None) with `record = {"candidates": [...], "selection": s}`
+    when candidate provenance is present and valid, `(None, None)` when neither
+    field is given (a non-tension answer — unchanged behavior), or `(None, reason)`
+    on a malformed record. `selection` is `owner-authored` | `candidate:<n>` |
+    `candidate:<n>+edited`; each candidate carries a 1-based `order`, its `text`,
+    and optional seed `pointers`."""
+    if candidates is None and selection is None:
+        return None, None
+    norm = []
+    if candidates is not None:
+        if not isinstance(candidates, list) or not candidates:
+            return None, "`candidates` must be a non-empty JSON list of offered options"
+        for i, c in enumerate(candidates):
+            if not isinstance(c, dict):
+                return None, f"candidate [{i}] must be a JSON object with at least `text`"
+            ctext = (c.get("text") or "").strip()
+            if not ctext:
+                return None, f"candidate [{i}] must carry non-empty `text` (the offered answer)"
+            entry = {"order": c.get("order", i + 1), "text": ctext}
+            if c.get("pointers"):
+                entry["pointers"] = list(c["pointers"])
+            norm.append(entry)
+    if selection is None:
+        return None, ("`candidates` were offered but `selection` is missing — record "
+                      "which one the owner took (candidate:<n>[+edited] | owner-authored)")
+    m = _SELECTION_RE.match(str(selection))
+    if not m:
+        return None, (f"invalid selection {selection!r} — use `candidate:<n>`, "
+                      "`candidate:<n>+edited`, or `owner-authored`")
+    if m.group("n") is not None:
+        if not norm:
+            return None, (f"selection {selection!r} references a candidate, but no "
+                          "`candidates` were recorded")
+        n = int(m.group("n"))
+        if n > len(norm):
+            return None, (f"selection {selection!r} is out of range — only "
+                          f"{len(norm)} candidate(s) offered")
+    return {"candidates": norm, "selection": str(selection)}, None
 
 
 def cmd_answer(args):
@@ -2828,9 +2889,17 @@ def cmd_answer(args):
         sys.stderr.write("error: single-answer form needs --id and --disposition "
                          "(or use --batch for a list)\n")
         return 2
-    record, reason = _validate_answer(
-        {"id": args.id, "disposition": args.disposition,
-         "text": args.text, "pointers": args.pointer})
+    spec = {"id": args.id, "disposition": args.disposition,
+            "text": args.text, "pointers": args.pointer}
+    if getattr(args, "candidates", None):
+        try:
+            spec["candidates"] = json.loads(args.candidates)
+        except json.JSONDecodeError as e:
+            sys.stderr.write(f"error: --candidates is not valid JSON: {e}\n")
+            return 1
+    if getattr(args, "selection", None):
+        spec["selection"] = args.selection
+    record, reason = _validate_answer(spec)
     if reason is not None:
         sys.stderr.write(f"error: {reason}\n")
         return 1
@@ -2863,12 +2932,18 @@ def cmd_journal(args):
 
     answers = {}
     answer_text = {}
+    answer_choice = {}    # id -> {"candidates": [...], "selection": s} (Story 18.28)
     if args.answers:
         parsed = _load_json_state(args.answers, "answers batch")
         for a in (parsed if isinstance(parsed, list) else [parsed]):
             answers[a.get("id")] = a.get("disposition")
             if a.get("text"):
                 answer_text[a.get("id")] = a["text"]
+            if a.get("selection") is not None:
+                answer_choice[a.get("id")] = {
+                    "candidates": a.get("candidates", []),
+                    "selection": a.get("selection"),
+                }
 
     # The asked set is the ≤5 survivors the owner actually saw; a candidate
     # that survived triage but fell to the question budget was never asked, so
@@ -2902,6 +2977,14 @@ def cmd_journal(args):
             return 1
         entry = {"id": qid, "status": "asked", "outcome": t["outcome"],
                  "rationale": t.get("rationale"), "disposition": disposition}
+        if qid in answer_choice:
+            # Offered-candidate provenance (Story 18.28, #515): the options the
+            # owner saw and which one they took, so `disposition: approved` no
+            # longer collapses accepted-candidate / accepted-after-edit /
+            # owner-authored into one indistinguishable state.
+            if answer_choice[qid]["candidates"]:
+                entry["candidates"] = answer_choice[qid]["candidates"]
+            entry["selection"] = answer_choice[qid]["selection"]
         if "grounding" in t:
             entry["grounding"] = t["grounding"]
         if "seed" in t:
@@ -2971,6 +3054,28 @@ def cmd_journal(args):
                 "policy_seeded": rationale_by_id.get(qid) == "policy-seed",
             }
             break
+
+    # Calibration-events stream (Story 18.28, #515): which candidate got chosen
+    # is pass-tuning data, exactly like the review arbitration events. When the
+    # SKILL passes --events, emit one interview-selection event per asked
+    # question that carried offered candidates, to the run workspace (a later
+    # offline mining pass ingests it, same as arbitration-events.jsonl). Purely
+    # additive: no --events, no stream, behavior unchanged.
+    if getattr(args, "events", None):
+        events = []
+        for e in entries:
+            if e.get("status") == "asked" and "selection" in e:
+                events.append({
+                    "type": "interview-selection",
+                    "id": e["id"],
+                    "disposition": e["disposition"],
+                    "selection": e["selection"],
+                    "offered": len(e.get("candidates", [])),
+                })
+        with open(args.events, "w", encoding="utf-8") as fh:
+            for ev in events:
+                fh.write(json.dumps(ev) + "\n")
+
     print(json.dumps(out, indent=2))
     return 0
 
@@ -4467,6 +4572,13 @@ def main(argv=None):
                     help="inherited source pointer (approved answers only; repeatable)")
     sp.add_argument("--batch", help="validate a JSON list of answer specs in one pass "
                                     "(FILE or - for stdin); reports every rejection at once")
+    sp.add_argument("--candidates", metavar="JSON",
+                    help="offered candidate answers as a JSON list (Story 18.28, #515) — "
+                         "each `{text, pointers?, order?}`; the consult-first 1-3 pinned "
+                         "options presented on a tension question")
+    sp.add_argument("--selection",
+                    help="which offered candidate the owner took: candidate:<n> | "
+                         "candidate:<n>+edited | owner-authored (Story 18.28)")
     sp = sub.add_parser("journal")
     sp.add_argument("--interview", required=True, help="the `interview` output JSON (carries triage), or - for stdin")
     sp.add_argument("--answers", help="recorded answer records (JSON list), or - for stdin")
@@ -4477,6 +4589,10 @@ def main(argv=None):
                     "'file:line@commit=article-type' records a decision (not a "
                     "question) the policy surface shaped (Story 13.37, "
                     "SPEC-policy-editorial-direction CAP-1)")
+    sp.add_argument("--events", metavar="PATH",
+                    help="also write interview-selection calibration events (one per "
+                         "asked question with offered candidates) to PATH in the run "
+                         "workspace (Story 18.28, #515)")
     sp = sub.add_parser("staging-candidates")
     sp.add_argument("--interview", help="the `interview` output JSON, or - for stdin (interview form)")
     sp.add_argument("--answers", help="recorded answer records (JSON list; interview form)")
