@@ -39,6 +39,40 @@ validation, path resolution, and source enumeration need not be separate
 round-trips when one call can carry the others), so a realistic run makes
 progress per turn instead of exhausting the budget on orchestration overhead.
 
+## Harvest coverage disclosure (stage 1)
+
+Harvest carries a **completeness contract**, not only the upper bound "read
+nothing outside the resolved scope" (`skills/harvest/SKILL.md §1`): it **visits
+every declared in-scope source or discloses the omission**. Coverage is never
+allowed to narrow silently as the corpus grows (the failure in #514: a ~4×
+corpus growth collapsed a 106-entry/~15-file harvest to 33/5 with zero
+disclosure).
+
+- **Coverage manifest (fact-sheet header).** The fact sheet opens with a
+  machine-checkable coverage manifest: the pin, the count of declared files the
+  scope resolver matched, per-file entry counts, and an explicit
+  `skipped: <file> (<reason>)` list. A harvest that skipped nothing states that.
+  The manifest is emitted from the deterministic source enumeration
+  (`resolve-writing-sources.py files`), so it reports what the run did — it is
+  auditable at a glance and a collapse is visible, not inferred.
+- **Deterministic behavior at the read ceiling.** When the declared corpus
+  exceeds what the run can read within the turn/compute ceiling, harvest
+  **either chunks to completion across resumed invocations** (the #388
+  per-source checkpoint) **or stops and surfaces the overflow as an owner
+  decision** — which sources to prioritize or exclude — as a publish blocker /
+  in-conversation choice (CAP-6 interaction contract). It **never silently
+  samples** a subset and presents the result as a full harvest.
+- **Scope of this contract.** It governs **coverage disclosure and ceiling
+  behavior only**. Run-to-run extraction determinism at a fixed pin *below* the
+  ceiling (identical facts from an identical blob) is a separate, **deferred**
+  architectural concern (#516: per-source budgeted extraction + blob-keyed cache
+  + deterministic merge), not addressed here.
+
+Enforced in lockstep at `skills/harvest/SKILL.md` (the harvest procedure and the
+fact-sheet output contract) and `scripts/validate-fact-sheet.py` (the manifest is
+present and its per-file counts/skips are well-formed) — a change to one without
+the other is a defect (the same lockstep rule the KIND set carries).
+
 ## Fact-sheet entry format (stage 1)
 
 ```
