@@ -1250,6 +1250,24 @@ its provenance stays exactly what the disposition rules assigned, and it adds
 no source pointer. A run whose slot-1 question was skipped simply has no
 anchor — nothing is invented.
 
+**The anchor is never a gate item, and never empty (Story 18.41, #545).** Since
+the mandated tier *leads* presentation, "the first presented answered question"
+would otherwise pick the **CAP-7 reconciliation gate** — which is a config
+answer, not a claim. #545 shipped exactly that: `editorial_anchor` was
+`{id: rc1, text: ""}`, so review calibration and provenance joins received an
+empty string. Anchor selection therefore **skips mandated/gate items and
+empty-text answers** and takes the claim/angle answer from the capped set —
+which may be the owner's brief/q2-derived claim when no policy tension seeds
+slot 1. Two named rejections guard it, in lockstep with `_anchor_rejection` in
+`draft-pipeline.py`:
+
+- `editorial-anchor-empty` — the answer carries no owner text;
+- `editorial-anchor-is-gate-item` — a mandated/gate item was proposed as the anchor.
+
+When no valid anchor exists the journal records
+`editorial_anchor_rejected: <reason>` — the loss is **named, never silent**
+(silent fallback is the failure this contract exists to prevent).
+
 **The journal ends with the `consulted:` line (Story 14.4, CAP-5).** Its last
 key maps every seed to the question it seeded, under the run's pin —
 `consulted: <policy-source>@<commit> — LESSONS.md:41 → t1; …` — the /ask-style

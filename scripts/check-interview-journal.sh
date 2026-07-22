@@ -162,6 +162,73 @@ assert 'editorial_anchor' not in json.load(sys.stdin)
 " && ok "no owner text -> no editorial anchor invented" \
   || err "anchor invented on an all-skipped run"
 
+# --- Anchor is never a gate item (Story 18.41, #545) -------------------------
+# The mandated tier LEADS presentation (Story 18.40), so a naive "first
+# answered" scan would record the CAP-7 reconciliation gate as the anchor —
+# which is exactly what #545 shipped (`{id: rc1, text: ""}`). The anchor must
+# skip mandated items and empty text, and pick the claim/angle answer.
+python3 - "$work/iv38.json" "$work/iv41.json" <<'PYEOF'
+import json, sys
+d = json.load(open(sys.argv[1]))
+rc = {"id": "rc1", "text": "config vs policy disagree", "topic": "other",
+      "from_gap": False, "outcome": "open", "rationale": "policy-reconciliation"}
+d["questions"] = [rc] + d["questions"]
+d["presentation_order"] = ["rc1"] + d["presentation_order"]
+d["mandated"] = ["rc1"]
+json.dump(d, open(sys.argv[2], "w"))
+PYEOF
+# a) gate answered first + a real claim answer -> the CLAIM is the anchor.
+python3 - "$work/iv41.json" "$work/ans41.json" <<'PYEOF'
+import json, sys
+d = json.load(open(sys.argv[1]))
+ans = [{"id": q["id"], "disposition": "skipped"} for q in d["questions"]]
+ans[0] = {"id": "rc1", "disposition": "answered", "text": "keep the recorded position"}
+ans[1] = {"id": d["presentation_order"][1], "disposition": "answered",
+          "text": "reproducibility is the feature"}
+json.dump(ans, open(sys.argv[2], "w"))
+PYEOF
+python3 "$DP" journal --interview "$work/iv41.json" --answers "$work/ans41.json" \
+  | python3 -c "
+import json, sys
+d = json.load(sys.stdin)
+a = d['editorial_anchor']
+assert a['id'] != 'rc1', a
+assert a['text'] == 'reproducibility is the feature', a
+" && ok "anchor skips the mandated gate item and records the claim/angle answer (#545)" \
+  || err "anchor was recorded as the gate item (#545 regression)"
+# b) ONLY the gate answered -> no anchor, and the loss is NAMED not silent.
+python3 - "$work/iv41.json" "$work/ans41b.json" <<'PYEOF'
+import json, sys
+d = json.load(open(sys.argv[1]))
+ans = [{"id": q["id"], "disposition": "skipped"} for q in d["questions"]]
+ans[0] = {"id": "rc1", "disposition": "answered", "text": "keep the recorded position"}
+json.dump(ans, open(sys.argv[2], "w"))
+PYEOF
+python3 "$DP" journal --interview "$work/iv41.json" --answers "$work/ans41b.json" \
+  | python3 -c "
+import json, sys
+d = json.load(sys.stdin)
+assert 'editorial_anchor' not in d, d.get('editorial_anchor')
+assert d.get('editorial_anchor_rejected') == 'editorial-anchor-is-gate-item', d
+" && ok "gate-only run: no anchor, rejection NAMED (editorial-anchor-is-gate-item)" \
+  || err "gate-only anchor loss was silent or mis-named"
+# c) an empty-text answer is not an anchor either (the #545 `text: ""` shape).
+python3 - "$work/iv38.json" "$work/ans41c.json" <<'PYEOF'
+import json, sys
+d = json.load(open(sys.argv[1]))
+ans = [{"id": q["id"], "disposition": "skipped"} for q in d["questions"]]
+ans[0] = {"id": d["presentation_order"][0], "disposition": "answered", "text": "   "}
+json.dump(ans, open(sys.argv[2], "w"))
+PYEOF
+python3 "$DP" journal --interview "$work/iv38.json" --answers "$work/ans41c.json" \
+  | python3 -c "
+import json, sys
+d = json.load(sys.stdin)
+assert 'editorial_anchor' not in d, d.get('editorial_anchor')
+assert d.get('editorial_anchor_rejected') == 'editorial-anchor-empty', d
+" && ok "empty-text answer is not an anchor (editorial-anchor-empty)" \
+  || err "empty-text anchor accepted"
+
 # --- Offered-candidate provenance (Story 18.28, #515) ------------------------
 # The answer record + journal entry carry which candidates were offered and
 # which the owner took, and --events emits the calibration stream.

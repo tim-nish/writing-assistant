@@ -2076,6 +2076,31 @@ def cmd_site_record(args):
 # as a policy-seeded tension item everywhere a tension item ranks.
 POLICY_PRIORITY_RATIONALES = ("policy-seed", "policy-reconciliation")
 
+def _anchor_rejection(anchor, mandated_ids=(), rationale_by_id=None):
+    """Named rejection for an invalid editorial anchor, or None when valid
+    (Story 18.41, #545). The editorial anchor is the run's claim/angle answer
+    (SPEC-policy-editorial-direction CAP-2) and downstream consumers — review
+    CAP-3 calibration, provenance joins — read it as claim INTENT:
+
+      editorial-anchor-empty        — no owner text; an empty anchor is a lost
+                                      anchor, and #545 shipped exactly that.
+      editorial-anchor-is-gate-item — a mandated/gate item (CAP-7
+                                      reconciliation, CAP-8 depth offer) is a
+                                      config/obligation answer, never a claim.
+
+    Kept beside MANDATED_RATIONALES so the two move in lockstep."""
+    if not anchor:
+        return "editorial-anchor-empty"
+    if not (anchor.get("text") or "").strip():
+        return "editorial-anchor-empty"
+    aid = anchor.get("id")
+    if aid in set(mandated_ids or ()):
+        return "editorial-anchor-is-gate-item"
+    if (rationale_by_id or {}).get(aid) in MANDATED_RATIONALES:
+        return "editorial-anchor-is-gate-item"
+    return None
+
+
 # --- Mandated/gate tier (Story 18.40, #542/#545) -----------------------------
 # Pipeline-MANDATED items are NOT interview candidates and must never compete
 # for the <=5 NEEDS-OWNER cap: the CAP-7 config<->policy reconciliation gate is
@@ -3082,16 +3107,39 @@ def cmd_journal(args):
     # claim intent anchor. It shapes argument and emphasis; it NEVER grounds
     # a factual claim (no-facts invariant — its provenance stays whatever the
     # disposition rules assigned).
+    #
+    # A MANDATED/gate item is never the anchor (Story 18.41, #545). The anchor
+    # is the claim/angle answer; a CAP-7 reconciliation is a config gate, not a
+    # claim — and because the mandated tier LEADS presentation (Story 18.40), a
+    # naive "first answered question" scan would now pick it every time. #545 is
+    # exactly that failure: `editorial_anchor` was recorded as `{id: rc1,
+    # text: ""}`, so review calibration and provenance joins got an empty
+    # string. An empty-text answer is likewise not an anchor. When no valid
+    # anchor exists the loss is NAMED (`editorial_anchor_rejected`), never
+    # silent — the SKILL already warns that a silent fallback is the failure
+    # mode here.
     owner_text = {"approved", "modified", "replaced", "answered"}
     rationale_by_id = {t["id"]: t.get("rationale") for t in triage}
+    for q in interview.get("questions") or []:          # authoritative rationale
+        rationale_by_id.setdefault(q.get("id"), q.get("rationale"))
+    mandated_ids = set(interview.get("mandated") or [])
+    rejected = None
     for qid in interview.get("presentation_order") or []:
-        if answers.get(qid) in owner_text:
-            out["editorial_anchor"] = {
-                "id": qid,
-                "text": answer_text.get(qid, ""),
-                "policy_seeded": rationale_by_id.get(qid) == "policy-seed",
-            }
-            break
+        if answers.get(qid) not in owner_text:
+            continue
+        candidate = {
+            "id": qid,
+            "text": answer_text.get(qid, ""),
+            "policy_seeded": rationale_by_id.get(qid) == "policy-seed",
+        }
+        reason = _anchor_rejection(candidate, mandated_ids, rationale_by_id)
+        if reason:
+            rejected = rejected or reason      # remember the first, keep looking
+            continue
+        out["editorial_anchor"] = candidate
+        break
+    if "editorial_anchor" not in out and rejected:
+        out["editorial_anchor_rejected"] = rejected
 
     # Calibration-events stream (Story 18.28, #515): which candidate got chosen
     # is pass-tuning data, exactly like the review arbitration events. When the
