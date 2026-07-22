@@ -18,6 +18,14 @@ Checks (all driven by `profile.packaging`, never a hardcoded platform rule):
   4. canonical-URL     — when present, it is a well-formed http(s) URL.
   5. です/ます (ja)     — a `language: ja` variant does not mix polite (です/ます)
                          and plain (だ/である) sentence forms (heuristic).
+  5b. language-mismatch — the body is actually WRITTEN in the profile's declared
+                         `language`. Distinct from check 5, which polices
+                         register *within* Japanese prose and therefore passes
+                         clean on a body with no Japanese at all (#574). A
+                         cross-language variant is a mixed-language artifact by
+                         design (only the lede is re-targeted, SPEC CAP-4), so
+                         this is a PUBLISH BLOCKER, never a refusal: it makes the
+                         consequence visible and the owner decides.
   6. visuals treatment — `packaging.visuals` was applied: `html-comment-blocked`
                          leaves no raw ```mermaid fence outside an HTML comment.
   7. layout existence  — every `packaging.layout` target directory EXISTS in the
@@ -101,6 +109,47 @@ def parse_frontmatter(lines):
 POLITE = re.compile(r"(です|ます)[。！？]")
 PLAIN = re.compile(r"(である|[^ま]だ)[。！]")
 
+# --- language-mismatch (check 5b, #574) -------------------------------------
+# Japanese scripts: Hiragana, Katakana, CJK ideographs. Latin letters stand in
+# for `en`. Everything else (digits, punctuation, whitespace) is unscripted and
+# does not vote.
+CJK = re.compile(r"[぀-ゟ゠-ヿ一-鿿]")
+LATIN = re.compile(r"[A-Za-z]")
+# Prose-only measurement: code, URLs, and HTML comments are language-neutral and
+# would otherwise make a legitimately code-heavy JA article read as English.
+NOT_PROSE = re.compile(
+    r"```.*?```"            # fenced code blocks
+    r"|`[^`\n]*`"           # inline code
+    r"|<!--.*?-->"          # HTML comments (the dev.to visuals treatment)
+    r"|https?://\S+",       # bare URLs
+    re.DOTALL,
+)
+# A body whose expected script holds less than this share of its scripted prose
+# characters is reported. 0.30 is deliberately permissive: it clears a JA article
+# quoting long English blocks or identifiers (measured well above it once code is
+# stripped) while a lede-only re-target — the #574 case, one JA paragraph over an
+# EN body — lands near 0.02. Raise it only against real variants, never a sample.
+MIN_EXPECTED_SHARE = 0.30
+# Below this many scripted characters the ratio is noise, not a signal.
+MIN_SCRIPTED_CHARS = 50
+
+EXPECTED_SCRIPT = {"ja": ("Japanese", CJK), "en": ("Latin", LATIN)}
+
+
+def language_share(body, language):
+    """Share of `language`'s expected script among the body's scripted PROSE
+    characters, plus that scripted-character count. Returns (None, count) when
+    the profile language has no declared script expectation."""
+    prose = NOT_PROSE.sub(" ", body)
+    cjk = len(CJK.findall(prose))
+    latin = len(LATIN.findall(prose))
+    scripted = cjk + latin
+    entry = EXPECTED_SCRIPT.get(language)
+    if entry is None or scripted == 0:
+        return None, scripted
+    expected = cjk if language == "ja" else latin
+    return expected / scripted, scripted
+
 
 def lint(path, platform, profiles, dest_repo):
     findings = []           # (line, message)
@@ -153,6 +202,21 @@ def lint(path, platform, profiles, dest_repo):
         ln = body_offset + body[:m.start()].count("\n") + 1
         findings.append((ln, "mixes polite (です/ます) and plain (だ/である) forms; "
                              "keep です/ます consistency for ja"))
+
+    # 5b. language-mismatch: the body is written in the profile's language (#574).
+    #     A publish blocker, never a refusal — a cross-language variant is
+    #     mixed-language BY DESIGN (only the lede is re-targeted, CAP-4); what
+    #     this forbids is that outcome being invisible.
+    lang = prof.get("language")
+    share, scripted = language_share(body, lang)
+    if share is not None and scripted >= MIN_SCRIPTED_CHARS and share < MIN_EXPECTED_SHARE:
+        script_name = EXPECTED_SCRIPT[lang][0]
+        findings.append((body_offset + 1,
+                         f"language-mismatch: profile declares language {lang!r} but only "
+                         f"{share:.0%} of the body's prose is {script_name} script "
+                         f"(expected at least {MIN_EXPECTED_SHARE:.0%}). A cross-language "
+                         "variant is mixed-language by design — only the lede is re-targeted; "
+                         "this is a publish blocker for your decision, not a refusal"))
 
     # 6. Visual treatment applied.
     if packaging.get("visuals") == "html-comment-blocked":
