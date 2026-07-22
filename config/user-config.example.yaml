@@ -117,6 +117,15 @@ syndication:
     en:
       mode: canonical            # site is canonical
       variants: [devto]          # full text syndicated to dev.to
+    # A non-`en` policy is fed by a DERIVED canonical, never by projecting the
+    # English one (SPEC-canonical-adaptation; #582). The route is: review the EN
+    # canonical -> `adapt canonical <slug> for zenn` -> emit zenn from the
+    # resulting `<slug>.ja.md`. Because that derivation declares the same reader
+    # and language the zenn profile does, its emission is PURE PACKAGING: the
+    # lede-retarget trigger fires zero proposals and the `language-mismatch`
+    # publish blocker has nothing to report. Projecting the EN canonical
+    # straight at zenn is what produced the unpublishable mixed-language
+    # artifact in #574.
     ja:
       mode: external             # site holds a mode:external record only
       variants: [zenn]           # Zenn is canonical via repo-sync

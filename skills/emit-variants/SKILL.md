@@ -73,6 +73,15 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py variants --slug <slug> -
   configured platform ids). `emitted` is empty and `written` is false: reading
   the choices emits nothing.
 
+A **derived canonical** (`<slug>.<language>.md`) is emitted through exactly this
+path, by its own slug, with nothing special about it: its `language` resolves
+its own `syndication.policy.<language>` entry, and because it declares the same
+reader the target profile does, its emission is **pure packaging** — the
+lede-retarget trigger fires zero proposals and no retarget screen appears at
+all. That is the whole point of deriving the canonical first: the one bounded
+judgment this stage allows has nothing left to do. A *fired-and-approved*
+retarget on such an emission would mean the derivation did not do its job.
+
 **Check every `available` platform actually resolves to a profile.** A platform
 declared in config whose profile exists only as a shipped `.example` file has no
 resolvable profile, and emission WILL fail at that platform (#494/#530). Use the
