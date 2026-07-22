@@ -217,6 +217,72 @@ def _load_rws():
 rws = _load_rws()
 
 
+def _load_hcache():
+    here = os.path.dirname(os.path.realpath(__file__))
+    spec = importlib.util.spec_from_file_location(
+        "hcache", os.path.join(here, "harvest-cache.py"))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+hcache = _load_hcache()
+
+
+# --- Cache-population compliance gate (#534, Story 18.37) ---------------------
+# CAP-10 (#516) promises the blob-keyed cache makes an unchanged re-harvest
+# return identical entries — but population (`harvest-cache.py put`) is a prompt
+# step in `skills/harvest/SKILL.md §3`, so a session can silently skip it and
+# still emit a conformant sheet (#534: run 20260722T083432 read 19 files and
+# wrote ZERO cache entries). Per SPEC-writing-assistant's enforced-mechanism
+# invariant, a promised cache is enforced by a mechanical assertion, not prompt
+# compliance: at harvest completion every source on the coverage manifest's
+# `read:` lines must carry a cache entry at its CURRENT blob-sha, and a missing
+# entry fails the run loudly, naming the file. The key is derived through
+# harvest-cache's own functions so this gate can never drift from what `put`
+# stored (same (basename, blob-sha, extractor-version) triple).
+def validate_cache_population(text, host):
+    """Return a list of `(file, reason)` for every `read:` source in the coverage
+    manifest that lacks a blob-keyed cache entry at its current bytes, or [] when
+    every read file is cached. Returns None when the sheet carries no coverage
+    manifest (nothing to assert — absence is the coverage gate's concern, not
+    this one). A read file that no longer resolves on disk is itself a violation:
+    the gate cannot confirm a run cached a file it can no longer key."""
+    body = _coverage_section(text)
+    if body is None:
+        return None
+    reads = []
+    for ln in body:
+        m = COV_READ_RE.match(ln.strip())
+        if m:
+            reads.append(m["file"])
+    if not reads:
+        return []
+    try:
+        cdir = hcache.cache_dir(host)
+        ver = hcache.extractor_version()
+    except SystemExit:
+        # repo-dir resolution failed — surface it as a single blocking reason
+        # rather than a per-file list, so the operator fixes the root/config.
+        return [("<cache>", "cannot resolve the cache directory for this host "
+                 "(resolve-paths.py repo-dir failed) — check --root")]
+    misses = []
+    for f in reads:
+        resolved = f if os.path.isabs(f) else os.path.join(host, f)
+        if not os.path.isfile(resolved):
+            misses.append((f, f"read file not found at {resolved} — cannot "
+                           "confirm it was extraction-cached"))
+            continue
+        bsha = hcache.blob_sha(resolved)
+        entry = os.path.join(cdir, hcache.key_hash(resolved, bsha, ver))
+        if not os.path.exists(entry):
+            misses.append((f, "no blob-keyed cache entry at its current blob-sha "
+                           "— harvest read it but never stored the extraction "
+                           "(`harvest-cache.py put`); the CAP-10 determinism "
+                           "promise does not hold for this file"))
+    return misses
+
+
 def _git(repo, *args):
     return subprocess.run(["git", "-C", repo, *args], capture_output=True, text=True)
 
@@ -392,6 +458,12 @@ def main(argv=None):
                    help="require a well-formed `## Coverage` manifest header (#514) — "
                         "the pipeline/harvest invocation passes this so a sheet with no "
                         "coverage disclosure is rejected")
+    p.add_argument("--check-cache-population", action="store_true",
+                   help="assert every `read:` source in the coverage manifest has a "
+                        "blob-keyed cache entry at its current bytes (#534, Story 18.37) "
+                        "— the harvest-completion invocation passes this so a run that "
+                        "read files but never populated the CAP-10 cache fails loudly, "
+                        "naming each un-cached file, instead of looking complete")
     args = p.parse_args(argv)
 
     host = rws.host_root(args.root)
@@ -428,6 +500,29 @@ def main(argv=None):
               "header (#514): disclose pin, matched count, per-file read counts, and "
               "skipped files (or `skipped: none`)")
         return 1
+
+    # Cache-population compliance (#534, Story 18.37): a completed harvest whose
+    # coverage manifest lists `read:` files must have populated the CAP-10
+    # blob-keyed cache for each of them. A miss fails loudly, naming the file —
+    # the enforced-mechanism invariant made mechanical, so a cache-skipping run
+    # cannot report "complete". The harvest-completion invocation passes
+    # `--check-cache-population`; a violation is surfaced as a CAP-6 publish
+    # blocker by `skills/harvest/SKILL.md §3`.
+    if args.check_cache_population:
+        misses = validate_cache_population(text, host)
+        if misses is None:
+            if args.require_coverage:
+                # Belt-and-suspenders: --require-coverage already rejected an
+                # absent manifest above; reaching here means the flag was passed
+                # without it and there is nothing to check against.
+                pass
+        elif misses:
+            for f, reason in misses:
+                print(f"REJECT  cache population: {f}\n        -> {reason}")
+            print(f"\n{len(misses)} read source(s) missing a blob-keyed cache "
+                  "entry — CAP-10 cache population was not enforced this run "
+                  "(#534). This is a publish blocker, not an informational note.")
+            return 1
 
     # Only the fact-sheet section: stop at the NEEDS-OWNER list (Story 3.3),
     # whose entries use a different `CANDIDATE / REASON / TOPIC` schema.

@@ -389,6 +389,43 @@ CG get --root "$work/host" --path "$cf" --blob-sha 00000000000000000000000000000
   && err "stale blob-sha key was served" \
   || ok "a changed blob-sha misses the old key (stale extraction never served)"
 
+# 12. Cache-population compliance gate (#534, Story 18.37): a completed harvest
+#     whose coverage manifest lists a read file must have populated the CAP-10
+#     cache for it. `validate-fact-sheet.py --check-cache-population` asserts this
+#     mechanically — mechanism-EXISTS (the round-trip above) plus mechanism-RAN
+#     (this gate). A fresh state root guarantees a cold start (the round-trip
+#     above already cached $cf under $cstate).
+cs2="$work/cachestate2"; mkdir -p "$cs2"
+csheet="$work/cachepop.md"
+cat > "$csheet" <<EOF
+## Coverage
+pin: deadbee
+matched: 1
+read: $cf (0)
+skipped: none
+EOF
+# a) an un-cached read file is the #534 defect: the gate REJECTs and names it.
+if out=$(XDG_STATE_HOME="$cs2" python3 "$VFS" "$csheet" --root "$work/host" \
+           --require-coverage --check-cache-population 2>&1); then
+  err "cache-population gate passed a run that never cached its read file: $out"
+else
+  printf '%s' "$out" | grep -q "cache population" \
+    && ok "cache-population gate fails+names an un-cached read file (#534)" \
+    || err "gate rejected but not for cache population: $out"
+fi
+# b) once the read file is cached at its current blob-sha, the same sheet passes.
+printf -- '- x / a.py:1@deadbee / result\n' \
+  | XDG_STATE_HOME="$cs2" python3 "$HC" put --root "$work/host" --path "$cf" 2>/dev/null
+XDG_STATE_HOME="$cs2" python3 "$VFS" "$csheet" --root "$work/host" \
+    --require-coverage --check-cache-population >/dev/null 2>&1 \
+  && ok "cache-population gate passes once the read file is cached (warm)" \
+  || err "cache-population gate rejected a properly-cached read file"
+# c) the SKILL states the completion assertion + publish-blocker routing (lockstep).
+has "check-cache-population" "SKILL runs the cache-population completion assertion"
+grep -q "validate_cache_population" "scripts/validate-fact-sheet.py" \
+  && ok "validator implements the cache-population assertion (lockstep)" \
+  || err "validate-fact-sheet.py missing validate_cache_population"
+
 if [ "$fail" -eq 0 ]; then
   printf '\nAll harvest checks passed.\n'; exit 0
 else
