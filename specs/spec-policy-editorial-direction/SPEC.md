@@ -55,7 +55,10 @@ every extension below must preserve:
   gate. The claim/angle answer may come from the owner's brief (q2) when no
   policy tension seeds slot 1; the anchor records that answer, not whatever
   occupies a reserved slot (the #545 failure, where `rc1` was recorded as the
-  anchor with empty `text`, cannot recur).
+  anchor with empty `text`, cannot recur). **The anchor carries the claim/angle
+  answer ONLY (clarified 2026-07-22, #554):** the narrative **structure** a run
+  selects is recorded in the argument plan's `arc` (SPEC-article-draft-pipeline
+  CAP-3/CAP-4, Story 18.26), never here — one choice, one recording location.
 - **CAP-3 — policy-calibrated review emphasis.** The review's severity
   criteria stay fixed, but pass prompts receive the run's policy-derived
   editorial anchors (claim, channel expectations) so findings are argued
