@@ -155,13 +155,88 @@ draft of it, not a scratch copy in the host tree. This invocation's mechanical
 core writes to `output.drafts` at no point; the answer, and the payload that
 preceded it, live in the run workspace.
 
+## Step 4 — write the derived canonical
+
+Only after that answer, and only when it was **approve** or **modify**. Author
+the target-language prose from the approved plan, then hand it to the writer —
+never hand-write the file, and never place it yourself: the path, the
+frontmatter, the ancestry block and the trailer are all the writer's.
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/adapt-canonical.py write \
+  --slug <slug> --target <target> --root <host-repo> \
+  --fill <plan.json> --body <derived-body.md> --ws "$WS"
+```
+
+`--body` carries **only the article body** — the frontmatter is composed for
+you. What comes out is an ordinary canonical at
+`<output.drafts>/<slug>.<language>.md`: its own `slug` (`<slug>.<language>`),
+`mode: canonical`, the target's `language` and reader, every other declared
+schema field carried from the source verbatim, its own `canonical-sha256`
+trailer, and the ancestry block
+
+```
+adapted_from: { slug: <source slug>, canonical_sha256: <source hash> }
+```
+
+The source hash is the **same convention the variant trailer uses** (sha256
+over content without the trailer) — there is one hash convention in this
+pipeline, not two.
+
+`write` re-reads the gate's recorded answer from `$WS` and refuses without one,
+so the CAP-3 ordering is mechanical rather than remembered: a `stop` answer, a
+missing answer, and an unanswered gate each write nothing.
+
+## Step 5 — the two conformance checks
+
+**Claims conformance (CAP-2).** Adaptation re-decides the telling, never the
+truth. The check compares the two artifacts' provenance-map **pointer sets** —
+language-independent claim identity — so it reports an added claim and a
+silently dropped one, and says nothing whatever about structure, section order,
+payoff position, framing, register or title, all of which CAP-2 leaves free:
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/adapt-canonical.py claims-check \
+  --source-map <source.map> --derived-map <derived.map> --fill <plan.json>
+```
+
+A deliberately dropped claim is declared in the plan's `omissions` entry with
+its `pointers`; anything else absent is a defect. There was **no existing
+claim-set comparison to reuse** — `verify-provenance.py` grades one map against
+one fact sheet, and map positions are per-artifact — so this comparison is new,
+built on the shipped map parser rather than a second map format.
+
+**Ancestry lint (CAP-4).** A block that does not resolve is named, never
+swallowed:
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/adapt-canonical.py lint-ancestry \
+  --derived <output.drafts>/<slug>.<language>.md --root <host-repo>
+```
+
+It names a malformed block, a `slug` that resolves to no canonical, and a
+recorded hash that matches no source content (reported with the hash pair).
+
+## What downstream does with it — nothing special
+
+The derived canonical is a canonical, so every downstream stage consumes it
+through its existing path with **zero special-casing**:
+
+- `emit variants --slug <slug>.<language>` resolves it exactly like an authored
+  canonical — no branch anywhere distinguishes the two;
+- review runs over it as a canonical. Claim **verification does not re-run**:
+  the claims are inherited under CAP-2, so review's scope over a derivation is
+  language and framing quality plus the claims-conformance check above.
+
 ## Boundaries
 
-- **This story stops at the recorded answer.** Persisting the derived canonical
-  with its ancestry block, and the staleness chain from the source canonical
-  through the derived one to its variants, are separate contracts
-  (SPEC-canonical-adaptation CAP-4/CAP-5) with their own stories. Do not
-  hand-write a `<slug>.<language>.md` here.
+- **The derived canonical is written by `write`, never by hand.** Do not create
+  a `<slug>.<language>.md` yourself, and do not edit one in place: a change to
+  the telling is a fresh adaptation, and a change to the claims routes to the
+  source canonical first.
+- **The staleness chain from the source canonical through the derivation to its
+  variants is a separate contract** (SPEC-canonical-adaptation CAP-5) with its
+  own story.
 - **Never a draft-flow stage, never an emission side effect.** If a flow seems
   to need adaptation, it needs the owner to invoke this skill, not a call from
   that flow.
