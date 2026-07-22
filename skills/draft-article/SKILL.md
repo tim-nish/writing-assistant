@@ -1012,12 +1012,33 @@ The surviving (non-suppressed) questions are returned as `questions`, and are:
   for — and the loss is silent: the editorial anchor falls back to a routine
   slot answer (`policy_seeded: false`) and contribute-back emits an empty file.
   With no valid tension item, selection is exactly as before — no slot is held
-  open and nothing is padded. A **reconciliation item counts as a
-  tension-priority item** here (Story 13.75): it ranks at least as high as a
-  policy-seeded tension question for both the priority order and the reserved
-  slot, and its `positions` ride into the journal like a seed does;
+  open and nothing is padded. **A reconciliation item no longer competes for
+  this slot (amended 2026-07-22, Story 18.40, #542/#545):** it is a
+  **mandated/gate** item, not an interview candidate — see the tier below. Its
+  `positions` still ride into the journal like a seed's do;
 - **at most 5**, and **zero** when harvest already covers everything — never
   padded to five.
+
+**Mandated/gate items are a tier OUTSIDE the ≤5 cap (Story 18.40, #542/#545).**
+Two items are pipeline **obligations**, not owner-knowledge candidates: the
+**CAP-7 config↔policy reconciliation gate** (a blocking gate — "surfaced and
+answered → gate cleared") and the **CAP-8 depth offer** ("offer it once"). They
+are partitioned out **before** the cap and the #302 reservation run, so they:
+
+- **never consume a capped slot** (they do not displace NEEDS-OWNER candidates,
+  and candidates never displace them), and
+- **never consume the #302 reserved slot** — that slot is guaranteed to the
+  highest-priority policy-**seeded** tension item, which is exactly what #545
+  broke when a reconciliation item took it and the editorial anchor was recorded
+  as an empty-text gate item.
+
+They **lead presentation** (a gate the owner must clear comes first) and are
+reported separately: `interview`'s JSON carries `mandated: [<id>…]` beside
+`asked` — where **`asked` counts only the capped pool**, so `asked <= budget`
+still holds and the total shown is `asked + len(mandated)`. The tier is bounded
+by construction (at most those two items), so the ≤10-minute owner-attention
+budget is unaffected, and every item is still presented under the owner-facing
+proposal contract.
 
 Present a policy-seeded question under the same proposal contract as every
 other: its **Why** context is the seed — the verbatim quote plus its

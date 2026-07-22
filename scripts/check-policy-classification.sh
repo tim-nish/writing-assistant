@@ -156,7 +156,7 @@ printf '{"stage":"consume","fact_sheet":[],"needs_owner":[]}' \
   | python3 "$PIPE" interview --framework F1 --items "$work/interview-items.json" - \
   > "$work/interview.json"
 python3 - "$work/interview.json" <<'PYEOF' \
-  && ok "interview: reconciliation asked with positions, leads presentation, ≤5 cap holds" \
+  && ok "interview: reconciliation asked with positions, leads as a MANDATED-tier item outside the ≤5 cap" \
   || err "interview fold-in of the reconciliation item failed"
 import json, sys
 d = json.load(open(sys.argv[1]))
@@ -164,12 +164,18 @@ qs = d["questions"]
 rcs = [q for q in qs if q.get("rationale") == "policy-reconciliation"]
 assert len(rcs) == 1, rcs
 assert rcs[0]["outcome"] == "open" and len(rcs[0]["positions"]) == 2, rcs[0]
-assert qs[0]["id"] == rcs[0]["id"], "reconciliation must lead (claim/angle slot)"
-assert len(qs) <= 5, len(qs)
+assert qs[0]["id"] == rcs[0]["id"], "reconciliation must lead (mandated tier)"
+# Story 18.40 (#542/#545): the gate item is MANDATED — outside the <=5 cap, so
+# the cap governs `asked` (the capped pool) and never counts this item.
+assert rcs[0]["id"] in d["mandated"], d.get("mandated")
+assert d["asked"] <= 5, d["asked"]
 PYEOF
 
-# Reserved slot (#302): 6 confirmed gaps + 1 reconciliation item → the
-# reconciliation question is guaranteed a slot, exactly like a tension item.
+# Mandated tier vs the #302 reserved slot (Story 18.40, #542/#545): 6 confirmed
+# gaps + 1 reconciliation item → the capped pool still asks its full 5, and the
+# reconciliation is guaranteed ON TOP of them rather than consuming a capped
+# slot (pre-#545 it displaced a candidate — and could take the RESERVED
+# policy-seed slot, starving a valid tension item).
 python3 - "$work/starve-state.json" <<'PYEOF'
 import json, sys
 topics = ["audience", "surprise", "significance", "tradeoff", "warning", "motivation"]
@@ -182,13 +188,45 @@ PYEOF
 python3 "$PIPE" interview --framework F2 --items "$work/rc-items.json" \
   "$work/starve-state.json" > "$work/starved.json"
 python3 - "$work/starved.json" <<'PYEOF' \
-  && ok "reserved slot: 6 gaps + 1 reconciliation → 5 asked, the reconciliation survives" \
-  || err "reconciliation starved out of the reserved slot"
+  && ok "mandated tier: 6 gaps + 1 reconciliation → 5 asked (cap intact) + the gate item outside it" \
+  || err "reconciliation starved out of the mandated tier"
 import json, sys
 d = json.load(open(sys.argv[1]))
 qs = d["questions"]
-assert len(qs) == 5, len(qs)
-assert sum(1 for q in qs if q.get("rationale") == "policy-reconciliation") == 1, qs
+rcs = [q for q in qs if q.get("rationale") == "policy-reconciliation"]
+assert len(rcs) == 1, qs
+# The capped pool is untouched by the gate item: still a full 5 candidates...
+assert d["asked"] == 5, d["asked"]
+# ...and the gate item rides the mandated tier ON TOP of them (6 shown total).
+assert rcs[0]["id"] in d["mandated"], d.get("mandated")
+assert len(qs) == 6, len(qs)
+PYEOF
+
+# Story 18.40 AC3 — the #545 regression fixture: 6 gaps + 1 reconciliation +
+# 1 valid policy-seed. The reconciliation rides the MANDATED tier, so the #302
+# RESERVED slot goes to the policy-seeded tension item. Pre-#545 the
+# reconciliation consumed that reserved slot and the valid seed was `capped`.
+python3 - "$work/classified.json" "$FIX/items.json" <<'PYEOF' > "$work/rc-seed-items.json"
+import json, sys
+rc = json.load(open(sys.argv[1]))["reconciliation_items"]
+seeded = [i for i in json.load(open(sys.argv[2])) if i.get("seed")][:1]
+json.dump(rc + seeded, sys.stdout)
+PYEOF
+python3 "$PIPE" interview --framework F2 --items "$work/rc-seed-items.json" \
+  "$work/starve-state.json" > "$work/rc-seed.json"
+python3 - "$work/rc-seed.json" <<'PYEOF' \
+  && ok "#545 fixture: reconciliation is mandated; the #302 reserved slot holds the policy-seed" \
+  || err "the reserved slot did not go to the policy-seed (#545 regression)"
+import json, sys
+d = json.load(open(sys.argv[1]))
+qs = d["questions"]
+rc = [q for q in qs if q.get("rationale") == "policy-reconciliation"]
+seed = [q for q in qs if q.get("rationale") == "policy-seed"]
+assert len(rc) == 1 and rc[0]["id"] in d["mandated"], (rc, d.get("mandated"))
+# the valid policy-seed survived the <=5 cap via #302's reservation
+assert len(seed) == 1, ("policy-seed starved", [q.get("rationale") for q in qs])
+assert seed[0]["id"] not in d["mandated"], "the seed is a capped candidate, not mandated"
+assert d["asked"] == 5, d["asked"]
 PYEOF
 
 # --- 8. Journal records the positions; consulted: maps the policy side ----------
