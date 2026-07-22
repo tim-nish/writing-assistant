@@ -1,0 +1,21 @@
+[
+  {"id": "c1", "gap_type": "ambiguity",
+   "seed": {"quote": "Website stays independent — reference records only.",
+            "pointer": "topics/articles.md:17@deadbeef4a5b6c7d8e9f0a1b2c3d4e5f6071829"},
+   "question": "Which publication topology should this article's EN edition use, given the recorded position on the site?",
+   "candidates": [
+     {"answer": "publish EN canonically on the site"},
+     {"answer": "keep EN as a reference record and syndicate the full text elsewhere"},
+     {"answer": "publish EN only on the syndication platforms, no site entry"}
+   ],
+   "owner_answer": ""},
+  {"id": "c2", "gap_type": "missing-rationale",
+   "seed": {"quote": "report trust must be enforced by a mechanism that survives a bad prompt",
+            "pointer": "LESSONS.md:41@deadbeef4a5b6c7d8e9f0a1b2c3d4e5f6071829"},
+   "question": "The lesson names the mechanism but not why prompt discipline failed — what broke that made you record this?",
+   "candidates": [
+     {"answer": "a reviewer noticed the omission by hand"},
+     {"answer": "a run shipped a report whose numbers no mechanism had checked"}
+   ],
+   "owner_answer": ""}
+]

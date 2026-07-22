@@ -88,6 +88,62 @@ rejection classes:
 | R8 | a `reconciliation` item with <2 positions, or any position missing its pointer/authority | a conflict needs both sides, auditable |
 | R9 | a `conflict`-classified subject presented as any other item type | the reconciliation gate cannot be bypassed by re-typing |
 
+### Constrained item (added 2026-07-22, #566 — SPEC CAP-7 `constrained` class)
+
+A `constrained`-classified question is an **ordinary item that is still
+asked**. It carries `policy_class: "constrained"` and an **item-level
+`candidates` array**; the answers a served line rules out **stay in that
+array**, each marked with an `excluded` object — never dropped from it:
+
+```json
+{
+  "id": "c1",
+  "gap_type": "ambiguity",
+  "seed": { "quote": "…", "pointer": "topics/articles.md:17@8f3c2d1" },
+  "question": "Which publication topology should this article's EN edition use?",
+  "policy_class": "constrained",
+  "candidates": [
+    {
+      "answer": "publish EN canonically on the site",
+      "excluded": {
+        "value": "canonical",
+        "reason": "served policy rules out 'canonical' for the EN publication topology",
+        "quote": "Website stays independent — reference records only.",
+        "pointer": "topics/articles.md:17@8f3c2d1",
+        "authority": "policy"
+      }
+    },
+    { "answer": "keep EN as a reference record and syndicate elsewhere" }
+  ],
+  "owner_answer": ""
+}
+```
+
+- The carrier is **item-level `candidates`, not `recommended_default`**. That
+  key is legal only on the editorial-judgment classes (R6), and judgment is
+  **structurally exempt** from this class — so the two carriers never coexist,
+  and reusing one for the other would make every constrained item an R6
+  rejection.
+
+- The **override is real**: the owner may still select an excluded candidate.
+  Doing so reverses a served ratified line, so it routes to the
+  staging-candidate block (§3) as a **proposed policy change** — never as
+  current policy for the same run's later stages.
+- The **≤3 gate cap governs the selectable remainder**. An excluded candidate
+  is a disclosure, not a choice; counting it against the cap would force the
+  classifier to drop a real option, which is exactly the suppression this
+  shape exists to prevent. An exclusion may never empty the list.
+- `constrained` and `conflict` are the **same subject under different config**:
+  when authoritative config asserts the excluded value the two authorities
+  disagree and the subject is a `conflict` (reconciliation item above);
+  otherwise the served line merely rules that answer out. Conflict takes
+  precedence, so a subject never lands in both classes.
+
+| # | Rejects | Guards |
+|---|---|---|
+| R11 | a candidate with no answer text; an `excluded` marker missing its reason, quote, or pinned pointer, or whose authority is not `policy`; or exclusions leaving no selectable answer | an exclusion the owner cannot read or audit is a silent one |
+| R12 | a `policy_class: "constrained"` item showing no excluded candidate | silent suppression — a constrained question must not read as a free choice |
+
 ## 3. Staging-candidate block (run output, proposal-only)
 
 Emitted when an interview answer contains a durable decision or reversal;

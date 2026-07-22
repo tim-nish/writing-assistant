@@ -26,6 +26,7 @@ an undeclared path passed here cannot expand what gets read.
 
 import argparse
 import bisect
+import copy
 import hashlib
 import json
 import os
@@ -2181,10 +2182,18 @@ def cmd_classify_policy(args):
 
     Four classes, per CAP-7:
 
-      determined / constrained — structurally present in the output but
-        EMPTY-BY-DEFAULT: they activate as comparable subjects gain
-        determining/excluding semantics in the table (the extension point).
-        The shipped EN-topology detector emits `conflict`.
+      determined — structurally present but EMPTY-BY-DEFAULT: it activates as
+        comparable subjects gain DETERMINING semantics in the table (the
+        extension point).
+      constrained — a served line rules some answers OUT without determining
+        one (Story 18.49, #566): the question is STILL ASKED, and each
+        candidate proposing a ruled-out value stays IN the presented list
+        MARKED `excluded` with the governing line's verbatim quote and pinned
+        pointer. The override is real — the owner may still pick it, which
+        routes to the staging candidate as a proposed policy change. Silent
+        suppression (dropping the candidate) is a defect of this CAP: it makes
+        a constrained question indistinguishable from a free choice and hides
+        the exclusion from audit.
       open       — the default pass-through: policy does not answer; the item
         is presented unchanged.
       conflict   — a served policy line and an authoritative user-config key
@@ -2246,8 +2255,11 @@ def cmd_classify_policy(args):
         _load_json_state(args.facts, "harvest state")
 
     # 1. Conflict detection over the declared comparable subjects (shared
-    # detector — the conformance gate runs the same one).
+    # detector — the conformance gate runs the same one). Constraint detection
+    # runs the same table; precedence (conflict > constrained) lives in the
+    # detector, so a subject never lands in both classes.
     conflicts = _policy_subjects.detect_conflicts(surface_lines, cfg, config_version)
+    constraints = _policy_subjects.detect_constraints(surface_lines, cfg, config_version)
 
     reconciliation_items = []
     journal_records = []
@@ -2285,9 +2297,57 @@ def cmd_classify_policy(args):
                 return i
         return None
 
+    def constrain_item(item):
+        """Mark every candidate answer a served line rules out, in place on a
+        COPY. Returns (new_item, marks) or (None, []) when nothing is excluded.
+
+        The excluded candidate is never dropped: it stays in the presented list
+        carrying `excluded: {value, reason, quote, pointer, authority}` so the
+        owner sees WHAT was ruled out and BY WHICH line, and can still pick it.
+        """
+        # Item-level `candidates` — NOT `recommended_default`, whose eligibility
+        # (R6/R7) is the editorial-judgment classes, and judgment is structurally
+        # exempt from this class. The two carriers are mutually exclusive by
+        # construction, so a constrained question carries its own answers.
+        positions = item.get("candidates")
+        if not isinstance(positions, list):
+            return None, []
+
+        marks = []
+        for idx, pos in enumerate(positions):
+            if not isinstance(pos, dict) or pos.get("excluded") is not None:
+                continue
+            for c in constraints:
+                value = _policy_subjects.excluded_by(c, pos.get("answer", ""))
+                if value is None:
+                    continue
+                marks.append({
+                    "index": idx, "value": value, "subject": c["subject"]["id"],
+                    "excluded": {
+                        "value": value,
+                        "reason": (f"served policy rules out {value!r} for "
+                                   f"{c['subject']['label']}"),
+                        "quote": c["policy"]["quote"],
+                        "pointer": c["policy"]["pointer"],
+                        "authority": "policy",
+                    },
+                })
+                break
+        if not marks:
+            return None, []
+
+        new_item = copy.deepcopy(item)
+        for m in marks:
+            new_item["candidates"][m["index"]]["excluded"] = m["excluded"]
+        # The class travels WITH the item so the presentation layer and the
+        # validator can both tell a constrained question from a free choice.
+        new_item["policy_class"] = "constrained"
+        return new_item, marks
+
     # 2. Classify every candidate item.
     classified = []
     open_items = []
+    constrained = []
     for item in items:
         gap_type = item.get("gap_type")
         if gap_type in JUDGMENT_CLASSES:
@@ -2309,6 +2369,23 @@ def cmd_classify_policy(args):
                 "subject": conflicts[ci]["subject"]["id"],
             })
             continue
+        constrained_item, marks = constrain_item(item)
+        if constrained_item is not None:
+            classified.append({"id": item.get("id"), "class": "constrained",
+                               "item": constrained_item})
+            constrained.append({
+                "id": item.get("id"),
+                "subject": marks[0]["subject"],
+                "excluded": [m["excluded"] for m in marks],
+            })
+            journal_records.append({
+                "id": item.get("id"), "class": "constrained",
+                "subject": marks[0]["subject"],
+                "excluded": [m["excluded"] for m in marks],
+            })
+            # Still ASKED — a constrained question is presented, never suppressed.
+            open_items.append(constrained_item)
+            continue
         classified.append({"id": item.get("id"), "class": "open", "item": item})
         open_items.append(item)
 
@@ -2319,7 +2396,7 @@ def cmd_classify_policy(args):
         "classified": classified,
         "reconciliation_items": reconciliation_items,
         "determined": [],
-        "constrained": [],
+        "constrained": constrained,
         "journal_records": journal_records,
         "interview_items": reconciliation_items + open_items,
     }

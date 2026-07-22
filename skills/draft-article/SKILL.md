@@ -979,9 +979,11 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py classify-policy \
 ```
 
 Every candidate subject lands in exactly one of CAP-7's four classes —
-`determined` / `constrained` / `open` / `conflict` (the first two are
-structurally present in the output and empty until the subject table grows;
-the shipped detector covers the EN-topology regression as `conflict`). Pass
+`determined` / `constrained` / `open` / `conflict` (`determined` is
+structurally present in the output and empty until the subject table gains
+determining semantics; the shipped detector covers the EN-topology regression
+as `conflict`, and the same subject as `constrained` when config does not
+assert the excluded value). Pass
 the output's `interview_items` array (reconciliation items first, then the
 open pass-throughs) as the `--items` file below, and carry its
 `journal_records` into the run record. Three contracts hold:
@@ -996,6 +998,18 @@ open pass-throughs) as the `--items` file below, and carry its
   2026-07-18 regression: a policy-incompatible records-only answer was
   offered as an ordinary candidate, selected, and shipped unreconciled
   against `syndication.policy` EN-canonical config.)
+- **A constrained subject excludes VISIBLY — never by filtering (#566).** When
+  a served line rules an answer out without determining one, the question is
+  **still asked** and the ruled-out candidate **stays in the list**, marked
+  `excluded` with the governing line's verbatim quote and its pinned pointer
+  (seam-formats.md §2). Present it that way: show what policy removed and why,
+  and keep the **override real** — the owner may still choose it, which routes
+  to the staging candidate as a *proposed policy change*. **Never present only
+  the compatible candidates.** A gate that looks like a free choice while one
+  resolution has been quietly removed is a defaulted multi-outcome gate
+  wearing a different costume, and the exclusion becomes unauditable. The ≤3
+  candidate cap counts **selectable** candidates only, so an exclusion never
+  forces a candidate out of the list.
 - **Owner judgment is never pre-decided — the structural exemption.** An item
   whose gap_type is a judgment class (`opinion`, `significance`, `surprise`,
   `tradeoff`, `warning`, `audience`, `motivation`, `retrospective`) always
