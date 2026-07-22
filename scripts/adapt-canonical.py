@@ -86,6 +86,7 @@ Subcommands:
   payload       --slug S --target P [--draft PATH] [--root R] --fill F
   write         --slug S --target P --fill F --body B --ws W [--root R]
   lint-ancestry --derived PATH [--root R]
+  staleness     [--derived PATH] [--root R]
   claims-check  --source-map M --derived-map M [--fill F]
 """
 
@@ -634,6 +635,114 @@ def cmd_lint_ancestry(args):
 
 
 # --------------------------------------------------------------------------
+# The staleness chain (CAP-5, Story 18.58)
+#
+# Editing the source canonical makes its derivation stale — and everything
+# downstream of the derivation stale WITH it. The chain is
+#
+#     EN canonical edit -> JA canonical stale -> its Zenn variant stale
+#
+# The second hop is not a second mechanism: the derived canonical's own variants
+# are graded by the SHIPPED `variant-staleness` check against the derivation,
+# unchanged. What this adds is the UPSTREAM link — when the derivation itself is
+# stale, its variants are stale by inheritance no matter how fresh their own
+# recorded hash is, because the content they were emitted from is superseded.
+
+
+def discover_derivations(root, only=None):
+    """Every derived canonical at the resolved output.drafts (an `adapted_from`
+    block is what makes a file one), or just the named path."""
+    if only:
+        return [os.path.realpath(only)]
+    drafts_dir = os.path.realpath(dp._resolve_drafts_dir(root))
+    if not os.path.isdir(drafts_dir):
+        return []
+    return [os.path.join(drafts_dir, f) for f in sorted(os.listdir(drafts_dir))
+            if f.endswith(".md") and dp._declares_ancestry(os.path.join(drafts_dir, f))]
+
+
+def chain_report(derived_path, root):
+    """One derivation's staleness, plus its variants' — the whole chain from the
+    source canonical down. Returns (entry, publish_blockers)."""
+    defects, ancestry = ancestry_defects(derived_path, root)
+    entry = {"derived": derived_path, ANCESTRY_KEY: ancestry, "variants": []}
+    blockers = []
+
+    # A defective ancestry block is named here too: a derivation whose source
+    # cannot be resolved cannot be shown fresh, so it is never silently fresh.
+    hard = [d for d in defects if d["defect"] != "ancestry-hash-mismatch"]
+    if hard:
+        entry["status"] = "unverifiable"
+        entry["defects"] = hard
+        for d in hard:
+            blockers.append({"path": derived_path, "blocker": d["defect"],
+                             "detail": d["detail"]})
+        return entry, blockers
+
+    mismatch = next((d for d in defects if d["defect"] == "ancestry-hash-mismatch"), None)
+    entry["recorded_source_sha256"] = ancestry["canonical_sha256"]
+    entry["current_source_sha256"] = (mismatch["current_sha256"] if mismatch
+                                      else ancestry["canonical_sha256"])
+    entry["status"] = "stale" if mismatch else "fresh"
+    if mismatch:
+        blockers.append({
+            "path": derived_path, "blocker": "stale-derivation",
+            "source_path": mismatch["source_path"],
+            "source_slug": ancestry["slug"],
+            "recorded_sha256": ancestry["canonical_sha256"],
+            "current_sha256": mismatch["current_sha256"],
+            "detail": ("the source canonical changed since this derivation; a Japanese "
+                       "article stating the superseded version must not publish. "
+                       "Re-adaptation is a FRESH owner decision through "
+                       "`adapt canonical <slug> for <target>` — never an implicit "
+                       "re-run and never an in-place edit of the derivation")})
+
+    # Second hop: the shipped variant-staleness check, unchanged, against the
+    # DERIVATION. Its findings pass through verbatim.
+    text = open(derived_path, encoding="utf-8").read()
+    inner = dp._staleness_report(text, root=root)
+    entry["variants"] = inner["variants"]
+    entry["derived_sha256"] = inner["canonical_sha256"]
+    blockers.extend(inner.get("publish_blockers", []))
+
+    # The upstream link: a stale derivation makes every variant of it stale by
+    # inheritance, including one whose own recorded hash still matches.
+    if mismatch:
+        already = {b.get("path") for b in inner.get("publish_blockers", [])}
+        for v in inner["variants"]:
+            if v["path"] in already:
+                continue
+            blockers.append({
+                "path": v["path"], "platform": v["platform"],
+                "blocker": "stale-by-inheritance",
+                "upstream": derived_path,
+                "upstream_blocker": "stale-derivation",
+                "source_slug": ancestry["slug"],
+                "recorded_sha256": ancestry["canonical_sha256"],
+                "current_sha256": mismatch["current_sha256"],
+                "detail": ("emitted from a derivation whose source canonical has since "
+                           "changed; it is stale even though its own recorded hash "
+                           "matches. Re-adapt first, then re-emit")})
+    return entry, blockers
+
+
+def cmd_staleness(args):
+    """The chained staleness check (CAP-5). Reports each derivation and its
+    variants; anything not fresh lands in the PUBLISH-BLOCKER bucket with the
+    hash pair — never a warning, never silent."""
+    derivations, blockers = [], []
+    for path in discover_derivations(args.root, args.derived):
+        entry, found = chain_report(path, args.root)
+        derivations.append(entry)
+        blockers.extend(found)
+    out = {"stage": "adaptation-staleness", "derivations": derivations}
+    if blockers:
+        out["publish_blockers"] = blockers
+    print(json.dumps(out, indent=2, ensure_ascii=False))
+    return 0
+
+
+# --------------------------------------------------------------------------
 # Claims conformance (CAP-2)
 
 
@@ -770,6 +879,13 @@ def main(argv=None):
     la.add_argument("--derived", required=True, help="path to the derived canonical")
     la.add_argument("--root", help="host repo root (default: git toplevel of cwd)")
 
+    st = sub.add_parser("staleness",
+                        help="the chained staleness check: source canonical -> "
+                             "derivation -> its variants (CAP-5)")
+    st.add_argument("--derived", help="one derived canonical (default: every "
+                                      "derivation at the resolved output.drafts)")
+    st.add_argument("--root", help="host repo root (default: git toplevel of cwd)")
+
     cc = sub.add_parser("claims-check",
                         help="compare source and derived claim sets (CAP-2)")
     cc.add_argument("--source-map", required=True,
@@ -784,7 +900,8 @@ def main(argv=None):
                          "neither presentable nor writable)\n")
         return USAGE
     fn = {"plan": cmd_plan, "payload": cmd_payload, "write": cmd_write,
-          "lint-ancestry": cmd_lint_ancestry, "claims-check": cmd_claims_check}[args.cmd]
+          "lint-ancestry": cmd_lint_ancestry, "staleness": cmd_staleness,
+          "claims-check": cmd_claims_check}[args.cmd]
     try:
         return fn(args)
     except Refusal as exc:
