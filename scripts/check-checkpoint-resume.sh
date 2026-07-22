@@ -204,6 +204,31 @@ grep -q 'interview-remaining' "$SKILL" \
   && ok "SKILL wires the Stage-2 interview resume (interview-remaining)" \
   || err "SKILL missing interview-remaining wiring"
 
+# Resume disclosure + orderly-stop-binds-on-resume (Story 18.39, #533): a resume
+# discloses what it will do before spending; a fresh/complete run discloses
+# nothing.
+WS6="$work/ws6"; mkdir -p "$WS6"
+[ -z "$(python3 "$DP" resume-disclosure --ws "$WS6")" ] \
+  && ok "resume-disclosure: fresh run discloses nothing" \
+  || err "resume-disclosure spoke on a fresh run"
+printf '{"stage":"consume","next_stage":"interview"}' | python3 "$DP" checkpoint --ws "$WS6" - >/dev/null
+python3 "$DP" progress --ws "$WS6" --stage interview --done q1 >/dev/null
+python3 "$DP" resume-disclosure --ws "$WS6" | grep -q 'skipped, not re-spent' \
+  && ok "resume-disclosure: a resume states what it will skip before spending (#533)" \
+  || err "resume-disclosure did not disclose skipped units"
+# the orderly budget stop binds on the resumed invocation and is relayed
+python3 "$DP" progress --ws "$WS6" --stage interview --done q2 --stop-note "budget reached; 1 left" >/dev/null
+python3 "$DP" resume-disclosure --ws "$WS6" | grep -q 'pending budget stop' \
+  && ok "resume-disclosure: relays the orderly budget stop on the resume path" \
+  || err "resume-disclosure did not relay the budget stop"
+printf '{"stage":"complete","next_stage":"done"}' | python3 "$DP" checkpoint --ws "$WS6" - >/dev/null
+[ -z "$(python3 "$DP" resume-disclosure --ws "$WS6")" ] \
+  && ok "resume-disclosure: a completed run discloses nothing" \
+  || err "resume-disclosure spoke on a completed run"
+grep -q 'resume-disclosure' "$SKILL" && grep -qi 'binds identically on a resumed' "$SKILL" \
+  && ok "SKILL wires resume disclosure + orderly stop on the resume path" \
+  || err "SKILL missing resume-disclosure / resume-path budget-stop wiring"
+
 if [ "$fail" -eq 0 ]; then
   printf '\nAll checkpoint/resume checks passed.\n'; exit 0
 else

@@ -568,6 +568,25 @@ presentation order (empty = every question answered, so the interview is
 complete and the run advances to `fill`). This is the elicitation half of the
 2026-07-22 (#533) durability amendment.
 
+**Disclose before re-spending on a resume, and stop orderly on the resume path
+too (Story 18.39, #533).** The #533 failure was a resume that spent a large
+token volume with **no visible explanation of what the spend was doing**. On
+**every resumed run** (`autostart` returned `"resumed": true`), before spending,
+emit the one-line disclosure of what the resume will do — the stage it resumes
+at, the already-done units it will **skip** (never re-spend), and any pending
+budget-stop note it relays:
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py resume-disclosure --ws "$WS"
+```
+
+Empty output means a fresh run or a completed one — nothing to disclose. And the
+budget-triage **orderly stop binds identically on a resumed invocation**: a
+resumed stage that breaches its budget persists at the next sub-stage boundary
+with `progress … --stop-note`, records the CAP-6 partial-progress note, and
+exits clean — exactly as a fresh run does. Budget triage is never a
+fresh-run-only path, and a resume never silently re-burns a budget.
+
 **Mark the run done on completion — through the completion gate (Story 13.68).**
 When the pipeline finishes, run the `complete` subcommand. It is the **only
 sanctioned way to finish a draft run** — never hand-write the final
