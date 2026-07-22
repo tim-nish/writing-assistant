@@ -334,7 +334,7 @@ it routes to the **NEEDS-OWNER** list below. Then run the validator **once, as a
 confirmation pass** over the emitted sheet:
 
 ```
-python3 ${CLAUDE_PLUGIN_ROOT}/scripts/validate-fact-sheet.py <harvest-doc> --root <host-repo> --require-coverage
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/validate-fact-sheet.py <harvest-doc> --root <host-repo> --require-coverage --check-cache-population
 ```
 
 (`--root` defaults to the git top-level of cwd; the validator errors if the
@@ -343,6 +343,20 @@ pointer against an empty source list.) `--require-coverage` makes the
 `## Coverage` manifest (§2a, #514) mandatory and checks its accounting closes
 (read + skipped == matched); a sheet that discloses nothing about coverage is
 rejected just like an unsourced entry.
+
+**`--check-cache-population` is a completion assertion, not a suggestion (#534,
+Story 18.37).** The blob-keyed cache (`put`, above) is populated by a prompt
+step, so a run can silently skip it and still emit a conformant sheet — run
+20260722T083432 read 19 files and wrote **zero** cache entries. This flag makes
+the CAP-10 population promise mechanical: it asserts every `read:` source on the
+coverage manifest has a cache entry at its current blob-sha, and a miss **fails
+the run loudly, naming the file**. A failure here is a **CAP-6 publish blocker**
+(not an informational note) — route it to the publish-blockers bucket of the
+completion summary; harvest never reports "complete" while a file it read was
+never extraction-cached. Enforced in lockstep with
+`scripts/validate-fact-sheet.py` (`validate_cache_population`) — a change to the
+`put` step here without the assertion there (or the reverse) is a defect, the
+same lockstep the nine-KIND set carries.
 
 Every entry must pass; the rejects are exactly what the NEEDS-OWNER list captures.
 
