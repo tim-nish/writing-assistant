@@ -278,9 +278,42 @@ repeatedly from one repo does not reselect covered material by chance:
   owner's to ratify). With **no plans for this project**, nothing is excluded and
   selection is exactly as today.
 
-**Named-element pin — scope the whole run to one element (CAP-9, #431).** The
-owner can say **"write the article about *this* element"** by passing
-`--element <name>` to stage 0 (recorded as `state.element`). When set:
+**Exclusion gates SURFACING, never PERMISSION (Story 18.47, #560).** The default
+above is about **what the selector offers first**, never about what the owner is
+allowed to ask for. An entry that **explicitly names** an element a prior article
+already consumed is **honoured** — the run states that it was consumed and by
+which plan, and proceeds. Refusing it, or re-asking for confirmation, is the
+failure this clause exists to prevent
+(`threshold-gates-surfacing-not-permission`;
+`consulted: product-lab@f58defe4 topics/articles.md:10, LESSONS.md:42`). Resolve
+it mechanically rather than by judgement:
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py entry --element "<name>" --consumed-index <consult-output.json>
+```
+
+Each named element comes back `honoured: true`, carrying `consumed_by` and the
+disclosure line when it was consumed. **Default (unnamed) selection is
+unchanged** — this clause changes permission semantics only, never the default
+surface (#430 intact).
+
+**One entry mechanism — the named-element pin is its degenerate case (CAP-9,
+#431, generalized by the 2026-07-22 #554 amendment).** An entry is the owner's
+**free-form description of the story they want**; an entry that **names an
+element** is the **degenerate case of that same path** — a request whose named
+set has exactly one member. It is **not a separate code path and not a second
+described mechanism**: `_entry_request` resolves both, `state.entry` records
+which form was used, and `state.element` is **projected from it**, so the pin's
+guarantees below hold by construction rather than by a parallel implementation.
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py entry --request "<the owner's free-form description>"
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py entry --element "<name>"    # the degenerate case
+```
+
+The owner can say **"write the article about *this* element"** by passing
+`--element <name>` to stage 0 (recorded as `state.element`, projected from
+`state.entry`). When set:
 
 - the name **resolves to an element id** (18.8) and **selection is pinned** to
   it — no other elements are selected, and the disclosure above states the pin
@@ -294,7 +327,10 @@ owner can say **"write the article about *this* element"** by passing
   no evidence there — the pin never reaches past the source boundary to get it.
 
 With **no** `--element`, selection is exactly as above (the default, disclosed
-rule) — the pin is an optional owner input, never a required gate.
+rule) — the pin is an optional owner input, never a required gate. The
+**declared-source boundary is identical for both entry forms**: naming an
+element and describing a story free-form each scope the run, and neither reaches
+past the writing-sources-declared files.
 
 ### Depth/scope directive (CAP-8, #432)
 

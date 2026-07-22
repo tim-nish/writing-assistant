@@ -4137,6 +4137,91 @@ def _read_brief(raw):
     return {"text": val, "provenance": "owner-authored", "origin": "inline"}
 
 
+# --- One entry mechanism (Story 18.47, #560; CAP-9 2026-07-22 #554 amendment) -
+# The #431 named-element pin is NOT a second entry mechanism sitting beside the
+# free-form entry — it is the free-form entry's DEGENERATE CASE: a request whose
+# named-element set happens to have exactly one member. Entry semantics are
+# therefore described and resolved in ONE place: `_entry_request` below, from
+# which `state.element` is projected (so the #431 pin's shipped guarantees are
+# preserved by construction, not re-implemented).
+#
+# The second half of the amendment is a PERMISSION rule, not a surfacing one:
+# consumption/overlap exclusion gates what the selector surfaces BY DEFAULT,
+# never what the owner may pick. An entry naming an element a prior article
+# already consumed is HONOURED — disclosed as consumed, never refused.
+# `consulted: product-lab@f58defe4 topics/articles.md:10,13, LESSONS.md:42`
+# (`threshold-gates-surfacing-not-permission`).
+
+def _entry_request(element=None, brief=None):
+    """Resolve an entry into the single entry-request record. `named` carries
+    the explicitly named elements — one member is the degenerate (#431 pin)
+    case, zero is the general free-form case. Returns None when the run was
+    entered with neither, which is the unchanged default-selection path."""
+    name = element.strip() if isinstance(element, str) and element.strip() else None
+    text = _brief_text(brief)
+    if not name and not text:
+        return None
+    entry = {
+        "form": "named-element" if name else "free-form",
+        "named": [name] if name else [],
+        # The pin SCOPES the run; neither form reaches past the declared
+        # sources. Stated in the record so the invariant travels with it.
+        "source_boundary": "unchanged",
+    }
+    if text:
+        entry["request"] = text
+    if name:
+        entry["pinned"] = True
+    return entry
+
+
+def _honour_named(entry, consumed_index):
+    """Consumption exclusion gates SURFACING, never PERMISSION: every explicitly
+    named element is honoured, and one a prior article consumed is honoured WITH
+    the disclosure of which plan consumed it. Never a refusal."""
+    out = []
+    for name in (entry or {}).get("named", []):
+        row = {"element": name, "honoured": True}
+        by = (consumed_index or {}).get(name)
+        if by:
+            row["consumed_by"] = by
+            row["disclosure"] = (
+                f"'{name}' was consumed by {by} — honoured because exclusion "
+                "gates what is surfaced by default, never what the owner may pick.")
+        out.append(row)
+    return out
+
+
+def cmd_entry(args):
+    """Resolve an article-creation entry through the ONE entry path (Story
+    18.47, CAP-9 #554): a free-form request, or its degenerate case — an entry
+    that names a single element (#431). Prints the entry record plus, when a
+    consumed index is supplied (`write-article-plan.py consult`'s
+    `project_consumed_index`), the honour disclosure for each named element.
+    Read-only; it selects nothing and widens no source boundary."""
+    entry = _entry_request(getattr(args, "element", None),
+                           getattr(args, "request", None))
+    if entry is None:
+        # No named element and no free-form request: the default surface is
+        # unchanged — this story changes permission semantics, never the
+        # default surface (#430 unconsumed-default intact).
+        print(json.dumps({"entry": None, "default_selection": "unchanged"},
+                         indent=2))
+        return 0
+    index = {}
+    if getattr(args, "consumed_index", None):
+        data = _load_json_state(args.consumed_index, "consumed index")
+        # Accept `consult`'s whole output or the index alone.
+        index = data.get("project_consumed_index", data) if isinstance(data, dict) else {}
+        if not isinstance(index, dict):
+            index = {}
+    out = {"entry": entry, "default_selection": "unchanged"}
+    if entry["named"]:
+        out["named_elements"] = _honour_named(entry, index)
+    print(json.dumps(out, indent=2))
+    return 0
+
+
 def _run_state(framework, sources, root=None, depth=None, element=None,
                brief=None):
     # `root` MUST already be resolved (resolve-paths host_root) — the entry gate
@@ -4181,6 +4266,14 @@ def _run_state(framework, sources, root=None, depth=None, element=None,
         d = depth.strip()
         state["depth"] = ({"level": d.lower()} if d.lower() in DEPTH_LEVELS
                           else {"scope": d})
+    # ONE entry path (Story 18.47): the named-element pin and the free-form
+    # request resolve through the same resolver, and `state.element` below is
+    # PROJECTED from it — the pin is the degenerate case, not a second path.
+    entry = _entry_request(element, brief)
+    if entry:
+        state["entry"] = entry
+    if entry and entry["named"]:
+        element = entry["named"][0]
     if element and element.strip():
         # CAP-9 named-element pin (#431): the owner named a specific story
         # element ("write the article about <element>"). Selection is PINNED to
@@ -5131,6 +5224,17 @@ def main(argv=None):
     sp.add_argument("--brief-informed", action="store_true",
                     help="the candidates were composed with the owner's brief in view "
                          "(Story 18.45) — recorded in the disclosure payload")
+    sp = sub.add_parser("entry",
+                        help="resolve an article-creation entry through the ONE entry "
+                             "path (Story 18.47): a free-form request, or its degenerate "
+                             "case — an entry naming a single element (#431)")
+    sp.add_argument("--request", help="the owner's free-form story description (text or "
+                                      "file path — the same reader --brief uses)")
+    sp.add_argument("--element", help="an explicitly named element: the degenerate case")
+    sp.add_argument("--consumed-index",
+                    help="JSON carrying `project_consumed_index` (write-article-plan.py "
+                         "consult) — a named element it lists is HONOURED with a "
+                         "disclosure, never refused")
     sp = sub.add_parser("answer")
     sp.add_argument("--id", help="the question id this answer keys to (single-answer form)")
     sp.add_argument("--disposition",
@@ -5327,6 +5431,7 @@ def main(argv=None):
         "start": cmd_start, "consume": cmd_consume, "interview": cmd_interview,
         "structures": cmd_structures,
         "structure-record": cmd_structure_record,
+        "entry": cmd_entry,
         "checkpoint": cmd_checkpoint, "resume": cmd_resume, "autostart": cmd_autostart,
         "interview-remaining": cmd_interview_remaining,
         "resume-disclosure": cmd_resume_disclosure,
