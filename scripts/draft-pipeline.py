@@ -3589,6 +3589,48 @@ def cmd_interview_remaining(args):
     return 0
 
 
+def cmd_resume_disclosure(args):
+    """Print a one-line human disclosure of what a RESUME will do before it spends
+    (Story 18.39, #533).
+
+    The #533 failure was a resume that spent a large token volume with **no
+    visible explanation of what the spend was doing**. Before a resumed run
+    continues, it states — in one line — the stage it resumes at, the sub-stage
+    units already done that it will **skip** (never re-spend), and any pending
+    orderly budget-stop note it is relaying. Empty output means there is nothing
+    to disclose: a fresh run (no checkpoint) or a completed run — a resume never
+    silently re-burns a budget, but a first run says nothing extra.
+
+    The budget-triage orderly stop (`progress --stop-note`) binds **identically**
+    on a resumed invocation — it is not a fresh-run-only path — and this
+    disclosure is what the resumed run says before it continues."""
+    path = _checkpoint_path(args.ws)
+    if not os.path.isfile(path):
+        return 0  # fresh run — nothing to disclose
+    try:
+        with open(path, encoding="utf-8") as f:
+            st = json.load(f)
+    except (OSError, json.JSONDecodeError) as e:
+        sys.stderr.write(f"error: checkpoint unreadable: {e}\n")
+        return 1
+    nxt = st.get("next_stage")
+    if not nxt or nxt == DONE_STAGE:
+        return 0  # complete — nothing to resume
+    done = st.get("progress", {}).get(nxt, {}).get("done", [])
+    parts = [f"resuming at stage {nxt}"]
+    if done:
+        parts.append(f"{len(done)} {nxt} unit(s) already done will be skipped, "
+                     "not re-spent")
+    else:
+        parts.append(f"no {nxt} sub-stage progress recorded yet — {nxt} continues "
+                     "from the start of its remaining work")
+    bstop = st.get("budget_stop")
+    if bstop and bstop.get("note"):
+        parts.append(f"relaying the pending budget stop: {bstop['note']}")
+    print("resume: " + "; ".join(parts) + ".")
+    return 0
+
+
 # A completed run's final checkpoint carries next_stage == DONE_STAGE so
 # `autostart` never resumes it (Story 13.12).
 DONE_STAGE = "done"
@@ -4533,6 +4575,11 @@ def main(argv=None):
     sp.add_argument("--present", required=True, nargs="+", metavar="ID",
                     help="the presented question ids in presentation order "
                          "(cmd_interview `presentation_order`)")
+    sp = sub.add_parser("resume-disclosure",
+                        help="print a one-line disclosure of what a resume will do "
+                             "before spending — stage, skipped units, pending budget "
+                             "stop (Story 18.39, #533)")
+    sp.add_argument("--ws", required=True, help="the run workspace ($WS)")
     sp = sub.add_parser("complete", help="finish the run through the dual-product completion gate (Story 13.68)")
     sp.add_argument("--draft", required=True, help="the workspace draft to persist as the canonical, or - for stdin")
     sp.add_argument("--slug", required=True, help="the article slug — names both products (<slug>.md)")
@@ -4842,6 +4889,7 @@ def main(argv=None):
         "structures": cmd_structures,
         "checkpoint": cmd_checkpoint, "resume": cmd_resume, "autostart": cmd_autostart,
         "interview-remaining": cmd_interview_remaining,
+        "resume-disclosure": cmd_resume_disclosure,
         "progress": cmd_progress,
         "stage0": cmd_stage0, "complete": cmd_complete,
         "classify-policy": cmd_classify_policy,
