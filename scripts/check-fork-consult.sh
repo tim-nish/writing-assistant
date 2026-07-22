@@ -193,6 +193,41 @@ python3 "$F" lint --input "$work/bad.json" >/dev/null 2>&1 \
   && err "#519: lint accepted a receipt with no outcome" \
   || ok "#519: lint rejects a receipt missing a valid outcome (lockstep gate)"
 
+
+# --- Story 18.51 (#567): gate-item content grounding reaches CANDIDATE TEXT ---
+# Pre-#567 `_check_gate` enforced the <=3 cap, no pre-selected default, and
+# grounding POINTERS -- candidate prose itself was never inspected, so an
+# invented premise in the answer the owner ratifies passed cleanly.
+cat > "$work/f.json" <<'JSON'
+{"forks":[{"id":"f1","in_scope":true,"question":"Which release cadence?",
+  "consult":{"covered":false,"candidates":[
+    {"answer":"weekly, since it was originally built for batch runs","grounding":[]}]}}]}
+JSON
+present && err "an ungrounded premise in a candidate answer was accepted" \
+  || { grep -q 'confabulated-premise' "$work/e" \
+       && ok "#567: an ungrounded premise in a gate CANDIDATE is refused" \
+       || err "candidate premise refused for the wrong reason: $(cat "$work/e")"; }
+
+# The same candidate GROUNDED at the point of use is accepted.
+cat > "$work/f.json" <<'JSON'
+{"forks":[{"id":"f1","in_scope":true,"question":"Which release cadence?",
+  "consult":{"covered":false,"candidates":[
+    {"answer":"weekly, since it was originally built (unverified — no declared source) for batch runs","grounding":[]}]}}]}
+JSON
+present && ok "#567: an inline \`unverified —\` marker grounds the candidate" \
+  || err "grounded candidate refused: $(cat "$work/e")"
+
+# The gate QUESTION is owner-facing text too.
+cat > "$work/f.json" <<'JSON'
+{"forks":[{"id":"f1","in_scope":true,
+  "question":"Given the tool was originally built for replay, which cadence?",
+  "consult":{"covered":false,"candidates":[{"answer":"weekly","grounding":[]}]}}]}
+JSON
+present && err "an ungrounded premise in the gate question was accepted" \
+  || { grep -q 'question: confabulated-premise' "$work/e" \
+       && ok "#567: an ungrounded premise in the gate QUESTION is refused" \
+       || err "gate-question premise not refused: $(cat "$work/e")"; }
+
 if [ "$fail" -eq 0 ]; then
   printf '\nAll fork-consult checks passed.\n'; exit 0
 else

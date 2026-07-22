@@ -55,6 +55,21 @@ def _load_core():
 
 core = _load_core()  # shared served-pointer / pin grammar
 
+_gate_premise = None
+
+
+def _gp():
+    """The shared gate-item premise checker (#567), loaded on first use — the
+    ONE implementation of the engine-wide content-grounding rule."""
+    global _gate_premise
+    if _gate_premise is None:
+        here = os.path.dirname(os.path.realpath(__file__))
+        spec = importlib.util.spec_from_file_location(
+            "gate_premise", os.path.join(here, "gate_premise.py"))
+        _gate_premise = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(_gate_premise)
+    return _gate_premise
+
 SLUG_RE = re.compile(r"^\d{4}-\d{2}-\d{2}-[a-z0-9][a-z0-9-]*$")
 
 
@@ -168,10 +183,20 @@ def _check_gate(gate, defects):
     if len(cands) > MAX_CANDIDATES:
         defects.append((gate["id"], f"a gate carries ≤{MAX_CANDIDATES} candidates, "
                         f"got {len(cands)}"))
+    # The gate's own question is owner-facing text and is held to the premise
+    # rule like any other gate content (#567).
+    for reason in _gp().scan_inline(gate.get("question") or ""):
+        defects.append((gate["id"], f"question: {reason}"))
     for i, c in enumerate(cands):
         if isinstance(c, dict) and (c.get("default") or c.get("selected")):
             defects.append((gate["id"], f"candidate[{i}] is pre-selected as a "
                             "default — the gate never times out into a choice"))
+        # Candidate TEXT was previously unchecked — only its count and its
+        # grounding pointers were. An invented premise in a candidate answer is
+        # exactly what the owner ratifies (#567).
+        if isinstance(c, dict):
+            for reason in _gp().scan_inline(c.get("answer") or ""):
+                defects.append((gate["id"], f"candidate[{i}]: {reason}"))
         for g in (c.get("grounding") or []) if isinstance(c, dict) else []:
             p = g.get("pointer") if isinstance(g, dict) else None
             if p and not _served_ok(p):

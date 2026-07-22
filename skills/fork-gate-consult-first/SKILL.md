@@ -138,5 +138,14 @@ orphan-mechanism defect the carrier check catches.
 - **Never machine-final.** A covered fork is an *application of an existing
   ratified line*, always overrideable; an uncovered fork never auto-resolves.
 - **No new consult surface, no cross-repo forwarding, no cache.**
+- **No unsourced premise in gate content (#567).** A gate's question and every
+  candidate answer are owner-facing text: neither may assert a factual premise
+  without a resolvable pointer or an inline `unverified —` marker (EM DASH) **at
+  the point of use**, in the same clause. This is the engine-wide gate-item
+  content-grounding rule (SPEC-writing-assistant), enforced mechanically by
+  `scripts/fork-consult.py` through the shared `gate_premise.py` — a payload
+  that breaches it is **REFUSED**, not warned. The rule attaches to premise
+  clauses, so a candid preamble is no defence for an invention later in the
+  sentence.
 - **Publication boundary:** FYIs, gates, and staging payloads carry only the
   served `file:line@commit` pointer grammar already public in this repo.

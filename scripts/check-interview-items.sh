@@ -171,6 +171,28 @@ printf '%s' "$out" | grep -q '"policy-seed"' \
   && err "no-items run leaked a policy-seed rationale" \
   || ok "no --items: interview output unchanged"
 
+
+# --- Story 18.51 (#567): R13 gate-item content grounding -----------------------
+# The engine-wide rule (SPEC-writing-assistant, one implementation in
+# gate_premise.py) reaches every owner-facing string an item presents.
+python3 "$VAL" "$FIX/r13-ungrounded-question.json" 2>&1 | grep -q 'R13' \
+  && ok "R13: an ungrounded premise in the QUESTION is rejected" \
+  || err "R13 not enforced on the question"
+
+python3 "$VAL" "$FIX/r13-marked-question.json" >/dev/null 2>&1 \
+  && ok "R13: an inline \`unverified —\` marker at the point of use passes" \
+  || err "a correctly marked premise was rejected"
+
+python3 "$VAL" "$FIX/r13-ungrounded-candidate.json" 2>&1 | grep -q 'R13' \
+  && ok "R13: reaches an item carrying candidate answers" \
+  || err "R13 not enforced across item candidates"
+
+# An item asserting NO factual premise is untouched: this adds a rejection
+# class, never an authoring burden on premise-free items.
+python3 "$VAL" "$FIX/r13-premise-free.json" >/dev/null 2>&1 \
+  && ok "R13: a premise-free item passes unchanged" \
+  || err "R13 burdened a premise-free item"
+
 if [ "$fail" -eq 0 ]; then
   printf '\nAll interview-item checks passed.\n'; exit 0
 else

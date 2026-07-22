@@ -6,8 +6,15 @@ Every proposal surface — gap interview, review arbitration, Stage-4
 verification, visual proposals — assembles a payload and must pass it through
 this gate before showing it to the owner. The gate is mechanical and blocks
 presentation the way `verify-markers` blocks stage progression: a payload with a
-missing Effect line, an empty field, or a field truncated mid-sentence is NOT
-presentable, so the damaged prompt never ships.
+missing Effect line, an empty field, a field truncated mid-sentence, or an
+UNGROUNDED FACTUAL PREMISE in its owner-facing prose (#567) is NOT presentable,
+so the damaged prompt never ships.
+
+Premise grounding (added 2026-07-22, #567) is the engine-wide gate-item
+content-grounding rule, implemented once in `gate_premise.py`: a machine-authored
+gate item asserts no factual premise without a resolvable pointer or an inline
+`unverified —` marker at the point of use. Because all four surfaces above
+present through THIS gate, wiring it here covers them all.
 
 Payload shape (JSON) — one proposal item, or a list under `items`:
 
@@ -40,6 +47,7 @@ Exit 0 = presentable; non-zero = blocked, with a per-field report.
 """
 
 import argparse
+import importlib.util
 import json
 import os
 import re
@@ -103,6 +111,52 @@ def _truncation_error(field, value, budget):
     return None
 
 
+def _load_gp():
+    here = os.path.dirname(os.path.realpath(__file__))
+    spec = importlib.util.spec_from_file_location(
+        "gate_premise", os.path.join(here, "gate_premise.py"))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+_gp = None
+
+
+def gp():
+    global _gp
+    if _gp is None:
+        _gp = _load_gp()
+    return _gp
+
+
+# The owner-facing strings of a proposal item — every field the owner READS and
+# ratifies. The premise rule binds gate-item CONTENT, so it runs over exactly
+# these (SPEC-writing-assistant, "Gate-item content grounding", #567).
+PREMISE_FIELDS = ("where", "why")
+
+
+def _premise_errors(item, tag):
+    """Every ungrounded factual premise in an item's owner-facing prose.
+
+    This one call site covers FOUR proposal surfaces — gap interview, review
+    arbitration, Stage-4 verification, and visual proposals — because they all
+    assemble their payload through this gate before presenting.
+    """
+    for field in PREMISE_FIELDS:
+        value = item.get(field)
+        if not isinstance(value, str):
+            continue
+        for reason in gp().scan_inline(value):
+            yield (f"{tag}.{field}", reason)
+    for j, ch in enumerate(item.get("choices") or []):
+        effect = ch.get("effect") if isinstance(ch, dict) else None
+        if not isinstance(effect, str):
+            continue
+        for reason in gp().scan_inline(effect):
+            yield (f"{tag}.choices[{j}].effect", reason)
+
+
 def validate(payload):
     """Yield (path, reason) for every defect; empty iterator means presentable."""
     if isinstance(payload, dict) and "items" in payload:
@@ -126,6 +180,7 @@ def validate(payload):
             if reason:
                 yield (f"{tag}.{field}", reason)
         yield from _markup_errors(item, tag)
+        yield from _premise_errors(item, tag)
         choices = item.get("choices")
         if not isinstance(choices, list) or not choices:
             yield (f"{tag}.choices", "no choices — selective presentation requires effect-stating options")
