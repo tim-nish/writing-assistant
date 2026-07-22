@@ -119,6 +119,58 @@ reason "$work/prem-unpinned.md" | grep -q 'unpinned-premise-pointer' \
 printf '# Fact sheet: x\n\n# NEEDS-OWNER\n- A bare unsourceable question / not in declared sources / surprise\n' > "$work/prem-none.md"
 NO "$work/prem-none.md" && ok "accept: no premise clause (bare unsourceable question, AC3)" || err "no-premise item rejected"
 
+# --- Story 18.50 (#567): the rule is shared, and it reaches PROSE clauses -----
+
+# 10a. The engine-wide rule has ONE implementation; this validator is a call
+#      site of it, not a second copy.
+GP="$root/scripts/gate_premise.py"
+[ -f "$GP" ] && grep -q 'gate_premise' "$root/scripts/validate-needs-owner.py" \
+  && ok "premise rule lives in the shared gate_premise.py; the validator calls it" \
+  || err "premise rule is not shared (gate_premise.py missing or not consumed)"
+
+# 10b. THE #567 REGRESSION FIXTURE: correct top-level disclosure (`not in
+#      declared sources` in the REASON) plus an unsourced premise in a
+#      SUBORDINATE CLAUSE of the candidate prose. Top-level candour is not a
+#      defence — this must FAIL. Pre-#567 it passed, because the grammar only
+#      ever saw a declared `premise:` clause.
+FIX567="$root/scripts/fixtures/needs-owner/inline-subordinate-premise.md"
+grep -q 'not in declared sources' "$FIX567" \
+  && grep -q 'originally built for scenario replay' "$FIX567" \
+  && ok "fixture reproduces the #567 shape (honest top level, invented subordinate clause)" \
+  || err "the #567 fixture drifted from its shape"
+reason "$FIX567" | grep -q 'confabulated-premise' \
+  && ok "reject: a premise smuggled into a subordinate prose clause (#567)" \
+  || err "inline subordinate premise accepted — top-level candour treated as a defence"
+
+# 10c. The same assertion GROUNDED AT THE POINT OF USE passes, both ways.
+printf '# Fact sheet: x\n\n# NEEDS-OWNER\n- Why framed as a demo, given it was originally built (unverified — no declared source) for replay? / owner framing / significance\n' > "$work/inline-marked.md"
+NO "$work/inline-marked.md" \
+  && ok "accept: inline \`unverified —\` marker at the point of use" \
+  || err "inline unverified marker rejected"
+printf '# Fact sheet: x\n\n# NEEDS-OWNER\n- Why framed as a demo, given it was originally built for replay (README.md:12@abc1234)? / owner framing / significance\n' > "$work/inline-pinned.md"
+NO "$work/inline-pinned.md" \
+  && ok "accept: inline pinned pointer at the point of use" \
+  || err "inline pinned premise rejected"
+
+# 10d. Marker SPELLING is fixed: a hyphen lookalike is a named rejection, not a
+#      silent miss — the likeliest way one spelling drifts back into two.
+printf '# Fact sheet: x\n\n# NEEDS-OWNER\n- Why framed as a demo, given it was originally built (unverified - no source) for replay? / owner framing / significance\n' > "$work/inline-hyphen.md"
+reason "$work/inline-hyphen.md" | grep -q 'marker-spelling' \
+  && ok "reject: hyphen lookalike of the \`unverified —\` marker (em dash is the spelling)" \
+  || err "hyphen marker variant silently accepted"
+
+# 10e. A marker in a DIFFERENT clause does not ground the assertion — that is
+#      the footnote the point-of-use rule exists to forbid.
+printf '# Fact sheet: x\n\n# NEEDS-OWNER\n- Why framed as a demo, given it was originally built for replay; unverified — see note / owner framing / significance\n' > "$work/inline-footnote.md"
+reason "$work/inline-footnote.md" | grep -q 'confabulated-premise' \
+  && ok "reject: marker in a different clause (a footnote is not point-of-use)" \
+  || err "a distant marker grounded the assertion"
+
+# 10f. LOCKSTEP (#567): §4 documents the prose rule and the em-dash marker.
+grep -q 'unverified —' "$SKILL" && grep -qi 'point of use' "$SKILL" \
+  && ok "skill documents the inline \`unverified —\` marker at the point of use (#567)" \
+  || err "skill missing the inline marker rule (lockstep breach)"
+
 if [ "$fail" -eq 0 ]; then
   printf '\nAll NEEDS-OWNER checks passed.\n'; exit 0
 else
