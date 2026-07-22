@@ -2076,6 +2076,22 @@ def cmd_site_record(args):
 # as a policy-seeded tension item everywhere a tension item ranks.
 POLICY_PRIORITY_RATIONALES = ("policy-seed", "policy-reconciliation")
 
+# --- Mandated/gate tier (Story 18.40, #542/#545) -----------------------------
+# Pipeline-MANDATED items are NOT interview candidates and must never compete
+# for the <=5 NEEDS-OWNER cap: the CAP-7 config<->policy reconciliation gate is
+# a blocking gate ("surfaced and answered -> gate cleared"), and the CAP-8 depth
+# offer is an "offer it once" obligation. Conflating them with owner-knowledge
+# candidates produced both #545 (a reconciliation item consumed the #302
+# RESERVED policy-seed slot, starving a valid tension item) and #542 (a mandated
+# depth offer silently absent). They are now partitioned out of the candidate
+# pool BEFORE the cap and the reservation run, and presented as their own
+# guaranteed tier ahead of the capped set — so the cap and the #302 reserved
+# slot govern only NEEDS-OWNER candidates and policy-seeds, exactly as
+# SPEC-article-draft-pipeline (2026-07-22, #542/#545) now states. The tier is
+# bounded by construction (at most the reconciliation gate + the depth offer),
+# so the <=10-minute owner-attention budget still holds.
+MANDATED_RATIONALES = ("policy-reconciliation", "depth-offer")
+
 # The owner-judgment classes CAP-7 structurally exempts from every class but
 # open/conflict: judgment is never pre-decided or candidate-filtered, even
 # when an item's text happens to match a comparable subject.
@@ -2657,7 +2673,21 @@ def cmd_interview(args):
     # and the staging-candidate emitter (seam CAP-4) writes an empty file. The
     # cap itself is untouched: the reserved item DISPLACES the lowest-priority
     # survivor, it never extends the budget.
+    # Mandated/gate tier (Story 18.40, #542/#545): partition BEFORE the cap and
+    # the reservation, so a blocking gate item can neither consume the #302
+    # reserved policy-seed slot nor be displaced by NEEDS-OWNER candidates.
+    # Order within the tier is stable (selection order), and the tier leads
+    # presentation — a gate the owner must clear is shown before capped
+    # questions.
+    mandated = [r for r in survivors
+                if r.get("rationale") in MANDATED_RATIONALES]
+    survivors = [r for r in survivors
+                 if r.get("rationale") not in MANDATED_RATIONALES]
+
     if len(survivors) > QUESTION_BUDGET:
+        # The reservation now sees only NEEDS-OWNER candidates + policy-seeds,
+        # so `seeds[0]` is necessarily a policy-seeded tension item (#302's
+        # guarantee) — never the reconciliation gate that took it in #545.
         seeds = [r for r in survivors
                  if r.get("rationale") in POLICY_PRIORITY_RATIONALES]
         if seeds and QUESTION_BUDGET >= 1:
@@ -2673,7 +2703,9 @@ def cmd_interview(args):
     # Presentation reorder (Story 13.30, CAP-4): selection above is untouched;
     # the asked set is SHOWN claim/angle → audience → significance → color.
     # Python's sort is stable, so ties keep the selection order within a slot.
-    presented = sorted(survivors, key=presentation_slot)
+    # The mandated tier is prepended, never interleaved with the capped set.
+    capped = sorted(survivors, key=presentation_slot)
+    presented = mandated + capped
 
     questions = [{"id": r["id"], "text": r["text"], "topic": r["topic"],
                   "from_gap": r["outcome"] == "recommended", "outcome": r["outcome"],
@@ -2687,7 +2719,13 @@ def cmd_interview(args):
         "next_stage": "fill",
         "framework": framework,
         "budget": QUESTION_BUDGET,
-        "asked": len(questions),
+        # `asked` counts the questions drawn from the CAPPED pool (NEEDS-OWNER
+        # candidates + policy-seeds) — the number the <=5 budget governs. The
+        # mandated/gate tier sits OUTSIDE that cap (Story 18.40), so the total
+        # the owner sees is `asked + len(mandated)`; consumers asserting the
+        # cap keep asserting `asked <= budget`.
+        "asked": len(capped),
+        "mandated": [r["id"] for r in mandated],
         "presentation_order": [q["id"] for q in questions],
         "questions": questions,
         "triage": triage,
