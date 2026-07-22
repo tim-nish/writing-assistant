@@ -163,8 +163,33 @@ the returned `ask_id`:
 printf '%s' '<answer JSON>' | python3 ${CLAUDE_PLUGIN_ROOT}/scripts/validate-proposal-payload.py --ws "$WS" --answer <ask_id>
 ```
 
-Offer: **each resolvable platform individually**, **all of them**, and **stop
-here** (emit nothing). "Stop here" is a first-class outcome, not a failure.
+Offer: **each resolvable platform in `direct` individually**, **all of them**,
+and **stop here** (emit nothing). "Stop here" is a first-class outcome, not a
+failure.
+
+**A cross-language target is offered as "adapt first", never as a projection.**
+The preflight JSON splits the configured platforms in two: `direct` is what may
+be projected from this canonical, and `adapt_first` lists any platform whose
+profile `language` differs from the canonical's. Offer nothing from
+`adapt_first` as an emit choice. Offer it instead as its own option stating the
+route and its concrete effect on the artifact — the entry carries both:
+
+> Adapt first for zenn — derives a ja canonical from this one; that canonical
+> emits to zenn with no retarget step. Nothing is emitted until you approve its
+> plan.
+
+Choosing it ends this invocation: adaptation is a separate, owner-gated
+invocation, and emission never fires it. `direct` platforms are offered
+**exactly as before** — this narrows only the cross-language case.
+
+Projecting an English canonical straight at a Japanese-reader platform is what
+produced the unpublishable #574 artifact: an English title, English headings and
+an English body on a ja-practitioner platform. It was never a design; it was
+what the screen offered when nothing filtered by language. This changes what is
+**offered by default**, never what the owner may do — if they deliberately want
+the mixed-language variant, `--platforms <id>` still emits it and the shipped
+`language-mismatch` publish blocker still reports the outcome, so it is visible
+rather than silent.
 
 **Emit exactly the chosen subset** — a comma-separated list, or `all` only when
 the owner chose every platform:

@@ -1764,11 +1764,44 @@ def cmd_variants(args):
     # all) reports the choices for the in-conversation selection and emits
     # nothing. `--platforms all` is an explicit opt-in to every configured one.
     if getattr(args, "list_platforms", False) or not getattr(args, "platforms", None):
-        print(json.dumps({"stage": "variants", "language": lang,
-                          "mode": policy.get("mode"), "available": available,
-                          "emitted": [], "written": False,
-                          "note": "choose platforms to emit with --platforms "
-                                  "<ids|all>; nothing is auto-emitted"}, indent=2))
+        # CROSS-LANGUAGE TARGETS ROUTE THROUGH ADAPTATION (SPEC-platform-variants
+        # CAP-3, amended 2026-07-22 per #582). Nothing filtered by language here
+        # before, which is how #574 got offered a JA-profile projection of an
+        # English canonical as an ordinary choice — an English title, English
+        # headings and an English body on a ja-practitioner platform. A platform
+        # whose profile language differs from this canonical's is NOT a
+        # direct-projection choice: it is presented as "adapt first", naming the
+        # route to a derived canonical in that language. What the owner MAY do is
+        # unchanged — `--platforms <id>` still emits it, and the language-mismatch
+        # publish blocker still reports the outcome — only what is OFFERED moves.
+        pp = _load("resolve-platform-profiles.py")
+        pdir = pp.profiles_dir(pp.host_root(args.root), None)
+        profiles, _findings = pp.load_profiles(pdir)
+        direct, adapt_first = [], []
+        for name in available:
+            prof_lang = (profiles.get(name) or {}).get("language")
+            if prof_lang and prof_lang != lang:
+                adapt_first.append({
+                    "platform": name, "profile_language": prof_lang,
+                    "canonical_language": lang,
+                    "route": f"adapt canonical {fields.get('slug')} for {name}",
+                    # Within the proposal contract's 140-char effect budget, so
+                    # a screen composed from this entry is presentable as-is.
+                    "effect": (f"derives a {prof_lang} canonical from this one; that "
+                               f"canonical emits to {name} with no retarget step. "
+                               "Nothing is emitted until you approve its plan.")})
+            else:
+                direct.append(name)
+        out = {"stage": "variants", "language": lang, "mode": policy.get("mode"),
+               "available": available, "direct": direct,
+               "emitted": [], "written": False,
+               "note": "choose platforms to emit with --platforms <ids|all>; "
+                       "nothing is auto-emitted"}
+        if adapt_first:
+            out["adapt_first"] = adapt_first
+            out["note"] += ("; a cross-language target is not a direct-projection "
+                            "choice — it is offered as `adapt first`")
+        print(json.dumps(out, indent=2, ensure_ascii=False))
         return 0
     requested = [p.strip() for p in args.platforms.split(",") if p.strip()]
     chosen = available if requested == ["all"] else requested
