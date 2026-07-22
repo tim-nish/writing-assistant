@@ -205,6 +205,49 @@ out=$(python3 "$DP" complete --draft "$ws/draft.md" --slug "$slug" --root "$h5" 
   && ok "canonical persisted into the auto-created inside-host drafts dir" \
   || err "canonical not persisted after auto-create"
 
+# --- INDEX.md browsing-surface view (Story 18.43, #540) ----------------------
+# The articles repo declares INDEX.md "regenerated — one line per
+# backlog/draft/newsletter item"; nothing carried it out, so a repo with 4
+# drafts read `_Empty._`. It is a VIEW (files win, idempotent), never a third
+# completion-gated product.
+RI="$root/scripts/regenerate-index.py"
+python3 -c "import py_compile; py_compile.compile('$RI', doraise=True)" 2>/dev/null \
+  && ok "regenerate-index.py is stdlib-only Python (compiles)" || err "regenerate-index.py syntax error"
+
+# end-to-end: the completion gate above persisted `$slug` into $a — its INDEX
+# must now list it (the #540 defect was exactly this line being absent).
+if grep -q "\`$slug\`" "$a/INDEX.md" 2>/dev/null; then
+  ok "complete regenerated the articles-repo INDEX.md to list the persisted draft (#540)"
+else
+  err "INDEX.md does not list the persisted draft after complete: $(cat "$a/INDEX.md" 2>/dev/null | tr '\n' ' ')"
+fi
+
+# unit: a repo whose items are present but whose INDEX says _Empty._ (the #540 state)
+ai="$work/articles-idx"; mkdir -p "$ai/drafts" "$ai/backlog"
+printf -- '---\nslug: alpha\ntitle: "Alpha draft"\ndate: 2026-07-22\n---\nbody\n' > "$ai/drafts/alpha.md"
+printf -- '---\none_liner: "Beta idea"\nstatus: evidenced\n---\nbody\n' > "$ai/backlog/beta.md"
+printf '# INDEX\n\nRegenerated — one line per backlog/draft/newsletter item.\n\n_Empty._\n' > "$ai/INDEX.md"
+python3 "$RI" check --repo "$ai" >/dev/null 2>&1 \
+  && err "index check passed on a stale INDEX.md (#540 state)" \
+  || ok "index check detects a stale INDEX.md (#540 state)"
+python3 "$RI" write --repo "$ai" >/dev/null 2>&1 || err "index write failed"
+if grep -q '`alpha`' "$ai/INDEX.md" && grep -q '`beta`' "$ai/INDEX.md"; then
+  ok "regenerated INDEX.md lists both draft and backlog items"
+else
+  err "INDEX.md missing items after regeneration"
+fi
+python3 "$RI" write --repo "$ai" 2>/dev/null | grep -q '"changed": false' \
+  && ok "index regeneration is idempotent (a current index is a no-op)" \
+  || err "index regeneration not idempotent"
+python3 "$RI" check --repo "$ai" >/dev/null 2>&1 \
+  && ok "index check reports current after regeneration" || err "index still stale after write"
+# contract: wired at complete, and stated as a view rather than a third product
+grep -q 'regenerate-index.py' "$root/scripts/draft-pipeline.py" \
+  && ok "complete wires INDEX regeneration" || err "complete does not wire index regeneration"
+grep -q 'regenerate-index.py' "$SKILL" && grep -qi 'never a third declared product\|not a third declared product' "$SKILL" \
+  && ok "SKILL states INDEX is a view, never a third declared product" \
+  || err "SKILL missing the INDEX view/disclosure contract"
+
 if [ "$fail" -eq 0 ]; then
   printf '\nAll completion-gate checks passed.\n'; exit 0
 else

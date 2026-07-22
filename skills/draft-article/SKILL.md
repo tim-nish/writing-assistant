@@ -615,6 +615,26 @@ relay them in the completion summary's informational notes. Re-running
 `complete` over already-persisted products re-verifies and succeeds
 (idempotent).
 
+**The articles repo's `INDEX.md` is regenerated at persist (Story 18.43,
+#540).** The repo declares it "regenerated — one line per
+backlog/draft/newsletter item", but nothing carried that duty out: a repo
+holding 4 drafts read `_Empty._`, so a just-persisted draft was invisible on
+its browsing surface. `complete` now rewrites it as a **deterministic
+projection over the item frontmatter the pipeline just wrote** — the files
+always win, and regenerating a current index is a no-op:
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/regenerate-index.py write --root <host-repo>
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/regenerate-index.py check --root <host-repo>   # exit 1 = stale
+```
+
+`INDEX.md` is a **view, not a third declared product**: it is never
+completion-gated, so a failed index write is a **disclosed warning** in the
+completion summary's informational notes (`index.warning` in `complete`'s
+JSON — relay it), never the hard error the two declared products carry. Persist
+therefore never silently widens the gap: the index is either current or its
+staleness is stated.
+
 Checkpoint state lives under `$WS` with the other intermediates
 (`docs/storage-architecture.md` D2), never in the host tree.
 

@@ -3994,6 +3994,33 @@ def cmd_complete(args):
                       indent=2)
         os.replace(tmp, checkpoint_path)
 
+    # Browsing-surface view (Story 18.43, #540) — NOT a third declared product.
+    # The articles repo declares INDEX.md "regenerated — one line per
+    # backlog/draft/newsletter item", but nothing carried that out: a repo with
+    # 4 drafts read `_Empty._`, so a just-persisted draft was invisible on the
+    # repo's browsing surface. Regenerate it here, as a deterministic projection
+    # over the frontmatter the pipeline just wrote (the files always win; the
+    # rewrite is idempotent). A failure is a DISCLOSED WARNING, never the hard
+    # error the two declared products carry — the index is a view, so a run
+    # whose canonical and plan both persisted is still complete, and the
+    # completion summary reports the staleness instead of silently widening it.
+    index_result = None
+    icmd = [sys.executable, os.path.join(here, "regenerate-index.py"), "write"]
+    if args.root:
+        icmd += ["--root", args.root]
+    ir = subprocess.run(icmd, capture_output=True, text=True)
+    if ir.returncode == 0:
+        try:
+            index_result = json.loads(ir.stdout)
+        except json.JSONDecodeError:
+            index_result = {"warning": "index regenerated but its result was unreadable"}
+    else:
+        index_result = {
+            "warning": "INDEX.md was not regenerated — the articles repo's "
+                       "browsing surface may not list this draft; regenerate with "
+                       "`regenerate-index.py write`",
+            "reason": (ir.stderr.strip() or "regenerate-index.py failed")}
+
     # Both persisted paths, absolute and copy-pasteable — the completion
     # summary relays them under informational notes.
     out = {
@@ -4007,6 +4034,7 @@ def cmd_complete(args):
                      "conforming": dest.get("conforming"),
                      "fallback": dest.get("fallback")},
         },
+        "index": index_result,
         "checkpoint": checkpoint_path,
     }
     print(json.dumps(out, indent=2))
