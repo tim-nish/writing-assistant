@@ -184,6 +184,26 @@ grep -qi 'resumption is .*automatic\|automatic, not opt-in' "$SKILL" && grep -qi
   && ok "SKILL wires automatic resume via autostart (Story 13.12)" || err "SKILL missing automatic-resume/autostart"
 grep -qi 'never re-runs a completed stage' "$SKILL" && ok "SKILL states resume never re-runs a completed stage" || err "SKILL missing idempotent-resume note"
 
+# Stage-2 gap-interview sub-stage resume (Story 18.38, #533): a resumed interview
+# re-enters at the next unanswered question. Harvest is capture-only; this is the
+# only ≤5-question elicitation loop.
+WS5="$work/ws5"; mkdir -p "$WS5"
+rem=$(python3 "$DP" interview-remaining --ws "$WS5" --present q1 q2 q3 | tr '\n' ' ')
+[ "$rem" = "q1 q2 q3 " ] && ok "interview-remaining: fresh interview -> all questions remain" \
+  || err "interview-remaining fresh wrong: '$rem'"
+python3 "$DP" progress --ws "$WS5" --stage interview --done q1 >/dev/null
+rem=$(python3 "$DP" interview-remaining --ws "$WS5" --present q1 q2 q3 | tr '\n' ' ')
+[ "$rem" = "q2 q3 " ] \
+  && ok "interview-remaining: resume re-enters at the next unanswered question (#533)" \
+  || err "interview-remaining after one answer wrong: '$rem'"
+python3 "$DP" progress --ws "$WS5" --stage interview --done q2 q3 >/dev/null
+rem=$(python3 "$DP" interview-remaining --ws "$WS5" --present q1 q2 q3)
+[ -z "$rem" ] && ok "interview-remaining: all answered -> empty (interview complete)" \
+  || err "interview-remaining not empty after all answered: '$rem'"
+grep -q 'interview-remaining' "$SKILL" \
+  && ok "SKILL wires the Stage-2 interview resume (interview-remaining)" \
+  || err "SKILL missing interview-remaining wiring"
+
 if [ "$fail" -eq 0 ]; then
   printf '\nAll checkpoint/resume checks passed.\n'; exit 0
 else
