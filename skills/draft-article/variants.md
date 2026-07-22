@@ -1,6 +1,10 @@
 # Platform-ready variants — a standalone post-review invocation
 
-Referenced from [`SKILL.md`](SKILL.md). Variant emission is a **separate
+Referenced from [`SKILL.md`](SKILL.md). The owner-facing front door for this
+flow is the [`emit-variants`](../emit-variants/SKILL.md) skill ("emit variants
+<slug>"), which orchestrates the invocation below — config preflight, one
+selection screen, emission of the chosen subset, per-variant lint — without
+restating this contract. Variant emission is a **separate
 post-review invocation** (Story 13.69; SPEC-platform-variants CAP-1/CAP-3,
 2026-07-18 amendments; SPEC-article-draft-pipeline CAP-4) — it is **not a
 stage of the draft flow**, which ends at the `complete` gate with next step
