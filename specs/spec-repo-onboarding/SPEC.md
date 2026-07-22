@@ -64,6 +64,18 @@ degraded interview when `policy_source` was never considered.
   same contract as the existing `set-draft-location`: comment-preserving line
   surgery, machine-global destination via the resolver, legacy-file migration
   semantics unchanged. These are the only write paths CAP-1 may use.
+  **Amended 2026-07-22 (#568):** the enumeration gains
+  `resolve-platform-profiles.py seed PLATFORM` — the sanctioned write path for
+  **platform profiles**, which are part of the machine-global config surface
+  this CAP governs but had **no writer at all**, so onboarding could only tell
+  the owner to find a machine-state path and hand-copy a shipped example. Same
+  contract as the writers above: destination resolved through the path
+  resolver, fail-closed (refuses to overwrite an existing profile without
+  `--force`), and **verified before finishing** (it re-validates the profile it
+  wrote). This **extends** the enumeration; it does not loosen it — a profile
+  still reaches machine-global config only through a sanctioned writer, and
+  hand-editing around one remains forbidden. `resolve-platform-profiles.py`
+  otherwise stays read-only.
   **Amended 2026-07-21 (#525):** `set-policy-source` also gains an optional
   `track_topics` mapping writer (a declarative replace of the `track_topics`
   block, same comment-preserving contract) — the config-write path onboarding
