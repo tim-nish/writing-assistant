@@ -1,0 +1,27 @@
+# language-conventions.yaml — per-LANGUAGE telling conventions for canonical
+# adaptation (SPEC-canonical-adaptation CAP-3/CAP-6, Story 18.56).
+#
+# The adaptation TARGET is named by pointing at a platform profile
+# (`adapt-canonical.py plan --target zenn`): the profile already declares the
+# one named reader (`audience`) and that reader's `language`. What a profile
+# does NOT declare — and must not, because a profile is packaging-scoped by the
+# ratified intent/packaging boundary (2026-07-16) — is how prose is TOLD in
+# that language. Register and terminology treatment are properties of the
+# language, shared by every target that speaks it, so they are declared once
+# here and read as data. No language branch lives in adaptation code (CAP-6).
+#
+# Adding a second adaptation target is:
+#   - one platform profile file (the reader + its language), and
+#   - one entry here only if that reader speaks a language not yet declared.
+#
+# This shipped file is the default. A host may override it per repo with a
+# `language-conventions.yaml` in its resolved repo-config directory
+# (`resolve-paths.py repo-config-dir`); the override replaces this file whole.
+
+languages:
+  en:
+    register: plain contemporary technical English, one register throughout
+    terminology: technical terms in their established English form, never invented synonyms
+  ja:
+    register: です/ます (polite form), consistent throughout, no mixed 常体
+    terminology: technical terms kept in English or established katakana, never force-translated
