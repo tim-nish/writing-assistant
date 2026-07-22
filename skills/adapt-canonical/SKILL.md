@@ -217,6 +217,41 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/adapt-canonical.py lint-ancestry \
 It names a malformed block, a `slug` that resolves to no canonical, and a
 recorded hash that matches no source content (reported with the hash pair).
 
+## Step 6 — the staleness chain
+
+An edit to the **source** canonical does not stop at the derivation: it reaches
+everything published downstream of it. The chain is
+
+```
+EN canonical edit  ->  JA canonical stale  ->  its Zenn variant stale
+```
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/adapt-canonical.py staleness \
+  --root <host-repo>
+```
+
+With no `--derived`, it covers every derivation at the resolved
+`output.drafts`. Anything not fresh lands in the **publish blocker** bucket with
+the **hash pair** (recorded vs current) — never a warning, never silent:
+
+- `stale-derivation` — the recorded source hash no longer matches the source
+  canonical's current hash;
+- `stale-by-inheritance` — a variant of a stale derivation, carrying the
+  upstream link. It is stale **even when its own recorded hash still matches**,
+  because the content it was emitted from is superseded. That is exactly the
+  failure the chain exists to prevent: a fix applied upstream leaving a
+  published Japanese article stating the superseded version.
+
+The derivation's own variants are graded by the **shipped** `variant-staleness`
+mechanism against the derivation, unchanged — this adds an upstream link, it
+does not replace that check.
+
+Clearing a stale derivation is **a fresh owner decision** through this
+invocation: run it again from Step 1, so the owner re-approves a plan against
+the changed source. It is never an implicit re-run, and never an in-place edit
+of the derived canonical — the staleness check itself writes nothing.
+
 ## What downstream does with it — nothing special
 
 The derived canonical is a canonical, so every downstream stage consumes it
