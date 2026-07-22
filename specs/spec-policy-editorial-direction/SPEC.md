@@ -47,7 +47,18 @@ every extension below must preserve:
   policy-seeded whenever the surface yields a tension or a recorded
   editorial stance; its answer is recorded as the run's *editorial anchor*
   and carried into review as the claim intent anchor. (This formalizes
-  what p1 did by accident.)
+  what p1 did by accident.) **The editorial anchor is the claim/angle
+  answer and never a gate item (amended 2026-07-22, #545):** a CAP-7
+  config↔policy reconciliation item (or any mandated-tier gate item) must
+  **never** be recorded as the anchor — a validator rejects an
+  `editorial_anchor` whose `text` is empty or whose item is a reconciliation
+  gate. The claim/angle answer may come from the owner's brief (q2) when no
+  policy tension seeds slot 1; the anchor records that answer, not whatever
+  occupies a reserved slot (the #545 failure, where `rc1` was recorded as the
+  anchor with empty `text`, cannot recur). **The anchor carries the claim/angle
+  answer ONLY (clarified 2026-07-22, #554):** the narrative **structure** a run
+  selects is recorded in the argument plan's `arc` (SPEC-article-draft-pipeline
+  CAP-3/CAP-4, Story 18.26), never here — one choice, one recording location.
 - **CAP-3 — policy-calibrated review emphasis.** The review's severity
   criteria stay fixed, but pass prompts receive the run's policy-derived
   editorial anchors (claim, channel expectations) so findings are argued

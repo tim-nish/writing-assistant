@@ -3477,8 +3477,80 @@ def cmd_consume(args):
 # existing Stage 3->4 gate (dim1 narrative arc; the #434 skeleton-variation
 # rules). This proposer is deterministic — the same selected elements yield the
 # same candidates.
+#
+# Widened 2026-07-22 (Story 18.45, CAP-9 #554 amendment): the proposer's INPUT
+# now also takes the owner's free-form coverage brief (#505), so the candidates
+# are composed for the story the owner described — message x fact sheet, not the
+# auto-selected elements alone. This is the SAME proposer: CAP-9's entry
+# generalization adds no second mechanism. With NO brief the output is
+# byte-identical to the element-only behavior of Story 18.26, and the brief only
+# ever steers EMPHASIS and SHAPE within the already-selected elements — it never
+# invents an element, never widens the declared-source boundary (the #431 pin
+# rule the brief already inherits), and never implies evidence absent from the
+# fact sheet: only element ids the brief actually matched are ever named.
 
-def _narrative_structures(elements):
+# Fixed cue vocabulary: the shape an owner's own words ask for. Ordered, literal
+# substring cues over the lowercased brief — deterministic and auditable (a
+# served rationale can quote the cue back). Never a model call.
+_BRIEF_SHAPE_CUES = (
+    ("chronological-journey", ("how it happened", "how it unfolded", "the story of",
+                               "timeline", "journey", "over time", "step by step",
+                               "chronolog", "start to finish", "led up to")),
+    ("single-incident-deep-thread", ("deep dive", "deep-dive", "just the", "only the",
+                                     "focus on", "one incident", "a single",
+                                     "in depth", "zoom in")),
+    ("thematic-braid", ("pattern", "theme", "thematic", "common thread", "in common",
+                        "across the", "tie together", "connects", "braid")),
+    ("sibling-lessons", ("each lesson", "one by one", "separately", "side by side",
+                         "a list of")),
+)
+
+
+def _brief_text(brief):
+    """Normalize the brief argument into its text, accepting either the recorded
+    run-state shape (`{"text": …}`, `_read_brief`) or a bare string. Anything
+    else — including an absent brief — yields "" (the element-only path)."""
+    if isinstance(brief, dict):
+        brief = brief.get("text")
+    return brief.strip() if isinstance(brief, str) else ""
+
+
+def _brief_signals(brief, elements):
+    """Derive the brief's deterministic influence on composition: which SELECTED
+    elements the brief emphasises, and which structural shapes its words ask for.
+
+    Emphasis is id-token matching — an element is emphasised when a token of its
+    id (split on `:` and `-`) appears as a token of the brief. Only ids that
+    actually matched are ever surfaced, so a candidate can never name evidence
+    the fact sheet does not carry. Returns ([emphasised ids], [shape names])."""
+    text = _brief_text(brief).lower()
+    if not text:
+        return [], []
+    words = set(re.findall(r"[a-z0-9]+", text))
+    emphasis = []
+    for e in elements:
+        eid = e.get("id")
+        if not eid:
+            continue
+        toks = [t for t in re.split(r"[^a-z0-9]+", eid.lower()) if len(t) > 2]
+        if toks and any(t in words for t in toks):
+            emphasis.append(eid)
+    shapes = [name for name, cues in _BRIEF_SHAPE_CUES
+              if any(c in text for c in cues)]
+    return emphasis, shapes
+
+
+def _brief_ordered(ids, emphasis):
+    """Lead with the brief-emphasised elements, in element order, keeping every
+    other element behind them in its original order. Composition, not selection:
+    the full element set survives — only the ORDER reflects the brief."""
+    if not emphasis:
+        return list(ids)
+    lead = [i for i in ids if i in emphasis]
+    return lead + [i for i in ids if i not in emphasis]
+
+
+def _narrative_structures(elements, brief=None):
     ids = [e.get("id") for e in elements if e.get("id")]
     n = len(ids)
     kinds_per = [set(e.get("kinds", []) or []) for e in elements]
@@ -3490,13 +3562,28 @@ def _narrative_structures(elements):
             freq[k] = freq.get(k, 0) + 1
     shared = sorted(k for k, c in freq.items() if c >= 2)
 
+    # Story 18.45: the brief is an INPUT alongside the elements. `emphasis` are
+    # the selected elements the owner's words name; `cued` are the shapes those
+    # words ask for. Both are empty without a brief, and every use below is
+    # gated on them — the no-brief path is unchanged.
+    emphasis, cued = _brief_signals(brief, elements)
+    informed = bool(emphasis or cued)
+    ordered = _brief_ordered(ids, emphasis)
+    emph_note = ""
+    if emphasis:
+        emph_note = (" The brief leads with "
+                     + ", ".join(f"'{i}'" for i in emphasis) + ".")
+
     # sibling-lessons: always offered, always the default — one section per
     # element (composition = sections), never elements-as-beats.
+    sib_rationale = (f"each of the {n} lesson clusters stands on its own — one "
+                     "section per lesson (the current F2 default).")
+    if emphasis:
+        sib_rationale += emph_note
     candidates = [{
         "structure": "sibling-lessons", "default": True,
-        "composition": "sections", "sections": ids,
-        "rationale": (f"each of the {n} lesson clusters stands on its own — one "
-                      "section per lesson (the current F2 default)."),
+        "composition": "sections", "sections": ordered,
+        "rationale": sib_rationale,
     }]
 
     # Candidate alternatives, in fixed preference order, each qualified by the
@@ -3529,13 +3616,50 @@ def _narrative_structures(elements):
                          "one cluster carries the whole piece — a single deep "
                          "thread.", 0))
 
+    # Story 18.45: the brief may ask for a shape the evidence alone did not
+    # signal. Admit it — it is still composed from the SAME selected elements as
+    # beats, so nothing is invented — and mark its grounding as brief-requested
+    # rather than evidence-signalled, so the distinction stays auditable. A
+    # braid needs >=2 elements to braid; that structural floor still holds.
+    have = {a[0] for a in alts}
+    brief_requested = set()
+    for name in cued:
+        if name in have or name == "sibling-lessons":
+            continue
+        if name == "thematic-braid" and n < 2:
+            continue
+        alts.append((name, "the brief asks for this shape — composed from the "
+                           "same selected clusters as beats.", 0))
+        have.add(name)
+        brief_requested.add(name)
+
     # Keep the 2-3 strongest (CAP-4: 2-3 candidates), sibling-lessons + up to 2.
-    alts.sort(key=lambda a: (-a[2], a[0]))
+    # A brief-cued shape sorts ahead of the merely evidence-signalled ones: the
+    # owner asked for it, so it must not be the candidate the cap drops.
+    alts.sort(key=lambda a: (0 if a[0] in cued else 1, -a[2], a[0]))
     for name, rationale, _score in alts[:2]:
-        candidates.append({"structure": name, "default": False,
-                           "composition": "beats", "beats": ids,
-                           "rationale": rationale})
-    return {"candidates": candidates, "default": "sibling-lessons"}
+        cand = {"structure": name, "default": False,
+                "composition": "beats",
+                "beats": _brief_ordered(ids, emphasis) if emphasis else ids,
+                "rationale": rationale}
+        if informed:
+            cand["grounding"] = ("brief-requested" if name in brief_requested
+                                 else "evidence-signalled")
+            if name in cued and name not in brief_requested:
+                cand["rationale"] += " The brief asks for this shape."
+            if emphasis:
+                cand["rationale"] += emph_note
+            cand["brief_informed"] = name in cued or bool(emphasis)
+        candidates.append(cand)
+
+    out = {"candidates": candidates, "default": "sibling-lessons"}
+    if informed:
+        # Disclosure payload (CAP-9): the run states that — and how — the brief
+        # informed the choice. Only matched element ids appear here.
+        out["brief_informed"] = True
+        out["brief_emphasis"] = emphasis
+        out["brief_cued_shapes"] = cued
+    return out
 
 
 def cmd_structures(args):
@@ -3545,7 +3669,13 @@ def cmd_structures(args):
     "dominant_incident":bool}, …]}` — from a file or stdin, and prints 2-3
     candidate structures, each with a one-line element-grounded rationale, the
     default (sibling-lessons) marked. Deterministic; selection is unchanged
-    (composition only)."""
+    (composition only).
+
+    Story 18.45 (CAP-9, #554): the owner's free-form coverage brief (#505) is a
+    second INPUT — pass `--brief <text|path>`, or carry a `"brief"` key in the
+    input JSON (the recorded run-state shape, so a run can pipe its own state
+    through). The brief steers emphasis and shape within the selected elements;
+    with no brief the output is exactly Story 18.26's."""
     raw = sys.stdin.read() if args.selected == "-" else open(
         args.selected, encoding="utf-8").read()
     try:
@@ -3553,7 +3683,13 @@ def cmd_structures(args):
     except json.JSONDecodeError as e:
         sys.stderr.write(f"error: selected-elements input is not valid JSON: {e}\n")
         return 2
-    print(json.dumps(_narrative_structures(data.get("elements", [])), indent=2))
+    # An explicit --brief wins over one carried in the input state; both resolve
+    # through the SAME reader stage 0 uses, so a file path behaves identically.
+    brief = data.get("brief")
+    if getattr(args, "brief", None):
+        brief = _read_brief(args.brief)
+    print(json.dumps(_narrative_structures(data.get("elements", []), brief),
+                     indent=2))
     return 0
 
 
@@ -4899,6 +5035,11 @@ def main(argv=None):
     sp.add_argument("selected", nargs="?", default="-",
                     help="selected-elements JSON ({\"elements\":[{id,kinds,dominant_incident}]}), "
                          "or - for stdin")
+    sp.add_argument("--brief",
+                    help="optional free-form owner coverage brief (text or file path, #505) "
+                         "composed INTO the candidates (Story 18.45, CAP-9 #554); may also "
+                         "ride the input JSON's \"brief\" key. Absent, the candidates are "
+                         "exactly the element-only ones")
     sp = sub.add_parser("answer")
     sp.add_argument("--id", help="the question id this answer keys to (single-answer form)")
     sp.add_argument("--disposition",
