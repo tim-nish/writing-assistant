@@ -2117,6 +2117,43 @@ def _anchor_rejection(anchor, mandated_ids=(), rationale_by_id=None):
 # so the <=10-minute owner-attention budget still holds.
 MANDATED_RATIONALES = ("policy-reconciliation", "depth-offer")
 
+# Within the tier, only a BLOCKING gate leads presentation. A CAP-7
+# reconciliation must be cleared before the run proceeds, so it comes first; the
+# CAP-8 depth offer is an obligation, not a blocker, and leading with it would
+# push the claim/angle question out of presentation slot 1 — the slot CAP-4
+# pins and the editorial anchor reads (SPEC-policy-editorial-direction CAP-2).
+# So obligations TRAIL the capped set: outside the cap either way, but the
+# owner still meets the claim/angle question first.
+BLOCKING_MANDATED = ("policy-reconciliation",)
+
+# CAP-8's "offer it once" obligation, made MECHANICAL (Story 18.42, #542).
+# The depth offer was only ever a prompt instruction in the SKILL, so any path
+# that skipped the prompt lost it silently — run 20260722T095152 re-entered via
+# the scope-ratification screen and never presented it, defaulting the depth in
+# exactly the way the depth-over-count policy forbids ("owner intent, never a
+# tool default"). Generating it from run state instead means no invocation path
+# can omit it, and the mandated tier keeps the <=5 cap from displacing it.
+DEPTH_OFFER_ID = "depth"
+DEPTH_OFFER_TEXT = ("How deep should this go — a quick note, a standard piece, "
+                    "or a deep-dive? Or name a scope in one line.")
+
+
+def _state_depth(state):
+    """The run's depth/scope directive, or None. Accepts both shapes a state may
+    carry it in: top-level `depth` (stage-0 run state) and a nested
+    `run_state.depth` (a consume/interview state that folded the run state in),
+    so the offer is never re-presented merely because the directive travelled
+    under a different key."""
+    if not isinstance(state, dict):
+        return None
+    d = state.get("depth")
+    if d:
+        return d
+    rs = state.get("run_state")
+    if isinstance(rs, dict) and rs.get("depth"):
+        return rs["depth"]
+    return None
+
 # The owner-judgment classes CAP-7 structurally exempts from every class but
 # open/conflict: judgment is never pre-decided or candidate-filtered, even
 # when an item's text happens to match a comparable subject.
@@ -2709,6 +2746,18 @@ def cmd_interview(args):
     survivors = [r for r in survivors
                  if r.get("rationale") not in MANDATED_RATIONALES]
 
+    # CAP-8 depth offer (Story 18.42, #542): with no directive in run state, the
+    # offer is GENERATED here rather than left to the prompt — so a re-opened or
+    # scope-narrowed run cannot silently default the depth. With a directive
+    # present it is not re-presented (no double-ask). It joins the mandated tier,
+    # so the <=5 cap can never displace it.
+    depth_directive = _state_depth(state)
+    if not depth_directive and not any(r.get("rationale") == "depth-offer"
+                                       for r in mandated):
+        mandated.append({"id": DEPTH_OFFER_ID, "text": DEPTH_OFFER_TEXT,
+                         "topic": "other", "outcome": "open",
+                         "rationale": "depth-offer"})
+
     if len(survivors) > QUESTION_BUDGET:
         # The reservation now sees only NEEDS-OWNER candidates + policy-seeds,
         # so `seeds[0]` is necessarily a policy-seeded tension item (#302's
@@ -2730,7 +2779,9 @@ def cmd_interview(args):
     # Python's sort is stable, so ties keep the selection order within a slot.
     # The mandated tier is prepended, never interleaved with the capped set.
     capped = sorted(survivors, key=presentation_slot)
-    presented = mandated + capped
+    leading = [r for r in mandated if r.get("rationale") in BLOCKING_MANDATED]
+    trailing = [r for r in mandated if r.get("rationale") not in BLOCKING_MANDATED]
+    presented = leading + capped + trailing
 
     questions = [{"id": r["id"], "text": r["text"], "topic": r["topic"],
                   "from_gap": r["outcome"] == "recommended", "outcome": r["outcome"],
@@ -2751,6 +2802,10 @@ def cmd_interview(args):
         # cap keep asserting `asked <= budget`.
         "asked": len(capped),
         "mandated": [r["id"] for r in mandated],
+        # CAP-8 accounting (Story 18.42, #542) — the completion summary asserts
+        # this: a run either carried a directive or was offered the choice.
+        # There is no third state in which the depth was silently defaulted.
+        "depth_offer": ("directive-present" if depth_directive else "presented"),
         "presentation_order": [q["id"] for q in questions],
         "questions": questions,
         "triage": triage,
@@ -3673,6 +3728,39 @@ def cmd_interview_remaining(args):
     for q in remaining:
         print(q)
     return 0
+
+
+def cmd_depth_check(args):
+    """Assert the CAP-8 depth offer happened, or disclose the applied default
+    (Story 18.42, #542).
+
+    A run either (a) carried a `--depth` directive, or (b) was presented the
+    depth offer exactly once. Anything else is a run whose depth was silently
+    defaulted — the failure the depth-over-count policy exists to prevent
+    ("owner editorial intent, never a tool default"). Exit 0 when the run is
+    accounted for; exit 1 with a one-line DISCLOSURE naming the applied default
+    when it is not, so the completion summary states it rather than shipping a
+    silent default."""
+    try:
+        with open(args.interview, encoding="utf-8") as f:
+            iv = json.load(f)
+    except (OSError, json.JSONDecodeError) as e:
+        sys.stderr.write(f"error: cannot read the interview payload: {e}\n")
+        return 2
+    if iv.get("depth_offer") == "directive-present":
+        print("depth: the run carried an explicit directive — no offer needed")
+        return 0
+    presented = (iv.get("depth_offer") == "presented"
+                 or DEPTH_OFFER_ID in (iv.get("mandated") or [])
+                 or any(q.get("rationale") == "depth-offer"
+                        for q in iv.get("questions") or []))
+    if presented:
+        print("depth: the offer was presented once (CAP-8 satisfied)")
+        return 0
+    print("depth: NOT offered and no directive given — this run applied the "
+          "framework default without asking. Disclose the applied default in "
+          "the completion summary (CAP-8 requires the offer exactly once).")
+    return 1
 
 
 def cmd_resume_disclosure(args):
@@ -4689,6 +4777,11 @@ def main(argv=None):
     sp.add_argument("--present", required=True, nargs="+", metavar="ID",
                     help="the presented question ids in presentation order "
                          "(cmd_interview `presentation_order`)")
+    sp = sub.add_parser("depth-check",
+                        help="assert the CAP-8 depth offer happened, else disclose "
+                             "the applied default (Story 18.42, #542)")
+    sp.add_argument("--interview", required=True,
+                    help="the interview payload JSON for the run")
     sp = sub.add_parser("resume-disclosure",
                         help="print a one-line disclosure of what a resume will do "
                              "before spending — stage, skipped units, pending budget "
@@ -5004,6 +5097,7 @@ def main(argv=None):
         "checkpoint": cmd_checkpoint, "resume": cmd_resume, "autostart": cmd_autostart,
         "interview-remaining": cmd_interview_remaining,
         "resume-disclosure": cmd_resume_disclosure,
+        "depth-check": cmd_depth_check,
         "progress": cmd_progress,
         "stage0": cmd_stage0, "complete": cmd_complete,
         "classify-policy": cmd_classify_policy,

@@ -308,10 +308,34 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py stage0 <framework> <sour
 ```
 
 The run-state then carries `depth: {"level": …}` or `depth: {"scope": …}`. If
-the owner gave **no** directive, do not invent one — **offer it once as a
-Stage-2 interview item** ("How deep — a quick note, a standard piece, or a
-deep-dive? Or name a scope.") under the proposal contract, and record the
-answer; absent an answer, the run proceeds exactly as before.
+the owner gave **no** directive, do not invent one — the offer is presented
+**exactly once as a Stage-2 interview item** under the proposal contract, and
+the answer is recorded; absent an answer, the run proceeds exactly as before.
+
+**The offer is generated mechanically, not left to this prompt (Story 18.42,
+#542).** It was previously only an instruction here, so any path that skipped
+the prompt lost it silently — run 20260722T095152 re-entered via the
+scope-ratification screen and defaulted the depth without ever asking, exactly
+what "owner intent, never a tool default" forbids. `interview` now emits the
+offer itself whenever run state carries no directive, as a **mandated-tier**
+item (so the ≤5 cap cannot displace it), and reports the accounting:
+
+- `depth_offer: "presented"` — no directive, the offer was made;
+- `depth_offer: "directive-present"` — a `--depth` directive (or a prior
+  invocation's recorded answer) exists, so it is **not** re-asked.
+
+This holds on **every fresh or re-opened/narrowed run** — re-entry regenerates
+it from state, so there is no path that silently defaults. The offer **trails**
+the capped questions so the claim/angle question keeps presentation slot 1.
+Before reporting completion, assert the accounting:
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py depth-check --interview "$WS/interview.json"
+```
+
+Exit 0 means the run either carried a directive or was offered the choice.
+Exit 1 means neither — **disclose the applied default in the completion
+summary's informational notes** rather than shipping a silent default.
 
 **Reading-time bands as the depth-choice unit (CAP-8 clause, Story 18.27,
 #506).** The stage-0 / stage-2 depth question **may** present **suggested

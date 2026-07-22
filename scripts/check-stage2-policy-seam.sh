@@ -54,7 +54,9 @@ assert any(q["outcome"] == "recommended" for q in qs), \
 assert qs[0].get("rationale") == "policy-seed", \
     "presentation must lead with the policy-seeded claim/angle question"
 assert d["presentation_order"] == [q["id"] for q in qs], d.get("presentation_order")
-assert len(qs) <= 5, len(qs)
+# Story 18.40/18.42: the <=5 cap governs the CAPPED pool; mandated/gate
+# items (reconciliation, depth offer) ride outside it.
+assert d["asked"] <= 5, (d["asked"], len(qs))
 PYEOF
 [ $? -eq 0 ] && ok "seeded items: asked, open, seed carried, no recommendation, rec>seed>open order, cap holds" \
   || err "seeded-item fold-in failed"
@@ -71,7 +73,7 @@ items = [{"id": f"t{i}", "gap_type": "ambiguity",
 json.dump(items, open(sys.argv[1], "w"))
 PYEOF
 n=$(printf '%s' "$state" | python3 "$PIPE" interview --framework F1 \
-    --items "$work/many-items.json" - | python3 -c "import json,sys; print(len(json.load(sys.stdin)['questions']))")
+    --items "$work/many-items.json" - | python3 -c "import json,sys; print(json.load(sys.stdin)['asked'])")
 [ "$n" -le 5 ] && ok "7 seeded items: asked set capped at $n (≤5)" || err "cap broken: $n asked"
 
 # --- 3. Journal: seed<- field + consulted: mapping under one pin -----------------
@@ -185,7 +187,7 @@ d = json.load(open(sys.argv[1]))
 qs = d["questions"]
 seeded = [q for q in qs if q.get("rationale") == "policy-seed"]
 gaps = [q for q in qs if q.get("from_gap")]
-assert len(qs) == 5, f"cap broken: {len(qs)} asked"
+assert d["asked"] == 5, f'cap broken: {d["asked"]} asked'
 assert len(seeded) == 1, f"expected exactly 1 tension question, got {len(seeded)}"
 assert len(gaps) == 4, f"expected 4 gap questions alongside it, got {len(gaps)}"
 assert seeded[0]["id"] == "t1", f"reserved slot took {seeded[0]['id']}, not the highest-priority t1"
@@ -197,7 +199,7 @@ python3 - "$work/nores.json" <<'PYEOF' && ok "no tension items: 5 gaps asked, no
 import json, sys
 d = json.load(open(sys.argv[1]))
 qs = d["questions"]
-assert len(qs) == 5, f"expected a full 5 gap questions, got {len(qs)}"
+assert d["asked"] == 5, f'expected a full 5 gap questions, got {d["asked"]}'
 assert not [q for q in qs if q.get("rationale") == "policy-seed"], "phantom seed"
 PYEOF
 

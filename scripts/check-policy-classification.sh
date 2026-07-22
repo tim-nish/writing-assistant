@@ -199,7 +199,7 @@ assert len(rcs) == 1, qs
 assert d["asked"] == 5, d["asked"]
 # ...and the gate item rides the mandated tier ON TOP of them (6 shown total).
 assert rcs[0]["id"] in d["mandated"], d.get("mandated")
-assert len(qs) == 6, len(qs)
+assert len(qs) == d["asked"] + len(d["mandated"]), (len(qs), d["asked"], d["mandated"])
 PYEOF
 
 # Story 18.40 AC3 — the #545 regression fixture: 6 gaps + 1 reconciliation +

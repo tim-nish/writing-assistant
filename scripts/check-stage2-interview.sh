@@ -73,7 +73,7 @@ iv "$s" F1 | jget 'all(q.get("id") and q.get("text") for q in d["questions"])' |
 # 9. Pinned presentation order (Story 13.30, SPEC-draft-article-ux CAP-4):
 #    claim/angle -> audience -> significance -> color; echoed as
 #    presentation_order and matching the questions array.
-[ "$(iv "$s" F1 | jget '",".join(d["presentation_order"])')" = "q5,q2,q4,q3,q1" ] \
+[ "$(iv "$s" F1 | jget '",".join([q for q in d["presentation_order"] if q not in d["mandated"]])')" = "q5,q2,q4,q3,q1" ] \
   && ok "F1 presentation: audience, significance, then color (pinned)" || err "F1 presentation order wrong"
 [ "$(iv "$s" F4 | jget 'd["presentation_order"][0]')" = "q6" ] \
   && ok "F4: the claim/angle (opinion) question presents first" || err "claim slot not first for F4"
@@ -106,6 +106,53 @@ python3 "$DP" journal --interview /tmp/iv-$$.json --answers /tmp/ans-$$.json \
   | jget 'd.get("presentation_order",[])[0]' | grep -q q6 \
   && ok "journal echoes presentation_order" || err "journal does not echo the order"
 rm -f /tmp/iv-$$.json /tmp/ans-$$.json
+
+# --- CAP-8 depth offer is mechanical, not prompt-trusted (Story 18.42, #542) --
+# Run 20260722T095152 re-entered via the scope-ratification screen and never
+# presented the depth question, defaulting the depth silently. The offer is now
+# GENERATED from run state, so no invocation path can omit it, and it rides the
+# mandated tier so the <=5 cap can never displace it.
+nod='{"fact_sheet":[],"needs_owner":[]}'
+iv "$nod" F1 | jget 'd["depth_offer"]' | grep -q '^presented$' \
+  && ok "depth: no directive -> the offer is generated (never prompt-trusted)" \
+  || err "depth offer not generated on a directive-less run"
+iv "$nod" F1 | jget '"depth" in d["mandated"] and d["asked"] <= 5' | grep -q True \
+  && ok "depth: the offer rides the mandated tier, outside the ≤5 cap" \
+  || err "depth offer counted against the cap or missing from the tier"
+# It TRAILS the capped set: the claim/angle question keeps presentation slot 1
+# (CAP-4), which the editorial anchor reads.
+iv "$nod" F4 | jget 'd["presentation_order"][0] != "depth" and d["presentation_order"][-1] == "depth"' \
+  | grep -q True \
+  && ok "depth: the offer trails the capped set (claim/angle keeps slot 1)" \
+  || err "depth offer displaced the claim/angle lead"
+# A directive already given -> no re-ask, in either state shape.
+iv '{"depth":{"level":"deep-dive"},"fact_sheet":[],"needs_owner":[]}' F1 \
+  | jget 'd["depth_offer"] == "directive-present" and d["mandated"] == []' | grep -q True \
+  && ok "depth: a top-level directive is not re-offered (no double-ask)" \
+  || err "depth offer re-presented despite a directive"
+iv '{"run_state":{"depth":{"scope":"just the retry bug"}},"fact_sheet":[],"needs_owner":[]}' F1 \
+  | jget 'd["depth_offer"] == "directive-present"' | grep -q True \
+  && ok "depth: a nested run_state directive is honored too" \
+  || err "nested run_state depth directive ignored"
+# depth-check: accounted runs pass; an unaccounted run DISCLOSES the default.
+tmpd=$(mktemp -d)
+iv "$nod" F1 > "$tmpd/offered.json"
+python3 "$DP" depth-check --interview "$tmpd/offered.json" >/dev/null 2>&1 \
+  && ok "depth-check: an offered run is accounted for (exit 0)" \
+  || err "depth-check failed an offered run"
+printf '{"stage":"interview","questions":[],"mandated":[]}' > "$tmpd/silent.json"
+if python3 "$DP" depth-check --interview "$tmpd/silent.json" >"$tmpd/out" 2>&1; then
+  err "depth-check passed a run that silently defaulted the depth"
+else
+  grep -qi 'without asking' "$tmpd/out" \
+    && ok "depth-check: a silent default exits 1 and discloses the applied default" \
+    || err "depth-check disclosure message wrong: $(cat "$tmpd/out")"
+fi
+rm -rf "$tmpd"
+# SKILL states the mechanical guarantee.
+grep -q 'depth-check' "$SKILL" && grep -qi 'fresh or re-opened' "$SKILL" \
+  && ok "SKILL states the depth offer is guaranteed on every run (incl. re-entry)" \
+  || err "SKILL missing the mechanical depth-offer guarantee"
 
 if [ "$fail" -eq 0 ]; then
   printf '\nAll stage-2 interview checks passed.\n'; exit 0
