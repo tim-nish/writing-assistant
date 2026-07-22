@@ -33,6 +33,7 @@ import os
 import re
 import subprocess
 import sys
+import tempfile
 
 FRAMEWORKS = {
     "f1": "F1-project-introduction.md",
@@ -1602,9 +1603,41 @@ def _git_toplevel():
     return os.path.realpath(top) if r.returncode == 0 and top else None
 
 
+# A test-declared run never writes to a destination it does not own (#573).
+# `output.drafts` is machine-wide but reads at the call site like a per-run
+# value, so a test-declared run is refused when the resolved destination lies
+# OUTSIDE the system temp dir — outside its own disposable tree. A destination
+# INSIDE that tree resolves normally, which is what keeps the #213 --create-out
+# consent path testable (check-stage5-variants.sh check 6 must resolve a config
+# destination with no --out — that IS what it tests).
+#
+# The predicate is the DESTINATION, not the invocation shape. Known limit,
+# accepted at the 2026-07-22 re-triage: "under the system temp dir" is an OS
+# path convention, so a harness using a non-temp scratch dir is refused for a
+# reason unrelated to the leak; fixtures live under the temp tree.
+#
+# Set once from the parsed args in main(); read only by _resolve_drafts_dir, so
+# the guard lives at the ONE chokepoint every writer already calls and no caller
+# carries a second copy of it.
+_TEST_DECLARED = False
+
+
+def _under_tmp(path):
+    """True when `path` is inside the system temporary directory (the run's own
+    disposable tree). Both sides realpath-canonicalized so a symlinked TMPDIR
+    (macOS /tmp -> /private/tmp) compares correctly."""
+    tmp = os.path.realpath(tempfile.gettempdir())
+    real = os.path.realpath(path)
+    return real == tmp or real.startswith(tmp + os.sep)
+
+
 def _resolve_drafts_dir(root):
     """Resolve output.drafts via resolve-writing-sources.py (Story 1.3). Exit 3
-    there means the location is undeclared — surface that, no silent default."""
+    there means the location is undeclared — surface that, no silent default.
+
+    A test-declared run (see _TEST_DECLARED) additionally may not resolve a
+    destination outside the system temp dir: it supplies an explicit --out, or
+    this aborts naming the destination it refused."""
     here = os.path.dirname(os.path.realpath(__file__))
     cmd = [sys.executable, os.path.join(here, "resolve-writing-sources.py")]
     if root:
@@ -1617,7 +1650,16 @@ def _resolve_drafts_dir(root):
                          "or pass --out")
     if r.returncode != 0:
         raise SystemExit(r.stderr.strip() or "error: could not resolve output.drafts")
-    return r.stdout.strip()
+    resolved = r.stdout.strip()
+    if _TEST_DECLARED and not _under_tmp(resolved):
+        raise SystemExit(
+            f"error: refusing the configured output.drafts ({resolved}) for a "
+            "test-declared run (--allow-external-draft): it lies outside this "
+            f"run's own disposable tree ({tempfile.gettempdir()}) and is very "
+            "likely the owner's real articles repo, where a test canonical is "
+            "indistinguishable from a real one by location (#573). Pass an "
+            "explicit --out <dir> under the temp tree.")
+    return resolved
 
 
 def _strip_emission_trailer(text):
@@ -5504,6 +5546,10 @@ def main(argv=None):
     rd.add_argument("--slug", help="draft slug for the diff labels (default: AFTER filename stem)")
 
     args = p.parse_args(argv)
+    # The one place the test-declared signal is read off the command line
+    # (#573); the guard itself lives in _resolve_drafts_dir.
+    global _TEST_DECLARED
+    _TEST_DECLARED = bool(getattr(args, "allow_external_draft", False))
     return {
         "start": cmd_start, "consume": cmd_consume, "interview": cmd_interview,
         "structures": cmd_structures,

@@ -243,6 +243,98 @@ clean && ok "host source repo still clean after destination writes" \
   || { err "a destination-bound run dirtied the host source repo:";
        git -C "$HOST" status --porcelain >&2; }
 
+# --- A test-declared run never writes to a destination it does not own (#573) -
+# `output.drafts` is machine-wide but reads at the call site like a per-run
+# value. The predicate is the DESTINATION, not the invocation shape (corrected
+# at the 2026-07-22 re-triage): a destination inside the run's own disposable
+# tree resolves normally, which is what keeps the #213 --create-out consent path
+# testable. The guard lives at the ONE chokepoint both writers call.
+DP="$root/scripts/draft-pipeline.py"
+# variants needs a resolvable platform profile for the configured `en` variant;
+# seed it the same way the destination fixture above seeds output.drafts.
+tppdir="$(python3 "$root/scripts/resolve-paths.py" repo-config-dir --root "$HOST")/platform-profiles"
+mkdir -p "$tppdir"
+cp "$root/config/platform-profiles/devto.example.yaml" "$tppdir/devto.yaml"
+tdraft="$work/td.md"
+cat > "$tdraft" <<'EOF'
+---
+slug: test-declared-probe
+title: "A probe"
+date: 2026-07-22
+mode: canonical
+language: en
+audience: en-practitioner
+audience_id: en-practitioner
+summary: A short summary.
+topics: [probes]
+---
+# Body
+
+A claim.
+EOF
+
+# 1. Destination OUTSIDE the temp tree: refused, names what it refused, writes
+#    nothing there. $HOME is the stand-in for the owner's real articles repo —
+#    the actual #573 leak destination class. Nothing is ever written to it: the
+#    assertion is that the run aborts BEFORE any write.
+outside="$HOME/.writing-assistant-check-573"
+python3 "$root/scripts/resolve-writing-sources.py" --root "$HOST" \
+  set-draft-location "$outside" >/dev/null 2>&1
+tout=$(python3 "$DP" variants "$tdraft" --allow-external-draft --root "$HOST" \
+         --platforms devto 2>&1) && trc=0 || trc=$?
+if [ "${trc:-0}" -ne 0 ] \
+   && printf '%s' "$tout" | grep -q 'refusing the configured output.drafts' \
+   && printf '%s' "$tout" | grep -q "$outside"; then
+  ok "test-declared run refuses a destination outside the temp tree, naming it"
+else
+  err "outside-tmp destination was not refused/named: $tout"
+fi
+[ ! -e "$outside" ] && ok "the refusal created nothing at that destination" \
+  || { err "the refused destination was created at $outside"; rm -rf "$outside"; }
+
+# 2. Destination INSIDE the temp tree resolves normally — this is the case
+#    check-stage5-variants.sh check 6 (#213 --create-out consent) depends on,
+#    and the reason the first formulation of this clause was withdrawn.
+python3 "$root/scripts/resolve-writing-sources.py" --root "$HOST" \
+  set-draft-location "$DEST/drafts/" >/dev/null 2>&1
+if python3 "$DP" variants "$tdraft" --allow-external-draft --root "$HOST" \
+     --platforms devto >/dev/null 2>&1 \
+   && [ -f "$DEST/drafts/test-declared-probe.devto.md" ]; then
+  ok "test-declared run resolves a destination inside the temp tree normally"
+else
+  err "an in-temp destination was refused; the #213 consent path stays testable"
+fi
+
+# 3. An explicit --out is honoured regardless.
+mkdir -p "$work/tout-dir"
+python3 "$DP" variants "$tdraft" --allow-external-draft --root "$HOST" \
+  --out "$work/tout-dir" --platforms devto >/dev/null 2>&1 \
+  && [ -f "$work/tout-dir/test-declared-probe.devto.md" ] \
+  && ok "test-declared run with an explicit --out writes under --out" \
+  || err "--out given but no variant written there"
+
+# 4. An ORDINARY run (no test marker) is untouched by the guard: it resolves a
+#    destination outside the temp tree exactly as before.
+python3 "$root/scripts/resolve-writing-sources.py" --root "$HOST" \
+  set-draft-location "$outside" >/dev/null 2>&1
+mkdir -p "$outside"
+cp "$tdraft" "$outside/test-declared-probe.md"
+if python3 "$DP" variants "$outside/test-declared-probe.md" --root "$HOST" \
+     --platforms devto >/dev/null 2>&1; then
+  ok "ordinary run still resolves an out-of-temp destination (guard is test-only)"
+else
+  err "the guard changed ordinary-run behaviour"
+fi
+rm -rf "$outside"
+
+# 5. The #213 consent harness passes UNMODIFIED — the mechanical proof that the
+#    withdrawn predicate's regression cannot recur.
+if sh "$root/scripts/check-stage5-variants.sh" >/dev/null 2>&1; then
+  ok "check-stage5-variants.sh passes unmodified (#213 consent path intact)"
+else
+  err "check-stage5-variants.sh regressed: $(sh "$root/scripts/check-stage5-variants.sh" 2>&1 | grep FAIL | head -3)"
+fi
+
 if [ "$fail" -eq 0 ]; then
   printf '\nAll footprint-invariant checks passed.\n'; exit 0
 else
