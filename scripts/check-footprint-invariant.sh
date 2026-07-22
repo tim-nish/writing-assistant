@@ -13,6 +13,13 @@
 #  - AC1 (contract): all three run-producing skills (harvest, draft-article,
 #    review-article) declare the footprint invariant and route intermediates
 #    through the resolver workspace, never the host tree.
+#  - Destination-repo write surface (Story 18.44, #550): the `output.drafts`
+#    DESTINATION repo — which the lint and footprint check name explicitly,
+#    never "host repo" — receives exactly the two GATED products plus one
+#    regenerated NON-GATING view (INDEX.md), and nothing else. Story 18.43
+#    added that third file with zero destination coverage here, so the surface
+#    was unbounded; a stray write is now detected and named, and the view's
+#    non-gating asymmetry is asserted so it cannot drift into a gate.
 #  - AC3 (as amended by #211/13.23): writing-sources.yaml is machine-global —
 #    resolve-paths.py owns its placement, no script composes the per-repo
 #    config path itself, and no doc points owners at the host root.
@@ -127,6 +134,114 @@ else
   err "README still claims a host-repo-root location (#218):"
   printf '%s\n' "$stale" >&2
 fi
+
+# --- Destination-repo write surface (Story 18.44, #550) ----------------------
+# Everything above bounds the HOST SOURCE repo. The `output.drafts` DESTINATION
+# repo had zero coverage — which is how Story 18.43 added a third file there
+# (INDEX.md) without the two-product invariant noticing. The permitted surface
+# is now named exhaustively (SPEC-writing-assistant, 2026-07-22 #550): the two
+# GATED products plus exactly one regenerated NON-GATING view. Assert it against
+# a real `complete` run, so a write outside the set fails here and is named.
+DEST="$work/articles"; mkdir -p "$DEST/drafts"
+git -C "$DEST" init -q
+git -C "$DEST" config user.email t@e.st
+git -C "$DEST" config user.name test
+printf '# INDEX\n\nRegenerated — one line per backlog/draft/newsletter item.\n\n_Empty._\n' > "$DEST/INDEX.md"
+git -C "$DEST" add -A && git -C "$DEST" commit -qm scaffold
+python3 "$root/scripts/resolve-writing-sources.py" --root "$HOST" \
+  set-draft-location "$DEST/drafts/" >/dev/null 2>&1
+dslug=footprint-probe
+wsd="$work/ws-dest"; mkdir -p "$wsd"
+cat > "$wsd/draft.md" <<EOF
+---
+slug: $dslug
+title: "A probe draft"
+language: en
+audience: en-practitioner
+audience_id: en-practitioner
+---
+
+## Hook
+
+A probe body line.
+EOF
+cat > "$work/plan-dest.md" <<EOF
+---
+kind: article-plan
+slug: $dslug
+intent: probe
+claim: probe claim
+status: drafted
+run_id: 20260722T000000-000000
+pin: host@a1b2c3d4e5f6a7b8
+---
+
+## Section plan
+
+- probe / README.md:1@a1b2c3d4e5f6a7b8
+EOF
+python3 "$root/scripts/write-article-plan.py" write --slug "$dslug" --root "$HOST" \
+  "$work/plan-dest.md" >/dev/null 2>&1 \
+  && ok "destination fixture: plan written" || err "destination fixture plan write failed"
+python3 "$root/scripts/draft-pipeline.py" complete --draft "$wsd/draft.md" --slug "$dslug" \
+  --root "$HOST" --ws "$wsd" >/dev/null 2>&1 \
+  && ok "destination fixture: complete succeeded" || err "destination fixture complete failed"
+
+# The write surface, exhaustively: the two products + the one regenerated view.
+dsurface() { git -C "$DEST" status --porcelain -uall | awk '{print $2}' | sort | tr '\n' ' '; }
+expected="INDEX.md drafts/$dslug.md plans/$dslug.md "
+actual=$(dsurface)
+[ "$actual" = "$expected" ] \
+  && ok "destination surface is exactly the 2 gated products + the INDEX view" \
+  || err "destination write surface unexpected: got [$actual], expected [$expected]"
+
+# Not vacuous: a write outside the declared set is detected and NAMED.
+: > "$DEST/stray-artifact.md"
+stray=$(dsurface)
+if [ "$stray" != "$expected" ] && printf '%s' "$stray" | grep -q 'stray-artifact.md'; then
+  ok "destination: a write outside the declared set is detected and named"
+else
+  err "a stray destination write went undetected: [$stray]"
+fi
+rm -f "$DEST/stray-artifact.md"
+
+# INDEX is NON-GATING: its failure leaves the run complete, with a warning —
+# the asymmetry that keeps a view from being promoted into a gate (or a gated
+# product from being quietly demoted into a view).
+# Fail ONLY the index write: make the destination ROOT unwritable (INDEX.md
+# lives there) while drafts/ and plans/ stay writable, so the two products still
+# persist. INDEX.md itself must remain a regular file — `write-article-plan.py`
+# keys the articles-repo layout on `isfile(INDEX.md)`, so replacing it with a
+# directory would perturb plan RESOLUTION rather than the index write.
+if [ "$(id -u)" -ne 0 ]; then
+  # The index must be STALE, or regeneration is an idempotent no-op that never
+  # attempts a write (and so could never fail).
+  printf '# INDEX\n\nRegenerated — one line per backlog/draft/newsletter item.\n\n_Empty._\n' > "$DEST/INDEX.md"
+  chmod a-w "$DEST"
+  set +e
+  iout=$(python3 "$root/scripts/draft-pipeline.py" complete --draft "$wsd/draft.md" \
+         --slug "$dslug" --root "$HOST" --ws "$wsd" 2>/dev/null)
+  irc=$?
+  set -e
+  chmod u+w "$DEST"
+  if [ "$irc" -eq 0 ] && printf '%s' "$iout" | python3 -c "
+import json,sys
+d = json.load(sys.stdin)
+assert d['next_stage'] == 'done', d
+assert (d.get('index') or {}).get('warning'), d.get('index')
+" 2>/dev/null; then
+    ok "destination: a failed INDEX write is a disclosed warning, run still completes"
+  else
+    err "INDEX write failure changed completion — the view must stay non-gating"
+  fi
+else
+  ok "destination: non-gating INDEX check skipped (running as root; chmod is a no-op)"
+fi
+
+# The host SOURCE repo is still untouched by all of the above.
+clean && ok "host source repo still clean after destination writes" \
+  || { err "a destination-bound run dirtied the host source repo:";
+       git -C "$HOST" status --porcelain >&2; }
 
 if [ "$fail" -eq 0 ]; then
   printf '\nAll footprint-invariant checks passed.\n'; exit 0
