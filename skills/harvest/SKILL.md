@@ -407,13 +407,35 @@ exactly one of:
 
 Anything else is a **named validator rejection**: prose asserted as fact →
 `confabulated-premise`; an unpinned `path:line` or malformed pointer →
-`unpinned-premise-pointer`. Do **not** smuggle a factual premise into the
-CANDIDATE prose (e.g. *… described internally as "the Tanuki demo" …*) — the
-grammar only sees a declared `premise:` clause, so an unsourced factual setup
-must be either pointer-backed or marked `unverified`, never asserted. An item
-with **no** `premise:` clause (a bare unsourceable question) still passes. This
-rule is held **in lockstep** with `scripts/validate-needs-owner.py` — changing
-one without the other is a defect (the same lockstep §3's nine-KIND set carries).
+`unpinned-premise-pointer`.
+
+**A premise in the CANDIDATE prose is now caught too (#567).** Smuggling the
+factual setup into the item's own text — *… given it was originally built for
+scenario replay …* — used to slip past, because the grammar only saw a declared
+`premise:` clause. It no longer does: the rule attaches to **premise clauses
+wherever they appear**, checked **per clause**, so a correct top-level
+disclosure (`not in declared sources` in the REASON) is **not a defence** for an
+invention in a subordinate clause. That is precisely the #526 shape — and an
+honest top-level disclosure can actively make the invention read as licensed.
+
+Ground it **at the point of use**, in the same clause, either way:
+
+- **inline `unverified —`** (EM DASH, the sanctioned spelling — a hyphen
+  variant is its own named rejection): *… given it was originally built
+  (unverified — no declared source) for scenario replay …*
+- **an inline pinned pointer**: *… originally built for scenario replay
+  (README.md:12@abc1234) …*
+
+A marker in a different clause does not ground the assertion — that is the
+footnote the rule exists to forbid. An item with **no** factual premise (a bare
+unsourceable question) still passes untouched.
+
+This is one instance of the **engine-wide** gate-item content-grounding rule
+(SPEC-writing-assistant, "Gate-item content grounding"), implemented once in
+`scripts/gate_premise.py` and shared by every gate producer. This section and
+`scripts/validate-needs-owner.py` remain the two enforcement copies for **this**
+path — changing one without the other is a defect (the same lockstep §3's
+nine-KIND set carries).
 
 Partition rule: a candidate lands in **exactly one** of the fact sheet or
 NEEDS-OWNER — never both. **Always emit the `# NEEDS-OWNER` heading**, even when
