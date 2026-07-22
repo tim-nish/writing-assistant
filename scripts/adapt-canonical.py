@@ -50,15 +50,47 @@ same plan in the proposal-payload shape for
 `validate-proposal-payload.py --surface adaptation-plan`, with the three
 options the gate offers: approve / modify / stop.
 
+THE DERIVED CANONICAL (CAP-4, Story 18.57). `write` persists the adaptation's
+output as an ORDINARY canonical — `<output.drafts>/<slug>.<language>.md`, its
+own `slug` (`<slug>.<language>`), `mode: canonical`, the target language and
+reader, and its own `canonical-sha256` trailer — through the pipeline's ONE
+canonical write path (`draft-pipeline.py _persist_canonical`), so no second
+hasher and no second writer exists. The only thing that marks it as derived is
+declaration, not behaviour: an ancestry block
+
+    adapted_from: { slug: <source slug>, canonical_sha256: <source hash> }
+
+whose hash is the SAME convention the emission trailer uses (sha256 over the
+content without the trailer). Downstream stages consume it with zero
+special-casing: `emit variants --slug <slug>.<language>` resolves it like any
+canonical because it IS one.
+
+Two checks guard the ancestry and the claims invariant:
+  - `lint-ancestry` NAMES a malformed block, an unresolvable source slug and a
+    hash that matches no source content — never swallows one;
+  - `claims-check` compares the source and derived canonicals' PROVENANCE-MAP
+    POINTER SETS (CAP-2). Pointer identity is language-independent, so this
+    reports an added claim and a silently dropped one while saying nothing at
+    all about structure, section order, payoff position, framing, register or
+    title — all of which CAP-2 leaves free. There was no existing claim-set
+    comparison to reuse: `verify-provenance.py` grades ONE map against ONE fact
+    sheet, and the map's positions are per-artifact, so cross-artifact
+    comparison is new here (deliberately built on the shipped map parser rather
+    than a second map format).
+
 Stdlib-only (host repos guarantee no venv). Exit codes: 0 ok, 1 refusal
-(precondition unmet / plan defect), 2 usage.
+(precondition unmet / plan defect / check finding), 2 usage.
 
 Subcommands:
-  plan     --slug S --target P [--draft PATH] [--root R] [--fill F]
-  payload  --slug S --target P [--draft PATH] [--root R] --fill F
+  plan          --slug S --target P [--draft PATH] [--root R] [--fill F]
+  payload       --slug S --target P [--draft PATH] [--root R] --fill F
+  write         --slug S --target P --fill F --body B --ws W [--root R]
+  lint-ancestry --derived PATH [--root R]
+  claims-check  --source-map M --derived-map M [--fill F]
 """
 
 import argparse
+import hashlib
 import importlib.util
 import json
 import os
@@ -314,9 +346,19 @@ def merge_fill(plan, fill):
                 or not str(om.get("reason") or "").strip():
             raise Refusal(f"omissions[{i}] must declare `what` and `reason` — a "
                           "deliberate omission is declared, never implicit")
+        # `pointers` is how an omission becomes CHECKABLE (CAP-2): the
+        # claims-conformance pass reads the dropped claims' fact-sheet pointers
+        # from here, so a load-bearing claim left out on purpose is declared in
+        # the same place a dropped section already is.
+        ptrs = om.get("pointers") or []
+        if not isinstance(ptrs, list) or any(not str(p).strip() for p in ptrs):
+            raise Refusal(f"omissions[{i}] `pointers` must be a list of non-empty "
+                          "fact-sheet pointers (omit it when the omission drops no "
+                          "sourced claim)")
         oms.append({"section": str(om.get("section") or "").strip(),
                     "what": str(om["what"]).strip(),
-                    "reason": str(om["reason"]).strip()})
+                    "reason": str(om["reason"]).strip(),
+                    "pointers": [str(p).strip() for p in ptrs]})
     dropped = [r["source_section"] for r in rows if r["disposition"] == "drop"]
     declared = {o["section"] for o in oms}
     undeclared = [s for s in dropped if s not in declared]
@@ -382,6 +424,281 @@ def compose_payload(plan):
 
 
 # --------------------------------------------------------------------------
+# The derived canonical (CAP-4)
+
+# The ancestry block, written as a ONE-LINE inline mapping — the same flow-style
+# convention the shipped canonical frontmatter already uses for `related:`, so
+# the pipeline's frontmatter reader keeps parsing it (as the raw string this
+# parser then reads) and no second frontmatter grammar appears.
+ANCESTRY_KEY = "adapted_from"
+_ANCESTRY_FIELD = re.compile(r"(\w+)\s*:\s*([^,}]+)")
+
+# Frontmatter keys the derivation OWNS: the derived canonical is a canonical in
+# its own right, so these are re-declared for the target reader rather than
+# inherited from the source.
+DERIVED_KEYS = ("slug", "title", "language", "audience", "audience_id")
+
+
+def derived_slug(source_slug, language):
+    return f"{source_slug}.{language}"
+
+
+def canonical_hash(text):
+    """The ONE hash convention: sha256 over the content WITHOUT the emission
+    trailer — the variant trailer's own convention, reached through the
+    pipeline's normalizer so there is never a second hasher."""
+    return hashlib.sha256(dp._strip_emission_trailer(text).encode("utf-8")).hexdigest()
+
+
+def parse_ancestry(fields):
+    """Read the ancestry block out of already-parsed frontmatter. Returns
+    (ancestry_or_None, defect_or_None) — an absent block is neither (the file
+    is simply not a derivation); a malformed one is a NAMED defect."""
+    raw = fields.get(ANCESTRY_KEY)
+    if raw is None:
+        return None, None
+    if not isinstance(raw, str) or not raw.strip().startswith("{"):
+        return None, f"`{ANCESTRY_KEY}` is not an inline mapping: {raw!r}"
+    found = dict((k, v.strip().strip('"\''))
+                 for k, v in _ANCESTRY_FIELD.findall(raw.strip().lstrip("{")))
+    slug, sha = found.get("slug"), found.get("canonical_sha256")
+    if not slug or not sha:
+        return None, (f"`{ANCESTRY_KEY}` must declare both `slug` and "
+                      f"`canonical_sha256`; got {sorted(found)}")
+    if not re.fullmatch(r"[0-9a-f]{64}", sha):
+        return None, (f"`{ANCESTRY_KEY}.canonical_sha256` is not a sha256 digest: "
+                      f"{sha!r}")
+    return {"slug": slug, "canonical_sha256": sha}, None
+
+
+def compose_derived(source_text, source_fields, plan, target, ancestry, body):
+    """Build the derived canonical's text: the source's frontmatter with the
+    derivation-owned keys re-declared for the target reader plus the ancestry
+    block, over the skill-authored target-language body. Every other declared
+    field (date, topics, related, ...) is carried verbatim — the derived file
+    conforms to the same frontmatter schema because it is the same kind of
+    file."""
+    lines = source_text.splitlines()
+    end = next(i for i in range(1, len(lines)) if lines[i].strip() == "---")
+    overrides = {
+        "slug": derived_slug(source_fields.get("slug"), target["language"]),
+        "title": plan["recomposed_title"],
+        "language": target["language"],
+        "audience": target["audience"],
+        "audience_id": target["audience"],
+        "mode": "canonical",
+    }
+    out, written = [], set()
+    for line in lines[1:end]:
+        m = re.match(r"^([A-Za-z_][\w-]*):\s*(.*)$", line)
+        key = m.group(1) if m else None
+        if key == ANCESTRY_KEY:
+            continue                      # never inherit a grandparent's ancestry
+        if key in overrides:
+            out.append(f'{key}: "{overrides[key]}"' if key in ("title",)
+                       else f"{key}: {overrides[key]}")
+            written.add(key)
+            continue
+        out.append(line)
+    for key, val in overrides.items():
+        if key not in written:
+            out.append(f'{key}: "{val}"' if key in ("title",) else f"{key}: {val}")
+    out.append(f'{ANCESTRY_KEY}: {{ slug: {ancestry["slug"]}, '
+               f'canonical_sha256: {ancestry["canonical_sha256"]} }}')
+    return "---\n" + "\n".join(out) + "\n---\n\n" + body.strip("\n") + "\n"
+
+
+def recorded_answer(ws):
+    """The owner's recorded answer to the adaptation gate (CAP-3). Returns the
+    selection string, or raises Refusal — `write` is the step AFTER the gate, so
+    an unanswered gate means nothing may be written."""
+    path = os.path.join(ws, "presented-payloads.jsonl")
+    records = []
+    try:
+        for line in open(path, encoding="utf-8"):
+            if line.strip():
+                records.append(json.loads(line))
+    except OSError:
+        raise Refusal(
+            f"no presented-payload log at {path} — the derived canonical is written "
+            "only after the owner answers the adaptation gate (CAP-3). Present the "
+            "payload (`adapt-canonical.py payload ... | validate-proposal-payload.py "
+            "--ws <ws> --surface adaptation-plan`) and record the answer first.")
+    except json.JSONDecodeError as exc:
+        raise Refusal(f"presented-payload log {path} is unreadable: {exc}")
+    answers = [r for r in records if r.get("kind") == "answer"]
+    if not answers:
+        raise Refusal(
+            "the adaptation gate has no recorded answer — nothing is written before "
+            "the owner answers (CAP-3). Record it with `validate-proposal-payload.py "
+            "--ws <ws> --answer <ask_id>`.")
+    selection = str((answers[-1].get("answer") or {}).get("selection") or "").strip()
+    if selection == "stop":
+        raise Refusal(
+            "the owner chose `stop` at the adaptation gate: nothing is written and "
+            "this article stays single-canonical. Re-invoke the adaptation only if "
+            "they ask for it.")
+    if selection not in ("approve", "modify"):
+        raise Refusal(
+            f"the recorded answer's selection is {selection!r}; the adaptation gate's "
+            "options are approve / modify / stop, and only approve or modify write a "
+            "derived canonical")
+    return selection
+
+
+def cmd_write(args):
+    """Persist the derived canonical (CAP-4) — after the recorded answer, never
+    before it. The write itself goes through the pipeline's ONE canonical write
+    path, so the derived file carries its own emission trailer under the same
+    hash convention as every other canonical."""
+    selection = recorded_answer(args.ws)
+    source_path, text, fields = resolve_source(args)
+    plan = _build(args)
+    target = plan["target"]
+    body = sys.stdin.read() if args.body == "-" else open(args.body, encoding="utf-8").read()
+    if not body.strip():
+        raise Refusal("--body is empty — the derived canonical's target-language prose "
+                      "is authored by the invoking skill from the approved plan")
+    ancestry = {"slug": fields.get("slug"), "canonical_sha256": canonical_hash(text)}
+    derived_text = compose_derived(text, fields, plan, target, ancestry, body)
+    dslug = derived_slug(fields.get("slug"), target["language"])
+    try:
+        path, sha = dp._persist_canonical(derived_text, dslug, args.root,
+                                          create_out=args.create_out)
+    except dp._CanonicalWriteError as exc:
+        raise Refusal(f"could not persist the derived canonical at {exc.path}: "
+                      f"{exc.reason}")
+    print(json.dumps({"stage": "adapt-write", "selection": selection,
+                      "source": {"path": source_path, "slug": fields.get("slug"),
+                                 "canonical_sha256": ancestry["canonical_sha256"]},
+                      "derived": {"path": path, "slug": dslug,
+                                  "language": target["language"],
+                                  "audience": target["audience"],
+                                  "canonical_sha256": sha},
+                      ANCESTRY_KEY: ancestry,
+                      "next": f"emit variants --slug {dslug}"},
+                     indent=2, ensure_ascii=False))
+    return 0
+
+
+def ancestry_defects(derived_path, root):
+    """Every way an ancestry block can be wrong, NAMED (CAP-4 success). Returns
+    (list_of_defects, ancestry_or_None)."""
+    defects = []
+    try:
+        text = open(derived_path, encoding="utf-8").read()
+    except OSError as exc:
+        return ([{"defect": "unreadable-derived-canonical", "path": derived_path,
+                  "detail": str(exc)}], None)
+    fields, _body = dp._read_frontmatter(text)
+    ancestry, malformed = parse_ancestry(fields)
+    if malformed:
+        defects.append({"defect": "malformed-ancestry", "path": derived_path,
+                        "detail": malformed})
+        return defects, None
+    if ancestry is None:
+        defects.append({
+            "defect": "missing-ancestry", "path": derived_path,
+            "detail": (f"no `{ANCESTRY_KEY}` block; a derived canonical records the "
+                       "source it was adapted from (CAP-4)")})
+        return defects, None
+
+    drafts_dir = os.path.realpath(dp._resolve_drafts_dir(root))
+    source_path = os.path.join(drafts_dir, f"{ancestry['slug']}.md")
+    if not os.path.isfile(source_path):
+        defects.append({
+            "defect": "ancestry-source-missing", "path": derived_path,
+            "source_slug": ancestry["slug"],
+            "detail": (f"`{ANCESTRY_KEY}.slug` resolves to no canonical at "
+                       f"{source_path}")})
+        return defects, ancestry
+    current = canonical_hash(open(source_path, encoding="utf-8").read())
+    if current != ancestry["canonical_sha256"]:
+        defects.append({
+            "defect": "ancestry-hash-mismatch", "path": derived_path,
+            "source_path": source_path,
+            "recorded_sha256": ancestry["canonical_sha256"],
+            "current_sha256": current,
+            "detail": ("the recorded source hash matches no current source content — "
+                       "the source canonical moved since this derivation, or the "
+                       "block was hand-edited")})
+    return defects, ancestry
+
+
+def cmd_lint_ancestry(args):
+    defects, ancestry = ancestry_defects(os.path.realpath(args.derived), args.root)
+    out = {"stage": "lint-ancestry", "derived": os.path.realpath(args.derived),
+           ANCESTRY_KEY: ancestry, "defects": defects}
+    print(json.dumps(out, indent=2, ensure_ascii=False))
+    return REFUSED if defects else 0
+
+
+# --------------------------------------------------------------------------
+# Claims conformance (CAP-2)
+
+
+def pointer_set(map_path):
+    """The claim identity set of one artifact: every pointer its provenance map
+    carries on a `sourced` or `derived` entry. Positions are deliberately
+    dropped — structure, order and framing are FREE under CAP-2, so a check
+    that read them would report exactly what the spec permits."""
+    try:
+        entries = dp.parse_provenance_map(open(map_path, encoding="utf-8").read())
+    except OSError as exc:
+        raise Refusal(f"provenance map {map_path} is unreadable: {exc}")
+    except ValueError as exc:
+        raise Refusal(f"provenance map {map_path} is malformed: {exc}")
+    return {p for _pos, cls, ptrs, _anchor in entries
+            if cls in ("sourced", "derived") for p in ptrs}
+
+
+def cmd_claims_check(args):
+    """Compare the derived canonical's claims against the source's (CAP-2): an
+    added claim is a defect; a load-bearing claim dropped without a declared
+    omission is a defect. Nothing else is reported."""
+    source = pointer_set(args.source_map)
+    derived = pointer_set(args.derived_map)
+    declared = set()
+    if args.fill:
+        raw = sys.stdin.read() if args.fill == "-" else open(args.fill, encoding="utf-8").read()
+        try:
+            fill = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            raise Refusal(f"--fill is not valid JSON: {exc}")
+        for om in (fill.get("omissions") or []):
+            for p in (om.get("pointers") or []):
+                declared.add(str(p).strip())
+
+    defects = []
+    for p in sorted(derived - source):
+        defects.append({
+            "defect": "added-claim", "pointer": p,
+            "detail": ("present in the derivation but absent from the source "
+                       "canonical; adaptation re-decides the telling, never the "
+                       "claims (CAP-2) — route a new claim to the source canonical "
+                       "and re-adapt")})
+    for p in sorted(source - derived - declared):
+        defects.append({
+            "defect": "dropped-claim", "pointer": p,
+            "detail": ("carried by the source canonical and absent from the "
+                       "derivation with no declared omission; declare it in the "
+                       "plan's `omissions` (with its `pointers`) or carry it")})
+    for p in sorted(declared - source):
+        defects.append({
+            "defect": "omission-unknown-pointer", "pointer": p,
+            "detail": "declared as omitted but the source canonical never carried it"})
+
+    out = {"stage": "claims-check",
+           "source_pointers": len(source), "derived_pointers": len(derived),
+           "declared_omissions": sorted(declared),
+           "free": ["structure", "section order", "payoff position", "framing",
+                    "register", "title"],
+           "defects": defects}
+    print(json.dumps(out, indent=2, ensure_ascii=False))
+    return REFUSED if defects else 0
+
+
+# --------------------------------------------------------------------------
 # Subcommands
 
 
@@ -421,7 +738,8 @@ def main(argv=None):
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = p.add_subparsers(dest="cmd", required=True)
     for name, help_ in (("plan", "compose the adaptation plan (skeleton, or filled with --fill)"),
-                        ("payload", "emit the filled plan as an owner-facing proposal payload")):
+                        ("payload", "emit the filled plan as an owner-facing proposal payload"),
+                        ("write", "persist the derived canonical after the recorded answer")):
         sp = sub.add_parser(name, help=help_)
         sp.add_argument("--slug", required=True,
                         help="slug of the PERSISTED source canonical at <output.drafts>/<slug>.md")
@@ -435,12 +753,38 @@ def main(argv=None):
         sp.add_argument("--conventions", help="language-conventions.yaml override (tests)")
         sp.add_argument("--fill", help="JSON file (or - for stdin) carrying the authored "
                                        "plan slots")
+        if name == "write":
+            sp.add_argument("--body", required=True,
+                            help="file (or - for stdin) carrying the derived "
+                                 "canonical's target-language prose, authored from the "
+                                 "approved plan")
+            sp.add_argument("--ws", required=True,
+                            help="run workspace holding the gate's recorded answer; "
+                                 "without an approve/modify answer nothing is written")
+            sp.add_argument("--create-out", action="store_true",
+                            help="consent to creating an output.drafts directory that "
+                                 "resolves outside the host repo")
+
+    la = sub.add_parser("lint-ancestry",
+                        help="name every defect in a derived canonical's ancestry block")
+    la.add_argument("--derived", required=True, help="path to the derived canonical")
+    la.add_argument("--root", help="host repo root (default: git toplevel of cwd)")
+
+    cc = sub.add_parser("claims-check",
+                        help="compare source and derived claim sets (CAP-2)")
+    cc.add_argument("--source-map", required=True,
+                    help="the source canonical's provenance map")
+    cc.add_argument("--derived-map", required=True,
+                    help="the derived canonical's provenance map")
+    cc.add_argument("--fill", help="the approved plan's JSON, for its declared omissions")
+
     args = p.parse_args(argv)
-    if args.cmd == "payload" and not args.fill:
-        sys.stderr.write("error: payload requires --fill (an unfilled plan is not "
-                         "presentable)\n")
+    if args.cmd in ("payload", "write") and not args.fill:
+        sys.stderr.write(f"error: {args.cmd} requires --fill (an unfilled plan is "
+                         "neither presentable nor writable)\n")
         return USAGE
-    fn = {"plan": cmd_plan, "payload": cmd_payload}[args.cmd]
+    fn = {"plan": cmd_plan, "payload": cmd_payload, "write": cmd_write,
+          "lint-ancestry": cmd_lint_ancestry, "claims-check": cmd_claims_check}[args.cmd]
     try:
         return fn(args)
     except Refusal as exc:

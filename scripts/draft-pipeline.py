@@ -1925,6 +1925,19 @@ def cmd_variants(args):
 
 
 _CANONICAL_SHA = re.compile(r"canonical-sha256=([0-9a-f]{64})")
+# A derived canonical declares its source in an inline `adapted_from` mapping
+# (SPEC-canonical-adaptation CAP-4). This is a PRESENCE test only — the block's
+# contents are read and graded by the adaptation invocation, never here — this
+# stage neither invokes it nor knows what a derivation means (CAP-1).
+_ADAPTED_FROM = re.compile(r"^adapted_from:\s*\{", re.MULTILINE)
+
+
+def _declares_ancestry(path):
+    try:
+        text = open(path, encoding="utf-8").read()
+    except OSError:
+        return False
+    return bool(_ADAPTED_FROM.search(text))
 
 
 def cmd_variant_staleness(args):
@@ -1966,6 +1979,12 @@ def _staleness_report(text, paths=None, out_dir=None, root=None):
         pattern = f"{slug}." if slug else ""
         paths = [os.path.join(out_dir, f) for f in sorted(os.listdir(out_dir))
                  if f.startswith(pattern) and f.endswith(".md")] if os.path.isdir(out_dir) else []
+        # A DERIVED CANONICAL shares this filename shape (`<slug>.<language>.md`,
+        # SPEC-canonical-adaptation CAP-4) but is a canonical, not a projection:
+        # it declares its own reader and carries an `adapted_from` ancestry
+        # block. Discovery excludes it here so it is never graded as a stale
+        # variant of its source — the ancestry chain is its own check.
+        paths = [p for p in paths if not _declares_ancestry(p)]
 
     variants, publish_blockers = [], []
     for path in paths:
