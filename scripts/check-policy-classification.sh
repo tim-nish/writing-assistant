@@ -9,8 +9,12 @@
 # candidate carries the records-only position); the owner-judgment structural
 # exemption (an `opinion` item passes through `open` untouched even when its
 # text matches a conflict subject); the emitted reconciliation item validates
-# against the extended schema; determined/constrained are structurally present
-# and empty-by-default; no conflict → pure pass-through; reconciliation items
+# against the extended schema; `determined` structurally present and
+# empty-by-default; the CAP-7 `constrained` class (Story 18.49, #566 — the
+# excluded candidate is SHOWN with its governing quote and pin, the question is
+# still asked, conflict takes precedence over constrained on one subject, and
+# R11/R12 reject an unauditable or filtered-away exclusion);
+# no conflict → pure pass-through; reconciliation items
 # ride the interview's tension-priority path (reserved slot, presentation
 # lead); the journal records positions; an answered reconciliation emits a
 # config↔policy reconciliation staging-candidate block; and the SKILL states
@@ -97,16 +101,97 @@ assert c["item"] == originals["q6"], "judgment item was modified in passing"
 assert originals["q6"] in d["interview_items"], "judgment item filtered out"
 PYEOF
 
-# --- 3. determined/constrained: structurally present, empty-by-default ----------
+# --- 3. determined: structurally present, empty-by-default ----------------------
+# `constrained` is NO LONGER empty-by-default (Story 18.49, #566) — it activates
+# on the same EN-topology row. On THIS fixture it stays empty for a different
+# reason: config asserts the excluded value, so the subject is a `conflict` and
+# the detector's precedence rule keeps it out of both classes at once.
 python3 - "$work/classified.json" <<'PYEOF' \
-  && ok "determined/constrained present and empty (the subject table is the extension point)" \
+  && ok "determined empty (extension point); constrained empty here because conflict takes precedence" \
   || err "determined/constrained shape wrong"
 import json, sys
 d = json.load(open(sys.argv[1]))
-assert d["determined"] == [] and d["constrained"] == [], (d["determined"], d["constrained"])
+assert d["determined"] == [], d["determined"]
+assert d["constrained"] == [], ("conflict must take precedence over constrained "
+                                "for one subject", d["constrained"])
 assert d["journal_records"], "conflict left no journal record"
 assert any(r.get("class") == "conflict" for r in d["journal_records"])
+assert not any(r.get("class") == "constrained" for r in d["journal_records"])
 PYEOF
+
+# --- 3b. constrained: the excluded candidate is SHOWN, marked, quoted, pinned ----
+# Same served line, config NOT asserting the excluded value: the line rules
+# `canonical` out as an ANSWER without determining one.
+printf '{"syndication": {"policy": {"en": {"mode": "source", "variants": []}}}}' \
+  > "$work/no-conflict-config.json"
+python3 "$PIPE" classify-policy --surface "$FIX/surface.txt" \
+  --config-json "$work/no-conflict-config.json" \
+  --items "$FIX/constrained-items.json" --config-version cfgv1 \
+  > "$work/constrained.json" || err "classify-policy failed on the constrained fixtures"
+python3 - "$work/constrained.json" <<'PYEOF' \
+  && ok "constrained: the ruled-out candidate is SHOWN in the list, marked with the governing quote + pin" \
+  || err "constrained presentation wrong (suppression or missing evidence)"
+import json, sys
+d = json.load(open(sys.argv[1]))
+by_id = {c["id"]: c for c in d["classified"]}
+assert by_id["c1"]["class"] == "constrained", by_id["c1"]
+cands = by_id["c1"]["item"]["candidates"]
+# NOT suppressed: all three candidates survive, the excluded one among them.
+assert len(cands) == 3, ("an excluded candidate was dropped — silent suppression", cands)
+exc = [c for c in cands if c.get("excluded")]
+assert len(exc) == 1, exc
+e = exc[0]["excluded"]
+assert e["value"] == "canonical" and e["authority"] == "policy", e
+assert "reference records only" in e["quote"], e
+assert e["pointer"].startswith("topics/articles.md:17@"), e
+assert e["reason"].strip(), "an exclusion with no reason is a silent one"
+# The item declares its class, and the question is STILL ASKED.
+assert by_id["c1"]["item"]["policy_class"] == "constrained"
+assert "c1" in [i["id"] for i in d["interview_items"]], "constrained item was not asked"
+# An unrelated candidate item is untouched.
+assert by_id["c2"]["class"] == "open", by_id["c2"]
+assert d["constrained"] and d["constrained"][0]["id"] == "c1", d["constrained"]
+assert any(r.get("class") == "constrained" for r in d["journal_records"])
+PYEOF
+
+# The emitted constrained item passes the extended validator (R10/R11 clean):
+# the exclusion is auditable and the ≤3 cap counts selectable candidates only.
+python3 - "$work/constrained.json" <<'PYEOF' > "$work/constrained-items.json"
+import json, sys
+json.dump(json.load(open(sys.argv[1]))["interview_items"], sys.stdout)
+PYEOF
+set +e; out=$(python3 "$VAL" "$work/constrained-items.json" 2>&1); rc=$?; set -e
+[ "$rc" -eq 0 ] && [ -z "$out" ] && ok "emitted constrained item validates (R10/R11 clean)" \
+  || err "emitted constrained item failed validation: $out"
+
+# R12 — the silent-suppression defect itself: a constrained item that shows only
+# the compatible candidates is REJECTED, not warned.
+python3 - "$work/constrained.json" <<'PYEOF' > "$work/suppressed-items.json"
+import json, sys
+items = json.load(open(sys.argv[1]))["interview_items"]
+item = next(i for i in items if i["id"] == "c1")
+item["candidates"] = [c for c in item["candidates"] if not c.get("excluded")]
+json.dump([item], sys.stdout)
+PYEOF
+set +e; out=$(python3 "$VAL" "$work/suppressed-items.json" 2>&1); rc=$?; set -e
+printf '%s' "$out" | grep -q 'R12' && [ "$rc" -eq 1 ] \
+  && ok "R12: a constrained item with the excluded candidate filtered away is rejected" \
+  || err "silent suppression passed validation (expected R12): $out"
+
+# R11 — an exclusion that is not auditable (unpinned governing pointer).
+python3 - "$work/constrained.json" <<'PYEOF' > "$work/unpinned-items.json"
+import json, sys
+items = json.load(open(sys.argv[1]))["interview_items"]
+item = next(i for i in items if i["id"] == "c1")
+for c in item["candidates"]:
+    if c.get("excluded"):
+        c["excluded"]["pointer"] = "topics/articles.md:17"   # no @sha
+json.dump([item], sys.stdout)
+PYEOF
+set +e; out=$(python3 "$VAL" "$work/unpinned-items.json" 2>&1); rc=$?; set -e
+printf '%s' "$out" | grep -q 'R11' && [ "$rc" -eq 1 ] \
+  && ok "R11: an unpinned governing pointer on an exclusion is rejected" \
+  || err "unauditable exclusion passed validation (expected R11): $out"
 
 # --- 4. The emitted reconciliation item passes the extended validator -----------
 python3 - "$work/classified.json" <<'PYEOF' > "$work/rc-items.json"
@@ -118,8 +203,7 @@ set +e; out=$(python3 "$VAL" "$work/rc-items.json" 2>&1); rc=$?; set -e
   || err "emitted reconciliation item failed validation: $out"
 
 # --- 5. No conflict → pure pass-through, no reconciliation residue ---------------
-printf '{"syndication": {"policy": {"en": {"mode": "source", "variants": []}}}}' \
-  > "$work/no-conflict-config.json"
+# (items.json carries no candidate answers, so nothing is constrained either.)
 python3 "$PIPE" classify-policy --surface "$FIX/surface.txt" \
   --config-json "$work/no-conflict-config.json" --items "$FIX/items.json" \
   > "$work/no-conflict.json" || err "classify-policy failed without a conflict"

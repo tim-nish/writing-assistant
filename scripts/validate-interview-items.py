@@ -92,6 +92,30 @@ own rejection classes, distinct from R1/R5:
       (R1 unchanged). A `recommended_default` with no `candidates` key is the
       single-position N=1 case — byte-identical to before.
 
+The CAP-7 `constrained` class (Story 18.49, #566) — a served line rules some
+answers OUT without determining one — is presented by SHOWING the ruled-out
+candidate, marked `excluded` with the governing line, never by filtering it
+away. `classify-policy` records the class on the item as `policy_class:
+"constrained"`, and the answers ride an ITEM-LEVEL `candidates` array —
+deliberately not `recommended_default`, which is legal only on the
+editorial-judgment classes (R6) that are structurally exempt from this class,
+so the two carriers never coexist. Its rejection classes:
+
+  R11 a malformed item-level candidate: no answer text, or an `excluded`
+      marker missing its reason, its verbatim governing quote, its pinned
+      whitelist pointer, or carrying an authority other than `policy` — an
+      exclusion the owner cannot read or audit is a silent one. Also when the
+      exclusions leave no selectable answer: the ≤3 gate cap governs the
+      SELECTABLE remainder, and excluded candidates ride on top rather than
+      pushing a real choice out of the list.
+  R12 an item declaring `policy_class: "constrained"` that shows NO excluded
+      candidate — presenting only the compatible candidates makes a
+      constrained question indistinguishable from a free choice and hides the
+      exclusion from audit. This is the silent-suppression defect itself.
+
+An item with no `excluded` marker and no `policy_class` parses exactly as
+before — every existing item shape is byte-identical.
+
 Input: a JSON array of items (or {"items": [...]}) from a file argument or
 stdin (`-`). Output: silent + exit 0 when every item passes; else one
 `[<item id>] R<n>: <reason>` line per rejection on stderr and exit 1.
@@ -110,6 +134,11 @@ TENSION_TYPES = {"contradiction", "ambiguity", "missing-rationale", "reversal-ca
 # The conflict-classified question shape (Story 13.75, CAP-7): carries a
 # `positions` array instead of a seed — see the module docstring.
 RECONCILIATION_TYPE = "reconciliation"
+
+# CAP-7 `constrained` (Story 18.49, #566): carried on the item by
+# `classify-policy` so presentation and validation can both tell a constrained
+# question from a free choice.
+CONSTRAINED_CLASS = "constrained"
 GAP_TYPES = NEEDS_OWNER_TAXONOMY | TENSION_TYPES | {RECONCILIATION_TYPE}
 
 # The editorial-judgment classes eligible for a policy-recalled recommended
@@ -289,6 +318,7 @@ def validate_items(items):
         # Recommended default (Story 13.59) — an optional, policy-recalled
         # proposed answer for an editorial-judgment gap. Absent by default, so
         # every existing item shape is byte-identical to before.
+        excluded_count = 0
         rd = item.get("recommended_default")
         if rd is not None:
             # Eligibility (R6/R7) is a property of the item's gap type — it
@@ -335,6 +365,63 @@ def validate_items(items):
                         _audit_position(cand, f"candidates[{i}]")
             else:
                 _audit_position(rd, "recommended_default")
+
+        # Item-level `candidates` — the CAP-7 `constrained` carrier (Story
+        # 18.49, #566). Deliberately NOT `recommended_default`: that one is
+        # legal only on the editorial-judgment classes (R6), and judgment is
+        # structurally exempt from `constrained`, so the two never coexist.
+        # An excluded candidate is a DISCLOSURE, not a choice: it is shown so
+        # the exclusion is visible, and it is auditable on the same terms as
+        # any recalled position — the governing line's quote and its pin.
+        item_candidates = item.get("candidates")
+        if item_candidates is not None:
+            if not isinstance(item_candidates, list) or not item_candidates:
+                rej("R11", "item-level `candidates` must be a non-empty array of "
+                           "proposed answers")
+                item_candidates = []
+            for i, cand in enumerate(item_candidates):
+                label = f"candidates[{i}]"
+                if not isinstance(cand, dict) or not str(cand.get("answer", "")).strip():
+                    rej("R11", f"{label} has no answer text — nothing for the "
+                               "owner to choose")
+                    continue
+                exc = cand.get("excluded")
+                if exc is None:
+                    continue
+                excluded_count += 1
+                if not isinstance(exc, dict):
+                    rej("R11", f"{label}.excluded is not an object")
+                    continue
+                if not str(exc.get("reason", "")).strip():
+                    rej("R11", f"{label}.excluded has no reason — an exclusion "
+                               "the owner cannot read is a silent one")
+                if not str(exc.get("quote", "")).strip():
+                    rej("R11", f"{label}.excluded has no governing quote — the "
+                               "exclusion is not auditable")
+                if not POINTER_RE.match(str(exc.get("pointer", "")) or ""):
+                    rej("R11", f"{label}.excluded pointer {exc.get('pointer')!r} is "
+                               "missing, unpinned, or outside the whitelist — the "
+                               "excluding line must resolve at its pin like a seed")
+                if exc.get("authority") != "policy":
+                    rej("R11", f"{label}.excluded authority {exc.get('authority')!r} "
+                               "is invalid — a candidate is ruled out by a served "
+                               "policy line (authority: policy)")
+            # The owner must still have something to choose: an exclusion never
+            # empties the list, and the selectable remainder is what the ≤3 gate
+            # cap governs.
+            selectable = len(item_candidates) - excluded_count
+            if item_candidates and not (1 <= selectable <= 3):
+                rej("R11", f"candidates must leave 1-3 SELECTABLE answers (got "
+                           f"{selectable}; excluded candidates are shown in addition "
+                           "and are not counted against the gate cap)")
+
+        # R12: a constrained question that shows no exclusion is a free choice
+        # wearing a constrained label — the silent-suppression defect itself.
+        if item.get("policy_class") == CONSTRAINED_CLASS and excluded_count == 0:
+            rej("R12", "an item classified `constrained` must SHOW at least one "
+                       "excluded candidate, marked with the governing line — "
+                       "presenting only the compatible candidates hides the "
+                       "exclusion from the owner and from audit")
 
         if not str(item["question"]).strip() and not any(
                 r[0] == iid and r[1] == "R4" for r in rejections):
