@@ -116,6 +116,17 @@ so the two carriers never coexist. Its rejection classes:
 An item with no `excluded` marker and no `policy_class` parses exactly as
 before — every existing item shape is byte-identical.
 
+Gate-item content grounding (Story 18.51, #567) — the ENGINE-WIDE rule
+(SPEC-writing-assistant Constraints), implemented once in `gate_premise.py`
+and shared by every gate producer:
+
+  R13 an owner-facing string asserting a factual premise with no resolvable
+      pointer and no inline `unverified —` marker AT THE POINT OF USE. Checked
+      per clause over the question, each candidate answer, and a recommended
+      default's proposed answer — so a correct top-level disclosure is no
+      defence for an invention in a subordinate clause. An item that asserts
+      no factual premise is untouched.
+
 Input: a JSON array of items (or {"items": [...]}) from a file argument or
 stdin (`-`). Output: silent + exit 0 when every item passes; else one
 `[<item id>] R<n>: <reason>` line per rejection on stderr and exit 1.
@@ -125,6 +136,44 @@ import argparse
 import json
 import re
 import sys
+
+_gate_premise = None
+
+
+def _gp():
+    """The shared gate-item premise checker (#567) — the ONE implementation of
+    the engine-wide content-grounding rule, loaded on first use."""
+    global _gate_premise
+    if _gate_premise is None:
+        import importlib.util
+        import os
+        here = os.path.dirname(os.path.realpath(__file__))
+        spec = importlib.util.spec_from_file_location(
+            "gate_premise", os.path.join(here, "gate_premise.py"))
+        _gate_premise = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(_gate_premise)
+    return _gate_premise
+
+
+def _premise_texts(item):
+    """(label, text) for every owner-facing string an interview item presents —
+    what the owner actually reads and ratifies."""
+    out = [("question", str(item.get("question") or ""))]
+    for i, cand in enumerate(item.get("candidates") or []):
+        if isinstance(cand, dict):
+            out.append((f"candidates[{i}].answer", str(cand.get("answer") or "")))
+    rd = item.get("recommended_default")
+    if isinstance(rd, dict):
+        cands = rd.get("candidates")
+        if isinstance(cands, list):
+            for i, cand in enumerate(cands):
+                if isinstance(cand, dict):
+                    out.append((f"recommended_default.candidates[{i}]",
+                                str(cand.get("default") or "")))
+        else:
+            out.append(("recommended_default", str(rd.get("default") or "")))
+    return out
+
 
 NEEDS_OWNER_TAXONOMY = {
     "audience", "motivation", "surprise", "tradeoff", "significance",
@@ -422,6 +471,15 @@ def validate_items(items):
                        "excluded candidate, marked with the governing line — "
                        "presenting only the compatible candidates hides the "
                        "exclusion from the owner and from audit")
+
+        # R13 — the engine-wide gate-item content-grounding rule (#567), one
+        # implementation in `gate_premise.py`. It runs over every owner-facing
+        # string the item carries: the question, each candidate answer, and a
+        # recommended default's proposed answer text. An item asserting no
+        # factual premise is untouched.
+        for label, text in _premise_texts(item):
+            for reason in _gp().scan_inline(text):
+                rej("R13", f"{label}: {reason}")
 
         if not str(item["question"]).strip() and not any(
                 r[0] == iid and r[1] == "R4" for r in rejections):

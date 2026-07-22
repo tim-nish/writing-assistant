@@ -125,6 +125,26 @@ done
 grep -q 'presented-payloads.jsonl' "$root/skills/owner-facing-proposal-contract.md" \
   && ok "contract (f) documents presented-payload capture" || err "contract missing capture section"
 
+
+# --- Story 18.51 (#567): premise grounding on the shared proposal gate ---------
+# This ONE gate is the presentation path for four surfaces -- gap interview,
+# review arbitration, Stage-4 verification, and visual proposals -- so wiring
+# it here reaches all of them.
+printf '{"items":[{"where":"Section 2","why":"the module, described internally as the demo path, lacks evidence","choices":[{"label":"approve","effect":"keep it"}]}]}' > "$ws/premise-bad.json"
+python3 "$V" "$ws/premise-bad.json" 2>&1 | grep -q 'confabulated-premise' \
+  && ok "#567: an ungrounded premise in an owner-facing field blocks presentation" \
+  || err "ungrounded premise presented to the owner"
+
+printf '{"items":[{"where":"Section 2","why":"the module, described internally (unverified — no declared source) as the demo path, lacks evidence","choices":[{"label":"approve","effect":"keep it"}]}]}' > "$ws/premise-marked.json"
+python3 "$V" "$ws/premise-marked.json" >/dev/null 2>&1 \
+  && ok "#567: an inline \`unverified —\` marker at the point of use is presentable" \
+  || err "a correctly marked premise was blocked"
+
+printf '{"items":[{"where":"Section 2","why":"the evidence is thin","choices":[{"label":"approve","effect":"keep it as originally built for replay"}]}]}' > "$ws/premise-effect.json"
+python3 "$V" "$ws/premise-effect.json" 2>&1 | grep -q 'choices\[0\].effect' \
+  && ok "#567: the rule reaches choice EFFECT text, not just where/why" \
+  || err "choice effect text escapes the premise rule"
+
 if [ "$fail" -eq 0 ]; then
   printf '\nAll proposal-payload checks passed.\n'; exit 0
 else
