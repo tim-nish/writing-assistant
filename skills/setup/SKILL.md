@@ -94,6 +94,24 @@ from nothing (evidence-gate-must-be-agent-fed).
    the run-time degrade stays silent by design (SPEC-policy-source-seam
    CAP-6); this offer is the setup-time surfacing of that decision, not a
    nag. Never present `policy_source` as required.
+4. **Platform profiles (only when `syndication.policy` declares variants).**
+   Ask the resolver which declared platforms have no profile — never derive it
+   from a second check:
+
+   ```
+   python3 ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-platform-profiles.py missing --root <host-repo>
+   ```
+
+   Each `<platform>\tseedable` line is one **approve / modify / skip** offer:
+   state where the profile lands (the resolved profiles directory), why it is
+   asked (this platform is declared but has no profile, so `emit-variants`
+   would fail at it), and each choice's effect. The shipped examples are
+   complete for the common case and owner values like `site_url` come from
+   user config, so approve is a real default. A `no-template` line has nothing
+   to seed from: report it, and let the owner author the profile by hand or
+   drop the variant. **Never tell the owner to `mkdir` a machine-state path
+   and copy files** (#568) — this offer exists precisely so the pipeline
+   places the file.
 
 ## Stage C — write through the sanctioned writers only
 
@@ -104,6 +122,8 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-writing-sources.py set-draft-locat
 # only when the owner accepted the policy_source offer (presence toggle,
 # no path argument — Story 13.73):
 python3 ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-writing-sources.py set-policy-source --root <host-repo>
+# one call per platform profile the owner approved in Stage B item 4 (#568):
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-platform-profiles.py seed <platform> --root <host-repo>
 ```
 
 The writers are fail-closed (a malformed result refuses and writes nothing)
@@ -133,7 +153,11 @@ it never ends the run with a broken config:
 2. `resolve-writing-sources.py files --root <host-repo>` — non-empty scope
    (or the owner explicitly accepted an empty one), and relay any noise
    warning.
-3. When `policy_source` was declared:
+3. When any platform profile was seeded:
+   `resolve-platform-profiles.py validate --root <host-repo>` — exit 0, and
+   `... missing --root <host-repo>` no longer lists the seeded platform. (The
+   writer verifies its own work too; this is the aggregate check.)
+4. When `policy_source` was declared:
    `read-policy-source.py pin --root <host-repo>` and `whitelist` — a
    **gateway health check** (Story 13.73, #366): the pin arrives from the
    tsurezure-gateway and the whitelist names GLOSSARY and LESSONS. No

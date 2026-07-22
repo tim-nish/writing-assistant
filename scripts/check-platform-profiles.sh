@@ -163,6 +163,83 @@ got=$($PY deprecations --root "$work" --global-config "$work/clean.yaml" \
   --repo-config "$work/none.yaml")
 eq "AC3 clean config reports no legacy keys" "$got" "ok: no legacy syndication.variants.* keys present"
 
+# --- Story 18.52 (#568): the pipeline places the profile, not the owner -------
+
+# 12. The sanctioned writer exists and seeds from the shipped example, creating
+# the directory it needs — the whole point is that the owner never mkdirs one.
+seedw="$work/seed-profiles/platform-profiles"
+[ -d "$seedw" ] && err "fixture dir should not pre-exist"
+$PY seed devto --root "$work" --profiles-dir "$seedw" >/dev/null 2>&1 \
+  && [ -f "$seedw/devto.yaml" ] \
+  && ok "seed writes the profile and creates the profiles directory" \
+  || err "seed did not place the profile"
+
+# 13. It VERIFIES before finishing: the seeded profile resolves and validates.
+$PY validate --root "$work" --profiles-dir "$seedw" >/dev/null 2>&1 \
+  && ok "seeded profile validates (verified before finishing)" \
+  || err "seeded profile does not validate"
+got=$($PY list --root "$work" --profiles-dir "$seedw")
+eq "seeded platform now resolves in list" "$got" "devto"
+
+# 14. Fail-closed: an existing profile is never clobbered without --force.
+printf 'edited: by the owner\n' >> "$seedw/devto.yaml"
+set +e; $PY seed devto --root "$work" --profiles-dir "$seedw" >/dev/null 2>&1; rc=$?; set -e
+[ "$rc" -ne 0 ] && grep -q '^edited: by the owner' "$seedw/devto.yaml" \
+  && ok "seed refuses to overwrite an existing profile; owner edits survive" \
+  || err "seed clobbered an existing profile"
+
+# 15. A platform with no shipped template is authored by hand, never invented.
+set +e; $PY seed hackernews --root "$work" --profiles-dir "$seedw" >/dev/null 2>&1; rc=$?; set -e
+[ "$rc" -ne 0 ] && [ ! -f "$seedw/hackernews.yaml" ] \
+  && ok "seed refuses a platform with no shipped example" \
+  || err "seed invented a profile with no template"
+
+# 16. `missing` is the preflight's own answer: declared-but-unresolvable
+# platforms, tagged with whether a template exists to seed from.
+cat > "$work/miss.yaml" <<'YAML'
+owner:
+  name: X
+syndication:
+  policy:
+    en:
+      mode: canonical
+      variants: [devto, hackernews]
+YAML
+empty="$work/empty-profiles"
+mkdir -p "$empty"
+got=$($PY missing --root "$work" --profiles-dir "$empty" \
+      --global-config "$work/miss.yaml" --repo-config "$work/none.yaml")
+eq "missing tags a declared platform with a template as seedable" \
+   "$(printf '%s' "$got" | grep -c 'devto	seedable')" "1"
+eq "missing tags a declared platform with no template as no-template" \
+   "$(printf '%s' "$got" | grep -c 'hackernews	no-template')" "1"
+
+# 17. A resolved platform is not reported missing (no false homework).
+$PY seed devto --root "$work" --profiles-dir "$empty" >/dev/null 2>&1
+got=$($PY missing --root "$work" --profiles-dir "$empty" \
+      --global-config "$work/miss.yaml" --repo-config "$work/none.yaml")
+eq "a seeded platform drops out of missing" \
+   "$(printf '%s' "$got" | grep -c 'devto')" "0"
+
+# 18. The skills state the in-conversation offer, not a cp instruction (#568) —
+# the lockstep partner of the writer above.
+EMIT="skills/emit-variants/SKILL.md"
+SETUP="skills/setup/SKILL.md"
+grep -q 'resolve-platform-profiles.py missing' "$EMIT" \
+  && grep -q 'resolve-platform-profiles.py seed' "$EMIT" \
+  && ok "emit-variants preflight consumes \`missing\` and writes through \`seed\`" \
+  || err "emit-variants preflight not wired to the resolver's missing/seed"
+grep -qi 'never homework\|never tell the owner' "$EMIT" \
+  && ok "emit-variants states a missing profile is an offer, never homework" \
+  || err "emit-variants missing the in-conversation offer contract"
+grep -q 'resolve-platform-profiles.py seed' "$SETUP" \
+  && grep -q 'resolve-platform-profiles.py missing' "$SETUP" \
+  && ok "setup offers platform-profile seeding and writes through the sanctioned writer" \
+  || err "setup missing the platform-profile step"
+grep -q 'cp config/platform-profiles' "$EMIT" \
+  && err "emit-variants still instructs the owner to cp an example file" \
+  || ok "no cp-the-example instruction remains in the emit-variants preflight"
+
 if [ "$fail" -eq 0 ]; then
   printf 'All platform-profile checks passed.\n'; exit 0
 else

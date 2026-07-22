@@ -79,18 +79,50 @@ resolvable profile, and emission WILL fail at that platform (#494/#530). Use the
 resolver's own answer — never a second profile check:
 
 ```
-python3 ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-platform-profiles.py list --root <host-repo>
-python3 ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-platform-profiles.py dir  --root <host-repo>
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-platform-profiles.py missing --root <host-repo>
 ```
 
-Any id in `available` that is absent from `list` is a **missing piece**. Report
-it before offering options, naming the exact path
-`<dir>/<platform>.yaml` and the fix — copy
-`config/platform-profiles/<platform>.example.yaml` there, or drop the declared
-variant from `syndication.policy`. When *every* `available` platform is
-unresolvable there is nothing emittable: stop. When only some are, report the
-unresolvable ones as missing pieces and carry only the resolvable ones into the
-selection screen.
+Each line is `<platform>\t<seedable|no-template>`: a declared platform with no
+resolvable profile, and whether a shipped example exists to seed it from. Empty
+output means every declared platform resolves — carry on to step 2.
+
+**A missing profile is an offer, never homework (#568).** Do not name a
+machine-state path and tell the owner to `mkdir` it and copy files: that is
+exactly "a path or artifact for the owner to open", which the owner-facing
+proposal contract forbids. Instead, present the missing profiles
+**in-conversation**, one choice per platform, before offering emission options:
+
+- **`seedable`** — offer **approve / modify / skip**. State *where* the profile
+  lands (the resolved directory), *why* it is being asked (this platform is
+  declared in `syndication.policy` but has no profile, so emission would fail
+  at it), and the *effect* of each choice: approve writes the profile from the
+  shipped example and the platform becomes emittable in this run; modify seeds
+  it and then applies the owner's stated changes; skip leaves it unresolvable
+  and drops it from the selection screen. The shipped examples are complete for
+  the common case (dev.to en-practitioner, Zenn ja-practitioner) and owner
+  values like `site_url` are composed from user config, not the profile — so
+  approve is a real default, not a stub.
+- **`no-template`** — there is nothing to seed from. Report it as a missing
+  piece: the profile must be authored by hand, or the declared variant dropped
+  from `syndication.policy`.
+
+On approve (or modify), write it through the sanctioned writer and let the
+resolver verify its own work:
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-platform-profiles.py seed <platform> --root <host-repo>
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-platform-profiles.py validate --root <host-repo>
+```
+
+`seed` creates the directory, resolves the destination through the path
+resolver, refuses to overwrite an existing profile without `--force`, and
+re-validates before reporting success. Never hand-write a profile file or
+compose that path yourself.
+
+After the offers, a platform that was seeded is **emittable in this run**. When
+*every* `available` platform is still unresolvable (all skipped, or all
+`no-template`) there is nothing emittable: stop. When only some are, carry the
+resolvable ones into the selection screen and report the rest as missing pieces.
 
 ## Step 2 — one selection screen, then emit
 
