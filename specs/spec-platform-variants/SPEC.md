@@ -111,6 +111,14 @@ per publish decision.**
     owner-facing proposal contract (approve / modify / replace), inside the
     existing ≤10-minute attention budget — it is the variant's only owner
     touchpoint.
+    **Scope of "language surface" (amended 2026-07-22, #574):** the re-targeted
+    material is the **lede**; the body — claims, evidence, section headings —
+    carries over unchanged, so a **cross-language variant is a mixed-language
+    artifact by design** (a JA-profile projection of an EN canonical ships an EN
+    body). This is not a defect to be translated away — auto-translation would
+    introduce claims the canonical provenance map does not contain — but it is
+    never left silent: CAP-5's `language-mismatch` check makes the consequence
+    visible in the publish-blocker bucket, and the owner decides.
   - **success:** Diffing a variant against the canonical draft shows changes only
     in frontmatter/packaging, language surface, and the re-targeted lede/framing;
     `verify-provenance` run on the variant finds no claim absent from the
@@ -122,14 +130,22 @@ per publish decision.**
     run on the canonical draft only. An emitted variant gets a **mechanical
     platform lint** — profile-declared frontmatter schema, tag cap, TL;DR
     placement, canonical-URL well-formedness, です/ます consistency for `ja`,
-    the `packaging.visuals` treatment applied, and profile target directories
+    **`language-mismatch` — a body whose script ratio does not match the
+    profile's declared `language` (amended 2026-07-22, #574)**, the
+    `packaging.visuals` treatment applied, and profile target directories
     existing in the `output.drafts` destination repo —
     plus the CAP-4 lede proposal above. No structure, prose, or cold-read pass
     re-runs per variant.
+    The `language-mismatch` check is a **publish blocker, never a refusal** — the
+    owner may publish a mixed-language variant knowingly; what the check forbids
+    is the outcome being invisible. It is distinct from the です/ます check, which
+    polices register *within* Japanese prose and therefore passes clean on a body
+    with no Japanese at all.
   - **success:** Emitting a variant from a reviewed canonical draft consumes zero
     LLM review passes beyond the single lede-re-targeting step; a seeded packaging
     defect (e.g. 5 tags where the profile caps 4) is reported by the lint with
-    file/line.
+    file/line; a `language: ja` profile's variant carrying an English body reports
+    exactly one `language-mismatch` publish blocker.
 
 ## Constraints
 

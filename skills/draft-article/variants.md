@@ -76,7 +76,12 @@ picks only one platform leaves no file for the others, anywhere).
   content without the trailer — one convention, Story 13.68).
 - **Projection, not rewrite:** the body carries over unchanged (claims, evidence,
   provenance, section structure); only frontmatter/packaging and the profile's
-  declared visual treatment differ from the canonical draft.
+  declared visual treatment differ from the canonical draft. **A cross-language
+  variant is therefore a mixed-language artifact by design** (#574): only the lede
+  is re-targeted, so a JA-profile projection of an EN canonical ships an EN body —
+  never translated (that would introduce claims the provenance map lacks), never
+  silent (the lint's `language-mismatch` check reports it as a publish blocker and
+  the owner decides).
 - **EN / `mode: canonical`** (dev.to-style profile) → the full article text with
   the profile's frontmatter, whose `canonical_url` is composed from the owner's
   base value and the profile's format, pointing back at the site page.
