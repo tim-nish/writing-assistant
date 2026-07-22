@@ -123,6 +123,74 @@ else
   ok "present layout dir passes (destination repo structure is authoritative)"
 fi
 
+# 7. language-mismatch (#574): a `language: ja` profile's variant carrying an
+#    English body is a publish blocker; the check is distinct from the です/ます
+#    register check, which passes clean on a body with no Japanese at all.
+cat > "$work/mixed.zenn.md" <<'EOF'
+---
+title: "Tanuki's hardest lessons"
+emoji: "📝"
+type: "tech"
+topics: ["dogfooding"]
+published: false
+---
+
+Tanuki は Claude Code プラグインを自動でドッグフーディングするツールです。
+
+## Context
+
+Tanuki is automated dogfooding of a Claude Code plugin. It drives branching
+scenarios in disposable clones, mines the recorded events into deduplicated
+findings, and consolidates the chronic ones into a short, ranked brief.
+
+## The weak driver is the instrument
+
+A capable model routes around friction so smoothly that the friction never gets
+written down. The weakness is the whole point of the instrument.
+EOF
+mkdir -p "$work/dest/articles"
+out=$(python3 "$LINT" "$work/mixed.zenn.md" --root "$work/host" --dest-repo "$work/dest" 2>&1 || true)
+printf '%s' "$out" | grep -Eq 'mixed.zenn.md:[0-9]+: language-mismatch' \
+  && ok "ja profile with an English body reports language-mismatch" \
+  || err "language-mismatch not reported: $out"
+printf '%s' "$out" | grep -q 'です/ます' \
+  && err "register check fired on a body with no Japanese prose" \
+  || ok "language-mismatch is distinct from the です/ます register check"
+
+# 7b. A body matching its profile language reports NO language-mismatch — the
+#     en/devto variant emitted above stays clean.
+python3 "$LINT" "$work/o/retry-storms.devto.md" --root "$work/host" 2>&1 \
+  | grep -q 'language-mismatch' \
+  && err "en body under an en profile wrongly flagged" \
+  || ok "body matching its profile language reports no language-mismatch"
+
+# 7c. A genuinely Japanese body stays clean even when it is code/identifier heavy
+#     — code fences, inline code and URLs are stripped before measuring.
+cat > "$work/ja.zenn.md" <<'EOF'
+---
+title: "設定の解決"
+emoji: "📝"
+type: "tech"
+topics: ["config"]
+published: false
+---
+
+この記事では、`resolve-writing-sources.py` の設定解決について説明します。
+
+```python
+def resolve_drafts_dir(value, root):
+    expanded = os.path.expandvars(os.path.expanduser(value))
+    return os.path.normpath(expanded)
+```
+
+上のコードは絶対パスをそのまま返します。詳細は https://example.com/docs を参照
+してください。設定は機械全体で共有されるため、取り違えに注意が必要です。
+EOF
+python3 "$LINT" "$work/ja.zenn.md" --root "$work/host" --dest-repo "$work/dest" 2>&1 \
+  | grep -q 'language-mismatch' \
+  && err "code-heavy Japanese body wrongly flagged as language-mismatch" \
+  || ok "code-heavy Japanese body passes (code/URLs stripped before measuring)"
+
 if [ "$fail" -eq 0 ]; then
   printf '\nAll platform-lint checks passed.\n'; exit 0
 else
