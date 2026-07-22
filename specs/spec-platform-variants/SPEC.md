@@ -67,7 +67,8 @@ per publish decision.**
     intent/packaging split is unrepresentable in a profile, not conventional
     (ratified 2026-07-16, Epic 16 story review; transcribed per
     SPEC-policy-realignment F5; implemented in Story 16.2).
-- **CAP-3 (emission is per publish decision)** (amended 2026-07-18, #361/#362)
+- **CAP-3 (emission is per publish decision)** (amended 2026-07-18, #361/#362;
+  amended 2026-07-22, #582 — cross-language targets route through adaptation)
   - **intent:** Variants are emitted on an explicit owner choice, presented
     in-conversation per the CAP-6 interaction contract (#226) — in a **separate
     post-review invocation** consuming the persisted, reviewed canonical: "emit
@@ -77,10 +78,28 @@ per publish decision.**
     the canonical changes after emission (e.g. review-applied edits), existing
     variants are marked stale (CAP-6) and re-emission waits for a fresh explicit
     publish decision.
+    **A cross-language target is never offered as a direct projection (amended
+    2026-07-22, #582).** A declared platform whose profile `language` differs
+    from the source canonical's `language` is **not** among the emit choices;
+    it is presented as **"adapt first"** — the route through
+    SPEC-canonical-adaptation to a derived canonical in that language, which
+    then emits as a same-reader variant with no retarget trigger. The
+    mixed-language projection was never a *design*; it was what the screen
+    happened to offer when nothing filtered by language, and the #574 artifact
+    (a JA-profile variant carrying an English title, headings, and body) is
+    what that produced. This changes only what is **offered by default**: the
+    owner may still emit such a variant deliberately, and the shipped
+    `language-mismatch` publish blocker (CAP-4 lint, added 2026-07-22 per #574)
+    remains the backstop that keeps the outcome visible rather than silent.
+    Same-language targets are offered exactly as before.
   - **success:** A run whose owner publishes only on dev.to this week leaves no
     Zenn file anywhere; the choice and its outcome appear in the completion
     summary; a review run that edits the canonical leaves the variant files
-    untouched and the staleness check reporting them stale.
+    untouched and the staleness check reporting them stale. **An EN canonical
+    with `zenn` (a `language: ja` profile) declared presents "adapt first" for
+    Zenn and no direct-projection option; the same canonical's dev.to option is
+    unchanged; a JA canonical derived from it offers Zenn normally, as pure
+    packaging.**
 - **CAP-4 (variant projection, with one bounded judgment step)**
   - **intent:** A variant is a projection of the canonical draft: claims, evidence,
     provenance, and section structure are carried over unchanged — a variant never
