@@ -1494,6 +1494,28 @@ as a beat of the chosen thread (the candidates echo the full element set). With
 **no choice**, the **default is sibling-lessons** — the run never hardens into a
 single shape, but it never blocks on the question either.
 
+**One gate, one record — the widening grows neither (Story 18.46, #559).** The
+brief-informed candidates flow through the **existing** presentation above:
+**exactly one** confirmation, selectable options **plus** a free-form
+counter-proposal, and **no second gate** anywhere in the entry path. The choice
+is recorded in the argument plan's **`arc`** and **nowhere else** — in
+particular **not** in `editorial_anchor`, which continues to carry the
+**claim/angle answer only** (Story 18.41; SPEC-policy-editorial-direction
+CAP-2). A second gate or a second store is a contract violation, so assert both
+mechanically before reporting completion:
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py structure-record --plan <plans/<slug>.md> --journal "$WS/journal.json" [--expect-choice] [--brief-informed]
+```
+
+Exit 0 prints the disclosure payload — which structure, that it is recorded in
+`arc`, and whether the choice was **brief-informed**. Exit 1 names the
+violation. When the choice was brief-informed, the **completion summary and the
+interview journal say so**, consistent with the existing per-element CAP-9
+disclosure. When the owner makes **no** choice the shipped default
+(sibling-lessons) still applies and the run **never blocks** on the question —
+so `--expect-choice` is passed only when a choice was actually made.
+
 Whichever structure is chosen, record it in the argument plan (`arc`) and
 compose Stage 3 from it. **Generation still owns coherence:** the chosen
 structure must **pass the existing Stage 3→4 gate** (dim1 narrative arc; the

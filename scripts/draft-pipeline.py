@@ -3693,6 +3693,85 @@ def cmd_structures(args):
     return 0
 
 
+# --- One gate, one record: the structure-choice guard (Story 18.46, #559) ----
+# CAP-9's #554 amendment widens the proposer's INPUT (Story 18.45). The failure
+# mode it exists to prevent is the widening silently growing a SECOND gate or a
+# SECOND recording location. Story 18.26 already ships both: the gate is the
+# owner-facing proposal contract presentation, and the record is the argument
+# plan's `arc`. The choice does NOT ride `editorial_anchor` — that carries the
+# claim/angle answer ONLY (Story 18.41 / SPEC-policy-editorial-direction CAP-2),
+# and an earlier draft of this story said otherwise; the spec correction (#554)
+# is canonical. This lint is the mechanical guard for both halves.
+
+STRUCTURE_NAMES = ("sibling-lessons", "chronological-journey",
+                   "single-incident-deep-thread", "thematic-braid")
+
+
+def _plan_arc(path):
+    """The `arc` frontmatter value of a plan record, via the plan writer's own
+    frontmatter parser (one parser, never a second)."""
+    wap = _load("write-article-plan.py")
+    fields, _body, _errs = wap.split_frontmatter(
+        open(path, encoding="utf-8").read())
+    return (fields.get("arc") or "").strip()
+
+
+def cmd_structure_record(args):
+    """Guard the structure choice's ONE gate and ONE record (Story 18.46,
+    CAP-9 #554 + CAP-3/CAP-4 `arc`).
+
+    Given the run's plan record (`--plan`) and interview journal (`--journal`),
+    assert that the chosen narrative structure is recorded in the plan's `arc`
+    and NOWHERE else — in particular not in `editorial_anchor`, which continues
+    to carry the claim/angle answer only. Prints the disclosure payload (which
+    structure, and whether the choice was brief-informed) so the completion
+    summary can state it. Exit 0 = conforming; 1 = a violation, named."""
+    defects = []
+    arc = _plan_arc(args.plan) if args.plan else ""
+    chosen = next((s for s in STRUCTURE_NAMES if s in arc), None)
+
+    if args.plan and not chosen:
+        # A run that never presented the choice has no structure to record —
+        # that is the shipped default path, not a defect. Only a run that
+        # DECLARES a choice was made must have recorded it.
+        if args.expect_choice:
+            defects.append(
+                "the run made a structure choice but the plan's `arc` names no "
+                f"structure (arc: {arc!r}) — `arc` is the one recording location")
+
+    journal = _load_json_state(args.journal, "interview journal") if args.journal else {}
+    anchor = journal.get("editorial_anchor") or {}
+    if anchor:
+        # The anchor must stay the claim/angle answer. A structure name in its
+        # text, or a structure-shaped key on it, is the second-store failure.
+        text = (anchor.get("text") or "")
+        leaked = [s for s in STRUCTURE_NAMES if s in text]
+        if leaked:
+            defects.append(
+                f"editorial_anchor.text records the structure choice ({', '.join(leaked)}) "
+                "— the anchor carries the claim/angle answer only (Story 18.41; "
+                "SPEC-policy-editorial-direction CAP-2). Record it in the plan's `arc`.")
+        for key in ("structure", "arc", "narrative_structure"):
+            if key in anchor:
+                defects.append(
+                    f"editorial_anchor carries a {key!r} key — a second recording "
+                    "location for the structure choice. `arc` is the only one.")
+
+    if defects:
+        for d in defects:
+            sys.stderr.write(f"error: {d}\n")
+        return 1
+
+    out = {"structure": chosen, "recorded_in": "arc" if chosen else None,
+           "editorial_anchor_clean": True}
+    if chosen:
+        # Disclosure (CAP-9): the run states that the structure choice was
+        # brief-informed, consistent with the per-element disclosure.
+        out["brief_informed"] = bool(args.brief_informed)
+    print(json.dumps(out, indent=2))
+    return 0
+
+
 def cmd_start(args):
     _rp = _load("resolve-paths.py")
     state, code = _run_state(args.framework, args.sources, _rp.host_root(args.root),
@@ -5040,6 +5119,18 @@ def main(argv=None):
                          "composed INTO the candidates (Story 18.45, CAP-9 #554); may also "
                          "ride the input JSON's \"brief\" key. Absent, the candidates are "
                          "exactly the element-only ones")
+    sp = sub.add_parser("structure-record",
+                        help="guard the structure choice's ONE gate and ONE record "
+                             "(Story 18.46): the chosen structure lives in the plan's "
+                             "`arc`, never in editorial_anchor")
+    sp.add_argument("--plan", help="the run's plan record (plans/<slug>.md)")
+    sp.add_argument("--journal", help="the run's interview journal JSON")
+    sp.add_argument("--expect-choice", action="store_true",
+                    help="the run presented the gate and the owner chose — require "
+                         "`arc` to name the structure")
+    sp.add_argument("--brief-informed", action="store_true",
+                    help="the candidates were composed with the owner's brief in view "
+                         "(Story 18.45) — recorded in the disclosure payload")
     sp = sub.add_parser("answer")
     sp.add_argument("--id", help="the question id this answer keys to (single-answer form)")
     sp.add_argument("--disposition",
@@ -5235,6 +5326,7 @@ def main(argv=None):
     return {
         "start": cmd_start, "consume": cmd_consume, "interview": cmd_interview,
         "structures": cmd_structures,
+        "structure-record": cmd_structure_record,
         "checkpoint": cmd_checkpoint, "resume": cmd_resume, "autostart": cmd_autostart,
         "interview-remaining": cmd_interview_remaining,
         "resume-disclosure": cmd_resume_disclosure,
