@@ -543,6 +543,31 @@ checkpoint overwrites the file, clearing its sub-stage progress. Stage 1
 records per pinned-source batch (the harvest skill states the exact contract
 at its write site).
 
+**Stage 2 (the gap interview) records per answered question (Story 18.38,
+#533).** The interview presents a deterministic ordered set (`interview`'s
+`presentation_order`). Harvest itself is capture-only and non-interactive — the
+only ≤5-question elicitation loop is *this* stage — so it is the interruptible
+question loop the #533 ESC-then-resume burned. After each question is answered
+(recorded via `answer`/`journal`), mark it done:
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py progress --ws "$WS" --stage interview --done <question-id>
+```
+
+On a resumed interview, recompute the presented set (deterministic — same ids)
+and re-enter at the **next unanswered question**, never re-asking an answered
+one. The remaining questions are a mechanical set-difference, not a judgment
+call:
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py interview-remaining --ws "$WS" --present <id> <id> …
+```
+
+It prints the presented ids not yet in `progress.interview.done`, in
+presentation order (empty = every question answered, so the interview is
+complete and the run advances to `fill`). This is the elicitation half of the
+2026-07-22 (#533) durability amendment.
+
 **Mark the run done on completion — through the completion gate (Story 13.68).**
 When the pipeline finishes, run the `complete` subcommand. It is the **only
 sanctioned way to finish a draft run** — never hand-write the final

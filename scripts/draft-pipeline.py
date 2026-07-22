@@ -3557,6 +3557,38 @@ def cmd_resume(args):
     return 0
 
 
+def cmd_interview_remaining(args):
+    """Print the presented interview question ids NOT yet answered — the questions
+    a resumed gap interview must still ask (#533, Story 18.38).
+
+    The Stage-2 gap interview presents a deterministic ordered set (`cmd_interview`
+    `presentation_order`), and records each answered question as a sub-stage unit
+    (`progress --stage interview --done <id>`). On resume the same ordered set is
+    recomputed; this helper subtracts `progress.interview.done` from it and prints
+    the remainder IN PRESENTED ORDER, so re-entry at 'the next unanswered question'
+    is a deterministic tool step, never prompt judgment. With no checkpoint or no
+    recorded interview progress, every presented id is remaining — a fresh
+    interview, unchanged from before this story."""
+    done = []
+    path = _checkpoint_path(args.ws)
+    if os.path.isfile(path):
+        try:
+            with open(path, encoding="utf-8") as f:
+                st = json.load(f)
+        except (OSError, json.JSONDecodeError) as e:
+            sys.stderr.write(f"error: checkpoint unreadable: {e}\n")
+            return 1
+        if st.get("next_stage") == DONE_STAGE:
+            # A completed run has no pending interview — its normal checkpoint
+            # cleared the sub-stage progress. Nothing remains.
+            return 0
+        done = st.get("progress", {}).get("interview", {}).get("done", [])
+    remaining = [q for q in args.present if q not in done]
+    for q in remaining:
+        print(q)
+    return 0
+
+
 # A completed run's final checkpoint carries next_stage == DONE_STAGE so
 # `autostart` never resumes it (Story 13.12).
 DONE_STAGE = "done"
@@ -4493,6 +4525,14 @@ def main(argv=None):
                     help="record an orderly budget stop at this boundary (Story 13.85): "
                          "the partial-progress note the resumed run relays — pass it on "
                          "the final recording before a clean exit")
+    sp = sub.add_parser("interview-remaining",
+                        help="print presented interview question ids not yet answered — "
+                             "a resumed gap interview re-enters at the next unanswered "
+                             "question (Story 18.38, #533)")
+    sp.add_argument("--ws", required=True, help="the run workspace ($WS)")
+    sp.add_argument("--present", required=True, nargs="+", metavar="ID",
+                    help="the presented question ids in presentation order "
+                         "(cmd_interview `presentation_order`)")
     sp = sub.add_parser("complete", help="finish the run through the dual-product completion gate (Story 13.68)")
     sp.add_argument("--draft", required=True, help="the workspace draft to persist as the canonical, or - for stdin")
     sp.add_argument("--slug", required=True, help="the article slug — names both products (<slug>.md)")
@@ -4801,6 +4841,7 @@ def main(argv=None):
         "start": cmd_start, "consume": cmd_consume, "interview": cmd_interview,
         "structures": cmd_structures,
         "checkpoint": cmd_checkpoint, "resume": cmd_resume, "autostart": cmd_autostart,
+        "interview-remaining": cmd_interview_remaining,
         "progress": cmd_progress,
         "stage0": cmd_stage0, "complete": cmd_complete,
         "classify-policy": cmd_classify_policy,
