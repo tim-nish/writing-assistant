@@ -112,7 +112,18 @@ flows into the existing brief/structures path unchanged.**
   vocabulary to maintain — the articles repo would own it, per "the repo's
   schema is the API"). Start pure-derived; promote to recorded frontmatter on
   observed instability.
-- **OQ2 — Quick Start relationship.** Whether the map absorbs, feeds, or sits
-  beside the machine-selected Quick Start candidates. They answer different
-  questions ("decide for me" vs "show me the terrain"); leaning side-by-side
-  entry points sharing CAP-1's assembly.
+- **OQ2 — relationship to a "decide for me" entry point.** *(Restated
+  2026-07-22, triage #583.)* **`unverified — no such surface ships today`:**
+  "Quick Start" names no capability, skill, script, or contract in this
+  repository — the term appears only in this spec. The original phrasing read
+  as a binding to an existing entry point, which would be an unverified
+  inference, so the question is restated at the altitude it actually sits at:
+  **should a machine-selected "decide for me" entry point exist at all**, and
+  if one is ever built, does it absorb, feed, or sit beside the map? The two
+  answer different questions ("decide for me" vs "show me the terrain"), and
+  side-by-side entry points sharing CAP-1's assembly remains the leaning — but
+  nothing here may be written as though the counterpart exists. **This spec
+  binds only to surfaces that ship**: CAP-3's outcome is handed to the
+  **existing stage-0 `--brief` path** (`skills/draft-article/SKILL.md`, owner
+  coverage brief, Story 18.24 / #505), and CAP-1 reads the shipped
+  `track_topics` config mapping (`scripts/resolve-writing-sources.py`, #525).
