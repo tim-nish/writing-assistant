@@ -1444,6 +1444,41 @@ kinds:
 python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py structures <<< '{"elements":[{"id":…,"kinds":["chronology",…],"dominant_incident":false}, …]}'
 ```
 
+**The owner's free-form message is an input to the candidates (Story 18.45,
+CAP-9 2026-07-22 #554 amendment).** When the run carries a
+[coverage brief](#owner-coverage-brief-cap-9-aligned-story-1824-505), pass it —
+the candidates are then composed for **the story the owner described**, not from
+the auto-selected elements alone. This is the **same proposer widened at its
+input**: CAP-9's entry generalization adds **no second proposer** and no second
+gate.
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py structures --brief "<the owner's message or a file path>" <<< '{"elements":[…]}'
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py structures <<< '{"elements":[…],"brief":{"text":"…"}}'   # or carry state.brief through
+```
+
+The brief steers **emphasis and shape, never scope**:
+
+- **Emphasis** — elements the brief names lead the sections/beats, and the
+  rationales say so ("the brief leads with '<element id>'"). Every selected
+  element still survives — **composition, not selection**.
+- **Shape** — the owner's own words may ask for a structure the evidence alone
+  did not signal ("tell the story of…", "just the retry storm, in depth", "what
+  pattern ties these together"). That candidate is offered, composed from the
+  **same** selected elements as beats, and marked `grounding:
+  "brief-requested"` as against `"evidence-signalled"` — the distinction stays
+  auditable, and the brief-cued shape is never the one the 3-candidate cap drops.
+- **Never invented evidence** — only element ids the brief actually **matched**
+  are named in a candidate, so no candidate can imply evidence absent from the
+  fact sheet. A brief item matching no cluster is handled where it already is:
+  as a NEEDS-OWNER gap at selection, not as a structure.
+- The guarantees are unchanged: still **≥2 distinct candidates**, capped at 3,
+  each element-grounded, **sibling-lessons still marked the default**, and the
+  proposer still **deterministic**.
+
+With **no** brief, the candidates are **exactly** the element-only ones above —
+byte for byte.
+
 For F2 the shapes are **sibling-lessons** (the current default), **chronological
 journey**, **single-incident deep thread**, and **thematic braid** — each
 returned with a one-line **rationale grounded in the selected elements' evidence
