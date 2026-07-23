@@ -265,6 +265,36 @@ def _lesson_seed_names(sub):
                    if i.get("family") == "hub-lessons"} - {None, ""})
 
 
+UNNAMED = "(unnamed)"
+
+
+def _subtopic_name(sub):
+    """A heading the owner can steer by (Story 18.70, #616). An empty name
+    renders as a dangling dash and names nothing, so fall back to a member's
+    slug and then to an explicit placeholder — never to blank."""
+    name = str(sub.get("subtopic") or "").strip()
+    if name:
+        return name
+    for item in sub.get("items", []):
+        alt = str(item.get("slug") or item.get("title") or "").strip()
+        if alt:
+            return alt
+    return UNNAMED
+
+
+def _member_lines(sub):
+    """The subtopic's members, by name, with status — what an entry carrying
+    only counts never told the owner. Consumed members are MARKED, never
+    hidden: the owner may still pick them."""
+    out = []
+    for item in sub.get("items", []):
+        label = str(item.get("slug") or item.get("title") or "").strip() or UNNAMED
+        facts = [str(f) for f in (item.get("status"), item.get("family")) if f]
+        mark = " — consumed" if item.get("consumed") else ""
+        out.append(label + (f" ({', '.join(facts)})" if facts else "") + mark)
+    return out or ["none"]
+
+
 def compose_view(map_data):
     """The View: one invocation's terrain, rendered so 20+ directions are
     legible and CAP-2's 'why this depth?' is answerable from the same counts
@@ -295,7 +325,7 @@ def compose_view(map_data):
         lines += [f"## {topic}", ""]
         for sub in sorted(by_topic[topic], key=lambda s: s["id"]):
             d = sub.get("density", {})
-            lines.append(f"### {sub['id']} — {sub['subtopic']}")
+            lines.append(f"### {sub['id']} — {_subtopic_name(sub)}")
             lines.append("")
             lines.append(f"- glance: {sub.get('glance', '')}")
             lines.append(f"- depth: {sub.get('depth', {}).get('why', '')}")
@@ -311,6 +341,14 @@ def compose_view(map_data):
                 lines.append(f"    - {p}")
             if not pointers:
                 lines.append("    - none")
+            # An entry with no pointers has shown the owner counts and nothing
+            # else — and the unclustered bucket is exactly the material nothing
+            # else surfaces, so it always names its members (Story 18.70,
+            # #616). The data is already on the record; this is a rendering.
+            if not pointers or sub.get("clustered_by") == "unclustered":
+                lines.append(f"- items ({d.get('items', 0)}):")
+                for member in _member_lines(sub):
+                    lines.append(f"    - {member}")
             lines.append("")
     return "\n".join(lines).rstrip() + "\n"
 

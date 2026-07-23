@@ -228,6 +228,22 @@ for n in range(12):                       # comfortably past the screen budget
     s["items"] = [{"slug": f"seed-{n}", "title": f"Lesson {n}",
                    "family": "hub-lessons"}]
     topic["subtopics"].append(s)
+# A POINTERLESS entry, and an UNNAMED one — the two opaque shapes #616 found in
+# a real View. Without these the no-opaque-entries assertions pass vacuously.
+blank = copy.deepcopy(base)
+blank["subtopic"] = ""
+blank["clustered_by"] = "evidence-subject"
+blank["density"] = dict(blank["density"], evidence_pointers=0, pointers=[])
+blank["items"] = [{"slug": "nameless-member", "title": "Nameless",
+                   "status": "seed", "family": "articles-items"}]
+topic["subtopics"].append(blank)
+lonely = copy.deepcopy(base)
+lonely["subtopic"] = "(unclustered)"
+lonely["clustered_by"] = "unclustered"
+lonely["density"] = dict(lonely["density"], evidence_pointers=0, pointers=[])
+lonely["items"] = [{"slug": "hidden-live-item", "title": "Hidden",
+                    "status": "shaping", "family": "articles-items"}]
+topic["subtopics"].append(lonely)
 print(json.dumps(d))
 PYEOF
 python3 "$D" payload --map "$work/big-map.json" --view "$work/view.md" \
@@ -286,6 +302,27 @@ check("host/w5.md:6@abc1234" in view, "the evidence pointers are listed")
 check("Lesson 3" in view, "lesson-seed names are shown")
 check("consumed: yes" in view and "consumed: no" in view,
       "consumed marks are shown, and consumed material is NOT hidden")
+
+# No opaque entries (Story 18.70, #616). An entry that shows counts and no
+# subjects is invisible terrain, and the unclustered bucket is exactly the
+# material nothing else surfaces.
+check(not re.search(r"^### T\d+\.\d+ —\s*$", view, re.M),
+      "no subtopic heading is left empty (no dangling dash)")
+# Each entry's own block, so a member name found elsewhere in the file cannot
+# stand in for the entry that was supposed to list it.
+blocks = {h: b for h, b in re.findall(
+    r"^### (T\d+\.\d+) — .*?$\n(.*?)(?=^### |\Z)", view, re.M | re.S)}
+opaque = [s for s in subs if not (s.get("density", {}).get("pointers") or [])]
+check(opaque, "the fixture contains a pointerless entry to exercise this")
+missing = [s["subtopic"] for s in opaque
+           if not any("- items (" in b and all(
+               str(i.get("slug") or i.get("title") or "") in b
+               for i in s.get("items", []))
+               for b in blocks.values())]
+check(not missing,
+      f"a subtopic with no evidence pointers names its members, not just counts ({missing[:2]})")
+check(sum("- items (" in b for b in blocks.values()) >= len(opaque),
+      "every pointerless entry carries an explicit items list")
 sys.exit(1 if fail else 0)
 PYEOF
 [ $? -eq 0 ] || fail=1
