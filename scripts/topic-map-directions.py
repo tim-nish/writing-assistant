@@ -305,6 +305,44 @@ def _subtopic_name(sub):
     return UNNAMED
 
 
+# How many source files one subtopic lists before the rest are disclosed as a
+# count. Declared here alone: it is an estimate of a readable block, not a
+# measurement. The remainder is always DISCLOSED, never silently truncated.
+VIEW_POINTER_FILES = 12
+
+
+def _pointer_lines(pointers):
+    """Evidence pointers AGGREGATED PER SOURCE FILE, `path ×N` (#615).
+
+    The View listed every pointer on its own line: one subtopic ran to 121
+    lines, another 85, and runs like `tools/tanuki-ledger:1403` through `:1408`
+    took six lines to say one thing. Over half a 1781-line View was pointer
+    dump. Line-granular pointers are machine provenance; the View's job is to
+    let the owner distinguish 20+ directions and answer "why this depth?" from
+    the counts — and burying that under provenance is the exact failure the
+    size switch exists to fix.
+
+    The total is unchanged and still printed beside this list, so the depth
+    estimate stays explainable from the same numbers it was derived from. Past
+    the cap the remainder is disclosed as `… and N more files`, the same
+    disclosure convention CAP-4 uses for an over-bound enumeration — a silent
+    truncation would read as "that was everything".
+    """
+    if not pointers:
+        return ["none"]
+    counts = {}
+    for p in pointers:
+        path = str(p).split("#")[0].rsplit(":", 1)[0].strip() or str(p)
+        counts[path] = counts.get(path, 0) + 1
+    # Most-cited first, ties broken by path so a run is reproducible.
+    ranked = sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))
+    shown = [f"{path} ×{n}" if n > 1 else path for path, n in ranked[:VIEW_POINTER_FILES]]
+    rest = len(ranked) - len(shown)
+    if rest:
+        shown.append(f"… and {rest} more file(s)")
+    return shown
+
+
 def _member_lines(sub):
     """The subtopic's members, by name, with status — what an entry carrying
     only counts never told the owner. Consumed members are MARKED, never
@@ -363,10 +401,8 @@ def compose_view(map_data):
                          + (", ".join(seeds) if seeds else "none"))
             pointers = d.get("pointers") or []
             lines.append(f"- evidence pointers ({len(pointers)}):")
-            for p in pointers:
-                lines.append(f"    - {p}")
-            if not pointers:
-                lines.append("    - none")
+            for line in _pointer_lines(pointers):
+                lines.append(f"    - {line}")
             # An entry with no pointers has shown the owner counts and nothing
             # else — and the unclustered bucket is exactly the material nothing
             # else surfaces, so it always names its members (Story 18.70,
