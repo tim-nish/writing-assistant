@@ -78,7 +78,11 @@ flows into the existing brief/structures path unchanged.**
 - **CAP-2 (map content — depth signals, not just names)**
   - **intent:** Per topic, the map shows: its subtopic clusters (grouped from
     backlog items, unconsumed Lessons, and evidence pointers sharing a
-    subject); per subtopic, an **evidence-density signal** (count of distinct
+    subject — under OQ1's declared precedence as closed 2026-07-23: a
+    declared `subtopic:` key in the articles repo names the cluster, and a
+    **path-family** derivation is the fallback for undeclared items, with
+    each cluster disclosing which basis named it); per subtopic, an
+    **evidence-density signal** (count of distinct
     evidence pointers, unconsumed Lessons citing it, backlog items and their
     status) and a **depth estimate** — what the material supports today
     (seed-only / short note / full article / article series), derived from the
@@ -116,6 +120,27 @@ flows into the existing brief/structures path unchanged.**
     ID, topic, depth glance, evidence-pointer list, lesson-seed names, and
     consumed marks — enough to distinguish 20+ directions and to answer
     CAP-2's "why this depth?" from the same counts. Deleting it loses nothing.
+  - **where the View lives (amended 2026-07-23, #611).** "A fixed path" is
+    **the `output.drafts` destination repository**, at a resolver-owned,
+    host-qualified path — not a per-run workspace directory. The View is
+    written for the owner to *open and read*, and a human-facing artifact
+    belongs in the repository the human works in, while machine
+    intermediates, caches and resumable state stay in machine-state
+    directories. A per-run path is not a fixed path: it moves every
+    invocation, so nothing the owner opened during a sitting can be reopened
+    later.
+    - It joins the destination repo's write surface as the **second
+      regenerated NON-GATING view**, beside `INDEX.md` — the same class, on
+      the same terms: fully regenerated per invocation, never read back,
+      never gating any decision, and **named exhaustively** in the footprint
+      check (`docs/storage-architecture.md` D1). The class is stated
+      narrowly on purpose: "human-facing" is not a general exemption from the
+      footprint invariant, and each member of the surface is enumerated.
+    - The path resolves through the path resolver like every other plugin
+      storage path; no skill, script or prompt composes it.
+    - CAP-1's properties are unchanged and remain the binding constraints:
+      deleting the View loses nothing, no code path reads it back, and no
+      stored index comes into existence. Only the location moves.
   - **stable indexes and the indexed hand-off.** Every subtopic in the map
     (and View) carries a stable ID (e.g. `T3.2`) from a deterministic ordering
     (topics sorted, subtopics ranked as today), **stable within a pin**; the
@@ -178,12 +203,39 @@ flows into the existing brief/structures path unchanged.**
 
 ## Open questions
 
-- **OQ1 — subtopic clustering authority.** Whether subtopic clusters are
-  computed per invocation (pure derivation, may vary run to run) or proposed
-  once and recorded as backlog frontmatter (stable names, but a stored
-  vocabulary to maintain — the articles repo would own it, per "the repo's
-  schema is the API"). Start pure-derived; promote to recorded frontmatter on
+- **OQ1 — subtopic clustering authority. CLOSED 2026-07-23 (#614).**
+  *Original question:* whether subtopic clusters are computed per invocation
+  (pure derivation, may vary run to run) or proposed once and recorded as
+  backlog frontmatter (stable names, but a stored vocabulary to maintain —
+  the articles repo would own it, per "the repo's schema is the API"). The
+  original answer was: start pure-derived; promote to recorded frontmatter on
   observed instability.
+  **Trigger amended.** The promotion trigger read *observed instability*
+  (names moving between pins). The failure actually observed at corpus scale
+  is **degeneracy**: a 147-subtopic map whose clusters were stable and
+  useless — one subtopic per file, because the derivation's fallback is an
+  evidence-pointer *file stem* and host-source items cite only themselves.
+  Stable-but-degenerate is a distinct failure from unstable, and it is
+  equally disqualifying, so the trigger now names both.
+  **Resolution — both mechanisms, under declared precedence:**
+  - **The articles repo owns subtopic names.** A declared `subtopic:` (or
+    `cluster:`) key in backlog frontmatter is authoritative, consistent with
+    "the article repo is separate permanently; the repo's frontmatter schema
+    is the API, the tool never owns state" and with the ratified
+    track↔topic vocabulary-ownership split. A declared name that a cluster
+    disagrees with is the tool's defect, never the repo's.
+  - **The derivation is the fallback, and must be good.** Undeclared items
+    still cluster, by **path family** rather than by file stem — the corpus
+    cannot be annotated in one sitting, and a map that stays degenerate until
+    a backfill completes fails the owner for the whole interval. The
+    derivation invents no stored state: it is recomputed per invocation and
+    recorded nowhere, so CAP-1 is untouched.
+  - **The basis is disclosed.** Each cluster states whether its name is
+    `declared` or derived, so the owner can always tell which authority
+    produced it — the mismatch check is recomputation, never reconciliation,
+    and no vocabulary is cached on the tool side.
+  Cross-pin ID stability (CAP-3) now has its escape hatch in the declared
+  key, exactly as that clause anticipated.
 - **OQ2 — relationship to a "decide for me" entry point.** *(Restated
   2026-07-22, triage #583.)* **`unverified — no such surface ships today`:**
   "Quick Start" names no capability, skill, script, or contract in this

@@ -63,6 +63,21 @@ where classifying would be premature.
     contract, and this document does not change that (see O1). The
     invariant covers what dogfooding showed agents *defaulting* into the
     tree; it does not pre-decide the config model.
+  - *Destination-repo write surface (amended 2026-07-23, #611):* the
+    `output.drafts` **destination** repository's permitted surface is the two
+    GATED products plus **exactly two regenerated NON-GATING views** —
+    `INDEX.md` and the topic-map View (SPEC-topic-map CAP-3). A non-gating
+    view qualifies only if it is fully regenerated per invocation, never read
+    back as an input, and gates no decision; the surface is **enumerated
+    exhaustively** in `scripts/check-footprint-invariant.sh`, so a write
+    outside the set fails there and is named.
+    **This is a named class, not a hatch.** "Human-facing" does not exempt a
+    file from the footprint invariant: a new member is added by amending this
+    list and the check together, in the sitting that adds it — never by a
+    caller deciding its own output is human-facing. Everything else the
+    plugin produces (state, caches, journals, per-run intermediates,
+    resumable state) stays in machine-state directories, resolved through the
+    seam below.
 - **The seam:** every storage path — config lookup, state root, run
   workspaces — resolves through **one path-resolver helper** (stdlib-only
   Python, per the no-JS constraint; e.g. `scripts/resolve-paths.py`). No
