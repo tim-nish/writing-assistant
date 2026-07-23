@@ -67,6 +67,18 @@ If `coverage.complete` is false, say so in one line with the count the
 disclosure names: the map read up to its bound and the rest is listed, not
 silently dropped.
 
+**Subtopic names belong to the articles repo.** A declared `subtopic:` (or
+`cluster:`) in backlog frontmatter names the cluster; everything undeclared
+falls to the derived **path family**, and each cluster records which basis
+named it. The repo is authoritative — a cluster disagreeing with a declared
+name is this tool's defect, not the repo's — and nothing is cached: the
+declaration is re-read every invocation, so the mismatch check is
+recomputation, never reconciliation.
+
+If `subtopic_defects` is non-empty, relay each entry in one line: the item, the
+key, and the reason. A declaration the map cannot honour is a **configuration
+defect in the articles repo, named** — never a silent fall-back to derivation.
+
 ## Step 2 — one screen
 
 ```
