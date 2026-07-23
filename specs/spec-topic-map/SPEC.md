@@ -232,9 +232,38 @@ flows into the existing brief/structures path unchanged.**
     would leave the adopted brief carrying the enum, which is the actual
     defect. The articles repo still owns subject *names* (OQ1) — this governs
     only the wording the tool composes when the repo named nothing.
+  - **substance-led rendering (amended 2026-07-23, #647).** A ranked slot is
+    filled by **the material's own words**, never by a description of how much
+    material exists. `cover docs/stories (163 evidence pointer(s))` describes
+    the corpus; a terrain shows it. So:
+    - **What fills a slot** is the claim the material makes — an element's own
+      summary or why, and for a subtopic a claim drawn from its strongest
+      element or Lesson line. The wording is **quoted or clipped from the
+      material, never composed about it**.
+    - **Counts demote.** Evidence-pointer counts, unconsumed/live tallies and
+      depth arithmetic are map *metadata*: they may appear as a trailing
+      annotation at most, and never as the content of a direction or terrain
+      line. CAP-2's "why this depth?" is still answerable — from the per-
+      subtopic detail, not from the ranked lines.
+    - **Elements are directions.** The element projection (CAP-2, Story 18.80)
+      reaches the **same** candidate list the subtopics do and is presented
+      **inside** the candidate directions, not in a section of its own. Two
+      lists split by internal derivation kind is an implementation detail on
+      the owner surface.
+    - **No fabricated claim.** Where a subtopic carries no claim-bearing
+      material, the line falls back to coverage wording **explicitly** — the
+      #637 rule above governs that fallback. The tool never invents a claim a
+      source did not make, and never asserts substance it did not read.
+    - **The boundary is unmoved.** A substance-led line still names *what to
+      cover* and, for a combination, the *axis*; it is not a thesis, an
+      argument or an article shape. The no-second-proposer rule above stands
+      verbatim, and the brief contract is unchanged: adopted wording is the
+      candidate's own wording plus the owner's note.
   - **success:** A sitting that starts at the map ends with a normal
     brief-carrying run; grepping the map implementation for structure
-    composition finds none; the map screen offers free-form alongside its
+    composition finds none; **no direction or terrain line on a rendered View
+    consists only of a subject plus counts, and the elements appear among the
+    candidate directions rather than in a separate section**; the map screen offers free-form alongside its
     options every time; a small map behaves exactly as shipped; a >budget map
     produces the View plus summary, is byte-regenerated per invocation, and no
     code path reads the View back. **A >budget View's first screenful presents
