@@ -121,18 +121,19 @@ python3 - "$work/m1.json" <<'PYEOF' && ok "CAP-1/CAP-4: every surface carries it
 import json, sys
 cov = json.load(open(sys.argv[1]))["coverage"]
 fams = {f["family"]: f for f in cov["families"]}
-assert set(fams) == {"articles-items", "hub-lessons", "host-sources"}, fams.keys()
+assert set(fams) == {"articles-items", "hub-lessons", "host-sources",
+                     "hub-elements"}, fams.keys()
 assert all(d["family"] == "articles-items" for d in cov["read"]), cov["read"]
 assert fams["articles-items"]["enumerated"] is True, fams["articles-items"]
 # declared, not enumerated, and the reason is NAMED — never a silent empty family
-for name in ("hub-lessons", "host-sources"):
+for name in ("hub-lessons", "host-sources", "hub-elements"):
     f = fams[name]
     assert f["declared"] is True and f["enumerated"] is False, f
     assert f["reason"], f
     assert f["matched"] == 0 and f["accounting_closes"] is True, f
 assert cov["families_enumerated"] == ["articles-items"], cov["families_enumerated"]
 assert [f["family"] for f in cov["families_not_enumerated"]] == [
-    "hub-lessons", "host-sources"], cov
+    "hub-lessons", "host-sources", "hub-elements"], cov
 assert cov["families_not_enumerated"][0]["reason"] == fams["hub-lessons"]["reason"], cov
 PYEOF
 
@@ -284,6 +285,83 @@ assert topics["delivery"]["mapped"] is True and topics["delivery"]["tracks"] == 
 assert "engineering" not in topics, topics.keys()
 assert "people" in topics and topics["people"]["mapped"] is False, topics.keys()
 assert d["stale_mapping_tracks"] == ["ghost"], d["stale_mapping_tracks"]
+PYEOF
+
+# --- 6b. hub-elements: the second projection (Story 18.79, #640) ---------------
+# Three declared topics, two servable, so the seam bound (2 per read) is
+# exercised for real rather than assumed. `zeta` is declared and never read.
+python3 - "$FX" <<'PYEOF'
+import json, sys
+fx = json.load(open(sys.argv[1]))
+sha = "0123456789abcdef0123456789abcdef01234567"
+fx["topics"] = {
+    "delivery": [
+        ["topics/delivery.md", 1, "# delivery"],
+        ["topics/delivery.md", 3, "- 2026-07-20 — Ship behind a flag; the rollback path is the feature. (q_a/x D1)"],
+        ["topics/delivery.md", 4, "- 2026-07-19 — ~~Weekly release train~~ superseded 2026-07-20 by continuous deploy."],
+        ["topics/delivery.md", 6, "## Declined (things considered and rejected)"],
+        ["topics/delivery.md", 7, "- 2026-07-18 — Blue/green for every service: rejected, the fleet is too small."],
+        ["topics/delivery.md", 9, "not a dated line, so not an element"],
+    ],
+    "nowhere": [
+        ["topics/nowhere.md", 1, "# nowhere"],
+        ["topics/nowhere.md", 2, "- 2026-07-21 — A decision that mentions a declined option inline, declined as a copy. (q_a/y D2)"],
+    ],
+    "zeta": [["topics/zeta.md", 2, "- 2026-07-01 — Never read: past the seam bound."]],
+}
+fx["surface"] = dict(fx.get("surface", {}), topics=["delivery", "nowhere", "zeta"])
+json.dump(fx, open(sys.argv[1], "w"))
+PYEOF
+printf '{"engineering": "delivery", "ghost": "nowhere", "extra": "zeta"}' | \
+  python3 "$root/scripts/resolve-writing-sources.py" --root "$h" \
+    set-policy-source --track-topics >/dev/null 2>&1
+MAP > "$work/elements.json" 2>/dev/null
+python3 - "$work/elements.json" <<'PYEOF' && ok "hub-elements: decisions and reversals are projected, typed by their native markers, bounded and disclosed" || err "the element projection is wrong"
+import json, sys
+d = json.load(open(sys.argv[1]))
+els = d["elements"]
+by_cite = {e["situation"].split("@")[0]: e for e in els}
+kinds = {c: e["kind"] for c, e in by_cite.items()}
+
+# Typed by the markers the served surface actually uses.
+assert kinds.get("topics/delivery.md:3") == "decision", kinds
+assert kinds.get("topics/delivery.md:4") == "reversal", kinds   # struck-through
+assert kinds.get("topics/delivery.md:7") == "reversal", kinds   # under ## Declined
+# The word "declined" INSIDE an ordinary decision line must not type it as a
+# reversal — section membership is the marker, not the word.
+assert kinds.get("topics/nowhere.md:2") == "decision", kinds
+# A non-dated line is not an element at all.
+assert "topics/delivery.md:9" not in kinds, kinds
+# The heading itself is never an element.
+assert "topics/delivery.md:6" not in kinds, kinds
+
+e = by_cite["topics/delivery.md:3"]
+assert e["date"] == "2026-07-20" and e["topic"] == "delivery", e
+assert e["evidence"] == [e["situation"]] and "@" in e["situation"], e
+assert e["consumed"] is False and e["consumption_join"], e
+# The q_a/ provenance pointer is the hub's bookkeeping, not the decision.
+assert "q_a/" not in e["summary"], e["summary"]
+
+# Ranked by recency, deterministically — the property the E<topic>.<n> indexes
+# assigned downstream depend on.
+assert [x["date"] for x in els] == sorted((x["date"] for x in els), reverse=True), els
+
+# The seam bound is real: `zeta` is declared, never read, and NAMED as skipped.
+cov = d["coverage"]
+assert cov["element_topics_read"] == ["delivery", "nowhere"], cov["element_topics_read"]
+assert cov["element_topics_skipped"] == ["zeta"], cov["element_topics_skipped"]
+assert not any(e["topic"] == "zeta" for e in els), "an unread topic produced elements"
+skipped = [s for s in cov["skipped"] if s["family"] == "hub-elements"]
+assert len(skipped) == 1 and "seam" in skipped[0]["reason"], skipped
+assert cov["complete"] is False, cov          # a bounded run says so
+fams = {f["family"]: f for f in cov["families"]}
+f = fams["hub-elements"]
+assert f["enumerated"] is True and f["matched"] == 3, f
+assert f["read"] == 2 and f["skipped"] == 1 and f["accounting_closes"] is True, f
+
+# Elements are a SECOND projection: they never become clustered items.
+items = [i for t in d["topics"] for i in t["items"]]
+assert not any(i.get("family") == "hub-elements" for i in items), "elements leaked into items"
 PYEOF
 
 # --- 7. consumption is READ from its one implementation, not re-implemented -----
@@ -479,7 +557,8 @@ python3 - "$work/lessons.json" <<'PYEOF' && ok "CAP-4: the manifest names BOTH e
 import json, sys
 cov = json.load(open(sys.argv[1]))["coverage"]
 assert cov["families_enumerated"] == ["articles-items", "hub-lessons"], cov["families_enumerated"]
-assert [f["family"] for f in cov["families_not_enumerated"]] == ["host-sources"], cov
+assert [f["family"] for f in cov["families_not_enumerated"]] == [
+    "host-sources", "hub-elements"], cov
 fams = {f["family"]: f for f in cov["families"]}
 assert fams["hub-lessons"]["matched"] == 3, fams["hub-lessons"]
 for f in fams.values():
