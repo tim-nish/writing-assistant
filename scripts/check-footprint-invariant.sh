@@ -76,13 +76,34 @@ clean && ok "host tree clean after intermediates written to the workspace" || {
 
 # 4. Contract: each run-producing skill declares the footprint invariant and
 #    routes intermediates through the resolver workspace (AC1 surface).
-for f in skills/harvest/SKILL.md skills/draft-article/SKILL.md skills/review-article/SKILL.md; do
+#    topic-map joined this set in Story 18.71 (#611). It was absent while it
+#    already wrote intermediates, and the omission is exactly what went
+#    unnoticed: the skill used `$WS` six times and never minted it, so its
+#    files landed wherever the caller's shell pointed. A run-producing skill
+#    missing from this list is unguarded, so the list must grow with them.
+for f in skills/harvest/SKILL.md skills/draft-article/SKILL.md \
+         skills/review-article/SKILL.md skills/topic-map/SKILL.md; do
   if grep -q 'resolve-paths.py' "$f" \
      && grep -qiE 'output\.drafts|host (working )?tree|host repo' "$f" \
      && grep -qi 'workspace' "$f"; then
     ok "footprint contract stated in $f"
   else
     err "footprint contract missing/incomplete in $f"
+  fi
+  # A skill that WRITES to "$WS/..." must also SAY WHERE $WS COMES FROM
+  # (Story 18.71, #611). The check above only greps for `resolve-paths.py`
+  # anywhere in the file, which topic-map satisfied with an unrelated
+  # `resolve-paths.py target` call while never minting a workspace — so the
+  # contract read as stated while the intermediates went to the caller's
+  # scratchpad. Either mint it (`new-run`) or document receiving it from the
+  # pipeline's Stage 0; using it unexplained is the defect.
+  if grep -q '\$WS/' "$f"; then
+    if grep -q 'resolve-paths.py new-run' "$f" \
+       || grep -qE "\\\$WS.*(Stage 0|stage 0|passes its run workspace)" "$f"; then
+      ok "\$WS is minted or explicitly received in $f"
+    else
+      err "$f writes to \$WS but never mints it (resolve-paths.py new-run) nor documents receiving it"
+    fi
   fi
 done
 
