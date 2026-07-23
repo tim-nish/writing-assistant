@@ -338,9 +338,9 @@ named = [s for s in subs if s["subtopic"] not in PLACEHOLDERS]
 check(all(s["subtopic"] in view for s in named),
       f"the View lists every one of the {len(named)} named subtopics")
 check(d["coverage"]["pin"] in view, "the View header carries the map's pin")
-check(re.search(r"^### T\d+\.\d+ — ", view, re.M),
+check(re.search(r"^#### T\d+\.\d+ — ", view, re.M),
       "every subtopic carries a stable ID (T<topic>.<subtopic>)")
-ids = re.findall(r"^### (T\d+\.\d+) ", view, re.M)
+ids = re.findall(r"^#### (T\d+\.\d+) ", view, re.M)
 check(len(ids) == len(set(ids)) == len(subs), "the IDs are unique, one per subtopic")
 # IDs are assigned in RANK order (richest terrain first), so the View must show
 # them in numeric order (#612). A string sort renders T3.1, T3.10, … T3.19, T3.2
@@ -384,7 +384,7 @@ check(not long_lines,
 
 # The placeholder states read as PROSE THAT STATES THE REMEDY, never as a bare
 # internal enum in a headline position (#634).
-check(not re.search(r"^#{2,3} .*\((?:unclustered|untracked|unnamed)\)", view, re.M),
+check(not re.search(r"^#{2,4} .*\((?:unclustered|untracked|unnamed)\)", view, re.M),
       "no placeholder enum value appears in a heading")
 check("not yet clustered" in view and "declare `subtopic:`" in view,
       "the not-yet-clustered state is named to the owner as prose with its remedy")
@@ -394,12 +394,12 @@ check("consumed: yes" in view and "consumed: no" in view,
 # No opaque entries (Story 18.70, #616). An entry that shows counts and no
 # subjects is invisible terrain, and the unclustered bucket is exactly the
 # material nothing else surfaces.
-check(not re.search(r"^### T\d+\.\d+ —\s*$", view, re.M),
+check(not re.search(r"^#### T\d+\.\d+ —\s*$", view, re.M),
       "no subtopic heading is left empty (no dangling dash)")
 # Each entry's own block, so a member name found elsewhere in the file cannot
 # stand in for the entry that was supposed to list it.
 blocks = {h: b for h, b in re.findall(
-    r"^### (T\d+\.\d+) — .*?$\n(.*?)(?=^### |\Z)", view, re.M | re.S)}
+    r"^#### (T\d+\.\d+) — .*?$\n(.*?)(?=^#### |\Z)", view, re.M | re.S)}
 opaque = [s for s in subs if not (s.get("density", {}).get("pointers") or [])]
 check(opaque, "the fixture contains a pointerless entry to exercise this")
 missing = [s["subtopic"] for s in opaque
@@ -437,7 +437,7 @@ def check(cond, msg):
     print(("ok:   " if cond else "FAIL: ") + msg, file=sys.stdout if cond else sys.stderr)
     if not cond: fail.append(msg)
 
-heads = re.findall(r"^#{2,3} (.+)$", view, re.M)
+heads = re.findall(r"^#{2,4} (.+)$", view, re.M)
 check(heads and heads[0] == "Candidate directions",
       f"the View's FIRST section is the candidate directions (got {heads[:1]})")
 check("The terrain at a glance" in heads
@@ -571,7 +571,7 @@ check(len(set(eids)) == len(eids), "element ids are unique")
 # AMONG THE DIRECTIONS since Story 18.81 (#647): two lists split by internal
 # derivation kind is an implementation detail on the owner surface, so the
 # elements are pickable where every other candidate is.
-heads = re.findall(r"^#{2,3} (.+)$", view, re.M)
+heads = re.findall(r"^#{2,4} (.+)$", view, re.M)
 check("What you decided" not in heads,
       f"elements have no section of their own ({heads[:4]})")
 block = view.split("## The terrain at a glance")[0]
@@ -857,7 +857,7 @@ cmp -s "$work/big-cands.json" "$work/big-cands2.json" \
   || err "the IDs are not stable within a pin"
 python3 - "$work/view-1.md" "$work/big-cands.json" <<'PYEOF' && ok "indexed selection: the View's IDs and the composer's IDs are the same identifiers" || err "the View and the composer disagree about indexes"
 import json, re, sys
-view_ids = set(re.findall(r"^### (T\d+\.\d+) ", open(sys.argv[1], encoding="utf-8").read(), re.M))
+view_ids = set(re.findall(r"^#### (T\d+\.\d+) ", open(sys.argv[1], encoding="utf-8").read(), re.M))
 cand_ids = {c["id"] for c in json.load(open(sys.argv[2]))["candidates"]
             if c["kind"] == "single"}
 assert cand_ids <= view_ids, cand_ids - view_ids
@@ -936,6 +936,65 @@ python3 "$D" candidates --map "$work/map.json" >/dev/null
 [ "$before" = "$(find "$a" -type f | sort)" ] \
   && ok "composing the screen writes nothing into the articles repo" \
   || err "the screen composer wrote into the articles repo"
+
+# --- the owner surface carries owner language only (18.82, #646) -------------
+# The reading path is everything above the maintenance section: what the owner
+# reads to choose. Counters, cluster/depth enums and remediation prompts belong
+# below it, in sections labeled for what they are.
+python3 - "$work/view.md" "$work/big-map.json" "$D" <<'PYEOF' || fail=1
+import importlib.util, json, re, sys
+view = open(sys.argv[1], encoding="utf-8").read()
+d = json.load(open(sys.argv[2]))
+spec = importlib.util.spec_from_file_location("dv", sys.argv[3])
+mod = importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)
+fail = []
+def check(cond, msg):
+    print(("ok:   " if cond else "FAIL: ") + msg, file=sys.stdout if cond else sys.stderr)
+    if not cond: fail.append(msg)
+
+heads = re.findall(r"^## (.+)$", view, re.M)
+check(any(h.startswith("Maintenance") for h in heads),
+      f"the View carries a maintenance section ({heads})")
+check(any(h.startswith("Diagnostics") for h in heads),
+      f"the View carries a diagnostics section ({heads})")
+reading = view.split("\n## Maintenance")[0]
+maint = view.split("\n## Maintenance")[1].split("\n## ")[0]
+diag = view.split("\n## Diagnostics")[1]
+
+# The lint's own contract: it FLAGS the pre-#646 line shape and passes the
+# shipped one — a lint that never fires would be a clean bill nobody earned.
+offender = "- **T1.1** — not yet clustered · [##..] seed-only - 4 ptr, 0 unconsumed"
+check(mod.lint_owner_lines([offender]), "the render-boundary lint flags an internal-vocabulary line")
+hits = mod.lint_owner_lines(reading.splitlines())
+check(not hits, f"the reading path carries no internal vocabulary ({hits[:2]})")
+
+# Registration is a contract, not a convenience list: a depth level or source
+# family the assembler grows and nobody registers would silently stop being
+# gated (the check-internal-vocabulary.sh pattern, applied to the map).
+levels = {s.get("depth", {}).get("level") for t in d["topics"] for s in t["subtopics"]}
+families = {i.get("family") for t in d["topics"] for s in t["subtopics"]
+            for i in s.get("items", [])}
+vocab = {v.lower() for v in mod.INTERNAL_VOCAB}
+unregistered = [x for x in (levels | families) if x
+                and x.lower().replace(" ", "-") not in vocab and x.lower() not in vocab]
+check(not unregistered,
+      f"every depth level and source family is registered in INTERNAL_VOCAB ({unregistered})")
+
+# The remediation prompt left the reading path but did NOT lapse.
+check("declare" in maint and "subtopic:" in maint,
+      "the maintenance section carries the declaration prompt")
+check("declare" not in reading,
+      "no remediation prompt sits inside a terrain or direction line")
+# The counters moved, they were not deleted: CAP-2's "why this depth?" is still
+# answerable from the same numbers the estimate used.
+check("[#" in diag and "ptr" in diag,
+      "the counters and the depth bar live in diagnostics, on the record")
+# IDs stay — they are the ratified selection mechanism.
+check(re.search(r"^- \*\*T\d+\.\d+\*\* — ", reading, re.M),
+      "terrain lines still carry their index for selection")
+sys.exit(1 if fail else 0)
+PYEOF
+[ $? -eq 0 ] || fail=1
 
 # --- the shipped map harnesses keep passing verbatim -------------------------
 for c in check-topic-map.sh check-topic-map-depth.sh; do

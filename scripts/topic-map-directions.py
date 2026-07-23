@@ -658,8 +658,34 @@ def _summary_lines(subs):
         else:
             # Nothing claim-bearing to quote, so the line names the subject and
             # stops. Never a fabricated claim, and never subject-plus-counts.
-            out.append(f"- **{sub['id']}** — {as_prose(_subtopic_name(sub))}{mark}")
+            # The SUBJECT is the coverage description (Story 18.82, #646): a
+            # remediation prompt ("declare `subtopic:` …") is an instruction to
+            # repo upkeep, not something the owner reads a terrain by, so it
+            # lives in the maintenance section instead of on this line.
+            out.append(f"- **{sub['id']}** — {_coverage_subject(sub)}{mark}")
     return out or ["- none"]
+
+
+def _maintenance_lines(subs, map_data):
+    """What the repo must declare for the map to name things properly — OUT of
+    the reading path (Story 18.82, #646).
+
+    These prompts are real and stay on the surface: an undeclared cluster is a
+    configuration gap only the owner can close. But they are addressed to repo
+    upkeep, not to someone choosing what to write, and inside a terrain line
+    they read as if the map were the thing needing attention.
+    """
+    out = []
+    for sub in sorted(subs, key=_id_order):
+        name = str(_subtopic_name(sub)).strip()
+        if name in PLACEHOLDER_PROSE:
+            out.append(f"- **{sub['id']}** — {PLACEHOLDER_PROSE[name]}")
+    for topic in sorted({str(s.get("topic") or "").strip() for s in subs}):
+        if topic in PLACEHOLDER_PROSE:
+            out.append(f"- topic — {PLACEHOLDER_PROSE[topic]}")
+    for defect in map_data.get("subtopic_defects") or []:
+        out.append(f"- declaration defect — {defect}")
+    return out or ["- none: every cluster and track is declared"]
 
 
 # The estimator's promotion rule, appended to the depth explanation by
@@ -686,6 +712,43 @@ def _depth_line(sub):
     """
     why = str(sub.get("depth", {}).get("why", ""))
     return why.split(DEPTH_PREDICATE_MARKER)[0].rstrip()
+
+
+# The map's OWN internal lexicon, enumerated (Story 18.82, #646). CAP-3's
+# owner-readable clause is only lintable because this list is finite: cluster
+# and track states, the depth ladder's enum keys, the density counter names,
+# and the source-family ids. Every one of them is a legitimate value in
+# `map.json` — the defect is presenting it on the surface the owner reads.
+#
+# A term added to the assembler and not registered here would silently stop
+# being gated, which is why `check-topic-map-screen.sh` derives the depth keys
+# and family names from the map itself and fails on a term this list misses.
+INTERNAL_VOCAB = (
+    "(unclustered)", "(untracked)", "(unnamed)",
+    "seed-only", "short-note", "full-article", "article-series",
+    "hub-lessons", "host-sources", "articles-items",
+    "unclustered", "subtopic:", "cluster:", "frontmatter",
+    " ptr,", " ptr)", "unconsumed", "live item", "density",
+)
+
+
+def lint_owner_lines(lines):
+    """Internal vocabulary found on the owner's reading path — the render-time
+    check CAP-3's owner-readable clause implies (Story 18.82, #646).
+
+    Returns `(line, term)` pairs. Reporting, never rewriting: a line the tool
+    silently launders would hide the derivation defect that produced it, and
+    #637 already established that the fix belongs in the derivation. The caller
+    decides what to do with a defect; `compose_view` reports it on stderr so it
+    cannot be emitted unnoticed.
+    """
+    found = []
+    for line in lines:
+        low = line.lower()
+        for term in INTERNAL_VOCAB:
+            if term.lower() in low:
+                found.append((line.strip(), term))
+    return found
 
 
 def compose_view(map_data, cands):
@@ -716,9 +779,10 @@ def compose_view(map_data, cands):
         f"Subtopics: {len(subs)} across {len(map_data.get('topics', []))} topic(s)",
         "",
         "Answer with a subtopic's index (for example T1.2) and a short note",
-        "about the angle you want. Free text always wins. Depth is a signal for",
-        "your judgment, never a gate: a seed-only subtopic is as pickable as a",
-        "rich one, and consumed material stays selectable.",
+        "about the angle you want. Free text always wins. How much material",
+        "sits behind a line is a signal for your judgment, never a gate:",
+        "a lone note is as pickable as a rich subject, and material you have",
+        "already written from stays selectable.",
         "",
         "## Candidate directions",
         "",
@@ -732,14 +796,22 @@ def compose_view(map_data, cands):
     lines += ["", "## The terrain at a glance", ""]
     lines += _summary_lines(subs)
     lines.append("")
+    # END OF THE READING PATH (Story 18.82, #646). Everything below is upkeep
+    # and machine detail, labeled as such: the owner chooses from what is
+    # above, and the counters that used to sit inside those lines are two
+    # headings down where they read as data rather than as the terrain.
+    reading_path = list(lines)
+    lines += ["## Maintenance — repo upkeep, not part of choosing", ""]
+    lines += _maintenance_lines(subs, map_data)
+    lines += ["", "## Diagnostics — how the map measured this terrain", ""]
     by_topic = {}
     for sub in subs:
         by_topic.setdefault(sub["topic"], []).append(sub)
     for topic in sorted(by_topic):
-        lines += [f"## {as_prose(topic)}", ""]
+        lines += [f"### {_topic_heading(topic)}", ""]
         for sub in sorted(by_topic[topic], key=_id_order):
             d = sub.get("density", {})
-            lines.append(f"### {sub['id']} — {as_prose(_subtopic_name(sub))}")
+            lines.append(f"#### {sub['id']} — {_coverage_subject(sub)}")
             lines.append("")
             lines.append(f"- glance: {sub.get('glance', '')}")
             lines.append(f"- depth: {_depth_line(sub)}")
@@ -763,12 +835,29 @@ def compose_view(map_data, cands):
                 for member in _member_lines(sub):
                     lines.append(f"    - {member}")
             lines.append("")
+    # The render-boundary check (Story 18.82, #646): an internal term reaching
+    # the reading path is REPORTED, never laundered. Rewriting the line here
+    # would hide the derivation defect that produced it, and the surface would
+    # go on looking clean while the adopted brief still carried the term.
+    for line, term in lint_owner_lines(reading_path):
+        sys.stderr.write(f"warning: internal vocabulary on the owner surface: "
+                         f"{term!r} in {line!r}\n")
     # The budget applies to the composed surface, not to each call site: a
     # field added later is budgeted by construction rather than by remembering.
     # Clipping is the last step, so every list above has already been capped
     # and its remainder disclosed — this bounds a single long VALUE, it never
     # silently drops an item.
     return "\n".join(_clip_line(x) for x in lines).rstrip() + "\n"
+
+
+def _topic_heading(topic):
+    """A topic as a heading the owner can read. The placeholder track states
+    say what the bucket CONTAINS; the declaration that would name it is a
+    maintenance instruction and lives in that section (Story 18.82, #646)."""
+    name = str(topic).strip()
+    if name == "(untracked)" or name in PLACEHOLDER_PROSE:
+        return "items not yet mapped to a topic"
+    return name
 
 
 def write_view(path, text):
