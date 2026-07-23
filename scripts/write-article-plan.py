@@ -421,21 +421,13 @@ def validate_plan(text, path):
 def articles_repo_root(root):
     """The articles repository: the git top-level containing the declared
     `output.drafts` destination (or the destination itself when it is not in a
-    git repo). Returns None when no destination is declared."""
-    rws = _load_sources()
-    lines = rws.read_lines(root)
-    val = rws.get_output_drafts(lines)
-    if not val:
-        return None
-    drafts = rws.resolve_drafts_dir(val, root)
-    cur = drafts
-    while True:
-        if os.path.isdir(os.path.join(cur, ".git")):
-            return cur
-        parent = os.path.dirname(cur)
-        if parent == cur:
-            return drafts        # not in a git repo: the destination itself
-        cur = parent
+    git repo). Returns None when no destination is declared.
+
+    Delegates to the path resolver (Story 18.72, #611): it owns every storage
+    path, and the topic-map View now resolves against the same destination
+    root. Two copies of this walk would be two answers to one question.
+    """
+    return rp.articles_repo_root(root)
 
 
 def has_articles_schema(repo):

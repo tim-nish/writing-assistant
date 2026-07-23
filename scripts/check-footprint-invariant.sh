@@ -226,6 +226,44 @@ else
 fi
 rm -f "$DEST/stray-artifact.md"
 
+# --- The topic-map View: the SECOND regenerated non-gating view (18.72, #611) --
+# D1's destination surface grew from three files to four. The View is the only
+# artifact the topic-map flow puts in the destination repo, it is fixed (not
+# per-run), and it must leave the tree CLEAN — a regenerated debug artifact that
+# shows up as untracked would hand the owner a dirty repo on every invocation.
+vpath=$(python3 "$root/scripts/resolve-paths.py" topic-map-view --root "$HOST")
+case "$vpath" in
+  "$DEST"/*) ok "View resolves inside the output.drafts destination repo" ;;
+  *) err "View resolved outside the destination repo ($vpath)" ;;
+esac
+vpath2=$(python3 "$root/scripts/resolve-paths.py" topic-map-view --root "$HOST")
+[ "$vpath" = "$vpath2" ] \
+  && ok "View path is FIXED across invocations (not per-run)" \
+  || err "View path changed between invocations: [$vpath] vs [$vpath2]"
+case "$vpath" in
+  */runs/*) err "View path still points into a per-run workspace ($vpath)" ;;
+  *) ok "View path is not a per-run workspace path" ;;
+esac
+printf '# probe view\n' > "$vpath"
+after=$(dsurface)
+[ "$after" = "$expected" ] \
+  && ok "writing the View leaves the destination tree clean (self-ignoring dir)" \
+  || err "the View dirtied the destination tree: got [$after], expected [$expected]"
+# Not vacuous: the guard is the tool-owned ignore, not luck.
+[ -f "$(dirname "$vpath")/.gitignore" ] \
+  && ok "the View's directory carries its own ignore rule" \
+  || err "the View's directory has no .gitignore; the destination tree will go dirty"
+# The View is never read back — CAP-1's derived-never-stored property, at the
+# same strength it held when the file lived in a run workspace.
+if grep -nE '(open|read_text|json\.load|cat)[^)]*VIEW_FILENAME' \
+     "$root/scripts/topic-map-directions.py" >/dev/null 2>&1; then
+  err "topic-map-directions.py appears to READ the View back"
+else
+  ok "no code path reads the View back (write-only, CAP-1)"
+fi
+rm -rf "$DEST/topic-map"
+rm -f "$DEST/stray-artifact.md"
+
 # INDEX is NON-GATING: its failure leaves the run complete, with a warning —
 # the asymmetry that keeps a view from being promoted into a gate (or a gated
 # product from being quietly demoted into a view).

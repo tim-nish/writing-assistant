@@ -48,6 +48,7 @@ Subcommands:
 
 import argparse
 import datetime
+import importlib.util
 import json
 import os
 import re
@@ -138,6 +139,72 @@ def repo_key(root):
 
 def repo_dir(root):
     return os.path.join(state_root(), repo_key(root))
+
+
+# --------------------------------------------------------------------------
+# The destination repository (Story 18.72, #611)
+#
+# Everything above resolves MACHINE-STATE paths — where intermediates, caches
+# and per-run workspaces live. The two functions below resolve a path in the
+# repository the OWNER WORKS IN, which is a different class with a much
+# narrower licence: `docs/storage-architecture.md` D1 bounds the destination
+# write surface exhaustively, and a member is added by amending that list and
+# the footprint check together. They live here because D1's seam says every
+# storage path resolves through this one helper — a caller composing a
+# destination path itself is the defect the seam exists to prevent.
+# --------------------------------------------------------------------------
+
+TOPIC_MAP_VIEW_DIR = "topic-map"
+TOPIC_MAP_VIEW_BASENAME = "topic-map-view.md"
+
+
+def articles_repo_root(root):
+    """The articles (destination) repository: the git top-level containing the
+    declared `output.drafts` destination, or the destination itself when it is
+    not inside a git repo. None when no destination is declared.
+
+    Single source: `write-article-plan.py` delegates here rather than keeping
+    its own copy, so "where is the destination repo" is answered in exactly one
+    place, like every other path in this file.
+    """
+    here = os.path.dirname(os.path.realpath(__file__))
+    spec = importlib.util.spec_from_file_location(
+        "rws", os.path.join(here, "resolve-writing-sources.py"))
+    rws = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(rws)
+    val = rws.get_output_drafts(rws.read_lines(root))
+    if not val:
+        return None
+    drafts = rws.resolve_drafts_dir(val, root)
+    cur = drafts
+    while True:
+        if os.path.isdir(os.path.join(cur, ".git")):
+            return cur
+        parent = os.path.dirname(cur)
+        if parent == cur:
+            return drafts        # not in a git repo: the destination itself
+        cur = parent
+
+
+def topic_map_view(root):
+    """The topic-map View's FIXED path (SPEC-topic-map CAP-3, amended
+    2026-07-23): <destination-repo>/topic-map/<repo-key>/topic-map-view.md.
+    None when no destination is declared.
+
+    Fixed, not per-run: the View is written for the owner to open, and a
+    per-run path moves every invocation, so nothing opened during a sitting can
+    be reopened later. Host-qualified by `repo_key`, because one articles repo
+    serves many host repos and each has its own terrain.
+
+    This changes only WHERE the file lands. CAP-1's properties are untouched
+    and remain binding: fully regenerated every invocation, never read back by
+    any code path, and deleting it loses nothing.
+    """
+    repo = articles_repo_root(root)
+    if not repo:
+        return None
+    return os.path.join(repo, TOPIC_MAP_VIEW_DIR, repo_key(root),
+                        TOPIC_MAP_VIEW_BASENAME)
 
 
 SOURCES_BASENAME = "writing-sources.yaml"
@@ -345,6 +412,30 @@ def cmd_run_workspace(args):
     return 0
 
 
+def cmd_topic_map_view(args):
+    path = topic_map_view(host_root(args.root))
+    if not path:
+        sys.stderr.write(
+            "error: no output.drafts destination is declared, so the topic-map "
+            "View has nowhere to land\n"
+            "  resolve-writing-sources.py set-draft-location <path> "
+            f"--root {host_root(args.root)}\n")
+        return 3
+    d = os.path.dirname(path)
+    os.makedirs(d, exist_ok=True)
+    # The View is regenerated every invocation and belongs to nobody's history,
+    # so the destination repo must never report it as untracked. A self-ignoring
+    # directory (`*` also matches this .gitignore) keeps the tree clean without
+    # asking the owner to maintain an ignore rule for a tool-owned path.
+    ignore = os.path.join(d, ".gitignore")
+    if not os.path.exists(ignore):
+        with open(ignore, "w", encoding="utf-8") as fh:
+            fh.write("# Regenerated per invocation by the topic-map skill;\n"
+                     "# never read back, safe to delete. Ignores itself too.\n*\n")
+    print(path)
+    return 0
+
+
 # Owner-facing article-type labels (canonical map: draft-pipeline.py
 # INTENT_LABELS — check-path-resolver.sh asserts the two stay in sync).
 # The picker shows these, never the internal F-ids (SPEC-review-ux CAP-1).
@@ -439,6 +530,10 @@ def main(argv=None):
     sp.add_argument("--root", help="host-repo root (default: git top-level of cwd; errors outside a git repo)")
     sp.add_argument("--run-id", required=True, help="the run id whose workspace to print")
 
+    sp = sub.add_parser("topic-map-view", help="print the topic-map View's fixed path in the "
+                        "output.drafts destination repo (Story 18.72); creates its directory")
+    sp.add_argument("--root", help="host-repo root (default: git top-level of cwd; errors outside a git repo)")
+
     sp = sub.add_parser("list-drafts", help="enumerate run workspaces holding a draft.md, "
                         "with picker metadata (Story 13.31)")
     sp.add_argument("--root", help="host-repo root (default: git top-level of cwd; errors outside a git repo)")
@@ -458,6 +553,7 @@ def main(argv=None):
         "sources-file": cmd_sources_file,
         "new-run": cmd_new_run,
         "run-workspace": cmd_run_workspace,
+        "topic-map-view": cmd_topic_map_view,
         "list-drafts": cmd_list_drafts,
         "target": cmd_target,
     }[args.cmd](args)
