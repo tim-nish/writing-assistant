@@ -971,16 +971,44 @@ def estimate_depth(density, thresholds):
             "gates": "surfacing only — never what the owner may pick"}
 
 
-def _glance(depth, density):
-    """A one-line, fixed-width density rendering so a rich subtopic and a lone
-    seed are visibly different AT A GLANCE. Data, not a screen — composing the
-    screen is CAP-3's job."""
-    filled = min(4, sum(1 for n in (density["evidence_pointers"] // 3,
-                                    density["unconsumed_lessons"],
-                                    density["live_items"] // 2,
-                                    density["items"] // 3) if n))
-    bar = "#" * filled + "." * (4 - filled)
-    return (f"[{bar}] {depth.get('level') or 'no estimate'} - "
+# The bar's width when there is no readable level declaration to take it from.
+# Only reachable on the no-estimate path, where every bar is empty anyway.
+GLANCE_FALLBACK_WIDTH = 4
+
+
+def _glance(depth, density, thresholds=None):
+    """A one-line density rendering so a rich subtopic and a lone seed are
+    visibly different AT A GLANCE. Data, not a screen — composing the screen is
+    CAP-3's job.
+
+    THE BAR IS THE ESTIMATE, RENDERED (Story 18.69, #613): one segment per
+    declared level, filled up to and including the level this subtopic landed
+    in. Two subtopics at the same level render the same bar, and a stronger
+    level never renders fewer segments than a weaker one.
+
+    It previously filled one segment per NON-ZERO density dimension, which
+    measured dimension DIVERSITY rather than accumulated depth — so a
+    seed-only subtopic with 7 live items and no evidence rendered `[##..]`
+    while an 85-pointer article series rendered `[#...]`. The bar and the depth
+    word beside it moved independently and sometimes in opposite directions,
+    which inverts exactly the comparison CAP-2's success criterion promises.
+
+    The rendering stays explainable from the counts printed on the same line,
+    because those counts are precisely what `estimate_depth` used to choose the
+    level (see its `why`). And it stays a SIGNAL: the bar reports where the
+    material landed, never what the owner may pick.
+    """
+    names = [lv["name"] for lv in (thresholds or {}).get("levels") or []]
+    level = depth.get("level")
+    if names and level in names:
+        width, filled = len(names), names.index(level) + 1
+    else:
+        # No readable declaration, so there is no ladder to place this subtopic
+        # on. An empty bar beside `no estimate` is the honest render — a bar
+        # invented here would be the "opaque score" the estimate refuses to be.
+        width, filled = len(names) or GLANCE_FALLBACK_WIDTH, 0
+    bar = "#" * filled + "." * (width - filled)
+    return (f"[{bar}] {level or 'no estimate'} - "
             f"{density['evidence_pointers']} ptr, "
             f"{density['unconsumed_lessons']} unconsumed, "
             f"{density['live_items']} live")
@@ -1037,7 +1065,7 @@ def cluster_subtopics(items, consumption, thresholds):
             "clustered_by": g["basis"],
             "density": density,
             "depth": depth,
-            "glance": _glance(depth, density),
+            "glance": _glance(depth, density, thresholds),
             # Consumed material is MARKED, never hidden — and stays pickable.
             "consumed_items": consumed_items,
             "consumed": consumed_items > 0 and consumed_items == len(g["items"]),
