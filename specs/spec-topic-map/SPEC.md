@@ -113,13 +113,47 @@ flows into the existing brief/structures path unchanged.**
     - **Above the budget:** the screen becomes a short **summary** plus the
       path of a **View file** the owner opens, and selection happens by
       **index** rather than by matching a proposed direction string.
+    - **The above-budget branch proposes no less than the small one (amended
+      2026-07-23, #632).** The size switch changes *where* the terrain is
+      presented, never *whether* the map proposes. So the View **leads with
+      candidate directions** — the same derived directions and cross-topic
+      combinations CAP-3's intent declares, which the large branch already
+      derives unbounded (every subtopic a candidate, the strongest combination
+      per distinct axis) — before any terrain detail. A branch that shows the
+      terrain and hides the directions inverts the switch's purpose, and it
+      would put the owner in front of a raw machine artifact to answer from,
+      which the human-gate presentation contract forbids. The directions are
+      the ones already derived: the View **reuses** them and derives nothing
+      of its own, so the no-second-proposer boundary is untouched — directions
+      name what to cover and along which axis, never narrative structure.
   - **the View file.** A *rendering* of one invocation, at the same status as
     `--emit-debug`: written to a fixed path, fully regenerated on every
     invocation, and **never read back as an input** — grep-assertable, like
-    the existing derived-never-stored check. It carries per subtopic: stable
-    ID, topic, depth glance, evidence-pointer list, lesson-seed names, and
-    consumed marks — enough to distinguish 20+ directions and to answer
-    CAP-2's "why this depth?" from the same counts. Deleting it loses nothing.
+    the existing derived-never-stored check. It carries, in this order: the
+    **candidate directions** above (with the subtopic indexes each names), a
+    compact **one-line-per-subtopic summary**, and only then per-subtopic
+    detail — stable ID, topic, depth glance, an **evidence summary**,
+    lesson-seed names, and consumed marks — enough to distinguish 20+
+    directions and to answer CAP-2's "why this depth?" from the same counts.
+    Deleting it loses nothing.
+  - **the View is a human surface, so it is budgeted (amended 2026-07-23,
+    #633/#634).** The View is written for the owner to read, and the
+    machine-readable form of everything on it already exists in the run's
+    `map.json`. Duplicating that form into the human artifact is what turns
+    the View into a log file, so:
+    - **Evidence renders as a summary:** the count of distinct pointers plus
+      **at most ~3 exemplar sources by name**. The full pointer enumeration —
+      with line numbers and per-line shas — stays in `map.json`; the View
+      header already carries the pin, which is what reproducibility needs.
+    - **Depth renders as the depth word** ("full article", "short note", …).
+      The promotion predicate and its threshold arithmetic are the depth
+      estimator's internals and stay in `map.json`.
+    - **Every View line carries a display budget**, and each per-subtopic
+      block a line cap, the same convention the screen payload's fields
+      already follow: a list renders one item per line, clipped, capped, with
+      an explicit `+N more` remainder. A fallback or placeholder state is
+      named to the owner as **prose that states the remedy**, never as a bare
+      internal enum value in a headline position.
   - **where the View lives (amended 2026-07-23, #611).** "A fixed path" is
     **the `output.drafts` destination repository**, at a resolver-owned,
     host-qualified path — not a per-run workspace directory. The View is
@@ -161,7 +195,10 @@ flows into the existing brief/structures path unchanged.**
     composition finds none; the map screen offers free-form alongside its
     options every time; a small map behaves exactly as shipped; a >budget map
     produces the View plus summary, is byte-regenerated per invocation, and no
-    code path reads the View back.
+    code path reads the View back. **A >budget View's first screenful presents
+    pickable candidate directions — not terrain detail — and no View line
+    exceeds its display budget**; grepping the View for a raw pointer
+    enumeration or for threshold arithmetic finds none.
   - **provenance (2026-07-23, owner ruling):** this supersedes CAP-3's
     original in-conversation-only reading — "never a path or artifact for the
     owner to open" — for the >budget branch only, by direct owner demand after
@@ -266,3 +303,29 @@ flows into the existing brief/structures path unchanged.**
   to make (gateway read-only, grants hub-owned). Open: whether to request that
   grant, or to accept index-line seeds as the permanent shape and let depth
   from lessons stay coarse.
+
+- **OQ4 — is the map's unit a subtopic cluster or a typed element?** *(Raised
+  2026-07-23 with #631; deliberately left open by that issue's resolution.)*
+  #631 asks for the map's unit to become a **typed element** — `lesson |
+  failure-retro | reversal | decision | thinking`, each with a one-line
+  summary, the situation it was recorded in, a consumed mark, and 1–3 evidence
+  pointers — grouped by situation or by similar meaning, rather than the
+  path-family subtopic cluster CAP-2 declares and OQ1 closed. The rendering
+  half of that direction was resolved above (the View leads with directions,
+  and is budgeted); **the unit itself was not**, for a reason that is a fact
+  about the substrate rather than a preference:
+  - CAP-4's declared families are exactly `articles-items`, `hub-lessons` and
+    `host-sources` (`scripts/topic-map.py:153-155`), and `hub-lessons` is one
+    seed per `LESSONS.md` **index line** (`:328-335`). Nothing this repository
+    can read records a **reversal**, a **decision with its why**, or
+    **thinking-at-the-time** as a typed record. Three of the five proposed
+    element types are therefore not projectable today.
+  - Reaching them means widening the policy seam's read scope, which is
+    **hub-side ratification, not a map-side change** — the same boundary OQ3
+    documents, and #631 states this itself.
+  So the unit question is blocked on the same upstream decision as OQ3, and
+  adopting the element unit before that grant exists would write this spec as
+  though it can read what it cannot. Open: whether to request the grant (with
+  OQ3, as one hub-side ask), or to keep the subtopic cluster as the permanent
+  unit and treat typed elements as a projection the hub itself would have to
+  serve. Until this closes, #631 stays open against it.
