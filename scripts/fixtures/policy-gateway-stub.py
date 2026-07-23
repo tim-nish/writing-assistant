@@ -22,8 +22,12 @@ Fixture format:
     "surface":  {"topics": [name, ...],             # surface_names identifiers
                  "glossary": [name, ...],
                  "lessons": [name, ...]},
+    "surface_envelope": "names" | "lines",          # which served shape (below)
     "tools":    [name, ...]                          # registered tools/list set
   }
+`surface_envelope` selects how surface_names answers: `names` (the spec's bare
+list, the default) or `lines` (the cite-carrying envelope the live gateway
+returns). Both are served in the wild, so both are fixtures.
 Empty/absent arrays serve the uniform miss shape. `tools` defaults to all five
 registered tools (incl. surface_names, tsurezure-gateway#41); omit surface_names
 from it to simulate an older gateway that lacks bounded enumeration.
@@ -82,6 +86,20 @@ def responses(fixture):
             kind = args.get("kind", "")
             names = fixture.get("surface", {}).get(kind, [])
             if names:
+                # Two served shapes, both real: the spec's bare `names` list,
+                # and the cite-carrying `lines` envelope the LIVE gateway
+                # actually returns (observed against product-lab@f7d5a73,
+                # 2026-07-23). `surface_envelope: "lines"` in the fixture
+                # selects the latter, so a reader that only reads `names`
+                # cannot pass the harness while silently enumerating nothing
+                # in production.
+                if fixture.get("surface_envelope") == "lines":
+                    lines = [{"cite": f"{kind}/{n}.md:1@{commit}", "text": n}
+                             for n in names]
+                    return {"miss": False, "pin": pin, "kind": kind,
+                            "lines": lines,
+                            "cites": [l["cite"] for l in lines],
+                            "consulted": f"consulted: {pin} (stub)"}
                 return {"miss": False, "pin": pin, "kind": kind, "names": names,
                         "consulted": f"consulted: {pin} (stub)"}
             return {"miss": True, "tool": name, "request": {"kind": kind},

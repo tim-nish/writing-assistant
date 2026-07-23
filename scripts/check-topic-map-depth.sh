@@ -13,8 +13,10 @@
 #          and stays selectable; "why this depth?" is answered with the pointer
 #          counts; a dense and a thin subtopic render visibly differently.
 #   Decl   the thresholds live in ONE readable place, changing one changes the
-#          estimate and nothing else, and the shipped values report themselves
-#          as PROPOSED (`ratified: false`) rather than as a settled rule.
+#          estimate and nothing else. The shipped values were RATIFIED by owner
+#          sign-off on 2026-07-23 (Story 18.68, #603) against the real
+#          post-#600 corpus, and every estimate reports that state alongside
+#          itself — ratification does not turn the estimate into a gate.
 
 set -eu
 
@@ -82,6 +84,9 @@ track: engineering
 subtopic: retry-behaviour
 evidence:
   - host/invoice.md:2@abc1234
+  - host/invoice.md:19@abc1234
+  - host/postmortem.md:7@abc1234
+  - host/postmortem.md:64@abc1234
 ---
 EOF
 # A THIN subtopic: one seed, one pointer, nothing cited.
@@ -149,7 +154,7 @@ rich, thin = subs.get("retry-behaviour", {}), subs.get("staffing", {})
 
 # --- the evidence-density signal -------------------------------------------
 rd = rich.get("density", {})
-check(rd.get("evidence_pointers") == 6,
+check(rd.get("evidence_pointers") == 9,
       f"the density signal counts DISTINCT evidence pointers (got {rd.get('evidence_pointers')})")
 check(rd.get("unconsumed_lessons") == 3,
       f"the density signal counts unconsumed cited elements (got {rd.get('unconsumed_lessons')})")
@@ -164,15 +169,17 @@ check(rich.get("depth", {}).get("level") == "full article",
 check(thin.get("depth", {}).get("level") == "seed-only",
       f"a lone seed estimates seed-only (got {thin.get('depth', {}).get('level')})")
 check(d["depth_thresholds"]["available"] is True
-      and d["depth_thresholds"]["ratified"] is False,
-      "the thresholds are declared and report themselves as PROPOSED, not ratified")
+      and d["depth_thresholds"]["ratified"] is True,
+      "the thresholds are declared and report themselves as RATIFIED (Story 18.68)")
+check(rich.get("depth", {}).get("ratified") is True,
+      "every estimate carries the ratification state alongside it")
 
 # --- "why this depth?" is answered with the pointer counts ------------------
 why = rich.get("depth", {}).get("why", "")
 counted = rich.get("depth", {}).get("counted", {})
-check(counted == {"evidence_pointers": 6, "unconsumed_lessons": 3, "live_items": 3},
+check(counted == {"evidence_pointers": 9, "unconsumed_lessons": 3, "live_items": 3},
       "the estimate carries the exact numbers it was derived from")
-check("6 evidence pointer" in why and "3 unconsumed lesson" in why,
+check("9 evidence pointer" in why and "3 unconsumed lesson" in why,
       "the estimate explains itself with its pointer counts, not an opaque score")
 check("article series" not in rich.get("depth", {}).get("level", "")
       and "needs" in why,
@@ -251,6 +258,60 @@ sys.exit(1 if fail else 0)
 PYEOF
 [ $? -eq 0 ] || fail=1
 
+# --- both declaration paths keep working (Story 18.68 AC) --------------------
+# The shipped default and the PER-REPO override at
+# <repo-config-dir>/topic-depth-thresholds.yaml, which wins without any flag.
+python3 -c "
+import json
+d=json.load(open('$work/m.json'))
+assert d['depth_thresholds']['source'].endswith('config/topic-depth-thresholds.yaml'), \
+    d['depth_thresholds']['source']
+assert d['depth_thresholds']['ratified'] is True, d['depth_thresholds']
+" && ok "declaration paths: with no override, the SHIPPED ratified default is used" \
+  || err "the shipped default is not the fallback declaration"
+
+repocfg=$(python3 "$root/scripts/resolve-paths.py" repo-config-dir --root "$h" 2>/dev/null) \
+  || repocfg=""
+if [ -n "$repocfg" ]; then
+  mkdir -p "$repocfg"
+  cat > "$repocfg/topic-depth-thresholds.yaml" <<'EOF'
+ratified: false
+order: [seed-only, short-note]
+levels:
+  seed-only:
+    name: seed-only
+    description: a lone note
+    min_evidence_pointers: 0
+    min_unconsumed_lessons: 0
+    min_live_items: 0
+  short-note:
+    name: short note
+    description: enough for a working note
+    min_evidence_pointers: 200
+    min_unconsumed_lessons: 0
+    min_live_items: 0
+EOF
+  MAP > "$work/repo-override.json"
+  python3 -c "
+import json
+d=json.load(open('$work/repo-override.json'))
+t=d['depth_thresholds']
+assert t['source'].startswith('$repocfg'), t['source']
+assert t['ratified'] is False, t
+s={x['subtopic']:x for tt in d['topics'] for x in tt['subtopics']}
+assert s['retry-behaviour']['depth']['level']=='seed-only', s['retry-behaviour']['depth']
+assert all(x['selectable'] for x in s.values()), s
+" && ok "declaration paths: a per-repo override wins with no flag, and carries its own ratification state" \
+    || err "the per-repo override path is broken"
+  rm -f "$repocfg/topic-depth-thresholds.yaml"
+  MAP > "$work/back-to-default.json"
+  cmp -s "$work/m.json" "$work/back-to-default.json" \
+    && ok "declaration paths: removing the override falls back to the shipped default, byte-for-byte" \
+    || err "removing the per-repo override did not restore the shipped default"
+else
+  err "resolve-paths.py repo-config-dir did not resolve — the per-repo override path is unverified"
+fi
+
 # An unreadable declaration is DISCLOSED, never replaced by invented numbers.
 MAP --thresholds "$work/no-such-file.yaml" > "$work/missing.json"
 python3 -c "
@@ -291,8 +352,12 @@ def check(cond, msg):
 names = [data["levels"][k]["name"] for k in data["order"]]
 check(names == ["seed-only", "short note", "full article", "article series"],
       "the shipped declaration names the four levels the spec lists")
-check(data["ratified"] is False,
-      "the shipped values declare themselves PROPOSED, awaiting ratification")
+check(data["ratified"] is True,
+      "the shipped values declare themselves RATIFIED (Story 18.68, owner sign-off 2026-07-23)")
+check(all(int(data["levels"][k]["min_live_items"]) == 0
+          for k in data["order"]),
+      "no level gates on live_items — declared sources and lesson seeds never "
+      "have one, and as an AND-gate it pinned the whole widened corpus to the floor")
 check(all(int(data["levels"][k]["min_evidence_pointers"]) >= 0 for k in data["order"]),
       "every level declares its minimums")
 sys.exit(1 if fail else 0)

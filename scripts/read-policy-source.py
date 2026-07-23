@@ -268,11 +268,38 @@ def has_surface_names():
 def surface_names(kind):
     """Bounded enumeration via the gateway's `surface_names` tool
     (kind: topics | glossary | lessons): identifiers only, never bodies
-    (spec §3). Returns the payload dict ({miss, pin, kind, names}). Callers
+    (spec §3). Returns the payload dict; read the identifiers out of it with
+    `surface_identifiers` rather than by key, because the served envelope has
+    two shapes. Callers
     gate this behind has_surface_names(), so an older gateway degrades to the
     named exit-13 gap and never reaches here."""
     (payload,) = call_gateway([("surface_names", {"kind": kind})])
     return payload
+
+
+def surface_identifiers(payload):
+    """The identifiers out of a `surface_names` payload, in served order.
+
+    The gateway serves the enumeration in the SAME cite-carrying envelope its
+    other tools use — `lines: [{cite, text}]`, one identifier per `text` — and
+    the spec also documents a bare `names` list. Reading only `names` silently
+    yields an empty enumeration against the live gateway, which is not a
+    harmless miss: `validate-config.py`'s topic-existence lint treats a
+    successful-but-empty enumeration as authoritative and reports every mapped
+    topic as absent from the hub — a blocking stage-0 error for a mapping that
+    is in fact correct (observed 2026-07-23 against product-lab@f7d5a73). Both
+    shapes are accepted, so neither a current nor a future gateway can
+    reintroduce that silence.
+    """
+    names = payload.get("names")
+    if isinstance(names, list) and names:
+        return [str(n) for n in names if str(n).strip()]
+    out = []
+    for entry in payload.get("lines") or []:
+        text = str((entry or {}).get("text") or "").strip()
+        if text:
+            out.append(text)
+    return out
 
 
 def split_cite(cite):
@@ -361,7 +388,7 @@ def cmd_list_topics(args):
         payload = surface_names("topics")
     except GatewayError as e:
         return _unavailable((UNAVAIL_GATEWAY, f"gateway unreachable ({e})"))
-    for name in payload.get("names", []):
+    for name in surface_identifiers(payload):
         print(name)
     return 0
 
@@ -445,7 +472,7 @@ def cmd_read(args):
                 return _tool_gap(GAP_WHOLE_GLOSSARY)
             names_payload = surface_names("glossary")
             pin = names_payload.get("pin")
-            glossary = compose_glossary(names_payload.get("names", []))
+            glossary = compose_glossary(surface_identifiers(names_payload))
         payloads = call_gateway(calls) if calls else []
     except GatewayError as e:
         return _unavailable((UNAVAIL_GATEWAY, f"gateway unreachable ({e})"))

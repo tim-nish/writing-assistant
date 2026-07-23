@@ -12,13 +12,48 @@
 # it lands in — a seed-only subtopic is a signal for the owner's judgment, not a
 # refusal.
 #
-# STATUS: PROPOSED, NOT YET RATIFIED. The spec does not choose these boundaries
-# — they are an owner-calibration input. The map reports `ratified: false`
-# alongside every estimate so a run can never mistake a proposal for a settled
-# rule. Ratify by setting `ratified: true` here (or in a per-repo override at
-# `<repo-config-dir>/topic-depth-thresholds.yaml`) once the numbers have been
-# checked against a real corpus.
-ratified: false
+# STATUS: RATIFIED 2026-07-23 (Story 18.68, #603), on the owner's sign-off on
+# the specific numbers below. The spec does not choose these boundaries — they
+# are an owner-calibration input — so ratification is a sign-off act, not a
+# contract amendment. A per-repo override at
+# `<repo-config-dir>/topic-depth-thresholds.yaml` still wins and carries its
+# own ratification state.
+#
+# WHAT THE NUMBERS WERE CALIBRATED AGAINST
+# ----------------------------------------
+# Corpus: the tanuki host repo at `tanuki@c9b38db` with the hub at
+# `product-lab@f7d5a73`, after the #600 widening — 147 subtopics across three
+# source families (9 articles-items surfaces, 65 hub-lessons index lines, 92
+# host-sources documents).
+#
+# Observed density, over all 147 subtopics:
+#
+#   evidence_pointers    min 0 · p50 1 · p75 4 · p90 4 · p95 14 · max 121
+#   unconsumed_lessons   max 1   (a lesson seed cites exactly itself)
+#   live_items           0 for 145 of 147   (max 7)
+#
+# THE FINDING THAT MOVED THE MODEL, not just the numbers: the previous levels
+# required `min_live_items` >= 1/2/4, and a declared source or a lesson seed
+# structurally never has a live item — a "live item" is a backlog/draft/
+# newsletter entry. As an AND-gate that pinned 146 of 147 subtopics to
+# seed-only, so the estimate could not tell a 121-pointer SPEC from a one-line
+# lesson seed. That is the same "true over the wrong corpus" defect #600 fixed
+# at the enumeration level, one layer down.
+#
+# So `min_live_items` and `min_unconsumed_lessons` are 0 above the floor and
+# EVIDENCE POINTERS carry the discrimination. Resulting spread on the corpus
+# above — the numbers the owner signed off on:
+#
+#   seed-only        97
+#   short note       40
+#   full article      6   CHANGELOG, DECISION-2026-07-19-probe-coverage,
+#                         tanuki, tanuki-config, tanuki-drive, tanuki-spec
+#   article series    4   README, SPEC, tanuki-ledger, tanuki-loop
+#
+# RATIFICATION DOES NOT MAKE THE ESTIMATE A GATE. CAP-2's rule is unaffected:
+# these boundaries still decide only what is SURFACED, every subtopic stays
+# `selectable: true`, and consumed material stays marked rather than hidden.
+ratified: true
 
 # Weakest to strongest. A subtopic lands in the STRONGEST level whose every
 # minimum it meets; the weakest level's minimums are all zero, so every subtopic
@@ -42,16 +77,16 @@ levels:
     description: enough for a working note or a short post
     min_evidence_pointers: 2
     min_unconsumed_lessons: 0
-    min_live_items: 1
+    min_live_items: 0
   full-article:
     name: full article
     description: enough evidence and unconsumed material for one full article
-    min_evidence_pointers: 5
-    min_unconsumed_lessons: 1
-    min_live_items: 2
+    min_evidence_pointers: 8
+    min_unconsumed_lessons: 0
+    min_live_items: 0
   article-series:
     name: article series
     description: more than one article's worth — splitting is the real decision
-    min_evidence_pointers: 12
-    min_unconsumed_lessons: 3
-    min_live_items: 4
+    min_evidence_pointers: 25
+    min_unconsumed_lessons: 0
+    min_live_items: 0
