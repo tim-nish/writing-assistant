@@ -952,10 +952,53 @@ def _pointer_subject(pointer):
     return stem or None
 
 
+def subtopic_defect(item):
+    """A declared subtopic key that is PRESENT but unusable, as
+    `(key, reason)` — else None (Story 18.74, #614).
+
+    The existence lint's counterpart for this vocabulary. A malformed
+    declaration must be a config defect SURFACED BY NAME, never a silent
+    fallback to derivation: today a non-string value simply fails the type test
+    and the item quietly clusters by evidence instead, so a typo in the
+    articles repo is indistinguishable from no declaration at all. Same shape
+    as the ratified track->topic existence lint — the articles repo is
+    authoritative, so a declaration the map cannot honour is the repo's defect
+    to fix, and it says so rather than degrading.
+    """
+    for key in SUBTOPIC_KEYS:
+        if key not in item:
+            continue
+        declared = item[key]
+        if isinstance(declared, list):
+            if not declared:
+                return key, "declares an empty list; name one subtopic or remove the key"
+            if len(declared) > 1:
+                return key, (f"declares {len(declared)} values "
+                             f"({', '.join(map(str, declared[:3]))}...); an item belongs "
+                             "to ONE subtopic — only the first would be used")
+            declared = declared[0]
+        if not isinstance(declared, str):
+            return key, (f"declares a value of type {type(declared).__name__}, "
+                         "not a name; subtopic names are strings")
+        if not declared.strip():
+            return key, "declares an empty name; remove the key instead"
+    return None
+
+
 def subtopic_key(item):
-    """Which cluster an item belongs to, derived in a fixed, explainable order:
-    a declared subtopic when the item happens to carry one, else the subject its
-    evidence pointers agree on, else `(unclustered)`. Never invented from prose.
+    """Which cluster an item belongs to, in a fixed, explainable order of
+    DECLARED PRECEDENCE (OQ1, closed 2026-07-23):
+
+      1. a declared `subtopic:`/`cluster:` from the articles repo — the repo's
+         frontmatter schema is the API, and it names its own subjects;
+      2. else the PATH FAMILY its evidence pointers agree on (Story 18.73);
+      3. else `(unclustered)`.
+
+    The articles repo is authoritative: a cluster disagreeing with a declared
+    name is this tool's defect, never the repo's. Nothing is cached — the
+    declaration is read at assembly time on every invocation, so the mismatch
+    check is RECOMPUTATION, never reconciliation, and no vocabulary is
+    mirrored into plugin state. Never invented from prose.
     """
     for key in SUBTOPIC_KEYS:
         declared = item.get(key)
@@ -1134,6 +1177,22 @@ def build_map(args):
     stale = sorted(t for t in mapping if t not in tracks_seen)
     consumption = consumption_view(root)
     thresholds = load_thresholds(root, getattr(args, "thresholds", None))
+    # Declared-subtopic defects, surfaced BY NAME rather than degrading into a
+    # silent derivation (Story 18.74, #614). Collected before clustering so the
+    # disclosure covers every item, including ones whose declaration was
+    # unusable and which therefore clustered by evidence instead.
+    subtopic_defects = []
+    for topic in topics:
+        for item in topic["items"]:
+            found = subtopic_defect(item)
+            if found:
+                key, reason = found
+                subtopic_defects.append({
+                    "item": item.get("slug") or item.get("surface") or "",
+                    "surface": item.get("surface") or "",
+                    "key": key,
+                    "reason": reason,
+                })
     for topic in topics:
         topic["subtopics"] = cluster_subtopics(topic["items"], consumption, thresholds)
     return {
@@ -1148,6 +1207,11 @@ def build_map(args):
         "track_topics": mapping,
         "unmapped_tracks": sorted(t for t in tracks_seen if t not in mapping),
         "stale_mapping_tracks": stale,
+        # The articles repo is authoritative for subtopic names; a declaration
+        # this map cannot honour is the repo's defect, named here rather than
+        # silently replaced by a derived cluster.
+        "subtopic_defects": sorted(subtopic_defects,
+                                   key=lambda d: (d["item"], d["key"])),
         "topics": topics,
         "coverage": coverage,
         "consumption": consumption,

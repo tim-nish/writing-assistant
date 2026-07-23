@@ -360,6 +360,63 @@ grep -q 'SENTINEL-HOOK' "$work/lessons.json" \
   && err "a lesson hook reached the map — more than the index line's title was projected" \
   || ok "hub-lessons: only the index line's title is projected (no hook prose, no lesson body)"
 
+# --- declared precedence + the malformed-declaration lint (18.74, #614) ------
+# The articles repo owns subtopic names; the derivation is the fallback. A
+# declaration the map cannot honour is a CONFIG DEFECT NAMED, never a silent
+# degradation into a derived cluster — which is what a wrong-typed value used
+# to produce, indistinguishable from no declaration at all.
+# End to end: a malformed declaration in a real backlog item reaches the map's
+# disclosure by name. Without this the lint could be correct in isolation and
+# never actually wired into an assembled map.
+cat > "$a/backlog/bad-decl.md" <<'EOF'
+---
+slug: bad-decl
+title: An item whose subtopic declaration is unusable
+status: seed
+track: engineering
+subtopic:
+  - one
+  - two
+evidence:
+  - host/notes.md:3@abc1234
+---
+EOF
+MAP > "$work/decl.json" 2>/dev/null
+python3 - "$work/decl.json" <<'PYEOF' && ok "a malformed declared subtopic is disclosed on the map, naming the item and the reason" || err "malformed subtopic declaration not disclosed"
+import json, sys
+d = json.load(open(sys.argv[1]))
+defects = {x["item"]: x for x in d["subtopic_defects"]}
+assert "bad-decl" in defects, d["subtopic_defects"]
+bad = defects["bad-decl"]
+assert bad["key"] == "subtopic" and "ONE subtopic" in bad["reason"], bad
+assert bad["surface"] == "backlog/bad-decl.md", bad
+# well-formed items contribute NO defect — the disclosure is not noise
+assert "retry-storm" not in defects and "cache-warmth" not in defects, defects
+PYEOF
+rm "$a/backlog/bad-decl.md"
+
+python3 - "$root/scripts/topic-map.py" <<'PYEOF' && ok "declared subtopic outranks the derivation, and a malformed declaration is NAMED (#614)" || err "declared precedence or the subtopic lint is wrong"
+import importlib.util, sys
+s = importlib.util.spec_from_file_location("tm", sys.argv[1])
+m = importlib.util.module_from_spec(s); s.loader.exec_module(m)
+# 1. Declared beats the path family, and records that basis.
+assert m.subtopic_key({"subtopic": "owner-named",
+                       "evidence": ["docs/stories/a.md:1@x"]}) == ("owner-named", "declared")
+assert m.subtopic_key({"cluster": " spaced "})[0] == "spaced"
+# 2. A well-formed declaration is not a defect.
+assert m.subtopic_defect({"subtopic": "fine"}) is None
+assert m.subtopic_defect({"evidence": ["docs/stories/a.md:1@x"]}) is None  # absent != defective
+# 3. Every unusable shape is reported WITH A REASON, and still clusters
+#    (the map degrades, but never silently).
+for item, needle in (({"subtopic": ["a", "b"]}, "ONE subtopic"),
+                     ({"subtopic": []},         "empty list"),
+                     ({"subtopic": 42},         "type int"),
+                     ({"subtopic": "   "},      "empty name")):
+    found = m.subtopic_defect(item)
+    assert found and needle in found[1], (item, found)
+    assert found[0] == "subtopic", found
+PYEOF
+
 # --- the path-family derivation itself (Story 18.73, #614) -------------------
 # The rule the clustering rests on, pinned directly: cluster by the pointer's
 # parent directory when it is at least two segments deep, else the file stem —
