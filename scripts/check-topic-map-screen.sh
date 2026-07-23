@@ -462,6 +462,56 @@ sys.exit(1 if fail else 0)
 PYEOF
 [ $? -eq 0 ] || fail=1
 
+# --- coverage wording never carries a placeholder (18.78, #637) -------------
+# The wording IS the brief on adoption, so this is asserted at the composed
+# brief and not only at the surface.
+python3 - "$work/big-map.json" "$work/big-cands.json" "$D" <<'PYEOF' || fail=1
+import importlib.util, json, sys
+d = json.load(open(sys.argv[1]))
+cands = json.load(open(sys.argv[2]))["candidates"]
+fail = []
+def check(cond, msg):
+    print(("ok:   " if cond else "FAIL: ") + msg, file=sys.stdout if cond else sys.stderr)
+    if not cond: fail.append(msg)
+
+PLACEHOLDERS = ("(unclustered)", "(untracked)", "(unnamed)")
+subs = [s for t in d["topics"] for s in t["subtopics"]]
+check(any(s["subtopic"] in PLACEHOLDERS or not str(s["subtopic"]).strip()
+          for s in subs),
+      "the fixture contains an unnamed / not-yet-clustered subtopic")
+
+bad = [c["direction"] for c in cands
+       if any(p in c["direction"] for p in PLACEHOLDERS)]
+check(not bad, f"no candidate direction carries a placeholder enum ({bad[:2]})")
+check(not any(c["direction"].strip() in ("cover", "cover ") for c in cands),
+      "no candidate direction is left with an empty subject")
+
+# The same rule at the BRIEF: adopting any index must never hand the owner an
+# enum as their own wording.
+spec = importlib.util.spec_from_file_location("d", sys.argv[3])
+mod = importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)
+pin = d["coverage"]["pin"]
+briefs = [mod.brief_from_answer(
+              {"index": c["id"], "note": "an angle", "pin": pin}, cands, pin)["brief"]
+          for c in cands]
+badb = [b for b in briefs if any(p in b for p in PLACEHOLDERS)]
+check(not badb, f"no composed brief carries a placeholder enum ({badb[:2]})")
+check(all(b.endswith("— an angle") for b in briefs),
+      "the owner's note is still carried verbatim onto every composed brief")
+
+# A NAMED cluster's wording is untouched: the articles repo still owns names.
+# Stable IDs are assigned by the composer, not carried in the map, so the
+# id-annotated view is what pairs a subtopic with its candidate.
+named = [s for s in mod._subtopics(d)
+         if str(s["subtopic"]).strip() and s["subtopic"] not in PLACEHOLDERS]
+byid = {c["id"]: c for c in cands if c["kind"] == "single"}
+check(all(byid[s["id"]]["direction"] == f"cover {s['subtopic']}"
+          for s in named if s["id"] in byid),
+      "a declared or derived name still produces exactly `cover <name>`")
+sys.exit(1 if fail else 0)
+PYEOF
+[ $? -eq 0 ] || fail=1
+
 # --- the View shows the ESTIMATE, not the estimator's rule (18.77, #633) ----
 python3 - "$work/big-map.json" "$work/view.md" "$D" <<'PYEOF' || fail=1
 import importlib.util, json, re, sys

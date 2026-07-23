@@ -204,7 +204,7 @@ def candidates(map_data):
         out.append({
             "kind": "single",
             "id": sub["id"],
-            "direction": f"cover {sub['subtopic']}",
+            "direction": f"cover {_coverage_subject(sub)}",
             "topics": [sub["topic"]],
             "subtopics": [sub["subtopic"]],
             "depth": depth.get("level"),
@@ -227,8 +227,8 @@ def candidates(map_data):
             combos.append({
                 "kind": "combination",
                 "id": f"{a['id']}+{b['id']}",
-                "direction": (f"connect {a['subtopic']} and {b['subtopic']} along "
-                              f"{shared[0]}"),
+                "direction": (f"connect {_coverage_subject(a)} and "
+                              f"{_coverage_subject(b)} along {shared[0]}"),
                 "topics": sorted({a["topic"], b["topic"]}),
                 "subtopics": [a["subtopic"], b["subtopic"]],
                 "axis": shared[0],
@@ -293,6 +293,30 @@ PLACEHOLDER_PROSE = {
 def as_prose(name):
     """A placeholder state, rendered for a person. Any other name is its own."""
     return PLACEHOLDER_PROSE.get(str(name).strip(), name)
+
+
+def _coverage_subject(sub):
+    """What a direction says it covers — OWNER-READABLE BY CONSTRUCTION (#637).
+
+    A candidate's wording becomes the owner's brief the moment they adopt it
+    (`_brief_from_index`), so an internal placeholder must never reach it: a
+    brief reading `cover (unclustered)` hands the tool's own enum back to the
+    owner as their words. Fixing that only where the View prints would leave
+    the adopted brief carrying the enum — so the constraint lives here, in the
+    derivation both branches share.
+
+    A declared or successfully derived name is returned untouched: the articles
+    repo owns subject NAMES (OQ1), and this only governs the wording composed
+    when the repo named nothing. In that case the subject DESCRIBES the
+    cluster's contents rather than inventing a name for it.
+    """
+    name = _subtopic_name(sub)
+    if str(name).strip() not in PLACEHOLDER_PROSE:
+        return name
+    count = sub.get("density", {}).get("items") or len(sub.get("items", []))
+    topic = str(sub.get("topic") or "").strip()
+    where = f" under {topic}" if topic and topic not in PLACEHOLDER_PROSE else ""
+    return f"the not-yet-clustered items{where} ({count} item(s))"
 
 
 def _id_order(sub):
