@@ -157,6 +157,42 @@ def _subtopics(map_data):
     return rows
 
 
+ELEMENT_SUMMARY_CHARS = 120
+
+
+def _elements(map_data):
+    """Every element in the map, each carrying its STABLE ID (Story 18.80,
+    #641).
+
+    `E<topic>.<n>` — a namespace of its own, so an indexed selection is never
+    ambiguous against the subtopic `T<topic>.<subtopic>` scheme. Topics are
+    numbered from the sorted set of topics the elements actually came from, and
+    `<n>` follows the assembler's order, which is recency-ranked and
+    deterministic within a pin (Story 18.79). Computed here per invocation and
+    stored nowhere, exactly as the subtopic IDs are.
+    """
+    rows, seen = [], {}
+    topics = sorted({e.get("topic", "") for e in map_data.get("elements", [])})
+    index = {name: i for i, name in enumerate(topics, start=1)}
+    for el in map_data.get("elements", []):
+        topic = el.get("topic", "")
+        seen[topic] = seen.get(topic, 0) + 1
+        rows.append(dict(el, id=f"E{index[topic]}.{seen[topic]}"))
+    return rows
+
+
+def _element_direction(el):
+    """An element as a coverage direction — the wording that becomes the brief
+    if the owner adopts it, so it names the material in the owner's terms and
+    carries no internal marker (#637's rule, unchanged for the new kind)."""
+    summary = _clip(str(el.get("summary") or "").strip(), ELEMENT_SUMMARY_CHARS)
+    kind = "reversal" if el.get("kind") == "reversal" else "decision"
+    if not summary:
+        # Never a bare enum on the owner surface: describe what it is instead.
+        return f"cover the {kind} recorded at {el.get('date') or 'an undated line'}"
+    return f"cover the {kind} — {summary}"
+
+
 def _rank(sub):
     """Richest first, ties broken by name so a run is reproducible."""
     d = sub.get("density", {})
@@ -238,6 +274,27 @@ def candidates(map_data):
                 "evidence_pointers": (a.get("density", {}).get("evidence_pointers", 0)
                                       + b.get("density", {}).get("evidence_pointers", 0)),
             })
+    # Elements (Story 18.80): the second projection reaches the SAME candidate
+    # list, so index selection, the screen and the View all resolve against one
+    # derivation. Unbounded like the singles above — the terrain bounds them,
+    # not a screen constant, and the seam already bounded which topics they
+    # came from.
+    for el in _elements(map_data):
+        out.append({
+            "kind": "element",
+            "element_kind": el.get("kind"),
+            "id": el["id"],
+            "direction": _element_direction(el),
+            "topics": [el.get("topic", "")],
+            "subtopics": [],
+            "date": el.get("date"),
+            "situation": el.get("situation"),
+            "depth": None,
+            "why": el.get("summary"),
+            "consumed": bool(el.get("consumed")),
+            "evidence_pointers": len(el.get("evidence") or []),
+        })
+
     combos.sort(key=lambda c: (-len(c["shared_evidence"]), -c["evidence_pointers"],
                                c["direction"]))
     if large:
@@ -457,7 +514,10 @@ def _direction_lines(cands):
     Every row carries its INDEX, because selection is by index against the pin.
     """
     combos = [c for c in cands if c.get("kind") == "combination"]
-    singles = [c for c in cands if c.get("kind") != "combination"]
+    # Elements are candidates like any other — they resolve by index and reach
+    # the screen — but on the View they get their own section, so they are not
+    # repeated here.
+    singles = [c for c in cands if c.get("kind") not in ("combination", "element")]
     out = []
     for c in combos + singles:
         facts = []
@@ -468,6 +528,38 @@ def _direction_lines(cands):
             facts.append("already consumed — still selectable")
         out.append(f"- **{c['id']}** — {c['direction']} ({', '.join(facts)})")
     return out or ["- none: this map proposes no directions"]
+
+
+def _element_lines(cands):
+    """The elements, one line each — index, kind, summary, situation, consumed
+    mark (Story 18.80). Same display convention as every other list here."""
+    els = [c for c in cands if c.get("kind") == "element"]
+    if not els:
+        return ["- none: no decision or reversal was projected this run"]
+    out = []
+    for c in els:
+        mark = " · consumed" if c.get("consumed") else ""
+        out.append(f"- **{c['id']}** — {c.get('element_kind') or 'element'} · "
+                   f"{c['direction'].split('—', 1)[-1].strip()} · "
+                   f"{c.get('date') or 'undated'}{mark}")
+    return out
+
+
+def _element_coverage_line(map_data):
+    """What the element projection does and does NOT cover, stated on the
+    surface. A bounded projection read as the whole record is the specific harm
+    CAP-4's element bound guards against, so the bound is never silent."""
+    cov = map_data.get("coverage", {}) or {}
+    read = cov.get("element_topics_read") or []
+    skipped = cov.get("element_topics_skipped") or []
+    if not read and not skipped:
+        return ("No hub topic is declared for this repo, so no decisions or "
+                "reversals were projected.")
+    line = f"From: {', '.join(read) if read else 'no topic'}."
+    if skipped:
+        line += (f" NOT covered: {', '.join(skipped)} — past the seam's read "
+                 f"bound, so these are absent, not empty.")
+    return line
 
 
 def _summary_lines(subs):
@@ -553,6 +645,9 @@ def compose_view(map_data, cands):
     lines += _direction_lines(cands)
     lines += ["", "## The terrain at a glance", ""]
     lines += _summary_lines(subs)
+    lines += ["", "## What you decided", "",
+              _element_coverage_line(map_data), ""]
+    lines += _element_lines(cands)
     lines.append("")
     by_topic = {}
     for sub in subs:

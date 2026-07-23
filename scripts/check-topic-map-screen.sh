@@ -259,6 +259,25 @@ blank["density"] = dict(blank["density"], evidence_pointers=0, pointers=[])
 blank["items"] = [{"slug": "nameless-member", "title": "Nameless",
                    "status": "seed", "family": "articles-items"}]
 topic["subtopics"].append(blank)
+# The SECOND PROJECTION (Story 18.80, #641): typed elements beside the
+# clusters, plus the bound disclosure that must reach the owner surface.
+d["elements"] = [
+    {"kind": "decision", "summary": "Ship behind a flag; rollback is the feature",
+     "topic": "delivery", "date": "2026-07-20",
+     "situation": "topics/delivery.md:3@abc1234",
+     "evidence": ["topics/delivery.md:3@abc1234"], "consumed": False},
+    {"kind": "reversal", "summary": "Weekly release train, superseded by continuous deploy",
+     "topic": "delivery", "date": "2026-07-19",
+     "situation": "topics/delivery.md:4@abc1234",
+     "evidence": ["topics/delivery.md:4@abc1234"], "consumed": True},
+    {"kind": "decision", "summary": "One repo doubles as the publishing repo",
+     "topic": "nowhere", "date": "2026-07-18",
+     "situation": "topics/nowhere.md:2@abc1234",
+     "evidence": ["topics/nowhere.md:2@abc1234"], "consumed": False},
+]
+d["coverage"] = dict(d.get("coverage", {}),
+                     element_topics_read=["delivery", "nowhere"],
+                     element_topics_skipped=["zeta"])
 lonely = copy.deepcopy(base)
 lonely["subtopic"] = "(unclustered)"
 lonely["clustered_by"] = "unclustered"
@@ -430,9 +449,12 @@ check(first_detail is not None and first_detail > 1,
 
 # Every derived direction reaches the View, with the index selection uses.
 block = view.split("## The terrain at a glance")[0]
-missing = [c["id"] for c in cands if f"**{c['id']}**" not in block]
+# Elements are candidates too, but the View gives them their own section
+# (Story 18.80) — this block covers the subtopic and combination directions.
+directional = [c for c in cands if c.get("kind") != "element"]
+missing = [c["id"] for c in directional if f"**{c['id']}**" not in block]
 check(not missing, f"every derived direction appears in the section ({missing[:3]})")
-check(len(cands) > 7, f"the fixture derives an over-budget candidate set ({len(cands)})")
+check(len(directional) > 7, f"the fixture derives an over-budget candidate set ({len(directional)})")
 
 # The combination move stays visible where the owner looks: combinations are
 # few and are listed FIRST, so the singles cannot push them below the fold.
@@ -509,6 +531,83 @@ check(all(byid[s["id"]]["direction"] == f"cover {s['subtopic']}"
           for s in named if s["id"] in byid),
       "a declared or derived name still produces exactly `cover <name>`")
 sys.exit(1 if fail else 0)
+PYEOF
+[ $? -eq 0 ] || fail=1
+
+# --- elements reach the surface and are pickable (18.80, #641) --------------
+python3 - "$work/big-cands.json" "$work/view.md" "$work/big-map.json" "$D" <<'PYEOF' || fail=1
+import importlib.util, json, re, sys
+cands = json.load(open(sys.argv[1]))["candidates"]
+view = open(sys.argv[2], encoding="utf-8").read()
+d = json.load(open(sys.argv[3]))
+fail = []
+def check(cond, msg):
+    print(("ok:   " if cond else "FAIL: ") + msg, file=sys.stdout if cond else sys.stderr)
+    if not cond: fail.append(msg)
+
+els = [c for c in cands if c.get("kind") == "element"]
+check(len(els) == len(d["elements"]), f"every element reaches the candidate list ({len(els)})")
+# Own namespace, no collision with the subtopic scheme.
+eids = [c["id"] for c in els]
+tids = [c["id"] for c in cands if c.get("kind") != "element"]
+check(all(re.fullmatch(r"E\d+\.\d+", i) for i in eids), f"element ids are E<topic>.<n> ({eids})")
+check(not (set(eids) & set(tids)), "element ids never collide with subtopic ids")
+check(len(set(eids)) == len(eids), "element ids are unique")
+
+# Its own section on the View, after the terrain summary, before the detail.
+heads = re.findall(r"^#{2,3} (.+)$", view, re.M)
+check("What you decided" in heads, f"the View carries an elements section ({heads[:4]})")
+check(heads.index("What you decided") == 2, "the elements section follows the at-a-glance summary")
+block = view.split("## What you decided")[1].split("\n## ")[0]
+check(all(f"**{i}**" in block for i in eids), "every element appears in that section with its index")
+check("reversal" in block and "decision" in block, "each element's kind is shown")
+check("· consumed" in block, "a consumed element is MARKED, not hidden")
+# The bound is never silent.
+check("delivery" in block and "zeta" in block and "NOT covered" in block,
+      "the section states which topics the elements came from, and which they did not")
+
+# Wording carries no internal marker and becomes the brief on adoption (#637).
+PLACEHOLDERS = ("(unclustered)", "(untracked)", "(unnamed)")
+check(not any(p in c["direction"] for c in els for p in PLACEHOLDERS),
+      "element wording carries no placeholder enum")
+spec = importlib.util.spec_from_file_location("dd", sys.argv[4])
+mod = importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)
+pin = d["coverage"]["pin"]
+out = mod.brief_from_answer({"index": eids[0], "note": "the angle I want", "pin": pin},
+                            cands, pin)
+check(out["brief"].endswith("— the angle I want"),
+      f"an element index composes an ordinary brief with the note VERBATIM ({out['brief'][:60]}…)")
+check(out["provenance"] == "owner-authored" and out["origin"] == "adopted-index",
+      "an adopted element is owner-adopted wording, like any other index")
+# A stale pin is refused for an element exactly as for a subtopic.
+try:
+    mod.brief_from_answer({"index": eids[0], "note": "x", "pin": "other@dead"}, cands, pin)
+    check(False, "a stale-pin element selection is refused with the mismatch named")
+except SystemExit:
+    check(True, "a stale-pin element selection is refused with the mismatch named")
+sys.exit(1 if fail else 0)
+PYEOF
+[ $? -eq 0 ] || fail=1
+
+# Elements reach the IN-CONVERSATION screen too — the size switch moves where
+# the terrain is presented, never what the map proposes.
+python3 - "$work/map.json" "$D" "$work/small-el.json" <<'PYEOF'
+import json, sys
+d = json.load(open(sys.argv[1]))
+d["elements"] = [{"kind": "decision", "summary": "A small-map decision",
+                  "topic": "delivery", "date": "2026-07-20",
+                  "situation": "topics/delivery.md:3@abc1234",
+                  "evidence": ["topics/delivery.md:3@abc1234"], "consumed": False}]
+d["coverage"] = dict(d.get("coverage", {}), element_topics_read=["delivery"],
+                     element_topics_skipped=[])
+json.dump(d, open(sys.argv[3], "w"))
+PYEOF
+python3 "$D" payload --map "$work/small-el.json" > "$work/small-el-payload.json" 2>/dev/null
+python3 - "$work/small-el-payload.json" <<'PYEOF' && ok "elements are offered on the in-conversation screen, not only in the View" || err "elements never reach the small-map screen"
+import json, sys
+labels = [c["label"] for c in json.load(open(sys.argv[1]))["items"][0]["choices"]]
+assert any("A small-map decision" in l for l in labels), labels
+assert any("name your own" in l for l in labels) and labels[-1] == "stop here", labels
 PYEOF
 [ $? -eq 0 ] || fail=1
 
