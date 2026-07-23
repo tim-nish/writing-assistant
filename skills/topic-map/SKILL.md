@@ -79,6 +79,13 @@ The screen always carries, in this order:
 - **stop here** — also first-class: nothing is drafted, no brief is recorded,
   and the map is recomputed fresh next time.
 
+Record the answer against the returned `ask_id`:
+
+```
+printf '%s' '<answer JSON>' | python3 ${CLAUDE_PLUGIN_ROOT}/scripts/validate-proposal-payload.py \
+  --ws "$WS" --answer <ask_id>
+```
+
 ### The size switch — a large map gets a View file
 
 **One screen does not scale.** Past the composer's declared screen budget, a
@@ -96,19 +103,26 @@ comes back:
   than by matching a proposed direction string. Free-form and **stop here**
   are offered exactly as above.
 
+Record an indexed answer with the **pin the View header shows**, alongside the
+owner's note:
+
+```
+printf '%s' '{"index":"T3.2","note":"<the owner'\''s angle, their words>","pin":"<the View'\''s pin>"}' \
+  | python3 ${CLAUDE_PLUGIN_ROOT}/scripts/validate-proposal-payload.py --ws "$WS" --answer <ask_id>
+```
+
+The pin is not bookkeeping. Indexes are **stable within a pin**, not across
+repo states, so an index chosen against a View that has since gone stale is
+**refused with the mismatch named** rather than re-resolved — re-run the map
+and choose from the fresh View. Free text still always wins; if the owner
+writes their own direction, that is the brief and no index is consulted.
+
 This is the one case where the map hands the owner **an artifact to open**
 (SPEC-topic-map CAP-3, amended 2026-07-23, superseding the earlier
 in-conversation-only reading for this branch only). The View is at the same
 status as a debug dump: a **fixed path**, **fully regenerated** on every
 invocation, and **never read back** by any code path. Deleting it loses
 nothing — re-run the map.
-
-Record the answer against the returned `ask_id`:
-
-```
-printf '%s' '<answer JSON>' | python3 ${CLAUDE_PLUGIN_ROOT}/scripts/validate-proposal-payload.py \
-  --ws "$WS" --answer <ask_id>
-```
 
 ## Step 3 — the brief, then a normal run
 
@@ -118,8 +132,12 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/topic-map-directions.py brief \
 ```
 
 The outcome is a **brief in the owner's words**. Free text always wins;
-machine-proposed wording becomes the brief only when the owner selected it, and
-then it is **owner-adopted wording**, never a tool-invented scope.
+machine-proposed wording becomes the brief only when the owner selected it —
+by matching a direction or by naming its **index** — and then it is
+**owner-adopted wording**, never a tool-invented scope. For an indexed
+selection the brief is the subtopic's coverage wording **plus the owner's
+note verbatim**; from here it is one ordinary brief string and nothing downstream
+can tell it from one the owner typed.
 
 Hand it to the **existing** stage-0 `--brief` path — the one shipped in Story
 18.24 (#505), unchanged:
