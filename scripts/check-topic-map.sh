@@ -360,6 +360,41 @@ grep -q 'SENTINEL-HOOK' "$work/lessons.json" \
   && err "a lesson hook reached the map — more than the index line's title was projected" \
   || ok "hub-lessons: only the index line's title is projected (no hook prose, no lesson body)"
 
+# --- the path-family derivation itself (Story 18.73, #614) -------------------
+# The rule the clustering rests on, pinned directly: cluster by the pointer's
+# parent directory when it is at least two segments deep, else the file stem —
+# and never adopt free-text prose as a subject. The old file-stem-only rule made
+# "cluster" a synonym for "file" at corpus scale (147 subtopics, ~no grouping).
+python3 - "$root/scripts/topic-map.py" <<'PYEOF' && ok "clustering derives PATH FAMILIES, and refuses prose as a subject (#614)" || err "path-family derivation wrong"
+import importlib.util, sys
+s = importlib.util.spec_from_file_location("tm", sys.argv[1])
+m = importlib.util.module_from_spec(s); s.loader.exec_module(m)
+cases = {
+    # a deep directory of siblings collapses into ONE family...
+    "docs/stories/18-54-x.md:3@a": "docs/stories",
+    "docs/stories/18-70-y.md:9@a": "docs/stories",
+    "specs/spec-tanuki-loop/SPEC.md:178@a": "specs/spec-tanuki-loop",
+    # ...while a top-level directory stays per-item (per tool, as before)
+    "tools/tanuki-ledger:1403@a": "tanuki-ledger",
+    "tools/tanuki-ledger:1408@a": "tanuki-ledger",
+    "README.md:1@a": "README",
+    # free-text prose with an embedded path names NO subject (#616)
+    "writing-assistant specs/spec-policy-source-seam/ (first shipped, Epic 14)": None,
+}
+for pointer, want in cases.items():
+    got = m._pointer_subject(pointer)
+    assert got == want, (pointer, got, want)
+# two files in one deep directory are ONE cluster, not two
+a = m.subtopic_key({"evidence": ["docs/stories/a.md:1@x"]})
+b = m.subtopic_key({"evidence": ["docs/stories/b.md:2@x"]})
+assert a == b == ("docs/stories", "evidence-subject"), (a, b)
+# a declared key still outranks the derivation (OQ1 precedence)
+assert m.subtopic_key({"subtopic": "owner-named",
+                       "evidence": ["docs/stories/a.md:1@x"]}) == ("owner-named", "declared")
+# an item whose only evidence is prose falls through, it does not invent a name
+assert m.subtopic_key({"evidence": ["some prose about specs/x/ (note)"]})[1] == "unclustered"
+PYEOF
+
 python3 - "$work/lessons.json" <<'PYEOF' && ok "hub-lessons: seeds cluster alongside items and count toward the subtopic's density signal (CAP-2)" || err "lesson seeds do not participate in clustering"
 import json, sys
 d = json.load(open(sys.argv[1]))
@@ -368,10 +403,17 @@ topics = {t["topic"]: t for t in d["topics"]}
 assert "hub-lessons" in topics, topics.keys()
 assert "hub-lessons" in d["unmapped_tracks"], d["unmapped_tracks"]
 subs = {s["subtopic"]: s for s in topics["hub-lessons"]["subtopics"]}
-assert "team-shape" in subs, subs.keys()
-s = subs["team-shape"]
-assert s["density"]["evidence_pointers"] == 1, s["density"]
-assert s["density"]["unconsumed_lessons"] == 1, s["density"]
+# Story 18.73 (#614): seeds no longer carry a TOOL-DECLARED per-seed subtopic.
+# They fall to the path-family derivation, all cite the same index surface, and
+# so land in ONE cluster whose members the View lists as lesson-seed names —
+# instead of 65 full subtopic blocks at corpus scale. What must survive is the
+# CAP-2 properties, asserted here rather than the old one-seed-one-cluster shape.
+assert len(subs) == 1, subs.keys()
+s = next(iter(subs.values()))
+assert s["clustered_by"] == "evidence-subject", s["clustered_by"]
+assert {i["slug"] for i in s["items"]} == {"retry-storm", "cache-warmth", "team-shape"}, s["items"]
+assert s["density"]["evidence_pointers"] == 3, s["density"]
+assert s["density"]["unconsumed_lessons"] == 3, s["density"]
 assert s["depth"]["level"], s["depth"]          # a depth estimate, like any subtopic
 assert s["selectable"] is True, s               # thresholds gate surfacing, never picking
 PYEOF
@@ -427,10 +469,16 @@ import json, sys
 d = json.load(open(sys.argv[1]))
 topics = {t["topic"]: t for t in d["topics"]}
 subs = {s["subtopic"]: s for s in topics["hub-lessons"]["subtopics"]}
-s = subs["team-shape"]
-assert s["consumed"] is True and s["selectable"] is True, s
-assert s["density"]["unconsumed_lessons"] == 0, s["density"]
-assert subs["retry-storm"]["consumed"] is False, subs["retry-storm"]
+# With seeds in one cluster (Story 18.73), "marked, never hidden" is asserted at
+# ITEM granularity — which is where it now matters, and a stronger claim than
+# the old per-seed-subtopic form: the consumed seed must still be PRESENT.
+s = next(iter(subs.values()))
+consumed = {i["slug"]: i["consumed"] for i in s["items"]}
+assert consumed.get("team-shape") is True, consumed
+assert consumed.get("retry-storm") is False, consumed
+assert s["consumed_items"] == 1 and len(s["items"]) == 3, s
+assert s["selectable"] is True, s               # consumed material stays pickable
+assert s["density"]["unconsumed_lessons"] == 2, s["density"]
 PYEOF
 rm "$a/plans/team-shape.md"
 
