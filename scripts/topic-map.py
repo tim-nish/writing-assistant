@@ -131,6 +131,7 @@ import argparse
 import importlib.util
 import json
 import os
+import re
 import subprocess
 import sys
 
@@ -694,12 +695,16 @@ def lesson_item(seed):
         "date": "",
         "evidence": [cite],
         "live": False,
-        # One seed is one cluster: a lesson index line names its own subject,
-        # and collapsing all seeds under the shared `LESSONS` pointer subject
-        # would hide the terrain this family exists to reveal. Whether that is
-        # the right granularity at corpus scale is Story 18.68's calibration
-        # question, not a number to tune here.
-        "subtopic": ident,
+        # NO tool-declared `subtopic` (Story 18.73, #614). One seed was one
+        # cluster, which at corpus scale turned 65 index lines into 65
+        # full subtopic blocks and buried the rest of the terrain. Seeds now
+        # fall to the path-family derivation — they all cite the same index
+        # surface, so they land in one cluster and the View lists them by name
+        # as LESSON SEEDS under their topic, which is where they belong.
+        #
+        # It was also the tool naming a cluster. Under OQ1 as closed, subtopic
+        # names belong to the articles repo's declared key; the tool derives,
+        # it does not declare.
         "lessons": [ident],
     }
 
@@ -909,18 +914,40 @@ def load_thresholds(root, override=None):
 
 
 def _pointer_subject(pointer):
-    """The subject a bare evidence pointer names: its path stem, with any line
-    anchor and extension dropped (`docs/retro.md:41` -> `retro`). Two items
-    citing the same source are talking about the same thing — that is the whole
-    of the derivation, and it needs no declared key."""
+    """The subject a bare evidence pointer names, at PATH-FAMILY granularity
+    (Story 18.73, #614). Two items citing the same *family* of sources are
+    talking about the same thing.
+
+    The rule, and why it is shaped this way: use the pointer's **parent
+    directory** when that directory is at least two segments deep, else the
+    file stem.
+
+        docs/stories/18-54-x.md:3   -> docs/stories      (one cluster, not ~60)
+        specs/spec-tanuki-loop/SPEC.md:178 -> specs/spec-tanuki-loop  (per spec)
+        tools/tanuki-ledger:1403    -> tanuki-ledger     (per tool, as before)
+        README.md:1                 -> README
+
+    The old rule was the file stem alone, which at corpus scale made "cluster"
+    a synonym for "file": host-source items cite only themselves, so a
+    147-subtopic map was a directory listing wearing a map's clothes. The
+    depth-two condition is what keeps `tools/*` and `specs/*` per-item while
+    collapsing a deep directory of siblings — both behaviours the map needs.
+
+    A pointer containing whitespace is PROSE, not a path: `evidence:` in the
+    articles repo holds free-text strings with embedded paths, so a last `/`
+    can fall mid-sentence. Prose names no subject and is refused here rather
+    than becoming a cluster name (the `" (first shipped consumer, Epic 14)"`
+    case, Story 18.70/#616).
+
+    Pure derivation: recomputed every invocation, recorded nowhere.
+    """
     head = str(pointer).split("#")[0].split(":")[0].strip()
-    # Strip the BASENAME too, not just the pointer (Story 18.70, #616). An
-    # `evidence:` entry is free-text prose with an embedded path, so its last
-    # `/` can fall mid-sentence: `writing-assistant specs/spec-policy-source-
-    # seam/ (first shipped consumer, Epic 14)` basenames to
-    # `" (first shipped consumer, Epic 14)"` — whitespace-led, non-empty, and
-    # adopted verbatim as a cluster name, which is how the View grew a subtopic
-    # whose heading was a dangling dash.
+    if not head or re.search(r"\s", head):
+        return None
+    head = head.rstrip("/")
+    parent = os.path.dirname(head)
+    if parent.count("/") >= 1:
+        return parent
     stem = os.path.splitext(os.path.basename(head))[0].strip()
     return stem or None
 
