@@ -49,6 +49,19 @@ indistinguishable from one whose brief the owner typed unaided.
 Free-form is offered EVERY time, not only on rejection: the owner naming their
 own direction or combination axis is a first-class outcome, not a fallback.
 
+INDEXED SELECTION (Story 18.67, #602)
+-------------------------------------
+From a View, the owner answers `{index: "T3.2", note: "<their angle>", pin:
+"<the View's pin>"}`. The composed brief is the subtopic's coverage wording
+plus THE NOTE VERBATIM, and it goes into the same stage-0 `--brief` path as any
+other brief — no new entry pipeline, and the note reaches the structure
+proposer only as brief text.
+
+Indexes are stable WITHIN A PIN, not across repo states, so an index carries
+the pin it was read at. A mismatch is REFUSED with the mismatch named rather
+than re-resolved: silently reinterpreting `T3.2` against a moved repository
+would hand the owner a scope they never chose. Free text still always wins.
+
 Stdlib-only. Subcommands:
   candidates  --map PATH        the candidate directions as JSON
   payload     --map PATH [--view PATH]
@@ -422,12 +435,62 @@ def _compose_summary_payload(map_data, view_path):
     return {"items": [item]}
 
 
-def brief_from_answer(answer, cands):
+def _brief_from_index(answer, cands, map_pin):
+    """An INDEXED selection from the View: `{index, note}` (Story 18.67, #602).
+
+    The composed brief is the subtopic's coverage wording PLUS THE OWNER'S NOTE
+    VERBATIM — the machine resolves which subtopic `T3.2` meant, the owner
+    supplies the angle, and the result is one ordinary brief string for the
+    existing stage-0 `--brief` path. There is no new entry pipeline: downstream
+    cannot tell this from a brief the owner typed, and the note reaches the
+    structure proposer only as brief text.
+
+    An index is meaningless without the map it was read from, so the answer
+    must carry the pin the View was rendered at. A mismatch is REFUSED with the
+    mismatch named — never silently re-resolved to whatever `T3.2` happens to
+    mean at the current pin, which would hand the owner a scope they never
+    chose. A missing pin is refused for the same reason: it cannot be proven
+    not to be stale.
+    """
+    index = str(answer.get("index") or "").strip()
+    answer_pin = str(answer.get("pin") or "").strip()
+    if not answer_pin:
+        raise SystemExit(_err(
+            f"the recorded answer selects index {index!r} but carries no pin. An "
+            "index only means something against the map it was read from, so "
+            "the View's pin must be recorded with the selection; without it a "
+            "stale selection cannot be told from a current one. Re-run the map "
+            "and choose again."))
+    if map_pin and answer_pin != map_pin:
+        raise SystemExit(_err(
+            f"pin mismatch: index {index!r} was chosen against a View rendered "
+            f"at {answer_pin}, but this map is at {map_pin}. The repository "
+            "moved, so that index may now name a different subtopic — it is "
+            "refused rather than re-resolved. Re-run the map and choose from "
+            "the fresh View."))
+    match = next((c for c in cands if c.get("id") == index), None)
+    if match is None:
+        raise SystemExit(_err(
+            f"index {index!r} names no subtopic in this map. The indexes come "
+            "from the View rendered at this pin — re-read it and choose again."))
+    note = str(answer.get("note") or "").strip()
+    brief = f"{match['direction']} — {note}" if note else match["direction"]
+    return {"brief": brief,
+            # The coverage wording is machine-proposed and the owner adopted it
+            # by choosing its index; the note is theirs outright. Both are the
+            # owner's words under the shipped rule — never a tool-invented scope.
+            "provenance": "owner-authored", "origin": "adopted-index",
+            "index": index, "pin": answer_pin, "note": note,
+            "candidate": match}
+
+
+def brief_from_answer(answer, cands, map_pin=None):
     """The owner's outcome as the brief string for stage-0 `--brief`.
 
     Free text ALWAYS wins: machine-proposed wording becomes the brief only when
-    the owner adopted it by selecting it, and then it is owner-adopted wording,
-    not a tool-invented scope."""
+    the owner adopted it by selecting it — by matching a direction string or by
+    naming its index — and then it is owner-adopted wording, not a
+    tool-invented scope."""
     free = str(answer.get("free_text") or "").strip()
     if free:
         return {"brief": free, "provenance": "owner-authored", "origin": "free-form"}
@@ -436,6 +499,8 @@ def brief_from_answer(answer, cands):
         raise SystemExit(_err(
             "the owner chose to stop at the map: no brief exists and no run "
             "follows. Stopping is a first-class outcome, not a failure."))
+    if str(answer.get("index") or "").strip():
+        return _brief_from_index(answer, cands, map_pin)
     for c in cands:
         if selection == c["direction"]:
             return {"brief": c["direction"], "provenance": "owner-authored",
@@ -487,8 +552,10 @@ def cmd_brief(args):
         return _err(f"unreadable answer at {args.answer}: {exc}")
     if answer.get("kind") == "answer":            # a presented-payloads.jsonl row
         answer = answer.get("answer") or {}
-    cands = candidates(load_map(args.map)) if args.map else []
-    out = brief_from_answer(answer, cands)
+    map_data = load_map(args.map) if args.map else None
+    cands = candidates(map_data) if map_data else []
+    map_pin = (map_data or {}).get("coverage", {}).get("pin")
+    out = brief_from_answer(answer, cands, map_pin)
     out["stage"] = "topic-map-brief"
     out["next"] = ("draft-pipeline.py stage0 <framework> <sources...> --brief "
                    "<this brief> — the existing stage-0 path, unchanged")

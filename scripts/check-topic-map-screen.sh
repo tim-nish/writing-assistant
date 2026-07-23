@@ -16,6 +16,12 @@
 #          renders a View file the owner opens and summarises on the screen.
 #          The View is write-only, fully regenerated, and losing it loses
 #          nothing.
+#   CAP-3  (Story 18.67) STABLE per-pin subtopic indexes and INDEXED SELECTION:
+#          {index, note} composes the subtopic's coverage wording plus the
+#          owner's note VERBATIM; free text still always wins; an index chosen
+#          against a different pin is REFUSED with the mismatch named; stopping
+#          stays first-class; downstream cannot tell an indexed selection from
+#          a typed brief.
 
 set -eu
 
@@ -366,6 +372,137 @@ python3 "$D" brief --answer "$work/answer-stop.json" --map "$work/map.json" \
      && ok "stopping produces no brief and no run, and says so" \
      || err "wrong stop behaviour: $(cat "$work/brief-stop.json")"
 
+# --- INDEXED SELECTION: {index, note} against the View's pin -----------------
+bigpin=$(python3 -c "import json;print(json.load(open('$work/big-map.json'))['coverage']['pin'])")
+idx=$(python3 -c "
+import json
+c=[x for x in json.load(open('$work/big-cands.json'))['candidates'] if x['kind']=='single']
+print(c[0]['id'])")
+python3 -c "
+import json,sys
+json.dump({'index':sys.argv[1],'note':'through the on-call retro, not the metrics',
+           'pin':sys.argv[2]}, open('$work/answer-idx.json','w'))
+" "$idx" "$bigpin"
+python3 "$D" brief --answer "$work/answer-idx.json" --map "$work/big-map.json" \
+  > "$work/brief-idx.json" 2>"$work/brief-idx.err" \
+  && ok "indexed selection: an index plus a note composes a brief" \
+  || err "indexed selection failed: $(cat "$work/brief-idx.err")"
+python3 - "$work/brief-idx.json" "$work/big-cands.json" <<'PYEOF' || fail=1
+import json, sys
+b = json.load(open(sys.argv[1]))
+cands = json.load(open(sys.argv[2]))["candidates"]
+fail = []
+def check(cond, msg):
+    print(("ok:   " if cond else "FAIL: ") + msg, file=sys.stdout if cond else sys.stderr)
+    if not cond: fail.append(msg)
+
+note = "through the on-call retro, not the metrics"
+check(note in b["brief"], "the owner's note is carried into the brief VERBATIM")
+wording = next(c["direction"] for c in cands if c["id"] == b["index"])
+check(b["brief"].startswith(wording),
+      "the brief is the subtopic's coverage wording plus the note")
+check(b["provenance"] == "owner-authored", "an adopted index is owner-adopted wording")
+check(b["origin"] == "adopted-index", "the origin records that an index was adopted")
+check(isinstance(b["brief"], str), "the outcome is one plain brief string")
+sys.exit(1 if fail else 0)
+PYEOF
+[ $? -eq 0 ] || fail=1
+
+# Free text ALWAYS wins — even when an index is also present.
+python3 -c "
+import json,sys
+json.dump({'index':sys.argv[1],'note':'ignored','pin':sys.argv[2],
+           'free_text':'my own direction, in my own words'},
+          open('$work/answer-idx-free.json','w'))
+" "$idx" "$bigpin"
+python3 "$D" brief --answer "$work/answer-idx-free.json" --map "$work/big-map.json" \
+  > "$work/brief-idx-free.json" 2>/dev/null
+python3 -c "
+import json
+b=json.load(open('$work/brief-idx-free.json'))
+assert b['brief']=='my own direction, in my own words', b
+assert b['origin']=='free-form', b
+" && ok "indexed selection: free text still always wins over an index" \
+  || err "an index overrode the owner's free text"
+
+# A STALE index is refused with the pin mismatch NAMED — never re-resolved.
+python3 -c "
+import json,sys
+json.dump({'index':sys.argv[1],'note':'x','pin':'deadbeef'},
+          open('$work/answer-stale.json','w'))
+" "$idx"
+if python3 "$D" brief --answer "$work/answer-stale.json" --map "$work/big-map.json" \
+     > "$work/brief-stale.out" 2>"$work/brief-stale.err"; then
+  err "a stale-pin index produced a brief instead of a refusal"
+else
+  rc=$?
+  [ "$rc" -eq 1 ] && ok "indexed selection: a stale-pin index is refused (exit 1)" \
+    || err "stale-pin refusal used exit $rc, not the documented refusal exit"
+  grep -q 'pin mismatch' "$work/brief-stale.err" \
+    && grep -q 'deadbeef' "$work/brief-stale.err" \
+    && grep -q "$bigpin" "$work/brief-stale.err" \
+    && ok "indexed selection: the refusal NAMES both pins" \
+    || err "the refusal does not name the mismatch: $(cat "$work/brief-stale.err")"
+  [ -s "$work/brief-stale.out" ] \
+    && err "a refused selection still emitted a brief" \
+    || ok "indexed selection: a refused selection emits no brief"
+fi
+
+# An index with no pin at all cannot be proven current, so it is refused too.
+python3 -c "
+import json,sys
+json.dump({'index':sys.argv[1],'note':'x'},open('$work/answer-nopin.json','w'))
+" "$idx"
+python3 "$D" brief --answer "$work/answer-nopin.json" --map "$work/big-map.json" \
+  > /dev/null 2>"$work/brief-nopin.err" \
+  && err "an index without a pin was silently resolved" \
+  || grep -q 'no pin' "$work/brief-nopin.err" \
+     && ok "indexed selection: an index without a pin is refused, and says why" \
+     || err "wrong no-pin behaviour: $(cat "$work/brief-nopin.err")"
+
+# Stopping stays first-class even from the View branch.
+printf '%s' '{"selection":"stop here","index":"T1.1","free_text":""}' \
+  > "$work/answer-idx-stop.json"
+python3 "$D" brief --answer "$work/answer-idx-stop.json" --map "$work/big-map.json" \
+  >"$work/idx-stop.out" 2>&1 \
+  && err "stopping from the View branch produced a brief" \
+  || grep -q 'first-class outcome' "$work/idx-stop.out" \
+     && ok "indexed selection: stop here still produces no brief and no run" \
+     || err "wrong stop behaviour from the View branch"
+
+# ID STABILITY within a pin: two invocations produce identical IDs.
+python3 "$D" candidates --map "$work/big-map.json" > "$work/big-cands2.json"
+cmp -s "$work/big-cands.json" "$work/big-cands2.json" \
+  && ok "indexed selection: IDs are identical across invocations at one pin" \
+  || err "the IDs are not stable within a pin"
+python3 - "$work/view-1.md" "$work/big-cands.json" <<'PYEOF' && ok "indexed selection: the View's IDs and the composer's IDs are the same identifiers" || err "the View and the composer disagree about indexes"
+import json, re, sys
+view_ids = set(re.findall(r"^### (T\d+\.\d+) ", open(sys.argv[1], encoding="utf-8").read(), re.M))
+cand_ids = {c["id"] for c in json.load(open(sys.argv[2]))["candidates"]
+            if c["kind"] == "single"}
+assert cand_ids <= view_ids, cand_ids - view_ids
+PYEOF
+
+# No new entry pipeline: an indexed brief reaches stage 0 exactly like a typed one.
+idxbrief=$(python3 -c "import json;print(json.load(open('$work/brief-idx.json'))['brief'])")
+python3 "$DP" stage0 "share engineering lessons" "$h" --brief "$idxbrief" --root "$h" \
+  > "$work/stage0-idx.json" 2>"$work/e-idx" \
+  || err "an indexed brief did not start a normal run: $(cat "$work/e-idx")"
+python3 "$DP" stage0 "share engineering lessons" "$h" --brief "$idxbrief" --root "$h" \
+  > "$work/stage0-idx-typed.json" 2>/dev/null
+python3 -c "
+import json
+b=(json.load(open('$work/stage0-idx.json')).get('run_state') or {}).get('brief') or {}
+t=(json.load(open('$work/stage0-idx-typed.json')).get('run_state') or {}).get('brief') or {}
+assert b.get('text')=='''$idxbrief''', b
+assert b.get('provenance')=='owner-authored', b
+# byte-for-byte the same record the SAME string typed unaided produces: the
+# index, the note and the pin exist only in the composer's output, never here
+assert b==t, (b,t)
+assert 'index' not in b and 'pin' not in b and 'note' not in b, b
+" && ok "indexed selection: downstream cannot distinguish an indexed selection from a typed brief" \
+  || err "an indexed selection left a downstream trace"
+
 # --- the hand-off is the EXISTING stage-0 --brief path -----------------------
 brief=$(python3 -c "import json;print(json.load(open('$work/brief-free.json'))['brief'])")
 mkdir -p "$work/ws2"
@@ -431,7 +568,9 @@ for token in 'topic-map.py assemble' 'topic-map-directions.py payload' \
              'topic-map-directions.py brief' 'validate-proposal-payload.py' \
              'stage0' '--brief' 'free-form' 'every time' \
              'never composes narrative structures' 'single proposer' \
-             '--view' 'topic-map-view.md' 'size switch' 'never read back'; do
+             '--view' 'topic-map-view.md' 'size switch' 'never read back' \
+             'stable within a pin' 'refused with the mismatch named' \
+             'note verbatim'; do
   grep -q -- "$token" "$SKILL" && ok "SKILL carries the contract text: $token" \
     || err "SKILL is missing contract text: $token"
 done
