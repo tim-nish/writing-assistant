@@ -78,6 +78,7 @@ Exit codes: 0 ok · 1 refusal (no usable map / no owner wording) · 2 usage.
 
 import argparse
 import json
+import re
 import sys
 
 REFUSED = 1
@@ -273,6 +274,23 @@ def _lesson_seed_names(sub):
 UNNAMED = "(unnamed)"
 
 
+def _id_order(sub):
+    """Sort key for a stable ID (`T3.2`) by its NUMERIC components (#612).
+
+    Sorting the ID as a string renders T3.1, T3.10, T3.11 … T3.19, T3.2 —
+    which scatters the ranking that assigned the IDs in the first place, so an
+    85-pointer article series lands below nineteen four-pointer short notes.
+    For a file whose whole purpose is owner observation, the ordering IS the
+    signal.
+
+    By construction the numeric order equals the shipped rank order (`_rank`),
+    so this restores "richest terrain first" without re-deriving it. Handles
+    topic numbers past 9 too, which a string sort would break next.
+    """
+    parts = re.findall(r"\d+", str(sub.get("id", "")))
+    return tuple(int(p) for p in parts) or (0,)
+
+
 def _subtopic_name(sub):
     """A heading the owner can steer by (Story 18.70, #616). An empty name
     renders as a dangling dash and names nothing, so fall back to a member's
@@ -331,7 +349,7 @@ def compose_view(map_data):
         by_topic.setdefault(sub["topic"], []).append(sub)
     for topic in sorted(by_topic):
         lines += [f"## {topic}", ""]
-        for sub in sorted(by_topic[topic], key=lambda s: s["id"]):
+        for sub in sorted(by_topic[topic], key=_id_order):
             d = sub.get("density", {})
             lines.append(f"### {sub['id']} — {_subtopic_name(sub)}")
             lines.append("")

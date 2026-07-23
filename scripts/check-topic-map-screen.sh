@@ -296,6 +296,16 @@ check(re.search(r"^### T\d+\.\d+ — ", view, re.M),
       "every subtopic carries a stable ID (T<topic>.<subtopic>)")
 ids = re.findall(r"^### (T\d+\.\d+) ", view, re.M)
 check(len(ids) == len(set(ids)) == len(subs), "the IDs are unique, one per subtopic")
+# IDs are assigned in RANK order (richest terrain first), so the View must show
+# them in numeric order (#612). A string sort renders T3.1, T3.10, … T3.19, T3.2
+# and scatters exactly the ranking that makes the file scannable.
+def _num(i):
+    return tuple(int(p) for p in re.findall(r"\d+", i))
+check(ids == sorted(ids, key=_num),
+      f"the View lists subtopics in NUMERIC id order, not lexicographic ({ids[:6]})")
+# Not vacuous: the two orders only differ once a topic reaches ten subtopics.
+check(any(_num(i)[1] >= 10 for i in ids),
+      f"the fixture reaches two-digit indexes, so the order above is a real test ({ids[-3:]})")
 check(all(t["topic"] in view for t in d["topics"]), "each subtopic sits under its topic")
 check("glance:" in view, "the depth glance is shown")
 check("host/w5.md:6@abc1234" in view, "the evidence pointers are listed")
