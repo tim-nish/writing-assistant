@@ -751,6 +751,24 @@ def lint_owner_lines(lines):
     return found
 
 
+def _terrain_size_line(topics, subs):
+    """How big this terrain is, in one unambiguous line (#645).
+
+    `Subtopics: 25 across 4 topic(s)` reads as a FRACTION — "four topics out of
+    twenty-five" — to anyone who does not already know that topics contain
+    subtopics. It was the first line of the artifact, so the map failed the
+    owner-readable bar before the owner reached anything selectable.
+
+    Leading with topics puts the containing unit first, which is the order the
+    relationship actually runs in, and `containing` names the relationship
+    instead of leaving `across` to imply it.
+    """
+    def plural(n, word):
+        return f"{n} {word}" if n == 1 else f"{n} {word}s"
+
+    return f"{plural(topics, 'topic')} containing {plural(subs, 'subtopic')}"
+
+
 def compose_view(map_data, cands):
     """The View: one invocation's terrain, rendered so 20+ directions are
     legible and CAP-2's 'why this depth?' is answerable from the same counts
@@ -776,7 +794,7 @@ def compose_view(map_data, cands):
         "     code path; deleting this file loses nothing. Do not edit or commit. -->",
         "",
         f"Pin: {pin}",
-        f"Subtopics: {len(subs)} across {len(map_data.get('topics', []))} topic(s)",
+        _terrain_size_line(len(map_data.get("topics", [])), len(subs)),
         "",
         "Answer with a subtopic's index (for example T1.2) and a short note",
         "about the angle you want. Free text always wins. How much material",
