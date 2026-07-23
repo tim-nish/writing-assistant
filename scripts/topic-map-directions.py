@@ -273,6 +273,27 @@ def _lesson_seed_names(sub):
 
 UNNAMED = "(unnamed)"
 
+# The placeholder states the ASSEMBLER records when nothing named a thing
+# (`scripts/topic-map.py:825`, `:866`). They are legitimate map values — the
+# spec is deliberate that an undeclared cluster falls to the derived path
+# family and that the fallback is NAMED, never silently smoothed. What is a
+# defect is presenting the bare enum in a headline position, where a machine
+# state reads as if it were the owner's own vocabulary. The View renders the
+# same state as prose that says what to do about it; `map.json` keeps the enum.
+PLACEHOLDER_PROSE = {
+    "(unclustered)": ("not yet clustered — declare `subtopic:` in the item's "
+                      "backlog frontmatter to name it"),
+    "(untracked)": ("not yet mapped to a topic — declare the track's topic in "
+                    "the articles repo to name it"),
+    UNNAMED: ("nothing named this yet — declare `subtopic:` in the item's "
+              "backlog frontmatter to name it"),
+}
+
+
+def as_prose(name):
+    """A placeholder state, rendered for a person. Any other name is its own."""
+    return PLACEHOLDER_PROSE.get(str(name).strip(), name)
+
 
 def _id_order(sub):
     """Sort key for a stable ID (`T3.2`) by its NUMERIC components (#612).
@@ -309,6 +330,44 @@ def _subtopic_name(sub):
 # count. Declared here alone: it is an estimate of a readable block, not a
 # measurement. The remainder is always DISCLOSED, never silently truncated.
 VIEW_POINTER_FILES = 12
+
+# The same convention, for lesson seeds (#634). One subtopic rendered 65
+# complete lesson texts joined onto ONE physical line — ~10,000 characters —
+# while every other subtopic showed `lesson seeds: none`, so the single
+# subtopic where seeds existed was the one where they could not be read. A seed
+# is a NAME here; its full text is reachable through the evidence pointers.
+VIEW_SEED_ITEMS = 8
+VIEW_SEED_CHARS = 110
+
+# No View line is longer than this. The View is a human surface, so its lines
+# are budgeted the way the screen payload's fields already are — a list renders
+# one item per line, clipped, capped, with the remainder disclosed. Asserted in
+# `scripts/check-topic-map-screen.sh`, so the 818-line regression cannot recur
+# unnoticed.
+VIEW_LINE_CHARS = 200
+
+
+def _clip_line(line):
+    """Bound one View line, preserving its indentation and leaving blank lines
+    blank. `_clip` collapses whitespace, which would flatten the list indents
+    the View's structure is made of, so it is applied to the value only."""
+    if len(line) <= VIEW_LINE_CHARS:
+        return line
+    indent = line[:len(line) - len(line.lstrip())]
+    return indent + _clip(line.strip(), VIEW_LINE_CHARS - len(indent))
+
+
+def _seed_lines(seeds):
+    """Lesson seeds, ONE PER LINE, clipped and capped — the convention
+    `_pointer_lines` already applies to evidence (#615), applied to the field
+    that was still unbounded (#634)."""
+    if not seeds:
+        return ["none"]
+    shown = [_clip(s, VIEW_SEED_CHARS) for s in seeds[:VIEW_SEED_ITEMS]]
+    rest = len(seeds) - len(shown)
+    if rest:
+        shown.append(f"… and {rest} more seed(s)")
+    return shown
 
 
 def _pointer_lines(pointers):
@@ -386,10 +445,10 @@ def compose_view(map_data):
     for sub in subs:
         by_topic.setdefault(sub["topic"], []).append(sub)
     for topic in sorted(by_topic):
-        lines += [f"## {topic}", ""]
+        lines += [f"## {as_prose(topic)}", ""]
         for sub in sorted(by_topic[topic], key=_id_order):
             d = sub.get("density", {})
-            lines.append(f"### {sub['id']} — {_subtopic_name(sub)}")
+            lines.append(f"### {sub['id']} — {as_prose(_subtopic_name(sub))}")
             lines.append("")
             lines.append(f"- glance: {sub.get('glance', '')}")
             lines.append(f"- depth: {sub.get('depth', {}).get('why', '')}")
@@ -397,8 +456,9 @@ def compose_view(map_data):
                          f" ({sub.get('consumed_items', 0)} of "
                          f"{d.get('items', 0)} item(s))")
             seeds = _lesson_seed_names(sub)
-            lines.append("- lesson seeds: "
-                         + (", ".join(seeds) if seeds else "none"))
+            lines.append(f"- lesson seeds ({len(seeds)}):")
+            for line in _seed_lines(seeds):
+                lines.append(f"    - {line}")
             pointers = d.get("pointers") or []
             lines.append(f"- evidence pointers ({len(pointers)}):")
             for line in _pointer_lines(pointers):
@@ -412,7 +472,12 @@ def compose_view(map_data):
                 for member in _member_lines(sub):
                     lines.append(f"    - {member}")
             lines.append("")
-    return "\n".join(lines).rstrip() + "\n"
+    # The budget applies to the composed surface, not to each call site: a
+    # field added later is budgeted by construction rather than by remembering.
+    # Clipping is the last step, so every list above has already been capped
+    # and its remainder disclosed — this bounds a single long VALUE, it never
+    # silently drops an item.
+    return "\n".join(_clip_line(x) for x in lines).rstrip() + "\n"
 
 
 def write_view(path, text):
