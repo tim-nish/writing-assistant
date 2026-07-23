@@ -121,17 +121,19 @@ python3 - "$work/m1.json" <<'PYEOF' && ok "CAP-1/CAP-4: every surface carries it
 import json, sys
 cov = json.load(open(sys.argv[1]))["coverage"]
 fams = {f["family"]: f for f in cov["families"]}
-assert set(fams) == {"articles-items", "hub-lessons"}, fams.keys()
+assert set(fams) == {"articles-items", "hub-lessons", "host-sources"}, fams.keys()
 assert all(d["family"] == "articles-items" for d in cov["read"]), cov["read"]
 assert fams["articles-items"]["enumerated"] is True, fams["articles-items"]
 # declared, not enumerated, and the reason is NAMED — never a silent empty family
-hl = fams["hub-lessons"]
-assert hl["declared"] is True and hl["enumerated"] is False, hl
-assert hl["reason"], hl
-assert hl["matched"] == 0 and hl["accounting_closes"] is True, hl
+for name in ("hub-lessons", "host-sources"):
+    f = fams[name]
+    assert f["declared"] is True and f["enumerated"] is False, f
+    assert f["reason"], f
+    assert f["matched"] == 0 and f["accounting_closes"] is True, f
 assert cov["families_enumerated"] == ["articles-items"], cov["families_enumerated"]
-assert [f["family"] for f in cov["families_not_enumerated"]] == ["hub-lessons"], cov
-assert cov["families_not_enumerated"][0]["reason"] == hl["reason"], cov
+assert [f["family"] for f in cov["families_not_enumerated"]] == [
+    "hub-lessons", "host-sources"], cov
+assert cov["families_not_enumerated"][0]["reason"] == fams["hub-lessons"]["reason"], cov
 PYEOF
 
 # --- 2. CAP-4: item BODIES are never read ---------------------------------------
@@ -378,7 +380,7 @@ python3 - "$work/lessons.json" <<'PYEOF' && ok "CAP-4: the manifest names BOTH e
 import json, sys
 cov = json.load(open(sys.argv[1]))["coverage"]
 assert cov["families_enumerated"] == ["articles-items", "hub-lessons"], cov["families_enumerated"]
-assert cov["families_not_enumerated"] == [], cov["families_not_enumerated"]
+assert [f["family"] for f in cov["families_not_enumerated"]] == ["host-sources"], cov
 fams = {f["family"]: f for f in cov["families"]}
 assert fams["hub-lessons"]["matched"] == 3, fams["hub-lessons"]
 for f in fams.values():
@@ -440,6 +442,140 @@ MAP > "$work/degraded.json" 2>/dev/null \
   && ok "hub-lessons: an unreachable gateway still yields a map (exit 0)" \
   || err "a degraded policy source broke the map instead of being disclosed"
 WRITING_ASSISTANT_GATEWAY_CMD="$saved_gw"
+
+# --- 7c. the host-sources family: declared writing sources enter the map -----
+# A host repo whose material lives in its README, docs and specs still has
+# terrain. The fixture sources carry a SENTINEL in their PROSE, so "read at
+# frontmatter/heading level, never as prose" is asserted rather than assumed.
+mkdir -p "$h/docs" "$h/specs"
+cat > "$h/README.md" <<'EOF'
+# The retry storm
+
+SENTINEL-PROSE-README — this paragraph is body text and must never be projected.
+
+## Why it happens
+
+More prose. SENTINEL-PROSE-README-TWO.
+
+```
+# not a heading — inside a fence
+```
+
+## What we changed
+EOF
+cat > "$h/docs/cache-warmth.md" <<'EOF'
+---
+title: Cache warmth, measured
+track: engineering
+---
+
+SENTINEL-PROSE-DOC — body text.
+
+## The measurement
+EOF
+printf '# Thin note\n' > "$h/specs/thin.md"
+printf '[{"path": "README.md"}, {"path": "docs"}, {"path": "specs"}]' | \
+  python3 "$root/scripts/resolve-writing-sources.py" --root "$h" \
+    set-sources >/dev/null 2>&1
+git -C "$h" add -A >/dev/null 2>&1
+git -C "$h" -c user.email=t@e -c user.name=t commit -qm sources >/dev/null 2>&1 || true
+
+MAP > "$work/hostsrc.json" 2>"$work/hostsrc.err" \
+  && ok "host-sources: the map assembles with declared sources enumerated" \
+  || err "assemble failed with declared sources: $(cat "$work/hostsrc.err")"
+
+python3 - "$work/hostsrc.json" <<'PYEOF' && ok "host-sources: declared sources become family-tagged surfaces, titled from frontmatter or the first H1" || err "host-sources projection wrong"
+import json, sys
+d = json.load(open(sys.argv[1]))
+srcs = {i["surface"]: i for t in d["topics"] for i in t["items"]
+        if i.get("family") == "host-sources"}
+assert {"README.md", "docs/cache-warmth.md", "specs/thin.md"} <= set(srcs), sorted(srcs)
+# a README has no frontmatter: its first level-1 heading is the nearest thing
+assert srcs["README.md"]["title"] == "The retry storm", srcs["README.md"]
+# frontmatter still wins where a source declares one, track included
+doc = srcs["docs/cache-warmth.md"]
+assert doc["title"] == "Cache warmth, measured", doc
+assert doc["track"] == "engineering", doc
+# an undeclared track falls to the family name, mappable like any other track
+assert srcs["README.md"]["track"] == "host-sources", srcs["README.md"]
+# one resolvable file:line@pin cite per heading, at the heading's TRUE line
+assert srcs["README.md"]["evidence"][0].startswith("README.md:1@"), srcs["README.md"]
+lines = [int(e.split(":")[1].split("@")[0]) for e in srcs["README.md"]["evidence"]]
+assert lines == [1, 5, 13], lines          # the fenced `# not a heading` is not one
+# the shipped size proxy is carried as a signal
+assert srcs["README.md"]["source_lines"] > srcs["specs/thin.md"]["source_lines"], srcs
+PYEOF
+
+grep -q 'SENTINEL-PROSE' "$work/hostsrc.json" \
+  && err "source prose reached the map — the read widened past heading level" \
+  || ok "CAP-4: no source prose reaches the map (declared sources are read at heading level only)"
+
+python3 - "$work/hostsrc.json" <<'PYEOF' && ok "CAP-4: the manifest names host-sources as enumerated and its accounting closes" || err "host-sources manifest wrong"
+import json, sys
+d = json.load(open(sys.argv[1]))
+cov = d["coverage"]
+assert "host-sources" in cov["families_enumerated"], cov["families_enumerated"]
+fams = {f["family"]: f for f in cov["families"]}
+assert fams["host-sources"]["matched"] >= 3, fams["host-sources"]
+for f in fams.values():
+    assert f["accounting_closes"] is True, f
+assert sum(f["matched"] for f in fams.values()) == cov["matched"], cov
+# depth is still a SIGNAL: every subtopic stays selectable whatever its size
+subs = [s for t in d["topics"] for s in t["subtopics"]]
+assert subs and all(s["selectable"] is True for s in subs), subs
+assert all("source_lines" in s["density"] for s in subs), subs[0]["density"]
+PYEOF
+
+# Assembly cost stays index-scale: a 20k-line body changes nothing but the
+# size proxy — no heading, no pointer, no subtopic moves.
+cp "$h/README.md" "$work/readme-small.md"
+python3 - "$h/README.md" <<'PYEOF'
+import sys
+open(sys.argv[1], "a", encoding="utf-8").write("\nfiller prose line\n" * 20000)
+PYEOF
+MAP > "$work/hostbig.json" 2>/dev/null
+python3 - "$work/hostsrc.json" "$work/hostbig.json" <<'PYEOF' && ok "CAP-4: a 20k-line source body adds no pointers and moves no subtopic (cost stays index-scale)" || err "source body growth changed the map's structure"
+import json, sys
+a = json.load(open(sys.argv[1])); b = json.load(open(sys.argv[2]))
+def ptrs(d):
+    return {i["surface"]: i["evidence"] for t in d["topics"] for i in t["items"]}
+assert ptrs(a) == ptrs(b), "evidence pointers changed with body size"
+def subs(d):
+    return {(t["topic"], s["subtopic"]) for t in d["topics"] for s in t["subtopics"]}
+assert subs(a) == subs(b), "clusters changed with body size"
+PYEOF
+cp "$work/readme-small.md" "$h/README.md"
+
+# An undeclared source configuration is a DISCLOSED family, not a silent empty
+# one — and the map still produces a result.
+h3="$work/host3"; mkdir -p "$h3"; git -C "$h3" init -q
+python3 "$root/scripts/resolve-writing-sources.py" --root "$h3" \
+  set-draft-location "$a/drafts/" >/dev/null 2>&1
+python3 "$M" assemble --root "$h3" > "$work/nosrc.json" 2>/dev/null \
+  && ok "host-sources: an undeclared source configuration still yields a map (exit 0)" \
+  || err "an undeclared source configuration broke the map instead of being disclosed"
+python3 - "$work/nosrc.json" <<'PYEOF' && ok "host-sources: an undeclared source configuration is disclosed as declared-but-not-enumerated WITH THE REASON" || err "undeclared sources not disclosed"
+import json, sys
+cov = json.load(open(sys.argv[1]))["coverage"]
+hs = {f["family"]: f for f in cov["families"]}["host-sources"]
+assert hs["declared"] is True and hs["enumerated"] is False, hs
+assert hs["reason"], hs
+assert "host-sources" in [f["family"] for f in cov["families_not_enumerated"]], cov
+assert "articles-items" in cov["families_enumerated"], cov
+PYEOF
+
+# The enumeration is the SINGLE enumerator's, order included — never a second
+# walk of the tree.
+python3 "$root/scripts/resolve-writing-sources.py" --root "$h" files 2>/dev/null \
+  > "$work/enum.txt"
+python3 - "$work/hostsrc.json" "$work/enum.txt" "$h" <<'PYEOF' && ok "host-sources: the family is exactly resolve-writing-sources.py files, in its order (one enumerator)" || err "host-sources does not match the single enumerator"
+import json, os, sys
+d = json.load(open(sys.argv[1]))
+declared = [os.path.relpath(p.strip(), sys.argv[3])
+            for p in open(sys.argv[2]) if p.strip()]
+read = [r["surface"] for r in d["coverage"]["read"] if r["family"] == "host-sources"]
+assert read == declared, (read, declared)
+PYEOF
 python3 - "$work/degraded.json" <<'PYEOF' && ok "hub-lessons: a degraded policy source is disclosed as declared-but-not-enumerated WITH THE REASON" || err "degraded policy source not disclosed"
 import json, sys
 d = json.load(open(sys.argv[1]))
@@ -510,9 +646,22 @@ allowed = {
     "resolve-user-config.py",       # the YAML-subset reader
     "write-article-plan.py",        # the SHIPPED consumption derived view
     "read-policy-source.py",        # the SHIPPED policy seam (hub-lessons)
+    # The shipped non-blank-line SIZE PROXY only (`harvestable_lines`, Story
+    # 18.65) — reused so the map and harvest measure a source the same way.
+    # Harvest's per-source EXTRACTION pass is a different thing entirely and
+    # is never invoked; the assertion below pins that distinction.
+    "harvest-budget.py",
 }
 extra = sorted(named - allowed)
 assert not extra, f"unreviewed sibling scripts: {extra}"
+PYEOF
+# harvest-budget.py is on the list for ONE measure. Reaching for its budget
+# machinery (or running it as a pass) is the corpus-scale cost CAP-4 forbids.
+python3 - "$M" <<'PYEOF' && ok "CAP-4: harvest-budget.py is used for its size proxy only — no budgeted extraction pass" || err "topic-map.py reaches past harvestable_lines into harvest's budgeting"
+import re, sys
+src = open(sys.argv[1], encoding="utf-8").read()
+used = set(re.findall(r'_budget\(\)\.(\w+)', src))
+assert used == {"harvestable_lines"}, f"harvest-budget attributes used: {sorted(used)}"
 PYEOF
 # The hub-lessons family goes through the SHIPPED seam — never a second reader.
 grep -q 'POLICY_READER' "$M" \

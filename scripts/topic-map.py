@@ -57,10 +57,15 @@ and every candidate surface carries the **source family** it came from
     (SPEC-topic-map OQ3). An unresolvable or degraded policy source makes the
     family **declared-but-not-enumerated with the reason** — the same disclosed
     refusal shape `consumption_view` uses — never a silent empty family.
+  * `host-sources` — the host repo's **declared writing sources** (Story
+    18.65, #605), enumerated through the SINGLE enumerator
+    (`resolve-writing-sources.py files`) that already owns the read boundary
+    and its order — the same one harvest's budgeting delegates to. Read at
+    **frontmatter/heading level only**: the leading `---` block and the ATX
+    heading lines, never the prose between them. Undeclared or unresolvable
+    sources make the family declared-but-not-enumerated with the reason, as
+    above.
 
-A family is a *declared denominator*, which is the point: a coverage claim
-that does not name the families it covers is exactly the defect CAP-4 exists
-to prevent (a "coverage complete" line that was true over the wrong corpus).
   * the **track↔topic mapping** — `policy_source.track_topics` in the host
     repo's `writing-sources.yaml`, read through
     `resolve-writing-sources.py policy-source` (#525). The articles repo owns
@@ -72,6 +77,10 @@ to prevent (a "coverage complete" line that was true over the wrong corpus).
     (consumed iff a live backlog/draft/published item cites it OR an
     ever-published item cites it — a selection-time derived view, never a
     stored flag). This script neither widens that join nor caches its answer.
+
+A family is a *declared denominator*, which is the point: a coverage claim
+that does not name the families it covers is exactly the defect CAP-4 exists
+to prevent (a "coverage complete" line that was true over the wrong corpus).
 
 **No map file is ever written for later reuse, and nothing this script writes
 is ever read back as an input.** `--emit-debug PATH` exists only so a run's
@@ -88,11 +97,14 @@ later observed to be unstable.
 
 CAP-4 — bounded assembly
 ------------------------
-Only **index and frontmatter surfaces** are read: `INDEX.md` and the leading
-`---` frontmatter block of each item file. `read_frontmatter` stops at the
-closing `---` and never touches the body, so assembly cost scales with index
-size, not corpus body size — a repo of 50 huge articles costs the same as 50
-stubs. There is an explicit read bound (`--max-surfaces`, default 400).
+Only **index, frontmatter and heading surfaces** are read: `INDEX.md`, the
+leading `---` frontmatter block of each item file, LESSONS.md index lines, and
+a declared source's frontmatter plus its ATX heading lines. `read_frontmatter`
+stops at the closing `---` and never touches the body; `read_headings` skips
+over the prose between headings and projects none of it. Assembly cost scales
+with index and outline size, not corpus body size — a repo of 50 huge articles
+costs the same as 50 stubs, and a 20k-line README contributes exactly its
+headings. There is an explicit read bound (`--max-surfaces`, default 400).
 
 When the bound truncates, the map **names the surfaces it did not read** rather
 than narrowing silently, in the coverage-disclosure shape harvest already uses
@@ -138,7 +150,9 @@ DEFAULT_MAX_SURFACES = 400
 # and says so per family rather than narrowing the denominator in silence.
 FAMILY_ARTICLES_ITEMS = "articles-items"
 FAMILY_HUB_LESSONS = "hub-lessons"
-DECLARED_FAMILIES = (FAMILY_ARTICLES_ITEMS, FAMILY_HUB_LESSONS)
+FAMILY_HOST_SOURCES = "host-sources"
+DECLARED_FAMILIES = (FAMILY_ARTICLES_ITEMS, FAMILY_HUB_LESSONS,
+                     FAMILY_HOST_SOURCES)
 
 # A lesson seed enters the topic derivation through the SAME track->topic path
 # every item uses: it carries the family name as its track, so an owner who
@@ -146,6 +160,12 @@ DECLARED_FAMILIES = (FAMILY_ARTICLES_ITEMS, FAMILY_HUB_LESSONS)
 # like any other track. Nothing here invents a topic.
 LESSON_TRACK = FAMILY_HUB_LESSONS
 LESSON_SECTION = FAMILY_HUB_LESSONS
+
+# A declared writing source enters the topic derivation the same way, for the
+# same reason: its own `track:` when it happens to declare one, else the family
+# name as a track the owner may map like any other.
+SOURCE_TRACK = FAMILY_HOST_SOURCES
+SOURCE_SECTION = FAMILY_HOST_SOURCES
 
 
 def _load(mod_filename):
@@ -163,6 +183,18 @@ SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
 SRC_RES = os.path.join(SCRIPT_DIR, "resolve-writing-sources.py")
 PLAN_WRITER = os.path.join(SCRIPT_DIR, "write-article-plan.py")
 POLICY_READER = os.path.join(SCRIPT_DIR, "read-policy-source.py")
+
+_BUDGET = []
+
+
+def _budget():
+    """harvest-budget.py, loaded once, for its `harvestable_lines` measure
+    ALONE (Story 18.65). This is the shipped non-blank-line size proxy, reused
+    so the map and harvest measure a source the same way — NOT harvest's
+    extraction pass, which the map never invokes (CAP-4's cost promise)."""
+    if not _BUDGET:
+        _BUDGET.append(_load("harvest-budget.py"))
+    return _BUDGET[0]
 
 
 def host_root(arg_root):
@@ -338,6 +370,142 @@ def lesson_seeds(root):
     return seeds, None
 
 
+def declared_sources(root):
+    """The `host-sources` family's read boundary, from the SINGLE enumerator.
+
+    `resolve-writing-sources.py files` is the one source of truth for which
+    files are in scope and in what order — the same enumeration harvest's
+    budgeting delegates to, so the map and harvest can never disagree about
+    what "the declared sources" means. Returns `(paths, reason)`; a `reason`
+    is the family's declared-but-not-enumerated disclosure.
+    """
+    cmd = [sys.executable, SRC_RES]
+    if root:
+        cmd += ["--root", root]
+    cmd += ["files"]
+    r = subprocess.run(cmd, capture_output=True, text=True)
+    if r.returncode != 0:
+        detail = (r.stderr.strip().split("\n")[-1] if r.stderr.strip()
+                  else f"the enumerator exited {r.returncode}")
+        return [], f"{detail} (resolve-writing-sources.py exit {r.returncode})"
+    paths = [ln for ln in r.stdout.splitlines() if ln.strip()]
+    if not paths:
+        return [], ("no writing sources are declared for this repo "
+                    "(resolve-writing-sources.py files enumerated none)")
+    return paths, None
+
+
+def read_headings(path):
+    """A declared source at **frontmatter/heading level**, in ONE pass.
+
+    **This is CAP-4's bound for the host-sources family**, the counterpart of
+    `read_frontmatter` for files that have no frontmatter at all. It returns
+    `(frontmatter, headings)` where `headings` is `[(level, text, line_no)]`
+    for ATX heading lines only.
+
+    The prose between headings is skipped over and discarded: it is never
+    projected into the map, which is the difference between reading a document
+    at outline level and consuming it as prose. Fenced code blocks are tracked
+    so a `# comment` inside one is not mistaken for a heading.
+    """
+    fm, headings = {}, []
+    try:
+        with open(path, encoding="utf-8", errors="strict") as fh:
+            raw = fh.read().splitlines()
+    except (OSError, UnicodeDecodeError):
+        return fm, headings
+    start = 0
+    if raw and raw[0].strip() == "---":
+        for i in range(1, len(raw)):
+            if raw[i].strip() == "---":
+                start = i + 1
+                break
+    if start:
+        fm = read_frontmatter(path)
+    fence = False
+    for n, line in enumerate(raw[start:], start=start + 1):
+        if line.lstrip().startswith("```") or line.lstrip().startswith("~~~"):
+            fence = not fence
+            continue
+        if fence or not line.startswith("#"):
+            continue
+        level = len(line) - len(line.lstrip("#"))
+        text = line[level:].strip()
+        if text and level <= 6:
+            headings.append((level, text, n))
+    return fm, headings
+
+
+def source_surfaces(root):
+    """The `host-sources` family as surfaces, in the enumerator's own order.
+
+    Returns `(surfaces, reason)`. The payload is the absolute path; the
+    surface name is the path relative to the host root, so the manifest names
+    a source the way the repo does.
+    """
+    paths, reason = declared_sources(root)
+    if reason:
+        return [], reason
+    out = []
+    for path in paths:
+        try:
+            rel = os.path.relpath(path, root)
+        except ValueError:                       # pragma: no cover - defensive
+            rel = path
+        out.append((FAMILY_HOST_SOURCES, SOURCE_SECTION, rel, path))
+    return out, None
+
+
+def source_item(rel, path, pin):
+    """A declared source as an item, projected from its OUTLINE alone.
+
+    The projection — the story's open design point, proposed here for review:
+
+      * **title** — the frontmatter `title:`, else the first level-1 heading,
+        else the path stem. A README has no frontmatter; its `# Title` is the
+        nearest thing it has to one.
+      * **evidence** — one `file:line@pin` pointer per heading, at the
+        heading's true line. These are real, resolvable cites, and a document
+        with a rich outline honestly carries more of them than a stub.
+      * **size** — `harvest-budget.py`'s `harvestable_lines`, the SHIPPED
+        non-blank-line proxy, called rather than reimplemented so the map and
+        harvest measure a source the same way.
+      * **subtopic** — NOT set here. The shipped clustering rule already
+        resolves a source to its own path stem via the evidence-pointer
+        subject, so nothing needs inventing; a source that declares
+        `subtopic:`/`cluster:` keeps winning as it does for any item.
+      * **body text** — never projected. `read_headings` counts it and drops
+        it; CAP-4 forbids widening to prose, and no heading's following
+        paragraph reaches the map.
+    """
+    fm, headings = read_headings(path)
+    title = fm.get("title") or fm.get("one_liner") or ""
+    if not title:
+        h1 = next((h for h in headings if h[0] == 1), None)
+        title = h1[1] if h1 else os.path.splitext(os.path.basename(rel))[0]
+    item = {
+        "slug": os.path.splitext(os.path.basename(rel))[0],
+        "title": title if isinstance(title, str) else str(title),
+        "family": FAMILY_HOST_SOURCES,
+        "section": SOURCE_SECTION,
+        "surface": rel,
+        "status": fm.get("status") or "",
+        "track": fm.get("track") or SOURCE_TRACK,
+        "date": fm.get("date") or "",
+        "evidence": ([f"{rel}:{n}@{pin}" for _lvl, _t, n in headings]
+                     or [f"{rel}:1@{pin}"]),
+        "live": False,
+        # The shipped cheap size proxy, carried as a SIGNAL. It informs the
+        # density readout and nothing else: no declared depth level takes a
+        # minimum over it, so CAP-2's "signal, never a gate" is untouched.
+        "source_lines": _budget().harvestable_lines(path),
+    }
+    for key in SUBTOPIC_KEYS:
+        if key in fm and fm[key]:
+            item[key] = fm[key]
+    return item
+
+
 def repo_pin(repo):
     """The articles repo's HEAD sha, or "unpinned" outside git — the coverage
     manifest's `pin`, exactly as harvest discloses one."""
@@ -489,6 +657,10 @@ def all_surfaces(repo, root):
     if reason:
         families[FAMILY_HUB_LESSONS].update(enumerated=False, reason=reason)
     matched += lessons
+    sources, reason = source_surfaces(root)
+    if reason:
+        families[FAMILY_HOST_SOURCES].update(enumerated=False, reason=reason)
+    matched += sources
     return matched, families
 
 
@@ -543,6 +715,7 @@ def assemble(repo, mapping, max_surfaces, root=None):
     matched, families = all_surfaces(repo, root)
     read_now = matched[:max_surfaces] if max_surfaces is not None else matched
     skipped = matched[len(read_now):]
+    host_pin = repo_pin(root) if root else "unpinned"
 
     items, read_disclosure = [], []
     for family, section, rel, payload in read_now:
@@ -550,6 +723,12 @@ def assemble(repo, mapping, max_surfaces, root=None):
             items.append(lesson_item(payload))
             read_disclosure.append({"family": family, "surface": rel,
                                     "entries": 1})
+            continue
+        if family == FAMILY_HOST_SOURCES:
+            item = source_item(rel, payload, host_pin)
+            items.append(item)
+            read_disclosure.append({"family": family, "surface": rel,
+                                    "entries": len(item["evidence"])})
             continue
         path = payload
         if section == "index":
@@ -620,7 +799,9 @@ def assemble(repo, mapping, max_surfaces, root=None):
         "families_not_enumerated": [
             {"family": name, "reason": families[name]["reason"]}
             for name in DECLARED_FAMILIES if not families[name]["enumerated"]],
-        "surfaces_read": "index and frontmatter only — item bodies are never read",
+        "surfaces_read": ("index and frontmatter only — item bodies are never "
+                          "read; a declared source is read at heading level, "
+                          "never as prose"),
     }
 
     # --- topics: a pure per-invocation derivation (OQ1) ---------------------
@@ -836,6 +1017,11 @@ def cluster_subtopics(items, consumption, thresholds):
                 backlog.append({"slug": item["slug"], "status": item["status"]})
         live_items = [i for i in g["items"] if i["live"]]
         density = {
+            # The declared sources' shipped size proxy, summed. A SIGNAL only:
+            # no declared level takes a minimum over it (CAP-2 — depth remains
+            # a signal, never a gate), it just lets a thin doc and a thick one
+            # look different in the readout.
+            "source_lines": sum(i.get("source_lines") or 0 for i in g["items"]),
             "evidence_pointers": len(pointers),
             "pointers": sorted(pointers),
             "lessons_cited": len(elements),

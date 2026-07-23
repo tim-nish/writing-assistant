@@ -47,7 +47,12 @@ python3 "$root/scripts/resolve-writing-sources.py" --root "$h" \
 # Stage 0 validates the declared sources before it accepts a brief, so the host
 # repo carries one readable source file and the config declares it.
 mkdir -p "$h/docs"
-printf '# notes\n\nThe retry storm doubled token spend.\n' > "$h/docs/notes.md"
+# The filename is deliberately unrelated to any backlog item's evidence
+# pointers: since Story 18.65 a declared source is itself a map surface, so a
+# host doc named `notes.md` would share the `notes` pointer subject with the
+# `staffing` subtopic below and legitimately earn a combination — defeating the
+# "never combined on a hunch" assertion, which is about UNRELATED subtopics.
+printf '# intake\n\nThe retry storm doubled token spend.\n' > "$h/docs/intake.md"
 git -C "$h" add -A >/dev/null 2>&1
 git -C "$h" -c user.email=t@e -c user.name=t commit -qm init >/dev/null 2>&1
 srcfile="$work/xdg/writing-assistant/repos/$(python3 "$root/scripts/resolve-paths.py" repo-key --root "$h")/writing-sources.yaml"
