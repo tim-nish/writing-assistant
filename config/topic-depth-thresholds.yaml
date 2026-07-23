@@ -1,0 +1,57 @@
+# topic-depth-thresholds.yaml — the ONE place the map's depth estimate is
+# declared (Story 18.62, #588; SPEC-topic-map CAP-2).
+#
+# The estimate answers "what does this material support TODAY" — seed-only /
+# short note / full article / article series — and it is computed from the
+# subtopic's evidence-density signal by these declared minimums, never by taste.
+# Changing a number here changes the estimate and nothing else.
+#
+# A THRESHOLD GATES WHAT IS SURFACED, NEVER WHAT THE OWNER MAY PICK
+# (`threshold-gates-surfacing-not-permission`). Every subtopic the map assembles
+# is shown and remains selectable at the free-form entry regardless of the level
+# it lands in — a seed-only subtopic is a signal for the owner's judgment, not a
+# refusal.
+#
+# STATUS: PROPOSED, NOT YET RATIFIED. The spec does not choose these boundaries
+# — they are an owner-calibration input. The map reports `ratified: false`
+# alongside every estimate so a run can never mistake a proposal for a settled
+# rule. Ratify by setting `ratified: true` here (or in a per-repo override at
+# `<repo-config-dir>/topic-depth-thresholds.yaml`) once the numbers have been
+# checked against a real corpus.
+ratified: false
+
+# Weakest to strongest. A subtopic lands in the STRONGEST level whose every
+# minimum it meets; the weakest level's minimums are all zero, so every subtopic
+# lands somewhere and none is dropped.
+order: [seed-only, short-note, full-article, article-series]
+
+# The three counted inputs are exactly the ones the density signal reports, so
+# the estimate is explainable from the same numbers it was derived from:
+#   evidence_pointers   distinct evidence pointers the subtopic's items declare
+#   unconsumed_lessons  distinct cited story elements no plan has consumed
+#   live_items          backlog/draft/newsletter items in the subtopic
+levels:
+  seed-only:
+    name: seed-only
+    description: a lone note — not enough recorded material to write from yet
+    min_evidence_pointers: 0
+    min_unconsumed_lessons: 0
+    min_live_items: 0
+  short-note:
+    name: short note
+    description: enough for a working note or a short post
+    min_evidence_pointers: 2
+    min_unconsumed_lessons: 0
+    min_live_items: 1
+  full-article:
+    name: full article
+    description: enough evidence and unconsumed material for one full article
+    min_evidence_pointers: 5
+    min_unconsumed_lessons: 1
+    min_live_items: 2
+  article-series:
+    name: article series
+    description: more than one article's worth — splitting is the real decision
+    min_evidence_pointers: 12
+    min_unconsumed_lessons: 3
+    min_live_items: 4

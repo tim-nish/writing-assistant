@@ -282,9 +282,6 @@ import json, sys
 c = json.load(open(sys.argv[1]))["consumption"]
 assert c["consumed_index"] == {}, c
 PYEOF
-grep -qE 'consumed:|consumed_index *=|def .*consumed' "$M" \
-  && err "topic-map.py re-implements the consumption predicate (it must READ the shipped view)" \
-  || ok "consumption: no second implementation of the predicate lives in topic-map.py"
 
 # --- 8. scope: CAP-2 and CAP-3 are NOT implemented here -------------------------
 # Scope is a property of the CODE, not of the prose that documents it: strip
@@ -301,9 +298,26 @@ for tok in tokenize.generate_tokens(io.StringIO(src).readline):
 print(" ".join(out))
 PYEOF
 CODE="$work/code.py"
-grep -qiE 'depth_estimate|seed-only|short note|article series|def .*depth' "$CODE" \
-  && err "topic-map.py computes depth estimates (CAP-2 belongs to a sibling story)" \
-  || ok "scope: no depth estimate is computed (CAP-2 left to its own story)"
+# The invariant is that the PREDICATE is not re-derived here. Story 18.62 marks
+# items against the shipped index (a lookup, not a second rule), so the check
+# targets re-derivation directly, over the comment-stripped code: topic-map.py
+# must never read `plans/` itself, and the view must come from
+# `write-article-plan.py consult`.
+grep -qE "plans" "$CODE" \
+  && err "topic-map.py reads plans/ itself (the consumption view must come from consult)" \
+  || ok "consumption: topic-map.py never reads plans/ — no second derivation of the predicate"
+grep -q 'PLAN_WRITER' "$M" \
+  && ok "consumption: the view is read from the shipped write-article-plan.py consult" \
+  || err "topic-map.py does not read the shipped consumption view"
+# CAP-2 (depth signals) SHIPPED with Story 18.62 (#588) and has its own harness
+# (check-topic-map-depth.sh). What must stay true here is that no depth boundary
+# is hardcoded in stage code: the numbers live in the declaration file alone.
+grep -qiE 'seed-only|short note|article series' "$CODE" \
+  && err "topic-map.py hardcodes a depth level name (the levels are declared data)" \
+  || ok "scope: no depth level is hardcoded (the boundaries stay declared)"
+grep -qE 'min_evidence_pointers *= *[0-9]|min_live_items *= *[0-9]' "$CODE" \
+  && err "topic-map.py hardcodes a threshold value (it must read the declaration)" \
+  || ok "scope: no threshold value is hardcoded in stage code"
 grep -qiE 'approve/modify|proposal contract|candidate direction|screen' "$CODE" \
   && err "topic-map.py builds a presentation screen (CAP-3 belongs to a sibling story)" \
   || ok "scope: no presentation screen is built (CAP-3 left to its own story)"

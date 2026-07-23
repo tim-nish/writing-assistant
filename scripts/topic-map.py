@@ -3,17 +3,40 @@
 SPEC-topic-map CAP-1 + CAP-4).
 
 The topic map is an overview of what the owner *could* write about, assembled
-**at every invocation** from state that already exists. This script implements
-exactly two capabilities:
+**at every invocation** from state that already exists. This script implements:
 
   CAP-1  derived view, never stored state
+  CAP-2  subtopic clusters, evidence density, depth estimate (Story 18.62)
   CAP-4  bounded assembly (index/frontmatter surfaces only, with disclosure)
 
-CAP-2 (subtopic clusters, evidence-density and depth signals) and CAP-3
-(in-conversation presentation, candidate directions, the brief hand-off) are
-**not** implemented here — they belong to sibling stories. This script prints
+CAP-3 (in-conversation presentation, candidate directions, the brief hand-off)
+is **not** implemented here — it belongs to a sibling story. This script prints
 JSON; it composes no owner-facing screen and no narrative structures (18.45's
 single-proposer invariant).
+
+CAP-2 — depth signals
+---------------------
+Each topic's items are grouped into SUBTOPICS and annotated with an
+evidence-density signal (distinct evidence pointers, unconsumed cited story
+elements, backlog items with their status, live item count) and a DEPTH
+ESTIMATE naming what the material supports today. The estimate is computed from
+that density by minimums declared in ONE place
+(`config/topic-depth-thresholds.yaml`, overridable per repo) — never by taste —
+and every estimate carries the counts it was derived from, so "why this depth?"
+is answered from the same numbers rather than an opaque score.
+
+Two invariants hold here regardless of the numbers:
+
+  * a threshold gates what is **surfaced**, never what the owner may pick —
+    every subtopic is emitted `selectable: true`, whatever level it lands in;
+  * already-consumed material is **marked consumed, not hidden**, so the owner
+    can still name it at the free-form entry (SPEC-article-draft-pipeline CAP-9,
+    Story 18.47). Consumption is READ from the shipped derived view, never
+    re-implemented and never stored.
+
+The shipped thresholds are PROPOSED, not ratified: the spec does not choose the
+boundaries, so the declaration carries `ratified: false` and the map reports it
+alongside every estimate.
 
 CAP-1 — derived, never stored
 -----------------------------
@@ -361,6 +384,12 @@ def assemble(repo, mapping, max_surfaces):
             "evidence": [e for e in evidence if isinstance(e, str)],
             "live": section in LIVE_SECTIONS,
         }
+        # Optional cluster/citation keys, projected only when an item happens to
+        # declare one (Story 18.62). Reading a key that may be absent imposes no
+        # schema obligation, and no clustering depends on any of them existing.
+        for key in SUBTOPIC_KEYS + ELEMENT_KEYS:
+            if key in fm:
+                item[key] = fm[key] if key in SUBTOPIC_KEYS else _as_list(fm[key])
         items.append(item)
         read_disclosure.append({"surface": rel,
                                 "entries": len(fm)})
@@ -414,6 +443,214 @@ def assemble(repo, mapping, max_surfaces):
     return out_topics, coverage, tracks_seen
 
 
+# --------------------------------------------------------------------------
+# Subtopic clusters, evidence density and the depth estimate (CAP-2)
+#
+# A rich subtopic and a lone seed must look different at a glance. Everything
+# below is DERIVED per invocation from the same bounded surfaces CAP-4 already
+# reads — no new frontmatter key is required of the articles repo (OQ1 stays
+# resolved as pure-derived), and nothing is stored.
+#
+# A THRESHOLD GATES WHAT IS SURFACED, NEVER WHAT THE OWNER MAY PICK. Every
+# subtopic is emitted with `selectable: true`, and already-consumed material is
+# MARKED consumed rather than hidden — the owner may still name it at the
+# free-form entry (SPEC-article-draft-pipeline CAP-9, Story 18.47).
+
+THRESHOLDS_FILE = "topic-depth-thresholds.yaml"
+
+# Optional item keys, read only when an item happens to declare them. None is
+# required, so the articles repo gains no schema obligation from this story.
+SUBTOPIC_KEYS = ("subtopic", "cluster")
+ELEMENT_KEYS = ("elements", "lessons")
+
+UNCLUSTERED = "(unclustered)"
+
+
+def thresholds_path(root, override):
+    """The depth-threshold declaration: an explicit override, else a per-repo
+    file beneath the RESOLVED repo-config directory, else the shipped default.
+    One place, so the boundaries can move without touching stage code."""
+    if override:
+        return os.path.realpath(override)
+    rp = _load("resolve-paths.py")
+    repo_local = os.path.join(rp.repo_config_dir(root), THRESHOLDS_FILE)
+    if os.path.isfile(repo_local):
+        return repo_local
+    return os.path.realpath(os.path.join(SCRIPT_DIR, "..", "config", THRESHOLDS_FILE))
+
+
+def load_thresholds(root, override=None):
+    """Read the declared levels. A missing or unreadable declaration is
+    DISCLOSED, never silently replaced by numbers invented here."""
+    path = thresholds_path(root, override)
+    uc = _load("resolve-user-config.py")
+    try:
+        data = uc.load_yaml(open(path, encoding="utf-8").read())
+    except (OSError, uc.YamlSubsetError) as exc:
+        return {"available": False, "source": path, "reason": str(exc), "levels": []}
+    declared = (data or {}).get("levels") or {}
+    order = (data or {}).get("order") or sorted(declared)
+    levels = []
+    for key in order:
+        entry = declared.get(key)
+        if not isinstance(entry, dict):
+            continue
+        levels.append({
+            "key": key,
+            "name": str(entry.get("name") or key),
+            "description": str(entry.get("description") or ""),
+            "min_evidence_pointers": int(entry.get("min_evidence_pointers") or 0),
+            "min_unconsumed_lessons": int(entry.get("min_unconsumed_lessons") or 0),
+            "min_live_items": int(entry.get("min_live_items") or 0),
+        })
+    if not levels:
+        return {"available": False, "source": path,
+                "reason": "the declaration names no levels", "levels": []}
+    return {"available": True, "source": path,
+            # Proposed values are visibly proposed: a run can never mistake an
+            # unratified calibration input for a settled rule.
+            "ratified": bool((data or {}).get("ratified")),
+            "levels": levels}
+
+
+def _pointer_subject(pointer):
+    """The subject a bare evidence pointer names: its path stem, with any line
+    anchor and extension dropped (`docs/retro.md:41` -> `retro`). Two items
+    citing the same source are talking about the same thing — that is the whole
+    of the derivation, and it needs no declared key."""
+    head = str(pointer).split("#")[0].split(":")[0].strip()
+    stem = os.path.splitext(os.path.basename(head))[0]
+    return stem or None
+
+
+def subtopic_key(item):
+    """Which cluster an item belongs to, derived in a fixed, explainable order:
+    a declared subtopic when the item happens to carry one, else the subject its
+    evidence pointers agree on, else `(unclustered)`. Never invented from prose.
+    """
+    for key in SUBTOPIC_KEYS:
+        declared = item.get(key)
+        if isinstance(declared, list) and declared:
+            declared = declared[0]
+        if isinstance(declared, str) and declared.strip():
+            return declared.strip(), "declared"
+    subjects = [s for s in (_pointer_subject(p) for p in item.get("evidence", [])) if s]
+    if subjects:
+        # The most-cited subject, ties broken alphabetically (determinism).
+        best = sorted(set(subjects), key=lambda s: (-subjects.count(s), s))[0]
+        return best, "evidence-subject"
+    return UNCLUSTERED, "unclustered"
+
+
+def estimate_depth(density, thresholds):
+    """The strongest declared level whose every minimum the density meets, plus
+    the reason it landed there — the estimate is EXPLAINABLE from the same
+    numbers it was derived from, never an opaque score."""
+    if not thresholds.get("available"):
+        return {"level": None, "ratified": None,
+                "why": ("no depth-threshold declaration is readable, so no estimate "
+                        f"is offered ({thresholds.get('reason')})"),
+                "thresholds_source": thresholds.get("source")}
+    counted = {"evidence_pointers": density["evidence_pointers"],
+               "unconsumed_lessons": density["unconsumed_lessons"],
+               "live_items": density["live_items"]}
+    chosen, unmet = thresholds["levels"][0], []
+    for level in thresholds["levels"]:
+        missing = [f"{k} {counted[k]} < {level['min_' + k]}"
+                   for k in counted if counted[k] < level["min_" + k]]
+        if missing:
+            unmet = missing
+            break
+        chosen = level
+    why = (f"{chosen['name']}: {counted['evidence_pointers']} evidence pointer(s), "
+           f"{counted['unconsumed_lessons']} unconsumed lesson(s), "
+           f"{counted['live_items']} live item(s)")
+    if unmet:
+        why += f"; the next level needs {', '.join(unmet)}"
+    return {"level": chosen["name"], "description": chosen["description"],
+            "ratified": thresholds.get("ratified"),
+            "counted": counted, "why": why,
+            "thresholds_source": thresholds.get("source"),
+            # Stated in the artifact so no consumer can read the estimate as
+            # permission: thresholds gate SURFACING, never what the owner picks.
+            "gates": "surfacing only — never what the owner may pick"}
+
+
+def _glance(depth, density):
+    """A one-line, fixed-width density rendering so a rich subtopic and a lone
+    seed are visibly different AT A GLANCE. Data, not a screen — composing the
+    screen is CAP-3's job."""
+    filled = min(4, sum(1 for n in (density["evidence_pointers"] // 3,
+                                    density["unconsumed_lessons"],
+                                    density["live_items"] // 2,
+                                    density["items"] // 3) if n))
+    bar = "#" * filled + "." * (4 - filled)
+    return (f"[{bar}] {depth.get('level') or 'no estimate'} - "
+            f"{density['evidence_pointers']} ptr, "
+            f"{density['unconsumed_lessons']} unconsumed, "
+            f"{density['live_items']} live")
+
+
+def cluster_subtopics(items, consumption, thresholds):
+    """Group a topic's items into subtopics and annotate each with its
+    evidence-density signal and depth estimate."""
+    consumed_index = (consumption or {}).get("consumed_index") or {}
+    groups = {}
+    for item in items:
+        name, basis = subtopic_key(item)
+        g = groups.setdefault(name, {"subtopic": name, "basis": basis, "items": []})
+        g["items"].append(item)
+
+    out = []
+    for name in sorted(groups):
+        g = groups[name]
+        pointers, elements, unconsumed = set(), set(), set()
+        backlog, consumed_items = [], 0
+        for item in g["items"]:
+            pointers.update(item.get("evidence") or [])
+            cited = []
+            for key in ELEMENT_KEYS:
+                cited.extend(_as_list(item.get(key)))
+            elements.update(cited)
+            item_consumed = bool(cited) and all(e in consumed_index for e in cited)
+            for eid in cited:
+                if eid not in consumed_index:
+                    unconsumed.add(eid)
+            if item_consumed:
+                consumed_items += 1
+            if item["section"] == "backlog":
+                backlog.append({"slug": item["slug"], "status": item["status"]})
+        live_items = [i for i in g["items"] if i["live"]]
+        density = {
+            "evidence_pointers": len(pointers),
+            "pointers": sorted(pointers),
+            "lessons_cited": len(elements),
+            "unconsumed_lessons": len(unconsumed),
+            "unconsumed": sorted(unconsumed),
+            "backlog_items": backlog,
+            "items": len(g["items"]),
+            "live_items": len(live_items),
+        }
+        depth = estimate_depth(density, thresholds)
+        out.append({
+            "subtopic": name,
+            "clustered_by": g["basis"],
+            "density": density,
+            "depth": depth,
+            "glance": _glance(depth, density),
+            # Consumed material is MARKED, never hidden — and stays pickable.
+            "consumed_items": consumed_items,
+            "consumed": consumed_items > 0 and consumed_items == len(g["items"]),
+            "selectable": True,
+            "items": [dict(i, consumed=bool(
+                [e for k in ELEMENT_KEYS for e in _as_list(i.get(k))])
+                and all(e in consumed_index
+                        for k in ELEMENT_KEYS for e in _as_list(i.get(k))))
+                for i in g["items"]],
+        })
+    return out
+
+
 def build_map(args):
     """The whole map, recomputed from scratch. No input to this function is a
     previously emitted map — there is no such input anywhere in this script."""
@@ -428,6 +665,10 @@ def build_map(args):
     mapping = track_topics(root)
     topics, coverage, tracks_seen = assemble(repo, mapping, args.max_surfaces)
     stale = sorted(t for t in mapping if t not in tracks_seen)
+    consumption = consumption_view(root)
+    thresholds = load_thresholds(root, getattr(args, "thresholds", None))
+    for topic in topics:
+        topic["subtopics"] = cluster_subtopics(topic["items"], consumption, thresholds)
     return {
         "kind": "topic-map",
         # CAP-1, stated in the artifact itself: this object is a view of the
@@ -442,7 +683,8 @@ def build_map(args):
         "stale_mapping_tracks": stale,
         "topics": topics,
         "coverage": coverage,
-        "consumption": consumption_view(root),
+        "consumption": consumption,
+        "depth_thresholds": thresholds,
     }
 
 
@@ -500,6 +742,10 @@ def build_parser():
                              "surfaces this invocation may read (default "
                              f"{DEFAULT_MAX_SURFACES}). Surfaces beyond it are "
                              "NAMED in the coverage disclosure, never dropped.")
+        sp.add_argument("--thresholds", metavar="PATH",
+                        help="depth-threshold declaration override (default: the "
+                             "per-repo file, else the shipped "
+                             f"config/{THRESHOLDS_FILE})")
         return sp
 
     a = common(sub.add_parser("assemble", help="the whole map as JSON"))
