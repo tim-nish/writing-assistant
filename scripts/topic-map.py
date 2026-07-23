@@ -151,9 +151,33 @@ DEFAULT_MAX_SURFACES = 400
 # and says so per family rather than narrowing the denominator in silence.
 FAMILY_ARTICLES_ITEMS = "articles-items"
 FAMILY_HUB_LESSONS = "hub-lessons"
+FAMILY_HUB_ELEMENTS = "hub-elements"
+
+# CAP-4's element bound, restated where it binds: the seam serves at most 2
+# `topics/*.md` per read (`scripts/read-policy-source.py:100`). Element coverage
+# is therefore PARTIAL BY CONSTRUCTION whenever the repo maps more topics than
+# this, and the surfaces beyond the bound are disclosed by name — never dropped
+# quietly, and never worked around with extra reads.
+ELEMENT_TOPIC_BOUND = 2
+
+# What a topic line looks like on the served surface: `- <date> — <text>`,
+# verified against product-lab@6b9a4882 rather than inferred.
+ELEMENT_LINE = re.compile(r"^-\s+(\d{4}-\d{2}-\d{2})\s+—\s+(.*)$")
+
+# The heading whose lines are rejections rather than decisions. Membership of
+# this SECTION is the marker — not the word "declined", which appears inline in
+# ordinary decision lines ("... declined as a conformance copy ...") and would
+# misclassify most of a topic file as reversals.
+DECLINED_HEADING = "declined"
+
+# The other native reversal record: a struck-through clause inside a dated line
+# marks the superseded position (topics/articles.md:17@6b9a4882 is one).
+STRUCK = "~~"
+
+ELEMENT_SUMMARY_CHARS = 200
 FAMILY_HOST_SOURCES = "host-sources"
 DECLARED_FAMILIES = (FAMILY_ARTICLES_ITEMS, FAMILY_HUB_LESSONS,
-                     FAMILY_HOST_SOURCES)
+                     FAMILY_HOST_SOURCES, FAMILY_HUB_ELEMENTS)
 
 # A lesson seed enters the topic derivation through the SAME track->topic path
 # every item uses: it carries the family name as its track, so an owner who
@@ -642,7 +666,150 @@ def lesson_surfaces(root):
             for seed in seeds], None
 
 
-def all_surfaces(repo, root):
+def _element_summary(text):
+    """One line of a topic decision, as a person reads it.
+
+    The served text is markdown with emphasis and a trailing `(q_a/... D1)`
+    provenance pointer. The pointer is the hub's own bookkeeping, not the
+    decision, so it is dropped from the summary — the cite carries provenance.
+    """
+    body = re.sub(r"\s*\(q_a/[^)]*\)\s*$", "", str(text).strip())
+    body = body.replace(STRUCK, "").replace("**", "").replace("`", "")
+    body = " ".join(body.split())
+    if len(body) > ELEMENT_SUMMARY_CHARS:
+        body = body[:ELEMENT_SUMMARY_CHARS - 1].rstrip() + "…"
+    return body
+
+
+def parse_topic_elements(topic, served, commit):
+    """The typed elements in one served topic file (CAP-2's element projection).
+
+    `served` is the seam's `N: text` lines for the file, in order. Two element
+    kinds are recognised, and BOTH markers were verified against the served
+    surface (product-lab@6b9a4882) rather than inferred from the spec prose:
+
+    * `reversal` — a dated line under the `## Declined` heading (things
+      considered and rejected), or a dated line carrying a struck-through
+      clause (`~~...~~`), which is how a superseded position is recorded
+      in place. These are "the recall surface's native reversal records".
+    * `decision` — any other dated line: the standing record of what was
+      decided, with its reasoning.
+
+    Section membership is what types a Declined line — NOT the word "declined",
+    which appears inline in many ordinary decision lines ("... declined as a
+    conformance copy ...", topics/articles.md:12) and would type most of a
+    topic file as a reversal.
+    """
+    elements, heading = [], ""
+    for number, text in served:
+        stripped = text.strip()
+        if stripped.startswith("## "):
+            heading = stripped[3:].strip().lower()
+            continue
+        m = ELEMENT_LINE.match(stripped)
+        if not m:
+            continue
+        date, body = m.group(1), m.group(2)
+        declined = heading.startswith(DECLINED_HEADING)
+        kind = "reversal" if (declined or STRUCK in body) else "decision"
+        cite = f"topics/{topic}.md:{number}@{commit}"
+        elements.append({
+            "kind": kind,
+            "summary": _element_summary(body),
+            "topic": topic,
+            # The situation it was recorded in: when, and exactly where.
+            "date": date,
+            "situation": cite,
+            "evidence": [cite],
+            # Marked, never hidden — the same rule lesson seeds follow. There
+            # is no join to compute it against yet: `consumed_index` is keyed
+            # by lesson id (`write-article-plan.py consult`), and the articles
+            # repo declares no element-citation key. Disclosed rather than
+            # guessed, and it widens exactly when that key appears.
+            "consumed": False,
+            "consumption_join": ("none — the articles repo declares no "
+                                 "element-citation key"),
+        })
+    return elements
+
+
+def element_topics(mapping):
+    """The topics this run may project elements from: the ones the repo already
+    declared through `policy_source.track_topics`, deduplicated and ordered
+    deterministically. A run never widens its own scope to reach more."""
+    names = {t for topics in mapping.values() for t in topics if t}
+    return sorted(names)
+
+
+def read_topic_elements(root, topics):
+    """Read up to `ELEMENT_TOPIC_BOUND` topic files through the shipped seam
+    and parse their elements.
+
+    Returns `(by_topic, reason)`. A `reason` is the family's
+    declared-but-not-enumerated disclosure, exactly as `lesson_seeds` returns
+    it — an undeclared policy source, an unreachable gateway, a too-old tool
+    surface, or a served miss. ONE read covers the whole bounded set; a run
+    never issues extra reads to widen coverage (CAP-4).
+    """
+    if not topics:
+        return {}, None
+    cmd = [sys.executable, POLICY_READER]
+    if root:
+        cmd += ["--root", root]
+    cmd += ["read", "--topics"] + [f"{t}.md" for t in topics]
+    r = subprocess.run(cmd, capture_output=True, text=True)
+    if r.returncode != 0:
+        detail = (r.stderr.strip().split("\n")[-1] if r.stderr.strip()
+                  else f"the policy reader exited {r.returncode}")
+        return {}, f"{detail} (read-policy-source.py exit {r.returncode})"
+    by_topic, pin, current, commit, served = {}, None, None, None, []
+    misses = []
+
+    def flush():
+        if current and served:
+            by_topic[current] = parse_topic_elements(current, served, commit)
+
+    for line in r.stdout.splitlines():
+        if line.startswith("pin: "):
+            pin = line[5:].strip()
+            continue
+        if line.startswith("miss: "):
+            misses.append(line[6:].strip())
+            continue
+        if line.startswith("=== "):
+            flush()
+            head = line[4:]
+            path, _sep, sha = head.rpartition(" @ ")
+            commit, served = sha.strip(), []
+            name = os.path.basename(path.strip())
+            current = (os.path.splitext(name)[0]
+                       if path.strip().startswith("topics/") else None)
+            continue
+        if not current:
+            continue
+        number, _sep, text = line.partition(": ")
+        if number.strip().isdigit():
+            served.append((number.strip(), text))
+    flush()
+    if misses and not by_topic:
+        return {}, (f"the policy source served a miss for {', '.join(misses)} "
+                    f"at {pin or 'an undisclosed pin'}")
+    return by_topic, None
+
+
+def element_surfaces(mapping):
+    """The `hub-elements` family as surfaces: one per DECLARED topic file.
+
+    Every declared topic is `matched` here, including the ones the seam bound
+    will not reach — that is what lets the per-family accounting close over the
+    real denominator and name which topics went unread, instead of quietly
+    redefining "all topics" as "the two we read".
+    """
+    return [(FAMILY_HUB_ELEMENTS, "topic", f"topics/{t}.md", t)
+            for t in element_topics(mapping)]
+
+
+def all_surfaces(repo, root, mapping=None):
     """Every candidate surface across every DECLARED family, in family order,
     plus the family registry the coverage manifest discloses.
 
@@ -662,6 +829,17 @@ def all_surfaces(repo, root):
     if reason:
         families[FAMILY_HOST_SOURCES].update(enumerated=False, reason=reason)
     matched += sources
+    # The element family's surfaces are the DECLARED topic files. An
+    # undeclared mapping yields none, which is not an error: a repo that maps
+    # no topics simply has no elements to project, and the family reports that
+    # rather than inventing topics to read.
+    elements = element_surfaces(mapping or {})
+    if not elements:
+        families[FAMILY_HUB_ELEMENTS].update(
+            enumerated=False,
+            reason=("no hub topic is declared for this repo "
+                    "(`policy_source.track_topics`), so no topic file may be read"))
+    matched += elements
     return matched, families
 
 
@@ -717,13 +895,50 @@ def assemble(repo, mapping, max_surfaces, root=None):
     disclosed by name in `coverage.skipped`, never dropped quietly, and the
     closed accounting is reported per family as well as overall.
     """
-    matched, families = all_surfaces(repo, root)
+    matched, families = all_surfaces(repo, root, mapping)
     read_now = matched[:max_surfaces] if max_surfaces is not None else matched
     skipped = matched[len(read_now):]
     host_pin = repo_pin(root) if root else "unpinned"
 
+    # --- the element family's own bound, applied BEFORE the loop ------------
+    # The seam serves at most ELEMENT_TOPIC_BOUND topic files per read, which
+    # is a different bound from `--max-surfaces` and is not negotiable here.
+    # One read covers the whole reachable set; the topics past it are skipped
+    # by NAME with the seam as the stated reason.
+    elem_surfaces = [s for s in read_now if s[0] == FAMILY_HUB_ELEMENTS]
+    elem_read = elem_surfaces[:ELEMENT_TOPIC_BOUND]
+    elem_over = elem_surfaces[ELEMENT_TOPIC_BOUND:]
+    elements_by_topic, element_reason = read_topic_elements(
+        root, [payload for _f, _s, _r, payload in elem_read])
+    if element_reason:
+        families[FAMILY_HUB_ELEMENTS].update(enumerated=False,
+                                             reason=element_reason)
+        # A family that could not be enumerated AT ALL is declared-but-not-
+        # enumerated with its reason and contributes no denominator — exactly
+        # how `host-sources` behaves when nothing is declared. Counting its
+        # surfaces as read-with-zero-entries would instead report a successful
+        # empty projection, the "silently empty family" shape CAP-4 forbids.
+        # This is distinct from the bounded case below: reading 2 of 9 topics
+        # IS an incomplete run and says so; reading none is a family that did
+        # not report.
+        matched = [s for s in matched if s[0] != FAMILY_HUB_ELEMENTS]
+        read_now = [s for s in read_now if s[0] != FAMILY_HUB_ELEMENTS]
+        skipped = [s for s in skipped if s[0] != FAMILY_HUB_ELEMENTS]
+        elem_read, elem_over = [], []
+    read_now = [s for s in read_now if s not in elem_over]
+
     items, read_disclosure = [], []
+    elements = []
     for family, section, rel, payload in read_now:
+        if family == FAMILY_HUB_ELEMENTS:
+            # Elements are a SECOND PROJECTION, not items: they never enter
+            # the clustering that produces subtopics (CAP-2 — the cluster
+            # stays the primary unit and elements sit beside it).
+            found = elements_by_topic.get(payload) or []
+            elements.extend(found)
+            read_disclosure.append({"family": family, "surface": rel,
+                                    "entries": len(found)})
+            continue
         if family == FAMILY_HUB_LESSONS:
             items.append(lesson_item(payload))
             read_disclosure.append({"family": family, "surface": rel,
@@ -773,6 +988,16 @@ def assemble(repo, mapping, max_surfaces, root=None):
         {"family": family, "surface": rel,
          "reason": f"over the read bound (--max-surfaces={max_surfaces})"}
         for family, _s, rel, _p in skipped]
+    # Named, not counted: the owner can see exactly which topics this run's
+    # elements do NOT cover, which is what keeps a partial projection from
+    # reading as the whole record.
+    skipped_disclosure += [
+        {"family": family, "surface": rel,
+         "reason": (element_reason if element_reason else
+                    f"over the seam's element bound (at most "
+                    f"{ELEMENT_TOPIC_BOUND} topics/*.md per read); widening it "
+                    f"is a hub-side ratification, never a map-side workaround")}
+        for family, _s, rel, _p in elem_over]
 
     # Per-family accounting: the same closed read+skipped==matched rule the
     # overall manifest carries, computed within each family so a "complete"
@@ -792,10 +1017,11 @@ def assemble(repo, mapping, max_surfaces, root=None):
         "matched": len(matched),
         "read": read_disclosure,
         "skipped": skipped_disclosure,
-        "complete": not skipped,
+        "complete": not skipped_disclosure,
         # Same closed accounting harvest's manifest carries: every matched
         # surface is disclosed as read or skipped, never silently omitted.
-        "accounting_closes": len(read_disclosure) + len(skipped) == len(matched),
+        "accounting_closes": (len(read_disclosure) + len(skipped_disclosure)
+                              == len(matched)),
         # CAP-4's named denominator: which declared families this run actually
         # enumerated, and which it did not — with the reason.
         "families": [families[name] for name in DECLARED_FAMILIES],
@@ -807,6 +1033,10 @@ def assemble(repo, mapping, max_surfaces, root=None):
         "surfaces_read": ("index and frontmatter only — item bodies are never "
                           "read; a declared source is read at heading level, "
                           "never as prose"),
+        # Which topics this run's elements actually cover, stated positively so
+        # the owner never reads a bounded projection as the whole record.
+        "element_topics_read": [payload for _f, _s, _r, payload in elem_read],
+        "element_topics_skipped": [payload for _f, _s, _r, payload in elem_over],
     }
 
     # --- topics: a pure per-invocation derivation (OQ1) ---------------------
@@ -840,7 +1070,14 @@ def assemble(repo, mapping, max_surfaces, root=None):
             "item_count": len(t["items"]),
             "items": sorted(t["items"], key=lambda i: (i["section"], i["slug"])),
         })
-    return out_topics, coverage, tracks_seen
+    # Ranked by RECENCY, then by cite (Story 18.79's open ranking choice,
+    # answered): "what did I decide lately, and what changed my mind" is the
+    # question elements exist to answer, and a date is the one ordering key
+    # every element carries. Ties break on the cite so the order is
+    # deterministic within a pin — the property the E<topic>.<n> indexes
+    # assigned downstream depend on.
+    elements.sort(key=lambda e: (e["date"], e["situation"]), reverse=True)
+    return out_topics, coverage, tracks_seen, elements
 
 
 # --------------------------------------------------------------------------
@@ -1172,8 +1409,8 @@ def build_map(args):
             "set-draft-location) or pass --repo\n")
         raise SystemExit(NO_ARTICLES_REPO)
     mapping = track_topics(root)
-    topics, coverage, tracks_seen = assemble(repo, mapping, args.max_surfaces,
-                                             root=root)
+    topics, coverage, tracks_seen, elements = assemble(
+        repo, mapping, args.max_surfaces, root=root)
     stale = sorted(t for t in mapping if t not in tracks_seen)
     consumption = consumption_view(root)
     thresholds = load_thresholds(root, getattr(args, "thresholds", None))
@@ -1216,6 +1453,10 @@ def build_map(args):
         "coverage": coverage,
         "consumption": consumption,
         "depth_thresholds": thresholds,
+        # CAP-2's SECOND PROJECTION, beside the subtopic clusters and never
+        # merged into them: what was decided, and what changed. Derived per
+        # invocation and stored nowhere, exactly like everything else here.
+        "elements": elements,
     }
 
 
