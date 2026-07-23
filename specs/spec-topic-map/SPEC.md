@@ -90,6 +90,26 @@ flows into the existing brief/structures path unchanged.**
     owner's judgment and never as a gate (thresholds gate surfacing, never
     what the owner may pick). Already-consumed material is shown as consumed,
     not hidden — the owner may still pick it at the free-form entry.
+  - **elements — a second projection, not a replacement (added 2026-07-23,
+    #631/OQ4).** Beside the subtopic clusters, the map projects **typed
+    elements** from the recall surface: `decision` (a dated `topics/*.md` line
+    with its reasoning and `q_a/` pointer) and `reversal` (a Declined or
+    struck-through topic line, or a `LESSONS.md` index line whose lesson
+    records one). Each element carries a one-line summary, the situation it
+    was recorded in (its date and source line), a consumed mark, and its
+    evidence pointer. **The subtopic cluster remains the map's primary unit**
+    — clusters answer "what material do I have?", elements answer "what did I
+    decide, and what changed my mind?", and the owner picks from either.
+    - **`thinking` is deliberately absent** until OQ3 closes: its payload is
+      the `## Journey` body in `lessons/*.md`, which the seam cannot serve.
+      No projection may synthesize it from what is readable.
+    - **Elements carry their own index namespace** (`E<topic>.<n>`, stable
+      within a pin, ranked deterministically) so an indexed selection is
+      unambiguous against the subtopic `T<topic>.<subtopic>` scheme. Selection
+      and brief composition are otherwise unchanged: `{index, note}` in, one
+      ordinary brief out.
+    - Elements are **derived per invocation and stored nowhere**, exactly as
+      CAP-1 requires of everything else on this map.
   - **success:** For any subtopic shown, the owner can ask "why this depth?"
     and the map answers with its pointer counts; a subtopic with rich material
     and one with a lone seed are visibly different at a glance.
@@ -245,6 +265,18 @@ flows into the existing brief/structures path unchanged.**
     harvest uses. **"Complete" is complete over a named denominator**: a
     coverage claim that does not name the families it covers is the defect
     this clause exists to prevent.
+  - **the element family is bounded by the seam, and says so (added
+    2026-07-23, #631/OQ4).** CAP-2's element projection reads the recall
+    surface through the pinned read-only pointer, which serves `GLOSSARY.md`,
+    `LESSONS.md` and **at most 2 `topics/*.md` per read**
+    (`scripts/read-policy-source.py:100`). The hub currently carries 9 topic
+    files, so **element coverage is partial by construction**: a run projects
+    elements only from the topics it already selected, and the coverage
+    manifest names which topics were read and which were not — the same
+    disclosed-denominator rule this capability already states for every other
+    family. Widening that scope is a **hub-side ratification**, never a
+    map-side workaround; a run may not issue extra reads to synthesize whole
+    coverage, and no element is invented for a topic that was not read.
   - **success:** Map assembly cost scales with index size, not corpus body
     size; an over-bound invocation's output names what it skipped; the closed
     accounting (`read + skipped == matched`) holds **per family**; a reader of
@@ -358,3 +390,36 @@ flows into the existing brief/structures path unchanged.**
   OQ3, as one hub-side ask), or to keep the subtopic cluster as the permanent
   unit and treat typed elements as a projection the hub itself would have to
   serve. Until this closes, #631 stays open against it.
+
+  **CORRECTED AND CLOSED 2026-07-23 — the blocking claim above was false.**
+  It was written from the consumer's family list without consulting the served
+  surface. A consultation the same day
+  (`product-lab@6b9a4882`) shows all three "missing" types are recorded, and
+  **inside the existing whitelist** — no grant is required:
+  - **Decisions with their why** are the topic lines themselves: every
+    `topics/*.md` entry is dated, states its reasoning, and carries a `q_a/`
+    provenance pointer (e.g. `topics/knowledge-architecture.md:9,21,39`).
+  - **Reversals** are recorded natively — "topic Declined lines and
+    struck-through superseded decision lines (**the recall surface's native
+    reversal records**)" (`topics/articles.md:30@6b9a4882`), alongside the
+    reversal-capture lesson at `LESSONS.md:23`.
+  - **Thinking-at-the-time** has a typed producer: distill-checklist item `N`
+    (narrative candidate), payload "original framing verbatim → the actual
+    question it became → what moved it"
+    (`topics/knowledge-architecture.md:67@6b9a4882`).
+
+  What is genuinely unreachable is only the **`## Journey` body**, which lives
+  in `lessons/*.md` — unservable, and already tracked as **OQ3**. The
+  existence and one-line form of a reversal are on the index and topic lines
+  and are readable today.
+
+  **Resolution:** the map gains a **second projection** — typed elements
+  beside the subtopic cluster (CAP-2), not replacing it — over what is
+  actually servable: `decision` and `reversal`. `thinking` is **out of scope
+  until OQ3 closes**, and no spec text may claim it. The real constraint is
+  **breadth, not access**: `MAX_TOPICS = 2` per read
+  (`scripts/read-policy-source.py:100`) against 9 topic files, so element
+  coverage is partial by construction and is **disclosed**, per CAP-4.
+  *(Method note: the false claim survived a whole sitting because the spec
+  lane grounded in the consumer's code and not in the served surface. Grounding
+  a claim about an upstream surface means consulting that surface.)*
