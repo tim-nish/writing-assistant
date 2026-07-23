@@ -230,6 +230,16 @@ for n in range(12):                       # comfortably past the screen budget
     topic["subtopics"].append(s)
 # A POINTERLESS entry, and an UNNAMED one — the two opaque shapes #616 found in
 # a real View. Without these the no-opaque-entries assertions pass vacuously.
+# A subtopic citing ONE file many times — the shape #615 found (24 pointers into
+# a single SPEC, six consecutive lines of one tool). Without it the per-file
+# aggregation assertion passes vacuously.
+dense = copy.deepcopy(base)
+dense["subtopic"] = "dense-citations"
+dense["density"] = dict(dense["density"], evidence_pointers=9,
+                        pointers=[f"specs/spec-loop/SPEC.md:{n}@abc1234"
+                                  for n in range(10, 17)]
+                                 + [f"tools/ledger:{n}@abc1234" for n in (1403, 1404)])
+topic["subtopics"].append(dense)
 blank = copy.deepcopy(base)
 blank["subtopic"] = ""
 blank["clustered_by"] = "evidence-subject"
@@ -298,7 +308,17 @@ ids = re.findall(r"^### (T\d+\.\d+) ", view, re.M)
 check(len(ids) == len(set(ids)) == len(subs), "the IDs are unique, one per subtopic")
 check(all(t["topic"] in view for t in d["topics"]), "each subtopic sits under its topic")
 check("glance:" in view, "the depth glance is shown")
-check("host/w5.md:6@abc1234" in view, "the evidence pointers are listed")
+# Evidence pointers are listed AGGREGATED PER FILE (#615), not line-granular:
+# the source file must appear, its line anchor must not.
+check("host/w5.md" in view, "the evidence source files are listed")
+check("host/w5.md:6@abc1234" not in view,
+      "raw per-line pointers are NOT dumped into the View")
+check(re.search(r"^\s+- \S+ ×\d+$", view, re.M),
+      "a file cited more than once is aggregated with a count (path ×N)")
+# The total stays printed beside the list, so "why this depth?" is still
+# answerable from the same counts the estimate used.
+check(re.search(r"- evidence pointers \(\d+\):", view),
+      "the pointer TOTAL is still shown alongside the aggregated list")
 check("Lesson 3" in view, "lesson-seed names are shown")
 check("consumed: yes" in view and "consumed: no" in view,
       "consumed marks are shown, and consumed material is NOT hidden")
