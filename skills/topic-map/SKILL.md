@@ -55,7 +55,7 @@ silently dropped.
 
 ```
 python3 ${CLAUDE_PLUGIN_ROOT}/scripts/topic-map-directions.py payload \
-  --map "$WS/map.json" > "$WS/topic-map.payload.json"
+  --map "$WS/map.json" --view "$WS/topic-map-view.md" > "$WS/topic-map.payload.json"
 python3 ${CLAUDE_PLUGIN_ROOT}/scripts/validate-proposal-payload.py \
   --ws "$WS" --surface topic-map "$WS/topic-map.payload.json"
 ```
@@ -63,11 +63,10 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/validate-proposal-payload.py \
 Present the result **in-conversation** under the
 [owner-facing proposal contract](../owner-facing-proposal-contract.md) — **one
 screen**, the map plus machine-proposed candidate directions plus a **free-form
-response**, never a path or artifact for the owner to open, and never a second
-confirmation after they answer. The payload is **plain text**: no `**bold**`, no
-backticks, no headings, no Markdown links (contract (g)). A non-zero exit means
-the payload is not presentable — fix the named field and re-validate; a blocked
-payload is never shown.
+response**, and never a second confirmation after they answer. The payload is
+**plain text**: no `**bold**`, no backticks, no headings, no Markdown links
+(contract (g)). A non-zero exit means the payload is not presentable — fix the
+named field and re-validate; a blocked payload is never shown.
 
 The screen always carries, in this order:
 
@@ -79,6 +78,30 @@ The screen always carries, in this order:
   only on rejection. The owner's own wording is a first-class outcome;
 - **stop here** — also first-class: nothing is drafted, no brief is recorded,
   and the map is recomputed fresh next time.
+
+### The size switch — a large map gets a View file
+
+**One screen does not scale.** Past the composer's declared screen budget, a
+20+-subtopic terrain collapsed into a handful of options hides exactly what the
+map exists to show. So the composer switches on the map's own size, and the
+skill does not decide anything here — it just passes `--view` and relays what
+comes back:
+
+- **At or under the budget** — the flow above, unchanged. No View file is
+  written and no path appears on the screen.
+- **Above the budget** — the composer writes the terrain to
+  `$WS/topic-map-view.md` and the payload becomes a short **summary plus that
+  path**. Relay the path as given and let the owner open it; selection is then
+  **by index** (`T3.2`) plus a short note about the angle they want, rather
+  than by matching a proposed direction string. Free-form and **stop here**
+  are offered exactly as above.
+
+This is the one case where the map hands the owner **an artifact to open**
+(SPEC-topic-map CAP-3, amended 2026-07-23, superseding the earlier
+in-conversation-only reading for this branch only). The View is at the same
+status as a debug dump: a **fixed path**, **fully regenerated** on every
+invocation, and **never read back** by any code path. Deleting it loses
+nothing — re-run the map.
 
 Record the answer against the returned `ask_id`:
 
@@ -124,3 +147,7 @@ tell the two apart.
   hides consumed material, and never narrows the sources a run may read.
 - **Stopping is an outcome.** A sitting that ends at the screen has cost
   nothing and left nothing behind.
+- **The View is a rendering, never a record.** Nothing reads it back, no
+  decision is stored in it, and it is regenerated whole every invocation. If it
+  is ever consulted as an input, the map has grown the stored index CAP-1
+  exists to prevent.
