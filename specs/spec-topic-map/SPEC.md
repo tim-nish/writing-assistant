@@ -200,6 +200,18 @@ flows into the existing brief/structures path unchanged.**
     downstream cannot tell an indexed selection from a typed brief. The note
     reaches the structure proposer only as brief text, so the single-proposer
     invariant is untouched.
+  - **coverage wording is owner-readable by construction (amended 2026-07-23,
+    #637).** A candidate's wording becomes the owner's brief the moment they
+    adopt it, so **no internal placeholder state may appear in a direction
+    string or in a composed brief** — not `(unclustered)`, not `(untracked)`,
+    not an empty name. Where a cluster carries no usable name, the wording
+    **describes what the cluster contains** rather than naming a subject the
+    repo never declared: "cover the not-yet-clustered items under
+    `<topic>`", not "cover `(unclustered)`". This is a constraint on the
+    *derivation*, not on the rendering: fixing it only where the View prints
+    would leave the adopted brief carrying the enum, which is the actual
+    defect. The articles repo still owns subject *names* (OQ1) — this governs
+    only the wording the tool composes when the repo named nothing.
   - **success:** A sitting that starts at the map ends with a normal
     brief-carrying run; grepping the map implementation for structure
     composition finds none; the map screen offers free-form alongside its
@@ -277,6 +289,13 @@ flows into the existing brief/structures path unchanged.**
     a backfill completes fails the owner for the whole interval. The
     derivation invents no stored state: it is recomputed per invocation and
     recorded nowhere, so CAP-1 is untouched.
+    **"Good" governs the WORDING too (2026-07-23, #637), not only the
+    clustering.** A cluster the derivation could not name still has to be
+    describable to the owner, because its coverage wording becomes their brief
+    on adoption (see CAP-3's owner-readable-wording clause). An internal
+    placeholder reaching that wording is the tool's defect, never the repo's —
+    the same rule this section already states for a declared name a cluster
+    disagrees with.
   - **The basis is disclosed.** Each cluster states whether its name is
     `declared` or derived, so the owner can always tell which authority
     produced it — the mismatch check is recomputation, never reconciliation,
