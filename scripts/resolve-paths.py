@@ -444,6 +444,7 @@ _INTENT_LABELS = {
     "F2": "share engineering lessons",
     "F3": "explain the evaluation methodology",
     "F4": "survey a research area",
+    "F5": "write a working note",
 }
 
 
