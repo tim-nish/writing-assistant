@@ -11,6 +11,11 @@
 #          the owner's words handed to the EXISTING stage-0 `--brief` path; the
 #          map composes NO narrative structures (grep-asserted); a sitting that
 #          starts at the map ends in a normal brief-carrying run.
+#   CAP-3  (Story 18.66) the SIZE SWITCH: a map at or under the screen budget
+#          composes a byte-identical payload and writes no View; a map above it
+#          renders a View file the owner opens and summarises on the screen.
+#          The View is write-only, fully regenerated, and losing it loses
+#          nothing.
 
 set -eu
 
@@ -187,6 +192,144 @@ assert 'stop here' in labels, labels
 " && ok "free-form is offered every time, not only on rejection" \
   || err "free-form is conditional"
 
+# --- the SIZE SWITCH: a large map gets a View file, a small one does not -----
+# At or under the screen budget the shipped flow must not move at all: passing
+# --view to a small map changes nothing and writes nothing.
+python3 "$D" payload --map "$work/map.json" --view "$work/small-view.md" \
+  > "$work/payload-view.json" 2>/dev/null
+cmp -s "$work/payload.json" "$work/payload-view.json" \
+  && ok "size switch: a map at or under the budget composes a BYTE-IDENTICAL payload, --view or not" \
+  || err "the small-map screen changed"
+[ -e "$work/small-view.md" ] \
+  && err "a View file was written for a map under the screen budget" \
+  || ok "size switch: no View file exists for a map under the budget"
+grep -q 'View' "$work/payload.json" \
+  && err "a View path leaked onto the small-map screen" \
+  || ok "size switch: no View path appears on the small-map screen"
+
+# A map ABOVE the budget: the terrain moves to the View, the screen summarises.
+python3 - "$work/map.json" > "$work/big-map.json" <<'PYEOF'
+import copy, json, sys
+d = json.load(open(sys.argv[1]))
+topic = d["topics"][0]
+base = topic["subtopics"][0]
+for n in range(12):                       # comfortably past the screen budget
+    s = copy.deepcopy(base)
+    s["subtopic"] = f"widened-{n:02d}"
+    s["density"] = dict(s["density"], evidence_pointers=n,
+                        pointers=[f"host/w{n}.md:{n + 1}@abc1234"])
+    s["consumed"] = (n == 0)
+    s["items"] = [{"slug": f"seed-{n}", "title": f"Lesson {n}",
+                   "family": "hub-lessons"}]
+    topic["subtopics"].append(s)
+print(json.dumps(d))
+PYEOF
+python3 "$D" payload --map "$work/big-map.json" --view "$work/view.md" \
+  > "$work/big-payload.json" 2>/dev/null
+[ -s "$work/view.md" ] \
+  && ok "size switch: a map above the budget renders a View file" \
+  || err "no View file was rendered for an over-budget map"
+python3 "$VP" --ws "$work/ws" --surface topic-map "$work/big-payload.json" \
+  > "$work/big-ask.json" \
+  && ok "size switch: the summary screen still passes validate-proposal-payload.py" \
+  || err "the summary screen is not presentable: $(cat "$work/big-ask.json")"
+python3 - "$work/big-payload.json" "$work/view.md" <<'PYEOF' || fail=1
+import json, sys
+p = json.load(open(sys.argv[1]))
+fail = []
+def check(cond, msg):
+    print(("ok:   " if cond else "FAIL: ") + msg, file=sys.stdout if cond else sys.stderr)
+    if not cond: fail.append(msg)
+
+check(len(p["items"]) == 1, "the over-budget screen is still ONE screen")
+item = p["items"][0]
+check(sys.argv[2] in item["where"],
+      "the summary carries the View file's path, whole and unclipped")
+check(len(item["where"]) <= 240, "the summary stays inside the display budget")
+labels = [c["label"] for c in item["choices"]]
+check(any("index" in l for l in labels), "selection by index is offered")
+check(any("name your own" in l for l in labels),
+      "free-form is still offered every time")
+check(labels[-1] == "stop here", "stopping is still offered last, first-class")
+check("signal for your judgment, never a gate" in item["why"],
+      "the depth-is-a-signal line is intact on the summary screen")
+sys.exit(1 if fail else 0)
+PYEOF
+[ $? -eq 0 ] || fail=1
+
+python3 - "$work/big-map.json" "$work/view.md" <<'PYEOF' || fail=1
+import json, re, sys
+d = json.load(open(sys.argv[1]))
+view = open(sys.argv[2], encoding="utf-8").read()
+fail = []
+def check(cond, msg):
+    print(("ok:   " if cond else "FAIL: ") + msg, file=sys.stdout if cond else sys.stderr)
+    if not cond: fail.append(msg)
+
+subs = [s for t in d["topics"] for s in t["subtopics"]]
+check(all(s["subtopic"] in view for s in subs),
+      f"the View lists every one of the {len(subs)} subtopics")
+check(d["coverage"]["pin"] in view, "the View header carries the map's pin")
+check(re.search(r"^### T\d+\.\d+ — ", view, re.M),
+      "every subtopic carries a stable ID (T<topic>.<subtopic>)")
+ids = re.findall(r"^### (T\d+\.\d+) ", view, re.M)
+check(len(ids) == len(set(ids)) == len(subs), "the IDs are unique, one per subtopic")
+check(all(t["topic"] in view for t in d["topics"]), "each subtopic sits under its topic")
+check("glance:" in view, "the depth glance is shown")
+check("host/w5.md:6@abc1234" in view, "the evidence pointers are listed")
+check("Lesson 3" in view, "lesson-seed names are shown")
+check("consumed: yes" in view and "consumed: no" in view,
+      "consumed marks are shown, and consumed material is NOT hidden")
+sys.exit(1 if fail else 0)
+PYEOF
+[ $? -eq 0 ] || fail=1
+
+# The caps stop being fixed constants above the budget.
+python3 "$D" candidates --map "$work/big-map.json" > "$work/big-cands.json"
+python3 -c "
+import json
+c=json.load(open('$work/big-cands.json'))['candidates']
+singles=[x for x in c if x['kind']=='single']
+assert len(singles) > 3, len(singles)
+" && ok "size switch: above the budget the fixed candidate caps no longer apply" \
+  || err "the over-budget branch is still capped at the screen constants"
+
+# Fully regenerated per invocation, for an unchanged pin.
+cp "$work/view.md" "$work/view-1.md"
+python3 "$D" payload --map "$work/big-map.json" --view "$work/view.md" >/dev/null 2>&1
+cmp -s "$work/view-1.md" "$work/view.md" \
+  && ok "size switch: two invocations regenerate the View identically at one pin" \
+  || err "the View is not deterministic at an unchanged pin"
+
+# WRITE-ONLY: poison it, and nothing downstream changes. Delete it, and nothing
+# is lost — it is a rendering, never a record.
+printf 'POISON-VIEW\n' > "$work/view.md"
+python3 "$D" payload --map "$work/big-map.json" --view "$work/view.md" \
+  > "$work/big-payload2.json" 2>/dev/null
+grep -q 'POISON-VIEW' "$work/big-payload2.json" \
+  && err "the composer read the View back (a stored index)" \
+  || ok "size switch: a poisoned View does not influence the next screen (write-only)"
+cmp -s "$work/big-payload.json" "$work/big-payload2.json" \
+  && ok "size switch: the screen is unchanged after the View was overwritten" \
+  || err "overwriting the View changed the screen"
+rm -f "$work/view.md"
+python3 "$D" payload --map "$work/big-map.json" --view "$work/view.md" \
+  > "$work/big-payload3.json" 2>/dev/null
+cmp -s "$work/big-payload.json" "$work/big-payload3.json" \
+  && cmp -s "$work/view-1.md" "$work/view.md" \
+  && ok "size switch: deleting the View loses nothing (map and View both regenerate)" \
+  || err "deleting the View lost something"
+
+# Source-level: the View path is written, never read (the --emit-debug rule).
+python3 - "$D" <<'PYEOF' && ok "size switch: no code path reads a View file back" || err "topic-map-directions.py contains a View-reading code path"
+import re, sys
+src = open(sys.argv[1], encoding="utf-8").read()
+reads = re.findall(r'open\((?![^)]*"w")[^)]*\)', src)
+for r in reads:
+    assert "view" not in r.lower(), f"a View file is opened for reading: {r}"
+assert 'def write_view' in src and 'open(path, "w"' in src, "the View is not write-only"
+PYEOF
+
 # --- the outcome is a brief IN THE OWNER'S WORDS -----------------------------
 printf '%s' '{"selection":"name your own direction or combination axis","free_text":"connect the retry storm to on-call load, through the retro"}' \
   > "$work/answer-free.json"
@@ -287,7 +430,8 @@ done
 for token in 'topic-map.py assemble' 'topic-map-directions.py payload' \
              'topic-map-directions.py brief' 'validate-proposal-payload.py' \
              'stage0' '--brief' 'free-form' 'every time' \
-             'never composes narrative structures' 'single proposer'; do
+             'never composes narrative structures' 'single proposer' \
+             '--view' 'topic-map-view.md' 'size switch' 'never read back'; do
   grep -q -- "$token" "$SKILL" && ok "SKILL carries the contract text: $token" \
     || err "SKILL is missing contract text: $token"
 done
