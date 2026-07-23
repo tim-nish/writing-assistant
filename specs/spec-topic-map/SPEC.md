@@ -141,13 +141,23 @@ flows into the existing brief/structures path unchanged.**
     machine-readable form of everything on it already exists in the run's
     `map.json`. Duplicating that form into the human artifact is what turns
     the View into a log file, so:
-    - **Evidence renders as a summary:** the count of distinct pointers plus
-      **at most ~3 exemplar sources by name**. The full pointer enumeration —
-      with line numbers and per-line shas — stays in `map.json`; the View
-      header already carries the pin, which is what reproducibility needs.
-    - **Depth renders as the depth word** ("full article", "short note", …).
-      The promotion predicate and its threshold arithmetic are the depth
-      estimator's internals and stay in `map.json`.
+    - **Evidence renders as a summary:** the count of distinct pointers, plus
+      the pointers **aggregated per source file** (`path ×N`) and capped at a
+      declared constant, with the remainder disclosed as a count — never
+      silently truncated. Line-granular pointers are machine provenance: the
+      full enumeration, with line numbers and per-line shas, stays in
+      `map.json`; the View header already carries the pin, which is what
+      reproducibility needs.
+    - **Depth renders as the level plus the counts it was derived from** —
+      "full article: 24 evidence pointer(s), 3 unconsumed lesson(s), 2 live
+      item(s)" — because CAP-2's success clause promises exactly that the
+      owner can ask "why this depth?" and be answered from those counts. What
+      does **not** reach the surface is the **unmet-threshold predicate**
+      ("the next level needs `evidence_pointers` 24 < 25"): that is the
+      estimator's promotion rule, meaningful to the estimator and not to an
+      owner choosing what to write. It stays in `map.json`, where the depth
+      harness asserts it — so this is a rendering rule, and the estimate's
+      explainability as recorded is unchanged.
     - **Every View line carries a display budget**, and each per-subtopic
       block a line cap, the same convention the screen payload's fields
       already follow: a list renders one item per line, clipped, capped, with
