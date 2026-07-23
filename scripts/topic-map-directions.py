@@ -465,6 +465,32 @@ def _summary_lines(subs):
     return out or ["- none"]
 
 
+# The estimator's promotion rule, appended to the depth explanation by
+# `scripts/topic-map.py:1045` as "; the next level needs evidence_pointers
+# 24 < 25". It answers "what would the NEXT level require?" — the estimator's
+# question, not the question of an owner choosing what to write.
+DEPTH_PREDICATE_MARKER = "; the next level needs "
+
+
+def _depth_line(sub):
+    """The depth estimate as the View shows it (#633): the level plus the
+    counts it was derived from, without the promotion arithmetic.
+
+    The counts STAY — CAP-2's success clause promises the owner can ask "why
+    this depth?" and be answered from them (`specs/spec-topic-map/SPEC.md`).
+    Only the unmet predicate leaves, and only from the RENDERING: `depth.why`
+    in `map.json` is untouched, which is where `check-topic-map-depth.sh`
+    asserts the predicate is named. Trimming in `estimate_depth` would break
+    that; trimming here cannot.
+
+    A `why` carrying no predicate — notably the "no depth-threshold declaration
+    is readable" DISCLOSURE (`scripts/topic-map.py:1027`) — passes through
+    unchanged. A trim must never swallow a disclosure.
+    """
+    why = str(sub.get("depth", {}).get("why", ""))
+    return why.split(DEPTH_PREDICATE_MARKER)[0].rstrip()
+
+
 def compose_view(map_data, cands):
     """The View: one invocation's terrain, rendered so 20+ directions are
     legible and CAP-2's 'why this depth?' is answerable from the same counts
@@ -514,7 +540,7 @@ def compose_view(map_data, cands):
             lines.append(f"### {sub['id']} — {as_prose(_subtopic_name(sub))}")
             lines.append("")
             lines.append(f"- glance: {sub.get('glance', '')}")
-            lines.append(f"- depth: {sub.get('depth', {}).get('why', '')}")
+            lines.append(f"- depth: {_depth_line(sub)}")
             lines.append(f"- consumed: {'yes' if sub.get('consumed') else 'no'}"
                          f" ({sub.get('consumed_items', 0)} of "
                          f"{d.get('items', 0)} item(s))")
