@@ -170,6 +170,31 @@ printf '%s\n' "$dout" | head -1 | grep -qx "pin: product-lab@$SHA" \
   && ok "default read serves GLOSSARY and LESSONS together (no exit 13)" \
   || err "default read did not serve both sections: $dout"
 
+# --- 6a. the LIVE gateway's surface_names envelope (cite-carrying `lines`) ----
+# The gateway serves the enumeration in the same {cite, text} envelope its
+# other tools use, not as a bare `names` list. A reader that reads only `names`
+# enumerates NOTHING against it — silently, at exit 0 — and
+# validate-config.py's topic-existence lint then reports every correctly
+# mapped topic as absent from the hub (a blocking stage-0 error; observed
+# against product-lab@f7d5a73 on 2026-07-23). Both shapes are fixtures now, so
+# that silence cannot come back.
+python3 - "$work/fixture.json" "$work/lines-fixture.json" <<'PYEOF'
+import json, sys
+fx = json.load(open(sys.argv[1], encoding="utf-8"))
+fx["surface_envelope"] = "lines"
+json.dump(fx, open(sys.argv[2], "w", encoding="utf-8"))
+PYEOF
+lt2=$(WRITING_ASSISTANT_GATEWAY_CMD="python3 $root/$STUB $work/lines-fixture.json" \
+      $PY --root "$host" list-topics)
+printf '%s\n' "$lt2" | grep -qx 'eval-alpha' && printf '%s\n' "$lt2" | grep -qx 'unrelated' \
+  && ok "list-topics enumerates from the live gateway's cite-carrying envelope too" \
+  || err "list-topics enumerated nothing from the served 'lines' envelope: '$lt2'"
+gout2=$(WRITING_ASSISTANT_GATEWAY_CMD="python3 $root/$STUB $work/lines-fixture.json" \
+        $PY --root "$host" read --only GLOSSARY.md)
+printf '%s\n' "$gout2" | grep -qx "=== GLOSSARY.md @ $SHA" \
+  && ok "whole-GLOSSARY composes from the cite-carrying envelope too" \
+  || err "whole-GLOSSARY did not compose from the served 'lines' envelope: $gout2"
+
 # --- 6b. Older gateway lacking surface_names: exit-13 fallback preserved -------
 # tools/list omits surface_names → the reader degrades to the named gap, one
 # line, never a file read (degrade, don't crash for a pre-#41 gateway).
