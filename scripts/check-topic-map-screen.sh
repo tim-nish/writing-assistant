@@ -462,6 +462,43 @@ sys.exit(1 if fail else 0)
 PYEOF
 [ $? -eq 0 ] || fail=1
 
+# --- the View shows the ESTIMATE, not the estimator's rule (18.77, #633) ----
+python3 - "$work/big-map.json" "$work/view.md" "$D" <<'PYEOF' || fail=1
+import importlib.util, json, re, sys
+d = json.load(open(sys.argv[1]))
+view = open(sys.argv[2], encoding="utf-8").read()
+fail = []
+def check(cond, msg):
+    print(("ok:   " if cond else "FAIL: ") + msg, file=sys.stdout if cond else sys.stderr)
+    if not cond: fail.append(msg)
+
+subs = [s for t in d["topics"] for s in t["subtopics"]]
+withpred = [s for s in subs if "the next level needs" in s.get("depth", {}).get("why", "")]
+check(withpred, "the fixture contains a subtopic with an UNMET promotion predicate")
+# The predicate stays on the record: this is a rendering rule, not a data change.
+check(all("the next level needs" in s["depth"]["why"] for s in withpred),
+      "map.json still carries the promotion predicate (the depth harness reads it)")
+# ...and never reaches the owner surface.
+check("the next level needs" not in view,
+      "the View does not carry the promotion predicate")
+check(not re.search(r"^- depth: .*\d+ < \d+", view, re.M),
+      "no threshold arithmetic appears on a depth line")
+# The counts DO stay — CAP-2's "why this depth?" is answered from them.
+check(re.search(r"^- depth: .+ \d+ evidence pointer\(s\)", view, re.M),
+      "the depth line still shows the level and the counts it was derived from")
+
+# A trim must never swallow a DISCLOSURE: a `why` with no predicate is passed
+# through whole, including "no depth-threshold declaration is readable".
+spec = importlib.util.spec_from_file_location("d", sys.argv[3])
+mod = importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)
+disclosure = ("no depth-threshold declaration is readable, so no estimate "
+              "is offered (nothing declared)")
+check(mod._depth_line({"depth": {"why": disclosure}}) == disclosure,
+      "a why carrying no predicate passes through unchanged (disclosure preserved)")
+sys.exit(1 if fail else 0)
+PYEOF
+[ $? -eq 0 ] || fail=1
+
 # NO SECOND PROPOSER: the View renders the directions it is GIVEN. A
 # `candidates()` call inside compose_view would be a second derivation, and the
 # screen and the View could then silently disagree about what was offered.
