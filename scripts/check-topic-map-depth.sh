@@ -208,6 +208,31 @@ check(rich.get("glance") != thin.get("glance"),
       "a dense and a thin subtopic render visibly differently")
 check(rich["glance"].count("#") > thin["glance"].count("#"),
       "the glance rendering is monotone in density")
+
+# The bar must never contradict the depth word sitting beside it (Story 18.69,
+# #613): it previously filled one segment per NON-ZERO density DIMENSION, so a
+# seed-only subtopic with several live items outglanced an article series with
+# 121 evidence pointers. The defect was an INVERSION BETWEEN A PAIR, so assert
+# it over every pair in the map rather than over the two fixtures above.
+#
+# Stated without re-declaring the level order (it lives in exactly one place,
+# the thresholds file): the shipped levels discriminate on evidence pointers,
+# so more pointers may never render a shorter bar, and one level must always
+# render one bar.
+graded = [(s["glance"].count("#"), s["depth"].get("level"),
+           s["density"]["evidence_pointers"], s["subtopic"])
+          for s in subs.values() if s.get("depth", {}).get("level")]
+inverted = [(a[3], b[3]) for a in graded for b in graded
+            if a[1] != b[1] and a[2] > b[2] and a[0] < b[0]]
+check(not inverted,
+      f"the bar never disagrees in direction with the depth label ({inverted[:2]})")
+per_level = {}
+for f, lv, _, _ in graded:
+    per_level.setdefault(lv, set()).add(f)
+check(all(len(v) == 1 for v in per_level.values()),
+      f"one depth level renders exactly one bar ({per_level})")
+widths = {len(s["glance"].split("]")[0]) - 1 for s in subs.values()}
+check(len(widths) == 1, f"the bar is one fixed width across the map ({widths})")
 sys.exit(1 if fail else 0)
 PYEOF
 [ $? -eq 0 ] || fail=1
