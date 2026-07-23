@@ -449,9 +449,9 @@ check(first_detail is not None and first_detail > 1,
 
 # Every derived direction reaches the View, with the index selection uses.
 block = view.split("## The terrain at a glance")[0]
-# Elements are candidates too, but the View gives them their own section
-# (Story 18.80) — this block covers the subtopic and combination directions.
-directional = [c for c in cands if c.get("kind") != "element"]
+# Since Story 18.81 (#647) elements are presented HERE, among the directions,
+# rather than in a section of their own — so every candidate is covered.
+directional = list(cands)
 missing = [c["id"] for c in directional if f"**{c['id']}**" not in block]
 check(not missing, f"every derived direction appears in the section ({missing[:3]})")
 check(len(directional) > 7, f"the fixture derives an over-budget candidate set ({len(directional)})")
@@ -471,11 +471,25 @@ head = "\n".join(view.splitlines()[:40])
 check(len(re.findall(r"^- \*\*", head, re.M)) >= 10,
       "about ten pickable candidates are visible without scrolling")
 
-# The summary is ONE LINE per subtopic, carrying index, depth word and glance.
+# The summary is ONE LINE per subtopic. Since Story 18.81 (#647) the line
+# carries the material's own claim where there is one, and the subject alone
+# where there is not — the glance (`[bar] level - N ptr`) is a description of
+# the corpus and now lives in the subtopic's own block.
 summary = view.split("## The terrain at a glance")[1].split("\n## ")[0]
-srows = re.findall(r"^- \*\*(T\d+\.\d+)\*\* — .+ · \[[#.]+\] ", summary, re.M)
+srows = re.findall(r"^- \*\*(T\d+\.\d+)\*\* — \S", summary, re.M)
 check(len(srows) == len(set(srows)) and len(srows) >= 10,
-      f"the summary carries one line per subtopic, with its glance ({len(srows)})")
+      f"the summary carries one line per subtopic ({len(srows)})")
+check("[#" not in summary and " ptr," not in summary,
+      "no terrain line carries the glance bar or raw counters (CAP-3 substance-led)")
+
+# SUBSTANCE-LED (CAP-3, amended #647): a ranked line is what the material
+# says, never subject-plus-counts. Every direction and terrain row must carry
+# something beyond an index, a subject and a number.
+COUNTS_ONLY = re.compile(r"^- \*\*\S+\*\* — [^—]+ \(\d+ evidence pointer\(s\)\)$")
+bad_rows = [l for l in (block + summary).splitlines()
+            if COUNTS_ONLY.match(l.strip())]
+check(not bad_rows,
+      f"no direction or terrain line is a subject plus counts ({bad_rows[:2]})")
 # The depth word rides INSIDE the glance; printing it beside the glance would
 # render the same word twice on every line.
 check(not re.search(r"^- \*\*T\d+\.\d+\*\* — .+ · (\S.*) · \[[#.]+\] \1 ", summary, re.M),
@@ -554,17 +568,22 @@ check(all(re.fullmatch(r"E\d+\.\d+", i) for i in eids), f"element ids are E<topi
 check(not (set(eids) & set(tids)), "element ids never collide with subtopic ids")
 check(len(set(eids)) == len(eids), "element ids are unique")
 
-# Its own section on the View, after the terrain summary, before the detail.
+# AMONG THE DIRECTIONS since Story 18.81 (#647): two lists split by internal
+# derivation kind is an implementation detail on the owner surface, so the
+# elements are pickable where every other candidate is.
 heads = re.findall(r"^#{2,3} (.+)$", view, re.M)
-check("What you decided" in heads, f"the View carries an elements section ({heads[:4]})")
-check(heads.index("What you decided") == 2, "the elements section follows the at-a-glance summary")
-block = view.split("## What you decided")[1].split("\n## ")[0]
-check(all(f"**{i}**" in block for i in eids), "every element appears in that section with its index")
+check("What you decided" not in heads,
+      f"elements have no section of their own ({heads[:4]})")
+block = view.split("## The terrain at a glance")[0]
+check(all(f"**{i}**" in block for i in eids),
+      "every element appears among the candidate directions, with its index")
 check("reversal" in block and "decision" in block, "each element's kind is shown")
-check("· consumed" in block, "a consumed element is MARKED, not hidden")
-# The bound is never silent.
+check("already consumed" in block, "a consumed element is MARKED, not hidden")
+# The bound is never silent: the projection's coverage disclosure survives the
+# section's removal — a bounded projection read as the whole record is what it
+# guards against.
 check("delivery" in block and "zeta" in block and "NOT covered" in block,
-      "the section states which topics the elements came from, and which they did not")
+      "the directions state which topics the elements came from, and which they did not")
 
 # Wording carries no internal marker and becomes the brief on adoption (#637).
 PLACEHOLDERS = ("(unclustered)", "(untracked)", "(unnamed)")

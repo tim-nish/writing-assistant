@@ -237,10 +237,12 @@ def candidates(map_data):
     for sub in (subs if large else subs[:MAX_SINGLE]):
         d = sub.get("density", {})
         depth = sub.get("depth", {})
+        claim = _subtopic_claim(sub)
         out.append({
             "kind": "single",
             "id": sub["id"],
-            "direction": f"cover {_coverage_subject(sub)}",
+            "direction": _coverage_direction(sub),
+            "claim": claim,
             "topics": [sub["topic"]],
             "subtopics": [sub["subtopic"]],
             "depth": depth.get("level"),
@@ -374,6 +376,69 @@ def _coverage_subject(sub):
     topic = str(sub.get("topic") or "").strip()
     where = f" under {topic}" if topic and topic not in PLACEHOLDER_PROSE else ""
     return f"the not-yet-clustered items{where} ({count} item(s))"
+
+
+# A claim is a sentence a source actually made. A path family's items carry
+# their own filename as a title (`docs/stories`, `!/usr/bin/env python3`),
+# which names a subject but claims nothing — so a title only qualifies when it
+# differs from its slug AND reads as a sentence. Set deliberately conservative:
+# the cost of rejecting a real claim is a coverage-worded line, while the cost
+# of accepting a filename is a line that pretends a source said something.
+CLAIM_MIN_WORDS = 5
+
+# The one family whose lines are claims by construction: a hub Lesson IS a
+# sentence the owner already committed to. CAP-3's clause names exactly this
+# source — "an element's own summary or why, and for a subtopic a claim drawn
+# from its strongest element or Lesson line".
+CLAIM_FAMILY = "hub-lessons"
+
+
+def _subtopic_claim(sub):
+    """The claim a subtopic's own material makes, or None (Story 18.81, #647).
+
+    CAP-3's substance-led clause: a ranked slot is filled by the material's own
+    words. This QUOTES the strongest claim-bearing member — never composes one
+    about it — so a subtopic with nothing claim-bearing returns None and its
+    caller falls back to coverage wording explicitly. The tool never invents a
+    claim a source did not make.
+
+    Strongest = unconsumed before consumed (unconsumed material is what an
+    article would be written from), hub Lessons before other families (a Lesson
+    line IS a claim by construction), then assembler order, which is
+    deterministic within a pin.
+    """
+    def rank(pair):
+        i, item = pair
+        return (bool(item.get("consumed")), i)
+
+    for _, item in sorted(enumerate(sub.get("items", [])), key=rank):
+        # Only a Lesson line qualifies. A declared-source or backlog title
+        # NAMES its subject ("Spec: /tanuki-loop — …"); quoting it beside a
+        # subtopic would read as if that one member characterised the whole
+        # cluster, which is a claim the map would be making, not the material.
+        if item.get("family") != CLAIM_FAMILY:
+            continue
+        title = str(item.get("title") or "").strip()
+        slug = str(item.get("slug") or "").strip()
+        if title and title != slug and len(title.split()) >= CLAIM_MIN_WORDS:
+            return title
+    return None
+
+
+def _coverage_direction(sub):
+    """A subtopic's direction — SUBSTANCE-LED where the material allows it.
+
+    `cover <subject> — <claim>`: still a coverage statement naming what to
+    cover, never a thesis or an article shape (the no-second-proposer boundary,
+    `specs/spec-topic-map/SPEC.md:125`). The claim lives in the DERIVATION, not
+    in the rendering, because this wording becomes the owner's brief the moment
+    they adopt it — the same reason #637's placeholder rule lives here.
+    """
+    subject = _coverage_subject(sub)
+    claim = _subtopic_claim(sub)
+    if not claim:
+        return f"cover {subject}"
+    return f"cover {subject} — {_clip(claim, ELEMENT_SUMMARY_CHARS)}"
 
 
 def _id_order(sub):
@@ -514,35 +579,41 @@ def _direction_lines(cands):
     Every row carries its INDEX, because selection is by index against the pin.
     """
     combos = [c for c in cands if c.get("kind") == "combination"]
-    # Elements are candidates like any other — they resolve by index and reach
-    # the screen — but on the View they get their own section, so they are not
-    # repeated here.
-    singles = [c for c in cands if c.get("kind") not in ("combination", "element")]
+    # Elements are candidates like any other, and since Story 18.81 (#647) they
+    # are presented HERE rather than in a section of their own: two lists split
+    # by internal derivation kind is an implementation detail on the owner
+    # surface. An element's wording is claim-bearing by construction, so it
+    # sorts with the other substance-led rows.
+    rest = [c for c in cands if c.get("kind") != "combination"]
+    rest.sort(key=lambda c: 0 if _is_substance_led(c) else 1)
     out = []
-    for c in combos + singles:
+    for c in combos + rest:
+        # COUNTS DEMOTE (CAP-3, substance-led rendering): a count may trail a
+        # line that leads with a claim, but it is never what the line says. A
+        # fallback line carries its subject alone — "subject plus counts" is
+        # the exact shape the clause forbids, and the counts stay one section
+        # down in the subtopic's own block.
         facts = []
-        if c.get("depth"):
-            facts.append(str(c["depth"]))
-        facts.append(f"{c.get('evidence_pointers', 0)} evidence pointer(s)")
+        if _is_substance_led(c):
+            facts.append(f"{c.get('evidence_pointers', 0)} evidence pointer(s)")
         if c.get("consumed"):
             facts.append("already consumed — still selectable")
-        out.append(f"- **{c['id']}** — {c['direction']} ({', '.join(facts)})")
+        trailer = f" ({', '.join(facts)})" if facts else ""
+        out.append(f"- **{c['id']}** — {c['direction']}{trailer}")
     return out or ["- none: this map proposes no directions"]
 
 
-def _element_lines(cands):
-    """The elements, one line each — index, kind, summary, situation, consumed
-    mark (Story 18.80). Same display convention as every other list here."""
-    els = [c for c in cands if c.get("kind") == "element"]
-    if not els:
-        return ["- none: no decision or reversal was projected this run"]
-    out = []
-    for c in els:
-        mark = " · consumed" if c.get("consumed") else ""
-        out.append(f"- **{c['id']}** — {c.get('element_kind') or 'element'} · "
-                   f"{c['direction'].split('—', 1)[-1].strip()} · "
-                   f"{c.get('date') or 'undated'}{mark}")
-    return out
+def _is_substance_led(cand):
+    """Does this candidate's wording carry the material's own claim?
+
+    True for an element (its summary IS the claim) and for a subtopic whose
+    material yielded one; False where `_subtopic_claim` found nothing and the
+    wording fell back to coverage. Combinations name an axis derived from
+    shared evidence and are ordered first regardless, so they never reach here.
+    """
+    if cand.get("kind") == "element":
+        return bool(str(cand.get("why") or "").strip())
+    return bool(cand.get("claim"))
 
 
 def _element_coverage_line(map_data):
@@ -574,10 +645,20 @@ def _summary_lines(subs):
     """
     out = []
     for sub in sorted(subs, key=_id_order):
-        glance = _clip(sub.get("glance", ""), VIEW_SUMMARY_GLANCE)
         mark = " · consumed" if sub.get("consumed") else ""
-        out.append(f"- **{sub['id']}** — {as_prose(_subtopic_name(sub))} · "
-                   f"{glance}{mark}")
+        claim = _subtopic_claim(sub)
+        if claim:
+            # SUBSTANCE-LED (Story 18.81, #647): the line IS what the material
+            # says, and the count trails it. `glance` renders `[bar] level -
+            # N ptr, …` — a description of the corpus, which is what this
+            # section stopped carrying: it stays in the block below.
+            n = sub.get("density", {}).get("evidence_pointers", 0)
+            out.append(f"- **{sub['id']}** — {_clip(claim, VIEW_SUMMARY_GLANCE)} "
+                       f"({n} evidence pointer(s)){mark}")
+        else:
+            # Nothing claim-bearing to quote, so the line names the subject and
+            # stops. Never a fabricated claim, and never subject-plus-counts.
+            out.append(f"- **{sub['id']}** — {as_prose(_subtopic_name(sub))}{mark}")
     return out or ["- none"]
 
 
@@ -643,11 +724,13 @@ def compose_view(map_data, cands):
         "",
     ]
     lines += _direction_lines(cands)
+    # The element projection's BOUND stays on the surface (CAP-4): the section
+    # that used to carry it is gone — elements are directions now (Story 18.81,
+    # #647) — but a bounded projection read as the whole record is exactly what
+    # the disclosure guards against, so it moves here rather than lapsing.
+    lines += ["", _element_coverage_line(map_data)]
     lines += ["", "## The terrain at a glance", ""]
     lines += _summary_lines(subs)
-    lines += ["", "## What you decided", "",
-              _element_coverage_line(map_data), ""]
-    lines += _element_lines(cands)
     lines.append("")
     by_topic = {}
     for sub in subs:
