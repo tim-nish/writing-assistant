@@ -406,6 +406,75 @@ assert len(singles) > 3, len(singles)
 " && ok "size switch: above the budget the fixed candidate caps no longer apply" \
   || err "the over-budget branch is still capped at the screen constants"
 
+# --- the View LEADS WITH THE CANDIDATE DIRECTIONS (Story 18.76, #632) --------
+# The size switch moves the terrain, never the proposing: the above-budget
+# branch must offer no less guidance than the one-screen branch.
+python3 - "$work/big-cands.json" "$work/view.md" <<'PYEOF' || fail=1
+import json, re, sys
+cands = json.load(open(sys.argv[1]))["candidates"]
+view = open(sys.argv[2], encoding="utf-8").read()
+fail = []
+def check(cond, msg):
+    print(("ok:   " if cond else "FAIL: ") + msg, file=sys.stdout if cond else sys.stderr)
+    if not cond: fail.append(msg)
+
+heads = re.findall(r"^#{2,3} (.+)$", view, re.M)
+check(heads and heads[0] == "Candidate directions",
+      f"the View's FIRST section is the candidate directions (got {heads[:1]})")
+check("The terrain at a glance" in heads
+      and heads.index("The terrain at a glance") == 1,
+      "the at-a-glance summary is the SECOND section, before any detail")
+first_detail = next((i for i, h in enumerate(heads) if re.match(r"T\d+\.\d+ — ", h)), None)
+check(first_detail is not None and first_detail > 1,
+      "per-subtopic detail comes only AFTER directions and the summary")
+
+# Every derived direction reaches the View, with the index selection uses.
+block = view.split("## The terrain at a glance")[0]
+missing = [c["id"] for c in cands if f"**{c['id']}**" not in block]
+check(not missing, f"every derived direction appears in the section ({missing[:3]})")
+check(len(cands) > 7, f"the fixture derives an over-budget candidate set ({len(cands)})")
+
+# The combination move stays visible where the owner looks: combinations are
+# few and are listed FIRST, so the singles cannot push them below the fold.
+rows = re.findall(r"^- \*\*(\S+)\*\* — (.+)$", block, re.M)
+combo_ids = {c["id"] for c in cands if c["kind"] == "combination"}
+check(combo_ids, "the fixture derives at least one cross-topic combination")
+positions = [i for i, (rid, _) in enumerate(rows) if rid in combo_ids]
+check(positions and max(positions) < len(combo_ids),
+      "combinations are listed before the single-subtopic directions")
+
+# Roughly ten pickable candidates in the first screenful — the whole point of
+# the section. Counted over the first 40 lines, header included.
+head = "\n".join(view.splitlines()[:40])
+check(len(re.findall(r"^- \*\*", head, re.M)) >= 10,
+      "about ten pickable candidates are visible without scrolling")
+
+# The summary is ONE LINE per subtopic, carrying index, depth word and glance.
+summary = view.split("## The terrain at a glance")[1].split("\n## ")[0]
+srows = re.findall(r"^- \*\*(T\d+\.\d+)\*\* — .+ · \[[#.]+\] ", summary, re.M)
+check(len(srows) == len(set(srows)) and len(srows) >= 10,
+      f"the summary carries one line per subtopic, with its glance ({len(srows)})")
+# The depth word rides INSIDE the glance; printing it beside the glance would
+# render the same word twice on every line.
+check(not re.search(r"^- \*\*T\d+\.\d+\*\* — .+ · (\S.*) · \[[#.]+\] \1 ", summary, re.M),
+      "the summary does not repeat the depth word beside the glance")
+sys.exit(1 if fail else 0)
+PYEOF
+[ $? -eq 0 ] || fail=1
+
+# NO SECOND PROPOSER: the View renders the directions it is GIVEN. A
+# `candidates()` call inside compose_view would be a second derivation, and the
+# screen and the View could then silently disagree about what was offered.
+python3 - "$D" <<'PYEOF' && ok "the View reuses the derived directions and derives none of its own" || err "compose_view derives its own directions (second proposer)"
+import ast, sys
+src = open(sys.argv[1], encoding="utf-8").read()
+fn = next(n for n in ast.parse(src).body
+          if isinstance(n, ast.FunctionDef) and n.name == "compose_view")
+calls = {n.func.id for n in ast.walk(fn)
+         if isinstance(n, ast.Call) and isinstance(n.func, ast.Name)}
+sys.exit(1 if "candidates" in calls else 0)
+PYEOF
+
 # Fully regenerated per invocation, for an unchanged pin.
 cp "$work/view.md" "$work/view-1.md"
 python3 "$D" payload --map "$work/big-map.json" --view "$work/view.md" >/dev/null 2>&1

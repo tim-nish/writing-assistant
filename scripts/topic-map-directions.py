@@ -415,10 +415,67 @@ def _member_lines(sub):
     return out or ["none"]
 
 
-def compose_view(map_data):
+# How much of a subtopic's glance the at-a-glance summary carries. The full
+# text stays one line further down, in the subtopic's own block.
+VIEW_SUMMARY_GLANCE = 70
+
+
+def _direction_lines(cands):
+    """The candidate directions, as pickable one-line rows (#632).
+
+    COMBINATIONS FIRST, then singles in rank order. The large branch derives
+    one single per subtopic, so on a 25-subtopic terrain the singles alone fill
+    the first screenful and would push the cross-topic combinations — "the move
+    the map exists for", and the scarcer of the two — below the fold. Ordering
+    them first costs nothing (there are few) and is what keeps the combination
+    move visible where the owner actually looks.
+
+    Every row carries its INDEX, because selection is by index against the pin.
+    """
+    combos = [c for c in cands if c.get("kind") == "combination"]
+    singles = [c for c in cands if c.get("kind") != "combination"]
+    out = []
+    for c in combos + singles:
+        facts = []
+        if c.get("depth"):
+            facts.append(str(c["depth"]))
+        facts.append(f"{c.get('evidence_pointers', 0)} evidence pointer(s)")
+        if c.get("consumed"):
+            facts.append("already consumed — still selectable")
+        out.append(f"- **{c['id']}** — {c['direction']} ({', '.join(facts)})")
+    return out or ["- none: this map proposes no directions"]
+
+
+def _summary_lines(subs):
+    """The terrain, one line per subtopic — the at-a-glance map (#632). Index,
+    name, glance, consumed mark: enough to choose from, with the per-subtopic
+    block below carrying the rest.
+
+    The DEPTH WORD is on the line inside the glance, not beside it: `_glance`
+    renders `[bar] <level> - <counts>` (`scripts/topic-map.py:1092`), so
+    printing the level separately rendered "short note · [##..] short note -
+    3 ptr" — the same word twice on a line whose whole job is to be scannable.
+    """
+    out = []
+    for sub in sorted(subs, key=_id_order):
+        glance = _clip(sub.get("glance", ""), VIEW_SUMMARY_GLANCE)
+        mark = " · consumed" if sub.get("consumed") else ""
+        out.append(f"- **{sub['id']}** — {as_prose(_subtopic_name(sub))} · "
+                   f"{glance}{mark}")
+    return out or ["- none"]
+
+
+def compose_view(map_data, cands):
     """The View: one invocation's terrain, rendered so 20+ directions are
     legible and CAP-2's 'why this depth?' is answerable from the same counts
     the estimate used.
+
+    Leads with the CANDIDATE DIRECTIONS, then the terrain at a glance, then
+    per-subtopic detail (#632). The size switch changes where the terrain is
+    presented, never whether the map proposes — so `cands` is REQUIRED and is
+    the caller's already-derived list. This function never calls `candidates()`
+    itself: a second derivation here would be a second proposer, and the
+    directions on the View must be the same ones the screen was built from.
 
     A RENDERING, at the same status as topic-map.py's --emit-debug: fully
     regenerated every invocation and NEVER read back by any code path. Deleting
@@ -440,7 +497,13 @@ def compose_view(map_data):
         "your judgment, never a gate: a seed-only subtopic is as pickable as a",
         "rich one, and consumed material stays selectable.",
         "",
+        "## Candidate directions",
+        "",
     ]
+    lines += _direction_lines(cands)
+    lines += ["", "## The terrain at a glance", ""]
+    lines += _summary_lines(subs)
+    lines.append("")
     by_topic = {}
     for sub in subs:
         by_topic.setdefault(sub["topic"], []).append(sub)
@@ -687,9 +750,12 @@ def cmd_payload(args):
     data = load_map(args.map)
     view_path = getattr(args, "view", None)
     large = is_large(data)
+    # Derived ONCE and shared: the screen and the View must offer the same
+    # directions, and deriving twice is how they would silently drift apart.
+    cands = candidates(data)
     if view_path and large:
-        write_view(view_path, compose_view(data))
-    print(json.dumps(compose_payload(data, candidates(data), view_path),
+        write_view(view_path, compose_view(data, cands))
+    print(json.dumps(compose_payload(data, cands, view_path),
                      indent=2, ensure_ascii=False))
     if large and not view_path:
         sys.stderr.write(
@@ -704,7 +770,8 @@ def cmd_payload(args):
 def cmd_view(args):
     """Render the View alone — the same rendering `payload --view` writes, for
     a caller that wants it without composing a screen."""
-    write_view(args.out, compose_view(load_map(args.map)))
+    data = load_map(args.map)
+    write_view(args.out, compose_view(data, candidates(data)))
     print(args.out)
     return 0
 
