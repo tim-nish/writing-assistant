@@ -30,6 +30,22 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-paths.py target --root <host-repo>
 
 Relay it as `Operating on host repo: <path>`.
 
+## Step 0 — mint the run workspace
+
+Everything this flow writes is an **intermediate**, never a product: the map,
+the payload, the recorded answer. They go to the run's **workspace outside the
+host repo** (`docs/storage-architecture.md` D1/D2), never into the host working
+tree. Mint one before anything below uses `$WS`:
+
+```
+WS=$(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-paths.py new-run --root <host-repo>)
+```
+
+**The path resolver owns every storage path** — this skill composes none of
+them itself. Skipping this step does not fail loudly: `$WS` simply resolves to
+whatever the surrounding shell happens to hold, which is how a real invocation
+wrote its intermediates into a harness scratchpad (#611).
+
 ## Step 1 — assemble the map
 
 ```
