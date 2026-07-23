@@ -914,7 +914,14 @@ def _pointer_subject(pointer):
     citing the same source are talking about the same thing — that is the whole
     of the derivation, and it needs no declared key."""
     head = str(pointer).split("#")[0].split(":")[0].strip()
-    stem = os.path.splitext(os.path.basename(head))[0]
+    # Strip the BASENAME too, not just the pointer (Story 18.70, #616). An
+    # `evidence:` entry is free-text prose with an embedded path, so its last
+    # `/` can fall mid-sentence: `writing-assistant specs/spec-policy-source-
+    # seam/ (first shipped consumer, Epic 14)` basenames to
+    # `" (first shipped consumer, Epic 14)"` — whitespace-led, non-empty, and
+    # adopted verbatim as a cluster name, which is how the View grew a subtopic
+    # whose heading was a dangling dash.
+    stem = os.path.splitext(os.path.basename(head))[0].strip()
     return stem or None
 
 
@@ -933,7 +940,11 @@ def subtopic_key(item):
     if subjects:
         # The most-cited subject, ties broken alphabetically (determinism).
         best = sorted(set(subjects), key=lambda s: (-subjects.count(s), s))[0]
-        return best, "evidence-subject"
+        # Same guard the declared branch above already holds: a name that is
+        # empty once stripped is NOT a name. Falling through to `(unclustered)`
+        # is honest; rendering an unnamed heading is not.
+        if best.strip():
+            return best.strip(), "evidence-subject"
     return UNCLUSTERED, "unclustered"
 
 
