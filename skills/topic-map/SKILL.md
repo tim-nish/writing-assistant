@@ -70,11 +70,20 @@ silently dropped.
 ## Step 2 — one screen
 
 ```
+VIEW=$(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-paths.py topic-map-view --root <host-repo>)
 python3 ${CLAUDE_PLUGIN_ROOT}/scripts/topic-map-directions.py payload \
-  --map "$WS/map.json" --view "$WS/topic-map-view.md" > "$WS/topic-map.payload.json"
+  --map "$WS/map.json" --view "$VIEW" > "$WS/topic-map.payload.json"
 python3 ${CLAUDE_PLUGIN_ROOT}/scripts/validate-proposal-payload.py \
   --ws "$WS" --surface topic-map "$WS/topic-map.payload.json"
 ```
+
+**The View is the one artifact this flow does not put in the workspace.** It is
+written for the owner to *open and read*, so it lands at a fixed path in the
+`output.drafts` **destination repository** — the repo they work in — resolved
+by the path resolver and never composed here. Exit 3 means no destination is
+declared; relay the error, which names the fix. The directory is self-ignoring,
+so the destination repo never reports the View as untracked. Everything else
+(map, payload, answer) stays in `$WS`.
 
 Present the result **in-conversation** under the
 [owner-facing proposal contract](../owner-facing-proposal-contract.md) — **one
@@ -112,8 +121,8 @@ comes back:
 
 - **At or under the budget** — the flow above, unchanged. No View file is
   written and no path appears on the screen.
-- **Above the budget** — the composer writes the terrain to
-  `$WS/topic-map-view.md` and the payload becomes a short **summary plus that
+- **Above the budget** — the composer writes the terrain to the resolver-owned
+  `$VIEW` path and the payload becomes a short **summary plus that
   path**. Relay the path as given and let the owner open it; selection is then
   **by index** (`T3.2`) plus a short note about the angle they want, rather
   than by matching a proposed direction string. Free-form and **stop here**

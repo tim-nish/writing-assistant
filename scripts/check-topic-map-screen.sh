@@ -605,7 +605,8 @@ for token in 'topic-map.py assemble' 'topic-map-directions.py payload' \
              'topic-map-directions.py brief' 'validate-proposal-payload.py' \
              'stage0' '--brief' 'free-form' 'every time' \
              'never composes narrative structures' 'single proposer' \
-             '--view' 'topic-map-view.md' 'size switch' 'never read back' \
+             '--view' 'size switch' 'never read back' \
+             'resolve-paths.py topic-map-view' 'destination repository' \
              'stable within a pin' 'refused with the mismatch named' \
              'note verbatim'; do
   grep -q -- "$token" "$SKILL" && ok "SKILL carries the contract text: $token" \

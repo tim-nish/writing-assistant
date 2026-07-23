@@ -100,10 +100,15 @@ MAX_COMBINATION = 2
 # restates it.
 SCREEN_BUDGET = 7
 
-# The View's fixed filename. "Fixed path" is the CAP-3 property that makes the
-# View safe: one name per run workspace, fully regenerated every invocation,
-# never read back. The caller passes the directory-qualified path (the run
-# workspace), exactly as it does for topic-map.py's --emit-debug.
+# The View's filename. "Fixed path" is the CAP-3 property that makes the View
+# safe: fully regenerated every invocation, never read back.
+#
+# Amended 2026-07-23 (Story 18.72, #611): the caller passes a path the PATH
+# RESOLVER owns, in the `output.drafts` destination repository — the repo the
+# owner actually works in — not a per-run workspace. A per-run path was never
+# "fixed": it moved every invocation, so a View opened during a sitting could
+# not be reopened. This script still just writes where it is told; the name
+# below is help text and a default basename, never a composed path.
 VIEW_FILENAME = "topic-map-view.md"
 
 # The proposal contract's per-field display budgets. Composing past one produces
@@ -308,6 +313,9 @@ def compose_view(map_data):
     pin = map_data.get("coverage", {}).get("pin")
     lines = [
         "# Topic map — the terrain",
+        "",
+        "<!-- Regenerated on every topic-map invocation. Never read back by any",
+        "     code path; deleting this file loses nothing. Do not edit or commit. -->",
         "",
         f"Pin: {pin}",
         f"Subtopics: {len(subs)} across {len(map_data.get('topics', []))} topic(s)",
