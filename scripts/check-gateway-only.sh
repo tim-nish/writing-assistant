@@ -18,6 +18,13 @@
 #      check-policy-reader.sh section 10) and scripts/fixtures/
 #      policy-gateway-stub.py. The scanner takes target dirs as arguments so
 #      the suite can prove it FAILS on a seeded violation (self-test below).
+#      One narrow exemption (Story 18.64): a `subprocess` call site whose own
+#      window names the SEAM READER (read-policy-source.py / POLICY_READER) is
+#      a hub name passed as an ARGUMENT to the sanctioned reader, which is the
+#      opposite of a direct read. It applies to the subprocess form only —
+#      open()/cat/git -C beside a hub name stays a violation however the
+#      window is worded — so the rule still catches every resurrected direct
+#      read (proven by the self-tests below, including a subprocess-cat one).
 #   2. CONFIG SCAN — no onboarded repo's machine-global writing-sources.yaml
 #      carries a policy_source path key (the consumer holds no hub path,
 #      13.73); the resolver rejects a path key with the named retired-key
@@ -71,6 +78,9 @@ HUB = re.compile(r"GLOSSARY\.md|LESSONS\.md|topics/\S*\.md|topics/\*")
 ACCESS = re.compile(
     r"\bopen\(|read_text|read_bytes|readlines\(|with open|\bPath\(|"
     r"git\s+-C\b|\bcat\s|sed\s+-n|subprocess")
+# A hub name handed to the SEAM READER as an argument is the sanctioned path,
+# not a direct read — exempt for the `subprocess` form only (see header).
+SEAM = re.compile(r"read-policy-source\.py|POLICY_READER")
 WINDOW = 3
 SKIP_DIRS = {"fixtures", "__pycache__", ".git"}
 # Hub names are labels here, never paths (rationale in the harness header):
@@ -93,9 +103,13 @@ for top in sys.argv[1:]:
                 if not HUB.search(line):
                     continue
                 lo, hi = max(0, i - WINDOW), min(len(lines), i + WINDOW + 1)
+                window = lines[lo:hi]
+                via_seam = any(SEAM.search(w) for w in window)
                 for j in range(lo, hi):
                     m = ACCESS.search(lines[j])
                     if m:
+                        if via_seam and m.group(0).strip() == "subprocess":
+                            continue
                         violations.append(
                             f"{path}:{i + 1}: hub-file name within {WINDOW} lines "
                             f"of file-access call site ({m.group(0).strip()!r} "
@@ -140,6 +154,35 @@ set +e; sout=$(python3 "$work/scan.py" "$work/seeded2"); rc=$?; set -e
 [ "$rc" -eq 1 ] && printf '%s' "$sout" | grep -q 'bad-cat.py' \
   && ok "scan self-test: subprocess-cat form caught" \
   || err "scan self-test (subprocess form): rc=$rc out='$sout'"
+# The seam exemption (18.64) is NARROW: naming the seam does not launder a
+# direct read. An open() beside a hub name is still a violation however the
+# surrounding lines are worded.
+mkdir -p "$work/seeded3"
+cat > "$work/seeded3/bad-launder.py" <<'PYV'
+import os
+# routed through read-policy-source.py (it is not — this is a direct read)
+def load(hub):
+    with open(os.path.join(hub, "LESSONS.md")) as fh:
+        return fh.readlines()
+PYV
+set +e; sout=$(python3 "$work/scan.py" "$work/seeded3"); rc=$?; set -e
+[ "$rc" -eq 1 ] && printf '%s' "$sout" | grep -q 'bad-launder.py' \
+  && ok "scan self-test: the seam exemption does not launder an open() direct read" \
+  || err "scan self-test (seam exemption too wide): rc=$rc out='$sout'"
+# And the exemption DOES clear the sanctioned form: a hub name passed as an
+# argument to the seam reader is not a direct read.
+mkdir -p "$work/seeded4"
+cat > "$work/seeded4/good-seam.py" <<'PYV'
+import subprocess, sys
+READER = "read-policy-source.py"
+def load(root):
+    cmd = [sys.executable, READER, "--root", root, "read", "--only", "LESSONS.md"]
+    return subprocess.run(cmd, capture_output=True, text=True)
+PYV
+set +e; python3 "$work/scan.py" "$work/seeded4" >/dev/null 2>&1; rc=$?; set -e
+[ "$rc" -eq 0 ] \
+  && ok "scan self-test: a hub name passed as an argument to the seam reader is not a violation" \
+  || err "scan self-test: the sanctioned seam invocation was flagged as a direct read"
 
 # --- 2. Config scan: no policy_source path key in any onboarded repo ----------
 cat > "$work/cfgscan.py" <<'PY'

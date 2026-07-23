@@ -7,9 +7,15 @@
 #          read back; two invocations straddling a fixture change differ
 #          exactly where the fixture changed; deleting the debug dump loses
 #          nothing.
+#   CAP-1  (Story 18.64) every surface carries its SOURCE FAMILY; the
+#          hub-lessons family enumerates LESSONS.md index lines through the
+#          shipped seam, and an unresolvable policy source makes it
+#          declared-but-not-enumerated WITH THE REASON, never silently empty.
 #   CAP-4  only index/frontmatter surfaces are read (item BODIES never are);
 #          an over-bound invocation NAMES the surfaces it skipped, with the
-#          closed read+skipped==matched accounting harvest's manifest uses.
+#          closed read+skipped==matched accounting harvest's manifest uses —
+#          per family as well as overall; the manifest names which declared
+#          families were enumerated and which were not.
 #   Scope  CAP-2 (depth estimates) and CAP-3 (a presentation screen) are NOT
 #          implemented by this story — asserted absent.
 
@@ -32,6 +38,18 @@ python3 -c "import py_compile; py_compile.compile('$M', doraise=True)" 2>/dev/nu
 work=$(mktemp -d); trap 'rm -rf "$work"' EXIT
 XDG_STATE_HOME="$work/state"; export XDG_STATE_HOME
 XDG_CONFIG_HOME="$work/xdg";  export XDG_CONFIG_HOME
+
+# The hub-lessons family reaches the policy source through the shipped seam,
+# so the harness must be hermetic about the gateway: point the documented test
+# seam at the stub server. Until a fixture declares lessons, the stub serves a
+# MISS — the family is then declared-but-not-enumerated, exactly as an empty
+# hub would be. (Before `set-policy-source` runs, the reader exits 10 without
+# ever spawning a server; the export matters from section 6 onward.)
+FX="$work/gateway.json"
+printf '{"pin": "product-lab@%s", "lessons": []}\n' \
+  "0123456789abcdef0123456789abcdef01234567" > "$FX"
+WRITING_ASSISTANT_GATEWAY_CMD="python3 $root/scripts/fixtures/policy-gateway-stub.py $FX"
+export WRITING_ASSISTANT_GATEWAY_CMD
 
 # Host source repo + a conforming articles repo (drafts/ + INDEX.md + backlog/).
 h="$work/host"; mkdir -p "$h"; git -C "$h" init -q
@@ -97,6 +115,23 @@ assert slugs == ["backlog/cache-warmth.md", "backlog/retry-storm.md",
                  "drafts/retry-storm.md"], slugs
 item = [i for i in topics["engineering"]["items"] if i["surface"] == "backlog/retry-storm.md"][0]
 assert item["status"] == "seed" and item["evidence"] == ["host/log.txt:12@abc1234"], item
+PYEOF
+
+python3 - "$work/m1.json" <<'PYEOF' && ok "CAP-1/CAP-4: every surface carries its family, and an undeclared policy source leaves hub-lessons declared-but-NOT-enumerated with the reason" || err "family disclosure wrong for an undeclared policy source"
+import json, sys
+cov = json.load(open(sys.argv[1]))["coverage"]
+fams = {f["family"]: f for f in cov["families"]}
+assert set(fams) == {"articles-items", "hub-lessons"}, fams.keys()
+assert all(d["family"] == "articles-items" for d in cov["read"]), cov["read"]
+assert fams["articles-items"]["enumerated"] is True, fams["articles-items"]
+# declared, not enumerated, and the reason is NAMED — never a silent empty family
+hl = fams["hub-lessons"]
+assert hl["declared"] is True and hl["enumerated"] is False, hl
+assert hl["reason"], hl
+assert hl["matched"] == 0 and hl["accounting_closes"] is True, hl
+assert cov["families_enumerated"] == ["articles-items"], cov["families_enumerated"]
+assert [f["family"] for f in cov["families_not_enumerated"]] == ["hub-lessons"], cov
+assert cov["families_not_enumerated"][0]["reason"] == hl["reason"], cov
 PYEOF
 
 # --- 2. CAP-4: item BODIES are never read ---------------------------------------
@@ -283,6 +318,141 @@ c = json.load(open(sys.argv[1]))["consumption"]
 assert c["consumed_index"] == {}, c
 PYEOF
 
+# --- 7b. the hub-lessons family: LESSONS.md index lines as lesson seeds -------
+# Served through the shipped seam only. The stub's LESSONS.md carries a body
+# sentinel in its hook text position and a non-index heading line, so "index
+# lines only" is asserted rather than assumed.
+python3 - "$FX" <<'PYEOF'
+import json, sys
+sha = "0123456789abcdef0123456789abcdef01234567"
+json.dump({
+    "pin": f"product-lab@{sha}",
+    "lessons": [
+        ["LESSONS.md", 1, "# Lessons"],
+        ["LESSONS.md", 3, "- [The retry storm](lessons/retry-storm.md) - SENTINEL-HOOK-ALPHA"],
+        ["LESSONS.md", 4, "- [Cache warmth](lessons/cache-warmth.md) - SENTINEL-HOOK-BETA"],
+        ["LESSONS.md", 5, "- [Team shape](lessons/team-shape.md) - SENTINEL-HOOK-GAMMA"],
+    ],
+}, open(sys.argv[1], "w"))
+PYEOF
+MAP > "$work/lessons.json" 2>"$work/lessons.err" \
+  && ok "hub-lessons: the map assembles with the family enumerated" \
+  || err "assemble failed with a served LESSONS.md: $(cat "$work/lessons.err")"
+
+python3 - "$work/lessons.json" <<'PYEOF' && ok "hub-lessons: one seed per INDEX LINE, tagged with its family, cited at its true line number" || err "lesson seeds wrong"
+import json, sys
+d = json.load(open(sys.argv[1]))
+seeds = [i for t in d["topics"] for i in t["items"] if i.get("family") == "hub-lessons"]
+assert {i["slug"] for i in seeds} == {"retry-storm", "cache-warmth", "team-shape"}, seeds
+one = [i for i in seeds if i["slug"] == "cache-warmth"][0]
+assert one["title"] == "Cache warmth", one
+# the seam's own file:line@commit cite, passed through, not recomposed
+assert one["evidence"] == ["LESSONS.md:4@0123456789abcdef0123456789abcdef01234567"], one
+# the heading line is not an index line
+assert not any(i["slug"].startswith("lessons") for i in seeds), seeds
+# a seed is available material, not a live article item
+assert one["live"] is False, one
+PYEOF
+
+grep -q 'SENTINEL-HOOK' "$work/lessons.json" \
+  && err "a lesson hook reached the map — more than the index line's title was projected" \
+  || ok "hub-lessons: only the index line's title is projected (no hook prose, no lesson body)"
+
+python3 - "$work/lessons.json" <<'PYEOF' && ok "hub-lessons: seeds cluster alongside items and count toward the subtopic's density signal (CAP-2)" || err "lesson seeds do not participate in clustering"
+import json, sys
+d = json.load(open(sys.argv[1]))
+topics = {t["topic"]: t for t in d["topics"]}
+# the family enters the topic derivation through the shipped track->topic path
+assert "hub-lessons" in topics, topics.keys()
+assert "hub-lessons" in d["unmapped_tracks"], d["unmapped_tracks"]
+subs = {s["subtopic"]: s for s in topics["hub-lessons"]["subtopics"]}
+assert "team-shape" in subs, subs.keys()
+s = subs["team-shape"]
+assert s["density"]["evidence_pointers"] == 1, s["density"]
+assert s["density"]["unconsumed_lessons"] == 1, s["density"]
+assert s["depth"]["level"], s["depth"]          # a depth estimate, like any subtopic
+assert s["selectable"] is True, s               # thresholds gate surfacing, never picking
+PYEOF
+
+python3 - "$work/lessons.json" <<'PYEOF' && ok "CAP-4: the manifest names BOTH enumerated families and the per-family accounting closes" || err "per-family manifest wrong"
+import json, sys
+cov = json.load(open(sys.argv[1]))["coverage"]
+assert cov["families_enumerated"] == ["articles-items", "hub-lessons"], cov["families_enumerated"]
+assert cov["families_not_enumerated"] == [], cov["families_not_enumerated"]
+fams = {f["family"]: f for f in cov["families"]}
+assert fams["hub-lessons"]["matched"] == 3, fams["hub-lessons"]
+for f in fams.values():
+    assert f["accounting_closes"] is True and f["read"] + f["skipped"] == f["matched"], f
+assert sum(f["matched"] for f in fams.values()) == cov["matched"], cov
+assert cov["accounting_closes"] is True and cov["complete"] is True, cov
+PYEOF
+
+# The bound truncates the later family and NAMES what it skipped, per family.
+MAP --max-surfaces 6 > "$work/lbound.json" 2>/dev/null
+python3 - "$work/lbound.json" <<'PYEOF' && ok "CAP-4: an over-bound run keeps the closed accounting PER FAMILY and names the skipped surfaces with their family" || err "per-family accounting does not close under the bound"
+import json, sys
+cov = json.load(open(sys.argv[1]))["coverage"]
+assert cov["complete"] is False, cov
+fams = {f["family"]: f for f in cov["families"]}
+assert fams["hub-lessons"]["skipped"] > 0, fams["hub-lessons"]
+for f in fams.values():
+    assert f["accounting_closes"] is True, f
+for s in cov["skipped"]:
+    assert s["family"] and s["surface"] and "read bound" in s["reason"], s
+assert len(cov["read"]) + len(cov["skipped"]) == cov["matched"], cov
+PYEOF
+
+# Consumed material is MARKED, never hidden (CAP-9 / Story 18.47).
+cat > "$a/plans/team-shape.md" <<'EOF'
+---
+kind: article-plan
+slug: team-shape
+intent: share engineering lessons
+claim: small teams ship
+status: drafted
+run_id: 20260722T090000-000002
+pin: host@a1b2c3d4e5f6a7b8
+consumed: [team-shape]
+---
+
+## Section plan
+
+- the team-shape lesson / host/notes.md:9@a1b2c3d4e5f6a7b8
+EOF
+MAP > "$work/lconsumed.json" 2>/dev/null
+python3 - "$work/lconsumed.json" <<'PYEOF' && ok "hub-lessons: a consumed seed is MARKED consumed and still surfaced (never hidden, still selectable)" || err "consumed lesson seed handling wrong"
+import json, sys
+d = json.load(open(sys.argv[1]))
+topics = {t["topic"]: t for t in d["topics"]}
+subs = {s["subtopic"]: s for s in topics["hub-lessons"]["subtopics"]}
+s = subs["team-shape"]
+assert s["consumed"] is True and s["selectable"] is True, s
+assert s["density"]["unconsumed_lessons"] == 0, s["density"]
+assert subs["retry-storm"]["consumed"] is False, subs["retry-storm"]
+PYEOF
+rm "$a/plans/team-shape.md"
+
+# A degraded policy source is a DISCLOSED family, and the map still produces a
+# result — the disclosed-refusal shape, never a silent empty family.
+saved_gw="$WRITING_ASSISTANT_GATEWAY_CMD"
+WRITING_ASSISTANT_GATEWAY_CMD="python3 $work/no-such-gateway.py"
+MAP > "$work/degraded.json" 2>/dev/null \
+  && ok "hub-lessons: an unreachable gateway still yields a map (exit 0)" \
+  || err "a degraded policy source broke the map instead of being disclosed"
+WRITING_ASSISTANT_GATEWAY_CMD="$saved_gw"
+python3 - "$work/degraded.json" <<'PYEOF' && ok "hub-lessons: a degraded policy source is disclosed as declared-but-not-enumerated WITH THE REASON" || err "degraded policy source not disclosed"
+import json, sys
+d = json.load(open(sys.argv[1]))
+cov = d["coverage"]
+hl = {f["family"]: f for f in cov["families"]}["hub-lessons"]
+assert hl["declared"] is True and hl["enumerated"] is False, hl
+assert hl["reason"], hl
+assert cov["families_not_enumerated"][0]["family"] == "hub-lessons", cov
+# the articles-items family is untouched — one family degrading narrows nothing else
+assert "articles-items" in cov["families_enumerated"], cov
+assert [i for t in d["topics"] for i in t["items"]], "the map lost its items"
+PYEOF
+
 # --- 8. scope: CAP-2 and CAP-3 are NOT implemented here -------------------------
 # Scope is a property of the CODE, not of the prose that documents it: strip
 # comments and string literals first, so a docstring saying "composes no
@@ -324,6 +494,33 @@ grep -qiE 'approve/modify|proposal contract|candidate direction|screen' "$CODE" 
 grep -qiE 'narrative structure|structure candidate|compose.*structure' "$CODE" \
   && err "topic-map.py composes narrative structures (18.45 single-proposer invariant)" \
   || ok "scope: the map composes no narrative structures (single-proposer invariant intact)"
+# CAP-4's cost promise as amended: widening the corpus must NOT pull in
+# harvest's per-source budgeted extraction. The map stays index-scale. The
+# check is a CLOSED SET of sibling scripts the map may reach for — adding one
+# is a reviewed decision, not a drive-by import, and no fact-sheet reader or
+# harvest cache is on it.
+python3 - "$M" <<'PYEOF' && ok "CAP-4: the map reaches only for its declared resolvers/seams — no harvest pass, no fact-sheet extractor (cost stays index-scale)" || err "topic-map.py reaches for a script outside its allowed set (an extraction pass would make the map corpus-scale)"
+import re, sys
+src = open(sys.argv[1], encoding="utf-8").read()
+named = set(re.findall(r'os\.path\.join\(SCRIPT_DIR,\s*"([^"]+\.py)"\)', src))
+named |= set(re.findall(r'_load\(\s*"([^"]+\.py)"\s*\)', src))
+allowed = {
+    "resolve-writing-sources.py",   # the declared-location / mapping resolver
+    "resolve-paths.py",             # the storage-layout resolver
+    "resolve-user-config.py",       # the YAML-subset reader
+    "write-article-plan.py",        # the SHIPPED consumption derived view
+    "read-policy-source.py",        # the SHIPPED policy seam (hub-lessons)
+}
+extra = sorted(named - allowed)
+assert not extra, f"unreviewed sibling scripts: {extra}"
+PYEOF
+# The hub-lessons family goes through the SHIPPED seam — never a second reader.
+grep -q 'POLICY_READER' "$M" \
+  && ok "hub-lessons: the family is served by the shipped read-policy-source.py seam" \
+  || err "topic-map.py does not read the policy source through the shipped seam"
+grep -qE 'lessons_index|LESSONS\.md.*open\(|policy_lookup' "$CODE" \
+  && err "topic-map.py talks to the gateway itself (the seam is the only reader)" \
+  || ok "hub-lessons: no second policy reader exists in the implementation"
 
 # --- 9. an unresolvable articles repo is a disclosed refusal, not a silent map ---
 h2="$work/host2"; mkdir -p "$h2"; git -C "$h2" init -q

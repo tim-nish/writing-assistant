@@ -38,14 +38,29 @@ The shipped thresholds are PROPOSED, not ratified: the spec does not choose the
 boundaries, so the declaration carries `ratified: false` and the map reports it
 alongside every estimate.
 
-CAP-1 — derived, never stored
------------------------------
-Every field of the output is recomputed from authoritative state on each run:
+CAP-1 — derived, never stored, enumerated PER SOURCE FAMILY
+-----------------------------------------------------------
+Every field of the output is recomputed from authoritative state on each run,
+and every candidate surface carries the **source family** it came from
+(Story 18.64, #604; CAP-1 as amended 2026-07-23). The families:
 
-  * the **articles repo** — `backlog/`, `drafts/`, `newsletter/`, `graveyard/`
-    item frontmatter and `INDEX.md`, reached through the declared
-    `output.drafts` location (`resolve-writing-sources.py draft-location`), so
-    no caller composes a storage path;
+  * `articles-items` — the **articles repo**: `backlog/`, `drafts/`,
+    `newsletter/`, `graveyard/` item frontmatter and `INDEX.md`, reached
+    through the declared `output.drafts` location
+    (`resolve-writing-sources.py draft-location`), so no caller composes a
+    storage path;
+  * `hub-lessons` — the hub's Lesson corpus as its **index lines**, one lesson
+    seed per line, read through the shipped policy seam
+    (`read-policy-source.py read --only LESSONS.md`, the gateway's
+    `lessons_index`). There is no second reader and no per-Lesson file read:
+    the seam's scope is code-bounded and lesson BODIES are out of reach
+    (SPEC-topic-map OQ3). An unresolvable or degraded policy source makes the
+    family **declared-but-not-enumerated with the reason** — the same disclosed
+    refusal shape `consumption_view` uses — never a silent empty family.
+
+A family is a *declared denominator*, which is the point: a coverage claim
+that does not name the families it covers is exactly the defect CAP-4 exists
+to prevent (a "coverage complete" line that was true over the wrong corpus).
   * the **track↔topic mapping** — `policy_source.track_topics` in the host
     repo's `writing-sources.yaml`, read through
     `resolve-writing-sources.py policy-source` (#525). The articles repo owns
@@ -84,7 +99,9 @@ than narrowing silently, in the coverage-disclosure shape harvest already uses
 (`skills/harvest/SKILL.md` output contract, `validate-fact-sheet.py`
 `validate_coverage`): a `pin`, a `matched` count, a `read` list with per-surface
 entry counts, and a `skipped` list of `(surface, reason)` — with the same closed
-accounting `#read + #skipped == matched`.
+accounting `#read + #skipped == matched` — which holds **per family** as well
+as overall, and the manifest names which declared families were enumerated and
+which were not.
 
 Stdlib-only (host repos guarantee no venv).
 
@@ -116,6 +133,20 @@ LIVE_SECTIONS = ("backlog", "drafts", "newsletter")
 
 DEFAULT_MAX_SURFACES = 400
 
+# Source families (CAP-1 as amended 2026-07-23), in a fixed enumeration order.
+# The order is the read order, so the bound truncates the later families first
+# and says so per family rather than narrowing the denominator in silence.
+FAMILY_ARTICLES_ITEMS = "articles-items"
+FAMILY_HUB_LESSONS = "hub-lessons"
+DECLARED_FAMILIES = (FAMILY_ARTICLES_ITEMS, FAMILY_HUB_LESSONS)
+
+# A lesson seed enters the topic derivation through the SAME track->topic path
+# every item uses: it carries the family name as its track, so an owner who
+# wants these under a hub topic name declares it in `policy_source.track_topics`
+# like any other track. Nothing here invents a topic.
+LESSON_TRACK = FAMILY_HUB_LESSONS
+LESSON_SECTION = FAMILY_HUB_LESSONS
+
 
 def _load(mod_filename):
     """Load a sibling script as a module (the resolve-*.py idiom)."""
@@ -131,6 +162,7 @@ def _load(mod_filename):
 SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
 SRC_RES = os.path.join(SCRIPT_DIR, "resolve-writing-sources.py")
 PLAN_WRITER = os.path.join(SCRIPT_DIR, "write-article-plan.py")
+POLICY_READER = os.path.join(SCRIPT_DIR, "read-policy-source.py")
 
 
 def host_root(arg_root):
@@ -227,6 +259,85 @@ def consumption_view(root):
             "degraded": data.get("degraded")}
 
 
+def _lesson_seed(text, cite):
+    """One LESSONS.md index line as a lesson seed: `(id, title, cite)`.
+
+    The index-line shape is the hub's own (`- [Title](lessons/<id>.md) — hook`),
+    and only that shape is understood: the link target's stem is the seed's
+    identifier, the link text its title. A line without a link keeps its text
+    as the title and slugifies it for an identifier. Nothing here follows the
+    link — lesson BODIES are out of the seam's reach (OQ3), and the hook text
+    beyond the title is not projected as prose.
+    """
+    s = text.strip()
+    if not s.startswith("- "):
+        return None                      # a heading, a blank, a prose line
+    s = s[2:].strip()
+    ident, title = None, s
+    if s.startswith("["):
+        close = s.find("](")
+        if close != -1:
+            end = s.find(")", close)
+            if end != -1:
+                title = s[1:close].strip()
+                target = s[close + 2:end].strip()
+                ident = os.path.splitext(os.path.basename(target))[0] or None
+    if ident is None:
+        head = title.split("—")[0].split(" - ")[0].strip()
+        ident = "".join(c if c.isalnum() else "-" for c in head.lower())
+        ident = "-".join(p for p in ident.split("-") if p)
+    if not ident:
+        return None
+    return ident, (title or ident), cite
+
+
+def lesson_seeds(root):
+    """The `hub-lessons` family: one seed per LESSONS.md **index line**, read
+    through the shipped seam and nothing else.
+
+    Returns `(seeds, reason)`. A `reason` means the family is
+    DECLARED-BUT-NOT-ENUMERATED and names why — an undeclared policy source
+    (exit 10), an unreachable gateway (11), a too-old tool surface (13), a
+    malformed block (4), or a served miss. The map still produces a result in
+    every one of those cases; a family that cannot be enumerated is disclosed,
+    never silently empty.
+    """
+    cmd = [sys.executable, POLICY_READER]
+    if root:
+        cmd += ["--root", root]
+    cmd += ["read", "--only", "LESSONS.md"]
+    r = subprocess.run(cmd, capture_output=True, text=True)
+    if r.returncode != 0:
+        detail = (r.stderr.strip().split("\n")[-1] if r.stderr.strip()
+                  else f"the policy reader exited {r.returncode}")
+        return [], f"{detail} (read-policy-source.py exit {r.returncode})"
+    pin, commit, seeds = None, None, []
+    in_section = False
+    for line in r.stdout.splitlines():
+        if line.startswith("pin: "):
+            pin = line[5:].strip()
+            continue
+        if line.startswith("miss: "):
+            return [], (f"the policy source served a miss for {line[6:].strip()} "
+                        f"at {pin or 'an undisclosed pin'}")
+        if line.startswith("=== "):
+            in_section = True
+            commit = line.rsplit(" @ ", 1)[-1].strip()
+            continue
+        if not in_section:
+            continue
+        number, _sep, text = line.partition(": ")
+        if not number.strip().isdigit():
+            continue
+        seed = _lesson_seed(text, f"LESSONS.md:{number.strip()}@{commit}")
+        if seed:
+            seeds.append(seed)
+    if not seeds:
+        return [], (f"the served LESSONS.md index at {pin or 'an undisclosed pin'} "
+                    "lists no index lines")
+    return seeds, None
+
+
 def repo_pin(repo):
     """The articles repo's HEAD sha, or "unpinned" outside git — the coverage
     manifest's `pin`, exactly as harvest discloses one."""
@@ -316,15 +427,20 @@ def index_entry_count(path):
 
 
 def candidate_surfaces(repo):
-    """Every index/frontmatter surface this map may read, in a deterministic
-    read order: INDEX files first, then item files by section and name. This is
-    the `matched` set of the coverage manifest — the bound is applied to it,
-    never to a silently pre-narrowed list."""
+    """The `articles-items` family: every index/frontmatter surface the
+    articles repo offers, in a deterministic read order — INDEX files first,
+    then item files by section and name.
+
+    Unchanged by Story 18.64 beyond the family tag: what this family yields is
+    exactly what it yielded before, so widening the corpus cannot quietly move
+    the family that already worked. Each entry is
+    `(family, section, rel, payload)`; here the payload is a filesystem path.
+    """
     surfaces = []
     for name in ("INDEX.md",):
         p = os.path.join(repo, name)
         if os.path.isfile(p):
-            surfaces.append(("index", name, p))
+            surfaces.append((FAMILY_ARTICLES_ITEMS, "index", name, p))
     for section in SECTIONS:
         d = os.path.join(repo, section)
         if not os.path.isdir(d):
@@ -336,9 +452,44 @@ def candidate_surfaces(repo):
         for name in names:
             if not name.endswith(".md") or name.startswith("."):
                 continue
-            surfaces.append((section, f"{section}/{name}",
-                             os.path.join(d, name)))
+            surfaces.append((FAMILY_ARTICLES_ITEMS, section,
+                             f"{section}/{name}", os.path.join(d, name)))
     return surfaces
+
+
+def lesson_surfaces(root):
+    """The `hub-lessons` family as surfaces: one per served index line.
+
+    Returns `(surfaces, reason)` — a `reason` is the family's
+    declared-but-not-enumerated disclosure, passed through from
+    `lesson_seeds`. The payload is the seed tuple itself, not a path: these
+    surfaces are index lines the seam already served, and no file is opened
+    for them.
+    """
+    seeds, reason = lesson_seeds(root)
+    if reason:
+        return [], reason
+    return [(FAMILY_HUB_LESSONS, LESSON_SECTION, seed[2], seed)
+            for seed in seeds], None
+
+
+def all_surfaces(repo, root):
+    """Every candidate surface across every DECLARED family, in family order,
+    plus the family registry the coverage manifest discloses.
+
+    The registry names each declared family and whether it was enumerated —
+    with the reason when it was not — so "complete" is always complete over a
+    named denominator (CAP-4 as amended 2026-07-23).
+    """
+    families = {name: {"family": name, "declared": True, "enumerated": True,
+                       "reason": None}
+                for name in DECLARED_FAMILIES}
+    matched = list(candidate_surfaces(repo))
+    lessons, reason = lesson_surfaces(root)
+    if reason:
+        families[FAMILY_HUB_LESSONS].update(enumerated=False, reason=reason)
+    matched += lessons
+    return matched, families
 
 
 def _as_list(val):
@@ -349,21 +500,60 @@ def _as_list(val):
     return [str(val)]
 
 
-def assemble(repo, mapping, max_surfaces):
+def lesson_item(seed):
+    """A lesson seed as an item, so it participates in the SAME clustering and
+    density derivation every other item does (CAP-2, Story 18.62).
+
+    Its identifier is declared as a `lessons:` element, which is the shipped
+    signal for "unconsumed material worth writing about" — so a seed a plan
+    already consumed is MARKED consumed by the existing lookup rather than
+    hidden, and no second consumption rule appears here. Its own index line is
+    its evidence pointer: a resolvable `file:line@commit` cite the seam served.
+    """
+    ident, title, cite = seed
+    return {
+        "slug": ident,
+        "title": title,
+        "family": FAMILY_HUB_LESSONS,
+        "section": LESSON_SECTION,
+        "surface": cite,
+        "status": "",
+        "track": LESSON_TRACK,
+        "date": "",
+        "evidence": [cite],
+        "live": False,
+        # One seed is one cluster: a lesson index line names its own subject,
+        # and collapsing all seeds under the shared `LESSONS` pointer subject
+        # would hide the terrain this family exists to reveal. Whether that is
+        # the right granularity at corpus scale is Story 18.68's calibration
+        # question, not a number to tune here.
+        "subtopic": ident,
+        "lessons": [ident],
+    }
+
+
+def assemble(repo, mapping, max_surfaces, root=None):
     """Assemble the map. Returns (topics, coverage, tracks_seen).
 
-    Reads ONLY the surfaces `candidate_surfaces` enumerates, at most
-    `max_surfaces` of them; everything beyond the bound is disclosed by name in
-    `coverage.skipped`, never dropped quietly.
+    Reads ONLY the surfaces `all_surfaces` enumerates across the declared
+    families, at most `max_surfaces` of them; everything beyond the bound is
+    disclosed by name in `coverage.skipped`, never dropped quietly, and the
+    closed accounting is reported per family as well as overall.
     """
-    matched = candidate_surfaces(repo)
+    matched, families = all_surfaces(repo, root)
     read_now = matched[:max_surfaces] if max_surfaces is not None else matched
     skipped = matched[len(read_now):]
 
     items, read_disclosure = [], []
-    for section, rel, path in read_now:
+    for family, section, rel, payload in read_now:
+        if family == FAMILY_HUB_LESSONS:
+            items.append(lesson_item(payload))
+            read_disclosure.append({"family": family, "surface": rel,
+                                    "entries": 1})
+            continue
+        path = payload
         if section == "index":
-            read_disclosure.append({"surface": rel,
+            read_disclosure.append({"family": family, "surface": rel,
                                     "entries": index_entry_count(path)})
             continue
         fm = read_frontmatter(path)
@@ -372,6 +562,7 @@ def assemble(repo, mapping, max_surfaces):
         item = {
             "slug": slug if isinstance(slug, str) else str(slug),
             "title": fm.get("title") or fm.get("one_liner") or "",
+            "family": family,
             "section": section,
             "surface": rel,
             "status": fm.get("status") or "",
@@ -391,21 +582,44 @@ def assemble(repo, mapping, max_surfaces):
             if key in fm:
                 item[key] = fm[key] if key in SUBTOPIC_KEYS else _as_list(fm[key])
         items.append(item)
-        read_disclosure.append({"surface": rel,
+        read_disclosure.append({"family": family, "surface": rel,
                                 "entries": len(fm)})
+
+    skipped_disclosure = [
+        {"family": family, "surface": rel,
+         "reason": f"over the read bound (--max-surfaces={max_surfaces})"}
+        for family, _s, rel, _p in skipped]
+
+    # Per-family accounting: the same closed read+skipped==matched rule the
+    # overall manifest carries, computed within each family so a "complete"
+    # claim can never be true over a denominator it never names.
+    for name in DECLARED_FAMILIES:
+        entry = families[name]
+        f_matched = sum(1 for f, _s, _r, _p in matched if f == name)
+        f_read = sum(1 for d in read_disclosure if d["family"] == name)
+        f_skipped = sum(1 for d in skipped_disclosure if d["family"] == name)
+        entry.update(matched=f_matched, read=f_read, skipped=f_skipped,
+                     complete=f_skipped == 0,
+                     accounting_closes=f_read + f_skipped == f_matched)
 
     coverage = {
         "pin": repo_pin(repo),
         "bound": max_surfaces,
         "matched": len(matched),
         "read": read_disclosure,
-        "skipped": [{"surface": rel,
-                     "reason": f"over the read bound (--max-surfaces={max_surfaces})"}
-                    for _s, rel, _p in skipped],
+        "skipped": skipped_disclosure,
         "complete": not skipped,
         # Same closed accounting harvest's manifest carries: every matched
         # surface is disclosed as read or skipped, never silently omitted.
         "accounting_closes": len(read_disclosure) + len(skipped) == len(matched),
+        # CAP-4's named denominator: which declared families this run actually
+        # enumerated, and which it did not — with the reason.
+        "families": [families[name] for name in DECLARED_FAMILIES],
+        "families_enumerated": [name for name in DECLARED_FAMILIES
+                                if families[name]["enumerated"]],
+        "families_not_enumerated": [
+            {"family": name, "reason": families[name]["reason"]}
+            for name in DECLARED_FAMILIES if not families[name]["enumerated"]],
         "surfaces_read": "index and frontmatter only — item bodies are never read",
     }
 
@@ -663,7 +877,8 @@ def build_map(args):
             "set-draft-location) or pass --repo\n")
         raise SystemExit(NO_ARTICLES_REPO)
     mapping = track_topics(root)
-    topics, coverage, tracks_seen = assemble(repo, mapping, args.max_surfaces)
+    topics, coverage, tracks_seen = assemble(repo, mapping, args.max_surfaces,
+                                             root=root)
     stale = sorted(t for t in mapping if t not in tracks_seen)
     consumption = consumption_view(root)
     thresholds = load_thresholds(root, getattr(args, "thresholds", None))
@@ -715,8 +930,8 @@ def cmd_surfaces(args):
     if not repo or not os.path.isdir(repo):
         sys.stderr.write("error: no articles repo resolvable (pass --repo)\n")
         return NO_ARTICLES_REPO
-    matched = candidate_surfaces(repo)
-    for _section, rel, _p in matched[:args.max_surfaces]:
+    matched, _families = all_surfaces(repo, root)
+    for _family, _section, rel, _p in matched[:args.max_surfaces]:
         print(rel)
     return 0
 
