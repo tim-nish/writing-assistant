@@ -240,6 +240,18 @@ dense["density"] = dict(dense["density"], evidence_pointers=9,
                                   for n in range(10, 17)]
                                  + [f"tools/ledger:{n}@abc1234" for n in (1403, 1404)])
 topic["subtopics"].append(dense)
+# A subtopic carrying MANY lesson seeds, one of them very long — the shape #634
+# found (65 complete lesson texts joined onto one ~10,000-character line).
+# Without it the seed cap, the clip and the remainder disclosure pass vacuously.
+seedy = copy.deepcopy(base)
+seedy["subtopic"] = "seed-heavy"
+seedy["density"] = dict(seedy["density"], evidence_pointers=1,
+                        pointers=["host/seeds.md:1@abc1234"])
+seedy["items"] = [{"slug": f"seed-heavy-{n}",
+                   "title": (f"Lesson {n} " + "x" * 400 if n == 0
+                             else f"Seeded lesson number {n:02d}"),
+                   "family": "hub-lessons"} for n in range(20)]
+topic["subtopics"].append(seedy)
 blank = copy.deepcopy(base)
 blank["subtopic"] = ""
 blank["clustered_by"] = "evidence-subject"
@@ -299,8 +311,13 @@ def check(cond, msg):
     if not cond: fail.append(msg)
 
 subs = [s for t in d["topics"] for s in t["subtopics"]]
-check(all(s["subtopic"] in view for s in subs),
-      f"the View lists every one of the {len(subs)} subtopics")
+# A PLACEHOLDER name is the assembler's enum for "nothing named this", and the
+# View renders that state as prose instead (#634) — so those entries are
+# checked by their prose, not by the bare token they carry in map.json.
+PLACEHOLDERS = ("(unclustered)", "(untracked)", "(unnamed)")
+named = [s for s in subs if s["subtopic"] not in PLACEHOLDERS]
+check(all(s["subtopic"] in view for s in named),
+      f"the View lists every one of the {len(named)} named subtopics")
 check(d["coverage"]["pin"] in view, "the View header carries the map's pin")
 check(re.search(r"^### T\d+\.\d+ — ", view, re.M),
       "every subtopic carries a stable ID (T<topic>.<subtopic>)")
@@ -330,6 +347,28 @@ check(re.search(r"^\s+- \S+ ×\d+$", view, re.M),
 check(re.search(r"- evidence pointers \(\d+\):", view),
       "the pointer TOTAL is still shown alongside the aggregated list")
 check("Lesson 3" in view, "lesson-seed names are shown")
+# Lesson seeds are budgeted the same way evidence is (#634): one per line,
+# clipped, capped, remainder DISCLOSED — never one 10,000-character line.
+check(re.search(r"- lesson seeds \(\d+\):", view),
+      "the lesson-seed TOTAL is shown alongside the list")
+check(re.search(r"^\s+- Lesson \d+$", view, re.M),
+      "lesson seeds render ONE PER LINE, not comma-joined onto one line")
+seed_block = re.search(r"- lesson seeds \(\d+\):\n((?:\s+- .*\n)+)", view)
+check(seed_block and "…" in view and re.search(r"… and \d+ more seed\(s\)", view),
+      "past the cap the remaining seeds are DISCLOSED, never silently dropped")
+
+# The View is a human surface, so every line is budgeted (#633/#634). This is
+# the guard that keeps an 818-line unreadable View from recurring unnoticed.
+long_lines = [l for l in view.splitlines() if len(l) > 200]
+check(not long_lines,
+      f"no View line exceeds its display budget (worst: {max((len(l) for l in long_lines), default=0)} chars)")
+
+# The placeholder states read as PROSE THAT STATES THE REMEDY, never as a bare
+# internal enum in a headline position (#634).
+check(not re.search(r"^#{2,3} .*\((?:unclustered|untracked|unnamed)\)", view, re.M),
+      "no placeholder enum value appears in a heading")
+check("not yet clustered" in view and "declare `subtopic:`" in view,
+      "the not-yet-clustered state is named to the owner as prose with its remedy")
 check("consumed: yes" in view and "consumed: no" in view,
       "consumed marks are shown, and consumed material is NOT hidden")
 
