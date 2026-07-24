@@ -124,6 +124,44 @@ intake as a **proposal only**.
   - **success:** Answering an uncovered fixture fork and choosing "report
     upstream" yields a schema-valid staging block in the run workspace and
     zero upstream changes; declining yields only the receipts-line signal.
+- **CAP-5** — the iterative consult-and-propose loop (amended 2026-07-24, #660)
+  - **intent:** The consult of CAP-1 is not one-shot. The skill consults at
+    **task start**, at **each in-scope fork** (CAP-1, unchanged), and **before
+    emitting a design artifact**, so the agent re-reads and reconstructs the
+    served surface as implementation makes the development state concrete.
+    Re-consult triggers are **precision-first** — under-trigger over noise,
+    mirroring the hub's ambient-trigger rule (`consulted:
+    product-lab@90877fa4e77e1353b527a76607ed2ea06daf2b27
+    topics/knowledge-architecture.md:80`). Each iteration carries its own
+    `consulted:` receipt line naming the served lines it applied. Freshness is
+    unchanged: the gateway serves committed hub state, so a re-consult sees new
+    Policy only after the hub commits, and no served position is cached across
+    the loop's iterations or across sittings.
+  - **Proposal emission is the loop's closing step (extends CAP-4).** When an
+    iteration surfaces a **new policy candidate** (not only an uncovered-fork
+    miss), the completing action is to **emit a Proposal** — a class-B
+    staging-candidate in THIS repo's own tree (the ratified `contribute_back`
+    schema, `<!-- staging-candidate -->`), proposal-only. The consumer never
+    writes hub Policy: *"a completing action stops at the ratification boundary
+    — the consumer's gate completes by emitting the proposal, the hub's gate
+    completes by promoting it"* (`consulted:
+    product-lab@90877fa4e77e1353b527a76607ed2ea06daf2b27
+    topics/knowledge-architecture.md:73`). The gateway write prohibition is
+    unchanged; "synchronize" means propose, never place.
+  - **success:** A run's receipts show a consult at task-start, per in-scope
+    fork, and pre-emit; each iteration's receipt names the served lines
+    applied; a surfaced new policy candidate yields a schema-valid
+    staging-candidate block in the consumer's own tree and zero hub writes.
+  - **DEFERRED — hit-discharge gate behavior (item 3, #660).** A decisive hit
+    *discharging* a question-shaped fork outright — versus the current ratified
+    covered→overrideable-FYI of CAP-2 — is **staged, not ratified** upstream
+    (the served surface carries no hit-discharge line; the ratified behavior
+    today is CAP-2's FYI, `consulted: … topics/knowledge-architecture.md:57`).
+    It is **not specified here** and must not be built against unratified
+    policy: it lands only once the hub sweep ratifies the §6 amendment. Tracked
+    as a **deferred item on the #660 umbrella** (issue-as-tracking-artifact,
+    `deferred` idiom, `topics/claude-code-ops.md:15`); its story is created only
+    when the trigger is observed.
 
 ## Constraints
 
