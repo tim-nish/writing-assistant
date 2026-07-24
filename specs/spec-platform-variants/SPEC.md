@@ -211,17 +211,21 @@ Ratified constraints binding the implementation whenever it is ordered:
   pinned, lessons first**; the hub's **Q&A history archive is never a harvest
   source** (promotion to the recall surface is the only path).
 - **Published text carries public repository links only.**
-- **Destination (amended 2026-07-24, #653):** the email and web-archive
-  renderings land in the destination repo's **`newsletter/` section** — a
-  distinct section with its own light schema, separate from the article
-  backlog (different layer/lifecycle), web-archived so SEO accrues to the owned
-  domain (`consulted: product-lab@90877fa4e77e1353b527a76607ed2ea06daf2b27
-  topics/articles.md:61,66`). This is a **fourth permitted destination write
-  surface** recorded in SPEC-writing-assistant (#653) — *not* the drafts
-  variant surface of the "Intermediates" clause above, whose "only the variant
-  files land at `output.drafts` … and nothing else lands anywhere" now reads
-  against that extended surface. Emission still uses the same declared-profile
-  packaging machinery; only the destination section differs.
+- **Destination (amended 2026-07-24, #653; corrected 2026-07-24, #658):** the
+  email and web-archive renderings are **variant files landing at
+  `output.drafts`** like every platform variant (the "Intermediates" clause
+  above: "only the variant files land at the `output.drafts` destination").
+  The published **`newsletter/` section** — a distinct section with its own
+  light schema, separate from the article backlog (different layer/lifecycle),
+  web-archived so SEO accrues to the owned domain
+  (`consulted: product-lab@90877fa4e77e1353b527a76607ed2ea06daf2b27
+  topics/articles.md:52,60,61,66`) — is an **owner publish target**, not a
+  plugin write location: `pipeline-proposes, owner-commits`, and a profile's
+  `newsletter/` `layout.dir` is a conformance record of that target (exactly
+  as Zenn's `articles/` is). The earlier "fourth permitted destination write
+  surface" wording overreached and is **withdrawn** (the write surface is
+  unchanged from #550); emission uses the same declared-profile packaging
+  machinery as every platform.
 - **Routing — a separate working-note emission lane (amended 2026-07-24, #657/#658):**
   a working-note (F5) draft selects its newsletter platforms **directly from the
   resolvable newsletter profiles**, *not* through the language-keyed
