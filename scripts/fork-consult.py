@@ -253,30 +253,54 @@ def cmd_lint(args):
     return 0
 
 
+def _staging_block(slug, created, source_repo, perishable, tags, body):
+    """The §3.1-conformant staging-candidate block shared by every emitter
+    (CAP-4 miss, CAP-5 candidate). A conformance copy of the hub §3.1 staging-file
+    schema, in the seam's staging-candidate shape (seam-formats.md §3): no schema
+    of its own; the hub §3.1 schema is the authority and wins on any mismatch.
+    Proposal-only — printed for the owner to copy by hand; the hub is never
+    written."""
+    return (
+        "<!-- staging-candidate -->\n"
+        "<!-- conforms to hub §3.1 (product-lab specs/knowledge-architecture.md);"
+        " hub schema is the authority, wins on mismatch -->\n"
+        "---\n"
+        f"slug: {slug}\n"
+        f"created: {created}\n"
+        f"source_repo: {source_repo}\n"
+        f"perishable: {'true' if perishable else 'false'}\n"
+        f"tags: [{', '.join(tags)}]\n"
+        "---\n"
+        f"{body}"
+    )
+
+
 def cmd_emit_miss(args):
     if not SLUG_RE.match(args.slug):
         sys.stderr.write("error: --slug must be <YYYY-MM-DD>-<kebab-gist>\n")
         return REFUSED
     tags = ["fork-miss"] + list(args.tag or [])
-    # A conformance copy of the hub §3.1 staging-file schema, in the seam's
-    # staging-candidate shape (seam-formats.md §3). No schema of its own; the hub
-    # §3.1 schema is the authority and wins on any mismatch. Proposal-only —
-    # printed for the owner to copy by hand; the hub is never written.
-    block = (
-        "<!-- staging-candidate -->\n"
-        "<!-- conforms to hub §3.1 (product-lab specs/knowledge-architecture.md);"
-        " hub schema is the authority, wins on mismatch -->\n"
-        "---\n"
-        f"slug: {args.slug}\n"
-        f"created: {args.created}\n"
-        f"source_repo: {args.source_repo}\n"
-        f"perishable: {'true' if args.perishable else 'false'}\n"
-        f"tags: [{', '.join(tags)}]\n"
-        "---\n"
-        f"Q: {args.question}\n"
-        f"Decision: {args.decision}\n"
-    )
-    sys.stdout.write(block)
+    body = f"Q: {args.question}\nDecision: {args.decision}\n"
+    sys.stdout.write(_staging_block(args.slug, args.created, args.source_repo,
+                                    args.perishable, tags, body))
+    return 0
+
+
+def cmd_emit_candidate(args):
+    """CAP-5 closing step (Story 18.90, #660/#662): when a loop iteration surfaces
+    a NEW policy candidate (not an uncovered-fork miss, which emit-miss covers),
+    the loop's completing action is to emit a Proposal — a §3.1 staging-candidate
+    in THIS repo's own tree, proposal-only. The consumer never writes hub Policy:
+    it proposes, the hub promotes (a completing action stops at the ratification
+    boundary). Same emitter envelope as the CAP-4 miss; distinct tag and payload."""
+    if not SLUG_RE.match(args.slug):
+        sys.stderr.write("error: --slug must be <YYYY-MM-DD>-<kebab-gist>\n")
+        return REFUSED
+    tags = ["policy-candidate"] + list(args.tag or [])
+    grounding = "; ".join(args.grounding or []) or "(none — a genuinely new position)"
+    body = f"Candidate: {args.candidate}\nGrounding: {grounding}\n"
+    sys.stdout.write(_staging_block(args.slug, args.created, args.source_repo,
+                                    args.perishable, tags, body))
     return 0
 
 
@@ -338,6 +362,17 @@ def main(argv=None):
     it.add_argument("--applied", action="append", metavar="FILE:LINE@COMMIT",
                     help="a served line this iteration applied; repeatable")
     it.set_defaults(fn=cmd_iteration)
+    ec = sub.add_parser("emit-candidate")
+    ec.add_argument("--candidate", required=True,
+                    help="the new policy candidate the loop surfaced")
+    ec.add_argument("--grounding", action="append", metavar="FILE:LINE@COMMIT",
+                    help="a served line the candidate builds on; repeatable")
+    ec.add_argument("--slug", required=True, help="<YYYY-MM-DD>-<kebab-gist>")
+    ec.add_argument("--source-repo", required=True)
+    ec.add_argument("--created", required=True, help="YYYY-MM-DD")
+    ec.add_argument("--perishable", action="store_true")
+    ec.add_argument("--tag", action="append")
+    ec.set_defaults(fn=cmd_emit_candidate)
     args = p.parse_args(argv)
     return args.fn(args)
 

@@ -115,6 +115,26 @@ Freshness is load-bearing: the gateway serves **committed** hub state, so a
 re-consult sees new Policy only after the hub commits; a fresh `--pin` per
 iteration is what forbids caching a served position across the loop.
 
+**Proposal emission is the loop's closing step.** When an iteration surfaces a
+**new policy candidate** (not an uncovered-fork miss, which `emit-miss` already
+covers), the completing action is to **emit a Proposal** into **this repo's own
+tree** — proposal-only, the same §3.1 staging-candidate envelope as the CAP-4
+miss:
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/fork-consult.py emit-candidate \
+  --candidate "<the new policy candidate>" \
+  --grounding "<file:line@commit>" [--grounding ...] \
+  --slug "<YYYY-MM-DD>-<gist>" --source-repo "<repo>" --created "<date>"
+```
+
+The consumer **never writes hub Policy** — a completing action stops at the
+ratification boundary: the consumer's gate completes by **emitting** the
+proposal, the hub's gate completes by **promoting** it. Emit **only** when an
+iteration genuinely surfaces a new candidate; an iteration that surfaces none
+emits nothing, and emission is never unattended. "Synchronize" means propose,
+never place.
+
 ## Carrier — every fork-presenting stop point (no orphan mechanism)
 
 The stop points that raise **policy/architecture/prior-decision fork tables** are
