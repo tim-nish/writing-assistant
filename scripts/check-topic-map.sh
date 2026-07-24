@@ -438,6 +438,54 @@ grep -q 'SENTINEL-HOOK' "$work/lessons.json" \
   && err "a lesson hook reached the map — more than the index line's title was projected" \
   || ok "hub-lessons: only the index line's title is projected (no hook prose, no lesson body)"
 
+# --- 7c. topic↔evidence usability join (Story 18.96, #669) --------------------
+# With no journey record declared, every hub-lesson candidate is
+# episodic-unrecorded and surfaced in needs_recording — never silently dropped.
+python3 - "$work/lessons.json" <<'PYEOF' && ok "#669: unmatched hub lessons are episodic-unrecorded, surfaced as NEEDS-RECORDING (never dropped)" || err "usability join / needs_recording wrong with no journey"
+import json, sys
+d = json.load(open(sys.argv[1]))
+seeds = [i for t in d["topics"] for i in t["items"] if i.get("family") == "hub-lessons"]
+assert seeds, "no hub-lesson seeds"
+assert all(i["usability"]["verdict"] == "episodic-unrecorded" for i in seeds), \
+    [i.get("usability") for i in seeds]
+nr = {t["slug"]: t for t in d["needs_recording"]}
+assert {"retry-storm", "cache-warmth", "team-shape"} <= set(nr), nr
+one = nr["cache-warmth"]
+assert one["target_file"].endswith("journey.md") and one["episode"], one
+PYEOF
+
+# Declare a journey record carrying ONE lesson's slug -> that candidate MATCHES;
+# the others stay episodic-unrecorded (three-valued, never collapsed).
+mkdir -p "$h/docs"
+printf '2026-07-01 · the retry storm doubled token spend (event) · #665 · retry-storm\n' \
+  > "$h/docs/journey.md"
+cfg=$(find "$work/xdg" -name writing-sources.yaml | head -1)
+printf '\njourney:\n  - docs/journey.md\n' >> "$cfg"
+MAP > "$work/lessons2.json" 2>"$work/l2.err" \
+  && ok "#671/#669: the map assembles with a declared journey record" \
+  || err "assemble failed with a journey declared: $(cat "$work/l2.err")"
+python3 - "$work/lessons2.json" <<'PYEOF' && ok "#669: a lesson whose slug a journey entry carries is MATCHED; others stay episodic-unrecorded" || err "journey match verdict wrong"
+import json, sys
+d = json.load(open(sys.argv[1]))
+seeds = {i["slug"]: i for t in d["topics"] for i in t["items"]
+         if i.get("family") == "hub-lessons"}
+assert seeds["retry-storm"]["usability"]["verdict"] == "matched", \
+    seeds["retry-storm"]["usability"]
+assert seeds["retry-storm"]["usability"]["checked"], \
+    "a matched verdict must carry the pointers checked (audited)"
+assert seeds["cache-warmth"]["usability"]["verdict"] == "episodic-unrecorded", \
+    seeds["cache-warmth"]["usability"]
+nr = {t["slug"] for t in d["needs_recording"]}
+assert "retry-storm" not in nr and "cache-warmth" in nr, nr
+PYEOF
+
+# The SKILL presents the verdicts and never silently filters to matched.
+grep -qi 'never silently' skills/topic-map/SKILL.md \
+  && grep -q 'needs_recording' skills/topic-map/SKILL.md \
+  && grep -qi 'no-episode' skills/topic-map/SKILL.md \
+  && ok "#669: topic-map SKILL presents verdicts + NEEDS-RECORDING, never silently filters" \
+  || err "topic-map SKILL missing the usability-verdict presentation"
+
 # --- declared precedence + the malformed-declaration lint (18.74, #614) ------
 # The articles repo owns subtopic names; the derivation is the fallback. A
 # declaration the map cannot honour is a CONFIG DEFECT NAMED, never a silent

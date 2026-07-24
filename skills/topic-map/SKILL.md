@@ -79,6 +79,29 @@ If `subtopic_defects` is non-empty, relay each entry in one line: the item, the
 key, and the reason. A declaration the map cannot honour is a **configuration
 defect in the articles repo, named** — never a silent fall-back to derivation.
 
+**Usability verdict per candidate (the topic↔evidence join, #669).** Each item
+carries a `usability` verdict resolving whether the target repo can *evidence*
+it, and the map's `needs_recording` list is the join's product:
+
+- **matched** — a declared source (for a hub lesson, a `journey:` entry carrying
+  its slug — #671) resolves into the read boundary → offer as **draft-ready**,
+  evidence pre-located. The verdict carries the pointers `checked` (audited).
+- **episodic-unrecorded** — a hub lesson no declared source carries → it appears
+  in `needs_recording` as a **NEEDS-RECORDING task** naming the lesson slug, the
+  episode, and the target `journey:` file. **Present this list — never silently
+  filter to matched**: the unusable topic IS the map's product, a named backfill
+  worklist (recording an episode there makes the next harvest match it — the
+  flywheel).
+- **no-episode** — a hub lesson with no locatable episode: **offer only as
+  owner-attributed framing** (the Story 17.1 attribution tier), stated as such.
+  The seam serves only Lesson **index lines**, not bodies, so the map cannot
+  mechanically tell `no-episode` from `episodic-unrecorded` (cannot-determine);
+  it defaults an unmatched hub lesson to `episodic-unrecorded` and leaves the
+  `no-episode` call to the owner at offer.
+
+The join **locates** evidence, it never **supplies** it: no hub line becomes a
+SOURCE pointer, and every offer stays a proposal the owner ratifies.
+
 ## Step 2 — one screen
 
 ```
