@@ -165,6 +165,63 @@ python3 "$DP" complete --draft "$ws/draft2.md" --slug "$slug" --root "$h" --ws "
   && ok "no-clobber gate: the owning run's revision loop proceeds (#666)" \
   || err "owned same-run revision was refused"
 
+# 3c. Completion-gate lint (Story 18.99, #674): a frontmatter BOUNDS violation
+#     (summary > 240) is a hard error with no done checkpoint; style-class
+#     findings are disclosed warnings, never blocking completion.
+long=$(python3 -c "print('x'*260)")
+wsl="$work/wslint"; mkdir -p "$wsl"
+cat > "$wsl/draft.md" <<EOF
+---
+slug: lint-bounds
+title: "A short title"
+language: en
+audience: en-practitioner
+audience_id: en-practitioner
+summary: "$long"
+---
+
+## Hook
+
+Body text for the lint-bounds case.
+EOF
+cat > "$work/plan-lint.md" <<EOF
+---
+kind: article-plan
+slug: lint-bounds
+intent: share engineering lessons
+claim: the claim
+status: drafted
+run_id: 20260718T000000-000000
+pin: host@$sha
+---
+
+## Section plan
+
+- a point / docs/x.md:1@$sha
+EOF
+python3 "$W" write --slug lint-bounds --root "$h" "$work/plan-lint.md" >/dev/null 2>&1
+if python3 "$DP" complete --draft "$wsl/draft.md" --slug lint-bounds --root "$h" --ws "$wsl" \
+     >/dev/null 2>"$work/e_lint"; then
+  err "completion reported over a summary-bounds-invalid canonical"
+else
+  grep -q 'lint-article rejects it on schema' "$work/e_lint" \
+    && grep -q 'chars (> 240)' "$work/e_lint" \
+    && ok "#674: a summary>240 canonical hard-errors at the completion gate" \
+    || err "lint bounds hard-error wrong: $(cat "$work/e_lint")"
+fi
+[ ! -f "$wsl/checkpoint.json" ] \
+  && ok "#674: no done checkpoint on a schema-bounds lint failure" \
+  || err "checkpoint written despite a schema-bounds lint failure"
+# A within-bounds canonical completes; style-class findings (missing fields,
+# pointer) are disclosed as completion warnings, never a hard error.
+python3 "$DP" complete --draft "$ws/draft.md" --slug "$slug" --root "$h" --ws "$ws" 2>/dev/null \
+  | python3 -c "import json,sys; d=json.load(sys.stdin); assert d.get('lint_warnings'), 'no lint_warnings'; print('ok')" >/dev/null 2>&1 \
+  && ok "#674: style-class lint findings are disclosed as completion warnings" \
+  || err "style-class lint findings not disclosed in the completion summary"
+grep -qi 'lint-article' "$SKILL" && grep -qi 'lint_warnings\|disclosed warning' "$SKILL" \
+  && ok "#674: SKILL documents the completion-gate lint (schema gates, style warns)" \
+  || err "SKILL missing the completion-gate lint contract"
+
 # 4. Plan missing → hard error naming product + path, NO checkpoint, even
 #    though the canonical write succeeded (partial success still hard-errors).
 ws2="$work/ws2"; mkdir -p "$ws2"

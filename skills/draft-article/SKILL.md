@@ -719,6 +719,16 @@ relay them in the completion summary's informational notes. Re-running
 `complete` over already-persisted products re-verifies and succeeds
 (idempotent).
 
+**`complete` also runs the destination repo's `lint-article` on the persisted
+canonical (Story 18.99, #674)** — authoritative by pointer, no rule copying. A
+frontmatter **bounds** violation (`summary` > 240, `title` > 70) is a **hard
+error** with no `next_stage: done` checkpoint, exactly like a failed product
+write — a run never reports "complete" over a canonical the destination repo
+rejects on schema. Every other lint class (`pointer`, `headings`, `links`,
+`template`, missing-field schema) is a **disclosed warning** in `complete`'s JSON
+(`lint_warnings`) — relay it in the completion summary; style rules never block
+completion.
+
 **The articles repo's `INDEX.md` is regenerated at persist (Story 18.43,
 #540).** The repo declares it "regenerated — one line per
 backlog/draft/newsletter item", but nothing carried that duty out: a repo
