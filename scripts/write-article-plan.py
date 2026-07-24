@@ -120,6 +120,15 @@ OPTIONAL_KEYS = ("audience", "audience_id", "policy_seeded", "seed", "relates",
                  # unconsumed elements. Keyed by element id, so it survives
                  # re-harvest pointer drift (the id is identity, 18.8).
                  "consumed",
+                 # `sections` (CAP-9 disclosure, Story 18.93/#668): the
+                 # section→element map — a one-line JSON array of
+                 # {title, elements} projected from the run's argument-plan
+                 # section-intents at completion. Additive: a plan without it is
+                 # unchanged; every element it names must be in `consumed`, so
+                 # the map can never drift from the consumption record. Makes
+                 # the owner's N-sections-vs-N-lessons review mechanical from
+                 # one durable file.
+                 "sections",
                  # `brief_provenance` (Story 18.24, #505): records that this
                  # plan was shaped by a free-form OWNER coverage brief. The only
                  # accepted value is `owner-authored` — the brief is the owner's
@@ -178,6 +187,36 @@ def parse_id_list(raw):
     if s.startswith("[") and s.endswith("]"):
         s = s[1:-1]
     return [t.strip().strip('"').strip("'") for t in s.split(",") if t.strip()]
+
+
+def parse_sections(raw):
+    """A `sections:` frontmatter value → the ordered list of section→element
+    mappings (Story 18.93, #668). The flat frontmatter parser stores the value
+    as a one-line JSON array (nested YAML is not parseable here), each item
+    `{"title": <str>, "elements": [<element-id>, ...]}`. Raises ValueError on a
+    malformed value so the schema can refuse it. An empty/absent value → []."""
+    s = str(raw).strip()
+    if not s:
+        return []
+    try:
+        data = json.loads(s)
+    except json.JSONDecodeError as e:
+        raise ValueError(f"not a one-line JSON array: {e}")
+    if not isinstance(data, list):
+        raise ValueError("must be a JSON array of {title, elements} objects")
+    out = []
+    for i, item in enumerate(data, 1):
+        if not isinstance(item, dict):
+            raise ValueError(f"section {i} is not an object")
+        title = item.get("title")
+        elements = item.get("elements")
+        if not isinstance(title, str) or not title.strip():
+            raise ValueError(f"section {i} has no non-empty title")
+        if not isinstance(elements, list) or not elements:
+            raise ValueError(f"section {i} ({title!r}) lists no elements")
+        out.append({"title": title.strip(),
+                    "elements": [str(e).strip() for e in elements]})
+    return out
 
 # The CAP-4 conformance trio (Story 13.76): optional in general, required as a
 # set when the plan is policy-seeded — recorded by `conformance --write`.
@@ -372,6 +411,35 @@ def validate_plan(text, path):
         if len(set(ids)) != len(ids):
             yield ("consumed", "duplicate story-element id — consumption is a "
                                "set keyed by id, list each element at most once")
+
+    # `sections` (CAP-9 disclosure, Story 18.93/#668): the section→element map,
+    # additive and optional. A plan without it validates exactly as before. When
+    # present it is the durable record of which element(s) landed in each section
+    # (making the owner's N-sections-vs-N-lessons review mechanical). Validated
+    # fail-closed: well-formed JSON shape, each section's element ids well-formed,
+    # and — the grouping-integrity check — every section element must be a
+    # consumed element (a section cannot place an element the draft never
+    # consumed), so the map can never drift from the consumption record.
+    if "sections" in fields:
+        try:
+            secs = parse_sections(fields["sections"])
+        except ValueError as e:
+            yield ("sections", f"malformed section→element map — {e}; the value "
+                               "is a one-line JSON array of "
+                               '{"title": <str>, "elements": [<element-id>, ...]}')
+            secs = []
+        consumed_set = set(parse_id_list(fields.get("consumed", "")))
+        for i, sec in enumerate(secs, 1):
+            for el in sec["elements"]:
+                if not ELEMENT_ID_RE.match(el):
+                    yield ("sections", f"section {i} ({sec['title']!r}) names a "
+                                       f"malformed element id {el!r}")
+                elif "consumed" in fields and el not in consumed_set:
+                    yield ("sections", f"section {i} ({sec['title']!r}) places "
+                                       f"element {el!r}, which is not in "
+                                       "`consumed` — the section map cannot "
+                                       "reference an element the draft never "
+                                       "consumed")
 
     # `brief_provenance` (Story 18.24/#505): the owner coverage brief is the
     # owner's own words — the only accepted provenance is owner-authored.
