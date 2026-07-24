@@ -249,6 +249,30 @@ python3 "$F" iteration --trigger pre-emit --pin "not-a-pin" >/dev/null 2>"$work/
        && ok "CAP-5: a missing/invalid fresh pin is refused (no cache)" \
        || err "CAP-5: bad pin refused for the wrong reason: $(cat "$work/e")"; }
 
+# --- CAP-5 closing step (#660): proposal emission for a NEW policy candidate ---
+python3 "$F" emit-candidate --candidate "consumers should re-consult pre-emit" \
+  --grounding "topics/knowledge-architecture.md:80@8f3c2d1e4a5b6c7d" \
+  --slug "2026-07-24-reconsult-pre-emit" --source-repo "writing-assistant" \
+  --created "2026-07-24" > "$work/cand.md" 2>"$work/e"
+if grep -q '<!-- staging-candidate -->' "$work/cand.md" \
+   && grep -q 'conforms to hub §3.1' "$work/cand.md" \
+   && grep -q 'tags: \[policy-candidate\]' "$work/cand.md" \
+   && grep -q 'Candidate: consumers should re-consult pre-emit' "$work/cand.md" \
+   && grep -q 'Grounding: topics/knowledge-architecture.md:80@' "$work/cand.md"; then
+  ok "CAP-5: emit-candidate yields a §3.1 staging-candidate block tagged policy-candidate"
+else
+  err "CAP-5: emit-candidate block wrong: $(cat "$work/cand.md" "$work/e")"
+fi
+python3 "$F" emit-candidate --candidate x --slug "bad_slug" \
+  --source-repo r --created 2026-07-24 >/dev/null 2>&1 \
+  && err "CAP-5: emit-candidate accepted a malformed slug" \
+  || ok "CAP-5: emit-candidate refuses a malformed slug"
+# emit-miss still emits its fork-miss block after the shared-helper refactor
+python3 "$F" emit-miss --question q --decision d --slug "2026-07-24-a-miss" \
+  --source-repo r --created 2026-07-24 2>/dev/null | grep -q 'tags: \[fork-miss\]' \
+  && ok "CAP-4: emit-miss still emits a fork-miss block (shared-helper regression)" \
+  || err "CAP-4: emit-miss regressed after the refactor"
+
 if [ "$fail" -eq 0 ]; then
   printf '\nAll fork-consult checks passed.\n'; exit 0
 else
