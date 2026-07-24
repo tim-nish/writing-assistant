@@ -170,6 +170,46 @@ python3 "$DP" quality-gate --draft "$work/vocab-fixed.md" | jget 'd["dimensions"
   && ok "one revision addressing the complete set clears dim3 (convergence)" \
   || err "dim3 still failing after a complete revision — the loop cannot converge"
 
+# Story 18.98/#673 — a DRAFT COINAGE (backticked, compound) used with no first-use
+# gloss fails dim3, even though it is not in the internal-vocabulary inventory.
+cat > "$work/coinage.md" <<'MD'
+---
+slug: c
+audience: en-practitioner
+audience_id: en-practitioner
+---
+# T
+
+The overnight loop is `patch-non-equivalent` and that broke our mental model.
+MD
+python3 "$DP" quality-gate --draft "$work/coinage.md" | jget 'd["dimensions"]["dim3"]["verdict"]' | grep -q fail \
+  && ok "#673: an undefined draft coinage fails dim3 (definedness-at-first-use)" \
+  || err "an undefined backticked coinage passed dim3"
+python3 "$DP" quality-gate --draft "$work/coinage.md" \
+  | jget 'd["dimensions"]["dim3"]["locations"]' | grep -q 'patch-non-equivalent' \
+  && ok "#673: dim3 names the uncalibrated coinage in its locations" \
+  || err "dim3 did not name the coinage"
+# An in-sentence apposition at first use clears it.
+cat > "$work/coinage-fixed.md" <<'MD'
+---
+slug: c
+audience: en-practitioner
+audience_id: en-practitioner
+---
+# T
+
+The overnight loop is `patch-non-equivalent` (a change git cannot represent as
+one commit), and that broke our mental model.
+MD
+python3 "$DP" quality-gate --draft "$work/coinage-fixed.md" | jget 'd["dimensions"]["dim3"]["verdict"]' | grep -q pass \
+  && ok "#673: a coinage glossed by apposition at first use passes dim3" \
+  || err "a glossed coinage still failed dim3"
+# The owner-ratified allowlist excludes a coinage too.
+python3 "$DP" quality-gate --draft "$work/coinage.md" \
+  --audience-known "patch-non-equivalent" | jget 'd["dimensions"]["dim3"]["verdict"]' | grep -q pass \
+  && ok "#673: an audience-known coinage is excluded (--audience-known)" \
+  || err "allowlisted coinage still failed dim3"
+
 # #305 — WRAPPED GLOSS reproduction: prose wraps, so a term and the gloss that
 # introduces it straddle a line break. A line-based scan calls the gloss absent
 # and manufactures a false violation. Asserted explicitly (not only via the

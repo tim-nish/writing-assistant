@@ -525,6 +525,46 @@ def _dim3_scan_units(draft_text):
         yield flush(buf)
 
 
+_BACKTICKED = re.compile(r"`([^`]+)`")
+
+
+def _dim3_coinage_terms(units):
+    """Backticked coinages the DRAFT itself introduces (Story 18.98, #673) — the
+    definedness-at-first-use surface beyond the closed internal-vocabulary
+    inventory. The gate escape #673 records: a draft-specific term like
+    `patch-non-equivalent` or `conflict-group question` is not in
+    `internal-vocabulary.json`, so dim3 never checked it for a gloss and passed a
+    draft its declared audience could not parse.
+
+    A coinage is a backticked span the owner explicitly marked a term AND that is
+    compound (hyphenated), multi-word, or mixed-case — so a single plain word is
+    not flagged. Paths, flags, `$vars`, and filenames are references, not coined
+    vocabulary, and are excluded. Bare (un-backticked) noun-phrase coinages stay
+    with the cheap-tier judge / cold read — a mechanical scan cannot tell them
+    from ordinary prose (SPEC-article-draft-pipeline CAP-7, #673)."""
+    terms, seen = [], set()
+    for text, kind, _line in units:
+        if kind != "prose":
+            continue
+        for m in _BACKTICKED.finditer(text):
+            raw = m.group(1).strip()
+            key = raw.lower()
+            if key in seen or not raw:
+                continue
+            if "/" in raw or raw.startswith("-") or raw.startswith("$"):
+                continue                       # path / flag / variable — a reference
+            if re.search(r"\.(py|md|sh|json|ya?ml|txt)$", raw):
+                continue                       # filename — a reference
+            is_compound = "-" in raw
+            is_phrase = " " in raw
+            is_mixedcase = raw != raw.lower() and raw != raw.upper()
+            if not (is_compound or is_phrase or is_mixedcase):
+                continue                       # a single plain word — not a coinage
+            seen.add(key)
+            terms.append(raw)
+    return terms
+
+
 def _dimension3(draft_text, allowlist=()):
     """Return the COMPLETE list of dim3 violations as (term, line) — every
     uncalibrated term in one pass, so a single revision can clear the dimension.
@@ -533,7 +573,9 @@ def _dimension3(draft_text, allowlist=()):
     or defining sentence; an inline appositive at first load-bearing use; an
     abbreviation expanded-with-gloss. A heading occurrence is neutral; a
     diagram label is a use; an expansion of an already-introduced base term is
-    never re-promoted to unintroduced.
+    never re-promoted to unintroduced. The scanned term set is the closed
+    internal-vocabulary inventory PLUS the draft's own backticked coinages
+    (Story 18.98, #673) — a coined term used with no first-use gloss fails too.
     """
     vocab_terms, vocab_res = _load_internal_vocabulary()
     known = {t.lower() for t in allowlist}
@@ -574,6 +616,26 @@ def _dimension3(draft_text, allowlist=()):
         if not ok and not any(b.lower() != surface.lower()
                               and b.lower() in surface.lower() for b in introduced)
     ]
+
+    # Draft-coinage pass (Story 18.98, #673): a backticked coinage the draft
+    # introduces must be glossed AT first use — an in-sentence apposition after
+    # the term (`term` (gloss) / `term`, gloss, / `term` — gloss). Unlike the
+    # inventory scan this does NOT accept a loose defining verb elsewhere in the
+    # block: definedness-at-first-use is the contract the #673 escape names, and
+    # a stray "is" in the sentence is not a definition of the coined term.
+    for term in _dim3_coinage_terms(units):
+        if term.lower() in known:
+            continue
+        rx = re.compile("`" + re.escape(term) + "`")
+        glossed_at_use = re.compile("`" + re.escape(term) + "`" + _APPOSITIVE, re.I)
+        for text, kind, line_of in units:
+            m = rx.search(text)
+            if not m or kind == "heading":
+                continue
+            if not glossed_at_use.search(text):
+                violations.append((m.group(0), line_of(m.start())))
+            break                              # first load-bearing use decides
+
     return sorted(violations, key=lambda v: (v[1], v[0]))
 
 
