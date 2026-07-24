@@ -88,6 +88,11 @@ def _served_ok(pointer):
 # extension, so it survives the D3 promotion to a shared versioned contract.
 OUTCOMES = ("auto-resolved-FYI", "escalated")
 
+# CAP-5 (#660): the iterative loop consults at these trigger points. `fork` is
+# the CAP-1 per-fork consult (unchanged); `task-start` and `pre-emit` are the
+# new call sites the loop adds.
+ITERATION_TRIGGERS = ("task-start", "fork", "pre-emit")
+
 
 def classify(forks, pin, policy_available, overridden=None):
     """Return (report, defects). report partitions every fork; defects is a list
@@ -275,6 +280,31 @@ def cmd_emit_miss(args):
     return 0
 
 
+def cmd_iteration(args):
+    """CAP-5 iterative loop (Story 18.89, #660/#661): emit one iteration's
+    `consulted:` receipt. The loop consults at **task start**, at **each in-scope
+    fork** (CAP-1, unchanged), and **before emitting a design artifact**; each
+    iteration records its own receipt naming the served lines it applied. The pin
+    is validated fresh — no consultation cache across iterations or sittings."""
+    if args.trigger not in ITERATION_TRIGGERS:
+        sys.stderr.write(f"error: --trigger must be one of {list(ITERATION_TRIGGERS)}\n")
+        return REFUSED
+    if not core.PIN_RE.match(str(args.pin)):
+        sys.stderr.write("error: --pin must be <policy-source>@<commit> "
+                         "(fresh per iteration; no consultation cache)\n")
+        return REFUSED
+    applied = list(args.applied or [])
+    bad = [p for p in applied if not _served_ok(p)]
+    if bad:
+        sys.stderr.write("error: --applied pointers must be <file:line@commit>: "
+                         + ", ".join(bad) + "\n")
+        return REFUSED
+    receipt = {"kind": "iteration", "trigger": args.trigger, "pin": args.pin,
+               "applied": applied}
+    print(json.dumps(receipt, indent=2))
+    return 0
+
+
 def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -300,6 +330,14 @@ def main(argv=None):
     em.add_argument("--perishable", action="store_true")
     em.add_argument("--tag", action="append")
     em.set_defaults(fn=cmd_emit_miss)
+    it = sub.add_parser("iteration")
+    it.add_argument("--trigger", required=True,
+                    help="task-start | fork | pre-emit (CAP-5 loop trigger)")
+    it.add_argument("--pin", required=True,
+                    help="<policy-source>@<commit>, fresh per iteration (no cache)")
+    it.add_argument("--applied", action="append", metavar="FILE:LINE@COMMIT",
+                    help="a served line this iteration applied; repeatable")
+    it.set_defaults(fn=cmd_iteration)
     args = p.parse_args(argv)
     return args.fn(args)
 
