@@ -175,6 +175,11 @@ def main(argv=None):
     p.add_argument("--judge-findings", help="independent judge's verdicts: `POS: reason` per line")
     p.add_argument("--list-narration", action="store_true", help="list narration positions for the judge")
     p.add_argument("--list-derived", action="store_true", help="list derived positions + pointers for the judge")
+    p.add_argument("--list-sourced", action="store_true",
+                   help="list sourced positions + pointers for the judge to grade ATTRIBUTION "
+                        "entailment (Story 18.97, #672): does the pointer support the claim AS "
+                        "STATED, including its actor/scope? A supported-topic-but-contradicted-"
+                        "attribution span is a `contradicted-attribution` finding")
     p.add_argument("--draft", help="the draft the map describes; makes the judge hand-off carry each\nposition's anchored line verbatim, and lets an echoed judge quote be checked (#304)")
     args = p.parse_args(argv)
 
@@ -191,8 +196,9 @@ def main(argv=None):
     # P{n}.S{n} numbering from skip rules (#304). Emission is a pure function of
     # (map, draft): every spawn receives byte-identical text, which is what makes
     # three judges agree on what P8.S3 is.
-    if args.list_narration or args.list_derived:
-        cls_wanted = "narration" if args.list_narration else "derived"
+    if args.list_narration or args.list_derived or args.list_sourced:
+        cls_wanted = ("narration" if args.list_narration
+                      else "derived" if args.list_derived else "sourced")
         listed = [e for e in entries if e[1] == cls_wanted]
         # Attestation header the judge must echo verbatim at the top of its
         # verdicts file (Story 13.67): the draft hash binds the verdicts to
