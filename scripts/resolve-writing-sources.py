@@ -162,6 +162,7 @@ def sources_path(root, notice=False):
 NEEDS_PROMPT = 3      # draft-location: no output.drafts declared
 POLICY_MALFORMED = 4  # policy-source: block present but malformed
 SOURCES_MALFORMED = 5 # sources: include: line not the inline-list form (#221)
+JOURNEY_MALFORMED = 6 # journey: block present but malformed / unreadable (#671)
 
 
 class MalformedSources(ValueError):
@@ -557,6 +558,50 @@ def get_typed_sources(lines, root):
     if errors:
         raise MalformedSources("\n".join(errors))
     return entries
+
+
+def get_journey(lines, root):
+    """Parse the optional top-level `journey:` block (Story 18.95, #671) into
+    (paths, errors): the declared episode-record file(s), each resolved to an
+    absolute path against `root`. `journey:` is a list — a block of `- path`
+    items, or an inline `[a, b]`. An absent block → ([], []); a declared-but-
+    empty or path-escaping block → an error. Resolution/validation follows the
+    source-set rules: a path never escapes the root."""
+    start, end = _block_span(lines, r"^journey:\s*(#.*)?$")
+    if start is None:
+        return [], []
+    errors = []
+    raws = []
+    m = re.match(r"^journey:\s*\[(.*)\]\s*(#.*)?$", lines[start])
+    if m:                                   # inline list form
+        raws = [x.strip().strip('"').strip("'") for x in m.group(1).split(",")
+                if x.strip()]
+    else:                                   # block list of `- path` items
+        for ln in lines[start + 1:end]:
+            if ln.strip() == "" or ln.lstrip().startswith("#"):
+                continue
+            lm = re.match(r"^\s*-\s*(.*?)\s*$", ln)
+            if not lm:
+                errors.append(("journey", f"unreadable list line {ln.strip()!r} — "
+                               "journey is a list of episode-record file paths "
+                               "(e.g. `- docs/journey.md`)"))
+                continue
+            item = re.sub(r"\s+#.*$", "", lm.group(1)).strip().strip('"').strip("'")
+            if item:
+                raws.append(item)
+    if not raws and not errors:
+        errors.append(("journey", "declared but empty — remove the key or name at "
+                       "least one episode-record file"))
+    paths = []
+    for r in raws:
+        if ".." in r.split("/"):
+            errors.append(("journey", f"path {r!r} escapes the repository with "
+                           "`..` — an episode record lives inside the declared "
+                           "source set"))
+            continue
+        paths.append(os.path.normpath(r) if os.path.isabs(r)
+                     else os.path.normpath(os.path.join(root, r)))
+    return paths, errors
 
 
 def get_sources(lines, root):
@@ -1029,8 +1074,20 @@ def cmd_is_declared(args):
 
 def cmd_files(args):
     root = host_root(args.root)
-    sources = get_sources(read_lines(root), root)
+    lines = read_lines(root)
+    sources = get_sources(lines, root)
     files = enumerate_files(sources)
+    # Declared journey files (#671) are read as ordinary declared prose — no new
+    # read path — so they join the harvest read set, deduplicated against the
+    # source enumeration. A non-existent journey file contributes nothing here
+    # (its absence is surfaced by the `journey` validation subcommand instead).
+    jpaths, _ = get_journey(lines, root)
+    seen = {os.path.realpath(f) for f in files}
+    for jp in jpaths:
+        if os.path.isfile(jp) and os.path.realpath(jp) not in seen:
+            seen.add(os.path.realpath(jp))
+            files.append(jp)
+    files = sorted(files)
     for f in files:
         print(f)
     # Emit the whole-tree noise warning only after the file list is fully
@@ -1051,6 +1108,31 @@ def cmd_files(args):
             f"{SOURCES_FILE} (e.g. `include: [\"specs/**\", \"docs/**\"]`); see "
             f"config/writing-sources.example.yaml. Default scope is unchanged — "
             f"this is advisory only.\n")
+    return 0
+
+
+def cmd_journey(args):
+    """Resolve the declared `journey:` episode-record file(s) (#671). Prints
+    `{"journey": [<abs path>, ...]}` when the block is absent (empty list) or
+    every declared file resolves to a readable file. A malformed block or a
+    declared file that does not exist is a stage-0 configuration DEFECT — the
+    same lint shape used for source `include:` paths and variant-profile target
+    directories — surfaced on stderr, exiting JOURNEY_MALFORMED so the stage-0
+    aggregate (validate-config.py) relays it."""
+    import json
+    root = host_root(args.root)
+    paths, errors = get_journey(read_lines(root), root)
+    for key, msg in errors:
+        sys.stderr.write(f"[{SOURCES_FILE}] {key}: {msg}\n")
+    missing = [p for p in paths if not os.path.isfile(p)]
+    for p in missing:
+        sys.stderr.write(
+            f"[{SOURCES_FILE}] journey: declared episode-record file does not "
+            f"exist or is not a readable file: {p}. Fix: create it, or correct "
+            "the `journey:` path.\n")
+    if errors or missing:
+        return JOURNEY_MALFORMED
+    print(json.dumps({"journey": paths}))
     return 0
 
 
@@ -1091,6 +1173,7 @@ def main(argv=None):
     sp = sub.add_parser("is-declared", parents=[root_parent])
     sp.add_argument("path")
     sub.add_parser("files", parents=[root_parent])
+    sub.add_parser("journey", parents=[root_parent])
     sub.add_parser("policy-source", parents=[root_parent])
     sp = sub.add_parser("set-policy-source", parents=[root_parent])
     # No positional PATH (Story 13.73, #366): the block is a presence toggle;
@@ -1121,6 +1204,7 @@ def main(argv=None):
             "typed-sources": cmd_typed_sources,
             "is-declared": cmd_is_declared,
             "files": cmd_files,
+            "journey": cmd_journey,
             "policy-source": cmd_policy_source,
             "set-policy-source": cmd_set_policy_source,
             "set-sources": cmd_set_sources,

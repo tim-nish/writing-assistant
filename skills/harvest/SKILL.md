@@ -53,6 +53,11 @@ material in scope. It already:
   host repo** (#211); resolve its location with
   `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-paths.py sources-file --root <host-repo>`;
 - applies each source's `include:` globs as an allowlist;
+- includes any file declared under the optional `journey:` key (#671) — a
+  repo's episode-record file(s), read as **ordinary declared prose** through the
+  same `files` enumeration (no new read path). A journey entry is an atomic-kind
+  fact (date · the episode as `event|number|quote|result` · local ids · the hub
+  lesson slug it produced), so it satisfies the F2 evidence-type gate natively;
 - prunes `.git/` and refuses any symlink or `..` that escapes a declared root.
 
 **Read nothing outside this list.** Do not traverse a sibling directory because
