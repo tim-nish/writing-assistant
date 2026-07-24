@@ -665,6 +665,32 @@ checkpoint yet — the guarantee is that no invocation ends silently. A complete
 run defers to the `complete` gate's persisted-path relay below and never restates
 it.
 
+**An ELECTIVE pause is an owner gate, rendered as a selection (Story 18.94, #667;
+SPEC-article-draft-pipeline invariant, 2026-07-24).** The line above covers
+*involuntary* stops (turn ceiling, budget triage). This governs the pauses the
+agent *elects* while contracted work remains — and an elected pause has none of a
+gate's properties unless you give it them:
+
+- **Elective pauses are permitted only at an ENUMERATED sanctioned point.** The
+  sanctioned points are the involuntary contracted stops (the turn-ceiling
+  casualty and the budget-triage orderly stop) plus a stage boundary explicitly
+  carrying large declared spend. **Absent a sanctioned point, the default is to
+  continue the contracted chain** — do not stop and ask.
+- **A bounded contracted step is NOT a pause point.** Electively stopping
+  immediately before a defined bounded step of a stage — e.g. the evidence-type
+  **`repair-hop`** (below), a re-judge, a re-gate — inverts the gate model: gates
+  end in actions, and a gate's outcome executes in the same sitting. Finish the
+  bounded step; do not pause in front of it.
+- **When you do elect a sanctioned pause, render it as a gate, not prose.** Its
+  **first line leads** — `PAUSED (elective) · run <ws> · stage <next_stage> · one
+  action` — never below a status report, and it presents an **explicit selection**
+  ("Continue now (<the bounded work>) / Pause here (resumes automatically at
+  `<stage>`)"), the same option-screen contract the interview uses. **No selection
+  presented ⇒ no elective pause.** A trailing "say *continue*" is the exact
+  anti-pattern this replaces.
+- The pause is disclosed by the stop-side run-status line above (elected pauses
+  are one of its named exit paths).
+
 **Mark the run done on completion — through the completion gate (Story 13.68).**
 When the pipeline finishes, run the `complete` subcommand. It is the **only
 sanctioned way to finish a draft run** — never hand-write the final
