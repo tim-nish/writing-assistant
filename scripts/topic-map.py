@@ -1397,6 +1397,67 @@ def cluster_subtopics(items, consumption, thresholds):
     return out
 
 
+def journey_join(root, topics):
+    """Resolve each candidate's usability against the target repo's declared
+    sources — the mechanical topic↔evidence join (Story 18.96, #669). Returns the
+    NEEDS-RECORDING worklist and annotates every item in place with `usability`.
+
+    A hub-lesson candidate is `matched` when a declared **journey** entry carries
+    its slug (the #671 join key resolves into declared sources); otherwise it is
+    `episodic-unrecorded` and emits a NEEDS-RECORDING task naming the slug, the
+    episode label, and the target journey file. **Never a silent drop** — the
+    unusable candidate IS the map's product, a named backfill worklist
+    (constrained-excludes-visibly, the flywheel that grows the usable set). A
+    source-derived or articles item is `matched` by construction: its evidence is
+    the declared source it came from. Every verdict carries the pointers checked
+    (audited), and the join only LOCATES evidence — it never supplies it, and no
+    hub line becomes a SOURCE pointer.
+
+    Boundary — `no-episode` is cannot-determine here: distinguishing a lesson the
+    hub records with no episode at all from one whose episode is merely unrecorded
+    needs the Lesson BODY, which the seam does not serve (only index lines, OQ3).
+    So an unmatched hub lesson defaults to `episodic-unrecorded` — the expected
+    day-one majority — and `no-episode` is the owner's attribution at offer
+    (Story 17.1 tier), stated as such."""
+    jpaths = []
+    r = subprocess.run([sys.executable, SRC_RES, "--root", root, "journey"],
+                       capture_output=True, text=True)
+    if r.returncode == 0:
+        try:
+            jpaths = json.loads(r.stdout).get("journey", [])
+        except json.JSONDecodeError:
+            jpaths = []
+    haystack = ""
+    for p in jpaths:
+        try:
+            with open(p, encoding="utf-8") as fh:
+                haystack += fh.read() + "\n"
+        except OSError:
+            continue
+    checked = list(jpaths)
+    target_file = jpaths[0] if jpaths else os.path.join(root, "docs", "journey.md")
+    target_repo = os.path.basename(root)
+    needs_recording = []
+    for topic in topics:
+        for item in topic["items"]:
+            if item.get("family") != FAMILY_HUB_LESSONS:
+                item["usability"] = {"verdict": "matched", "checked": []}
+                continue
+            slug = item.get("slug") or ""
+            if slug and slug in haystack:
+                item["usability"] = {"verdict": "matched", "checked": checked}
+            else:
+                item["usability"] = {"verdict": "episodic-unrecorded",
+                                     "checked": checked}
+                needs_recording.append({
+                    "slug": slug,
+                    "episode": item.get("title") or slug,
+                    "target_repo": target_repo,
+                    "target_file": target_file,
+                })
+    return sorted(needs_recording, key=lambda t: t["slug"])
+
+
 def build_map(args):
     """The whole map, recomputed from scratch. No input to this function is a
     previously emitted map — there is no such input anywhere in this script."""
@@ -1430,6 +1491,10 @@ def build_map(args):
                     "key": key,
                     "reason": reason,
                 })
+    # Topic↔evidence usability join (Story 18.96, #669) — annotate every item
+    # with its usability verdict and collect the NEEDS-RECORDING worklist BEFORE
+    # clustering, so the subtopic-item copies carry the verdict too.
+    needs_recording = journey_join(root, topics)
     for topic in topics:
         topic["subtopics"] = cluster_subtopics(topic["items"], consumption, thresholds)
     return {
@@ -1450,6 +1515,11 @@ def build_map(args):
         "subtopic_defects": sorted(subtopic_defects,
                                    key=lambda d: (d["item"], d["key"])),
         "topics": topics,
+        # The topic↔evidence join's product (Story 18.96, #669): the
+        # NEEDS-RECORDING worklist for hub-lesson candidates whose episode no
+        # declared source carries. Never a silent drop — the unusable candidate
+        # is surfaced as named backfill work (constrained-excludes-visibly).
+        "needs_recording": needs_recording,
         "coverage": coverage,
         "consumption": consumption,
         "depth_thresholds": thresholds,
