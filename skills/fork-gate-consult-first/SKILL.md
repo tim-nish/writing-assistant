@@ -92,6 +92,29 @@ own** — the same emitter the divergence detector (#436/#482) cites. This skill
 is the **second emitter** into that intake: shared envelope, distinct payload.
 The **upstream hub is never written**; the copy is a manual, approved owner step.
 
+## The iterative loop (CAP-5, #660)
+
+The per-fork consult of CAP-1 is not one-shot. Consult at **task start**, at
+**each in-scope fork** (CAP-1, unchanged), and **before emitting a design
+artifact** — so the served surface is re-read as implementation makes the
+development state concrete. Re-consult triggers are **precision-first**:
+under-trigger over false positives (mirroring the hub's ambient-trigger rule),
+with the explicit consult as the fallback for a missed trigger.
+
+Each iteration records **its own `consulted:` receipt** naming the served lines
+it applied, via the `iteration` subcommand (the pin is validated fresh — no
+consultation cache across iterations or sittings):
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/fork-consult.py iteration \
+  --trigger task-start|fork|pre-emit --pin "<policy-source>@<commit>" \
+  --applied "<file:line@commit>" [--applied ...]
+```
+
+Freshness is load-bearing: the gateway serves **committed** hub state, so a
+re-consult sees new Policy only after the hub commits; a fresh `--pin` per
+iteration is what forbids caching a served position across the loop.
+
 ## Carrier — every fork-presenting stop point (no orphan mechanism)
 
 The stop points that raise **policy/architecture/prior-decision fork tables** are

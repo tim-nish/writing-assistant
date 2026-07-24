@@ -228,6 +228,27 @@ present && err "an ungrounded premise in the gate question was accepted" \
        && ok "#567: an ungrounded premise in the gate QUESTION is refused" \
        || err "gate-question premise not refused: $(cat "$work/e")"; }
 
+# --- CAP-5 (#660): the iterative loop's per-iteration receipt -----------------
+# Each iteration (task-start / fork / pre-emit) emits its own consulted: receipt;
+# the pin is validated fresh (no cache); a bad trigger/pin/pointer is refused.
+python3 "$F" iteration --trigger task-start --pin "$PIN" \
+  --applied "topics/articles.md:17@8f3c2d1e4a5b6c7d" > "$work/it.json" 2>"$work/e" \
+  && python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); sys.exit(0 if d["kind"]=="iteration" and d["trigger"]=="task-start" and d["applied"]==["topics/articles.md:17@8f3c2d1e4a5b6c7d"] else 1)' "$work/it.json" \
+  && ok "CAP-5: an iteration emits a receipt naming the served lines it applied" \
+  || err "CAP-5: iteration receipt wrong: $(cat "$work/it.json" "$work/e")"
+
+python3 "$F" iteration --trigger midway --pin "$PIN" >/dev/null 2>"$work/e" \
+  && err "CAP-5: an invalid trigger was accepted" \
+  || { grep -q 'trigger must be one of' "$work/e" \
+       && ok "CAP-5: an out-of-set trigger is refused" \
+       || err "CAP-5: bad trigger refused for the wrong reason: $(cat "$work/e")"; }
+
+python3 "$F" iteration --trigger pre-emit --pin "not-a-pin" >/dev/null 2>"$work/e" \
+  && err "CAP-5: a cache-shaped (invalid) pin was accepted" \
+  || { grep -q 'no consultation cache' "$work/e" \
+       && ok "CAP-5: a missing/invalid fresh pin is refused (no cache)" \
+       || err "CAP-5: bad pin refused for the wrong reason: $(cat "$work/e")"; }
+
 if [ "$fail" -eq 0 ]; then
   printf '\nAll fork-consult checks passed.\n'; exit 0
 else
