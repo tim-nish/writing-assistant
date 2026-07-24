@@ -240,6 +240,16 @@ flows into the existing brief/structures path unchanged.**
       summary or why, and for a subtopic a claim drawn from its strongest
       element or Lesson line. The wording is **quoted or clipped from the
       material, never composed about it**.
+    - **Clipping is render-only (amended 2026-07-24, #651).** Any length bound
+      (`ELEMENT_SUMMARY_CHARS`) is a *rendering* concern, applied where a line
+      is printed. The wording the **derivation** composes — the string the
+      brief is built from — carries the material's **full** claim, ending at a
+      boundary the source actually wrote, **never mid-word**. Clipping the
+      claim in the derivation hands the owner a fragment as adopted wording,
+      which seeds the thesis candidate and directs harvest as a sentence
+      fragment — the same derivation-vs-rendering leak the #637 rule above
+      fixes, inverted (a *display* concern leaking into the derivation instead
+      of a derivation concern fixed only at display).
     - **Counts demote.** Evidence-pointer counts, unconsumed/live tallies and
       depth arithmetic are map *metadata*: they may appear as a trailing
       annotation at most, and never as the content of a direction or terrain
