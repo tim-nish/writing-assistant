@@ -647,6 +647,24 @@ with `progress … --stop-note`, records the CAP-6 partial-progress note, and
 exits clean — exactly as a fresh run does. Budget triage is never a
 fresh-run-only path, and a resume never silently re-burns a budget.
 
+**End EVERY invocation with the stop-side run-status line (Story 18.91, #665).**
+On any exit path that is not a `complete` — a turn ceiling, a budget stop, an
+interview pause, an elected pause, a session end — the **final owner-visible line**
+of the invocation is the deterministic run-status line: the workspace id, the
+stage it stopped at, and (whenever `next_stage` is not `done`) an explicit
+"no draft persisted yet — re-invoking `draft-article <repo>` resumes at
+`<stage>`", so the owner never has to diff directories to learn what the run did.
+It renders from the checkpoint alone:
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py stop-disclosure --ws "$WS" --repo <host-repo>
+```
+
+Unlike `resume-disclosure`, this speaks on **every** stop including a run with no
+checkpoint yet — the guarantee is that no invocation ends silently. A completed
+run defers to the `complete` gate's persisted-path relay below and never restates
+it.
+
 **Mark the run done on completion — through the completion gate (Story 13.68).**
 When the pipeline finishes, run the `complete` subcommand. It is the **only
 sanctioned way to finish a draft run** — never hand-write the final

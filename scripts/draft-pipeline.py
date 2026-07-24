@@ -4232,6 +4232,49 @@ def cmd_resume_disclosure(args):
     return 0
 
 
+def cmd_stop_disclosure(args):
+    """Print a one-line owner-visible run-status line for a STOP — the stop-side
+    twin of `resume-disclosure` (Story 18.91, #665).
+
+    The #665 failure was an invocation that ended anywhere before `complete`
+    (turn ceiling, budget stop, interview pause, session end) with no statement
+    of run state, so the owner could not tell whether a draft had been persisted
+    and was left diffing directories. This renders — deterministically from the
+    checkpoint — the **workspace id**, the **stage it stopped at** (`next_stage`),
+    and, whenever `next_stage` is not `done`, an explicit **no-draft-persisted**
+    note with the resume invocation. A completed run (`next_stage == done`) defers
+    to the `complete` gate's persisted-path relay (Story 13.68) and never
+    contradicts it. Unlike `resume-disclosure`, this speaks on **every** exit path
+    — including a run with no checkpoint yet — because the guarantee is that no
+    invocation ends silently; the SKILL mandates it as the final owner-visible
+    line."""
+    wsid = os.path.basename(os.path.normpath(args.ws))
+    invocation = f"draft-article {args.repo}" if getattr(args, "repo", None) else "draft-article"
+    path = _checkpoint_path(args.ws)
+    if not os.path.isfile(path):
+        # No checkpoint yet: the run stopped before its first stage persisted —
+        # nothing is drafted, and a re-invocation resumes from the start.
+        print(f"run-status: workspace {wsid}; stopped before any stage checkpointed; "
+              f"no draft persisted yet — re-invoking `{invocation}` resumes at harvest.")
+        return 0
+    try:
+        with open(path, encoding="utf-8") as f:
+            st = json.load(f)
+    except (OSError, json.JSONDecodeError) as e:
+        sys.stderr.write(f"error: checkpoint unreadable: {e}\n")
+        return 1
+    nxt = st.get("next_stage")
+    if nxt == DONE_STAGE:
+        # Completion is the `complete` gate's contract (Story 13.68) — defer to
+        # its persisted-path relay rather than restating or contradicting it.
+        print(f"run-status: workspace {wsid}; complete (next_stage=done) — "
+              f"canonical persisted via the complete gate.")
+        return 0
+    print(f"run-status: workspace {wsid}; stopped at stage {nxt}; "
+          f"no draft persisted yet — re-invoking `{invocation}` resumes at {nxt}.")
+    return 0
+
+
 # A completed run's final checkpoint carries next_stage == DONE_STAGE so
 # `autostart` never resumes it (Story 13.12).
 DONE_STAGE = "done"
@@ -5307,6 +5350,13 @@ def main(argv=None):
                              "before spending — stage, skipped units, pending budget "
                              "stop (Story 18.39, #533)")
     sp.add_argument("--ws", required=True, help="the run workspace ($WS)")
+    sp = sub.add_parser("stop-disclosure",
+                        help="print a one-line run-status line for a STOP — workspace, "
+                             "stopped-at stage, and whether a draft was persisted "
+                             "(Story 18.91, #665)")
+    sp.add_argument("--ws", required=True, help="the run workspace ($WS)")
+    sp.add_argument("--repo", help="host repo name, to render the resume invocation "
+                                   "`draft-article <repo>` (optional)")
     sp = sub.add_parser("complete", help="finish the run through the dual-product completion gate (Story 13.68)")
     sp.add_argument("--draft", required=True, help="the workspace draft to persist as the canonical, or - for stdin")
     sp.add_argument("--slug", required=True, help="the article slug — names both products (<slug>.md)")
@@ -5657,6 +5707,7 @@ def main(argv=None):
         "checkpoint": cmd_checkpoint, "resume": cmd_resume, "autostart": cmd_autostart,
         "interview-remaining": cmd_interview_remaining,
         "resume-disclosure": cmd_resume_disclosure,
+        "stop-disclosure": cmd_stop_disclosure,
         "depth-check": cmd_depth_check,
         "progress": cmd_progress,
         "stage0": cmd_stage0, "complete": cmd_complete,
