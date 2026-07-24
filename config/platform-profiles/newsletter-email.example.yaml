@@ -1,0 +1,43 @@
+# platform-profiles/newsletter-email.example.yaml — newsletter email profile
+# (Story 18.87, #657; working-note slim profile — SPEC-platform-variants).
+#
+# Copy to the machine-global per-repo profiles directory (NEVER the host repo):
+#   dir=$(python3 scripts/resolve-paths.py repo-config-dir --root <host-repo>)
+#   cp config/platform-profiles/newsletter-email.example.yaml "$dir/platform-profiles/newsletter-email.yaml"
+#
+# A profile declares platform PACKAGING only. This is a WORKING-NOTE platform:
+# a working-note (F5) draft emits to it via the separate working-note lane
+# (`draft-pipeline.py variants --framework working-note`), NOT through the
+# language-keyed `syndication.policy` that routes ordinary articles. The lane
+# selects newsletter platforms by their `packaging.layout` targeting the
+# `newsletter/` destination section (SPEC-writing-assistant write-surface, #653).
+
+platform: newsletter-email
+
+# The named reader for the owner's newsletter issue (email).
+audience: en-practitioner
+language: en
+
+packaging:
+  # The 4-block working-note issue carries no site-article frontmatter; the
+  # email view is assembled at publish from the working-note's blocks.
+  frontmatter: [subject]
+  tag_cap: 0
+  tldr_placement: none
+  cover: none
+  # A newsletter issue is its own product, not a syndicated copy of a site
+  # article — it carries no canonical_url back to the site.
+  canonical_url:
+    policy: none
+  # Email clients do not render Mermaid; a diagram is pre-rendered to an image
+  # before sending (F5 declares no visual slot, so this is rarely exercised).
+  visuals: html-comment-blocked
+  # The destination section: the `newsletter/` layer of the articles repo — its
+  # own light schema, separate from the article backlog (#653). This is also
+  # how the working-note lane recognises a newsletter platform.
+  layout:
+    repo: articles
+    dir: newsletter/
+
+# Where the newsletter's own end-pointer points.
+distribution_hook: newsletter-follow

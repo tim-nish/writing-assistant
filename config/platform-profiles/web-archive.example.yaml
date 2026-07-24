@@ -1,0 +1,41 @@
+# platform-profiles/web-archive.example.yaml — newsletter web-archive profile
+# (Story 18.87, #657; working-note slim profile — SPEC-platform-variants).
+#
+# Copy to the machine-global per-repo profiles directory (NEVER the host repo):
+#   dir=$(python3 scripts/resolve-paths.py repo-config-dir --root <host-repo>)
+#   cp config/platform-profiles/web-archive.example.yaml "$dir/platform-profiles/web-archive.yaml"
+#
+# A profile declares platform PACKAGING only. This is a WORKING-NOTE platform:
+# a working-note (F5) draft emits to it via the separate working-note lane
+# (`draft-pipeline.py variants --framework working-note`), NOT through the
+# language-keyed `syndication.policy`. The web-archive rendering is
+# web-archived on the owned domain so SEO accrues there (#653). The lane
+# selects newsletter platforms by their `packaging.layout` targeting the
+# `newsletter/` destination section.
+
+platform: web-archive
+
+# The named reader for the web-archived newsletter issue.
+audience: en-practitioner
+language: en
+
+packaging:
+  # A web-archive page carries a minimal head; the body is the 4-block issue.
+  frontmatter: [title, date]
+  tag_cap: 0
+  tldr_placement: none
+  cover: none
+  # The web archive IS the canonical web home of the newsletter issue on the
+  # owned domain, so it points at itself — no back-link to a site article.
+  canonical_url:
+    policy: self
+  # A web page renders Mermaid via the site's own toolchain if present; the
+  # working-note declares no visual slot, so this is rarely exercised.
+  visuals: html-comment-blocked
+  # Same `newsletter/` destination section as the email rendering — the two
+  # renderings of one working-note issue.
+  layout:
+    repo: articles
+    dir: newsletter/
+
+distribution_hook: newsletter-follow

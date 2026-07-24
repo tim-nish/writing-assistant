@@ -406,6 +406,29 @@ else
 fi
 rm -f "$work/host/writing-sources.yaml"
 
+# 11b. Working-note emission lane (Story 18.87, #657; SPEC-platform-variants
+#      slim-profile "Routing"): a working-note (F5) draft selects newsletter
+#      platforms DIRECTLY from resolvable profiles targeting the `newsletter/`
+#      section, bypassing the language-keyed syndication.policy; an ordinary
+#      draft's routing stays exactly as syndication.policy[lang] says.
+cp config/platform-profiles/newsletter-email.example.yaml "$ppdir/newsletter-email.yaml"
+cp config/platform-profiles/web-archive.example.yaml "$ppdir/web-archive.yaml"
+wn_list=$(python3 "$DP" variants "$work/en.md" --allow-external-draft \
+  --root "$work/host" --config-json "$work/cfg.json" \
+  --framework working-note --list-platforms 2>/dev/null)
+if printf '%s' "$wn_list" | python3 -c 'import sys,json; d=json.load(sys.stdin); a=set(d["available"]); sys.exit(0 if a=={"newsletter-email","web-archive"} and d["mode"]=="newsletter" and "devto" not in a else 1)' 2>/dev/null; then
+  ok "working-note lane selects the newsletter profiles, bypassing syndication.policy"
+else
+  err "working-note lane wrong: $wn_list"
+fi
+art_list=$(python3 "$DP" variants "$work/en.md" --allow-external-draft \
+  --root "$work/host" --config-json "$work/cfg.json" --list-platforms 2>/dev/null)
+if printf '%s' "$art_list" | python3 -c 'import sys,json; d=json.load(sys.stdin); sys.exit(0 if d["available"]==["devto"] and d["mode"]=="canonical" else 1)' 2>/dev/null; then
+  ok "ordinary-article routing unchanged (syndication.policy[en] -> devto)"
+else
+  err "article routing changed: $art_list"
+fi
+
 # 12. AC1/AC4 — the draft-flow SKILL carries no platform decision point: the
 #     Stage-5 emission flow is gone, no platform identifiers or emission flags
 #     remain, and only a short pointer section references the standalone
