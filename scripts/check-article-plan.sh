@@ -241,6 +241,54 @@ grep -qi 'none auto-applied\|never applies a prior plan' "$DSKILL" \
 grep -qi 'no residue' "$DSKILL" \
   && ok "CAP-3: skill states a declined proposal leaves no residue" || err "skill missing no-residue rule"
 
+# --- Story 18.93/#668: the section→element map (CAP-9 disclosure) ----------
+# A conforming plan carrying `consumed` + a well-formed one-line-JSON `sections`.
+sect_plan() {
+plan <<EOF
+---
+kind: article-plan
+slug: interview-is-the-difference
+intent: share engineering lessons
+claim: the interview is the difference between a fact sheet and an article
+status: outlined
+run_id: 20260717T135459-737958
+pin: writing-assistant@$sha
+consumed: [el-signals, el-fast-feedback]
+sections: $1
+---
+
+## Section plan
+
+- the interview carries the article / docs/interview-architecture.md:12@$sha
+EOF
+}
+sect_plan '[{"title": "Signals, not verdicts", "elements": ["el-signals"]}, {"title": "Fast feedback", "elements": ["el-fast-feedback"]}]'
+V "$P" && ok "sections: a well-formed section→element map is accepted (#668)" \
+  || err "well-formed sections map was refused: $(reason "$P")"
+# Malformed JSON -> refused with the sections diagnostic.
+sect_plan 'not-json'
+reason "$P" | grep -q 'malformed section' \
+  && ok "sections: a malformed value is refused fail-closed" \
+  || err "malformed sections value was accepted"
+# A section placing an element the draft never consumed -> refused (grouping integrity).
+sect_plan '[{"title": "Ghost", "elements": ["el-never-consumed"]}]'
+reason "$P" | grep -q 'not in `consumed`' \
+  && ok "sections: a section referencing an unconsumed element is refused (#668)" \
+  || err "sections map drifted from consumed without a diagnostic"
+# Multi-element (grouped) section is legal and visible.
+sect_plan '[{"title": "Grouped", "elements": ["el-signals", "el-fast-feedback"]}]'
+V "$P" && ok "sections: a multi-element (grouped) section is accepted and recorded" \
+  || err "grouped section was refused: $(reason "$P")"
+# Absent sections key: plan still validates exactly as before (additive/optional).
+good
+V "$P" && ok "sections: a plan without the key validates as before (additive)" \
+  || err "absence of sections changed validation"
+
+# The draft skill carries the section→element map into the plan at complete.
+grep -q 'sections:' "$DSKILL" \
+  && ok "#668: draft skill emits the sections map into the plan" \
+  || err "draft skill missing the section→element map wiring"
+
 if [ "$fail" -eq 0 ]; then
   printf '\nAll article-plan checks passed.\n'; exit 0
 else

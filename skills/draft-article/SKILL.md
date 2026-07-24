@@ -2253,6 +2253,29 @@ artifacts this run already produced (journal, editorial anchor, dispositioned
 answers, visual decisions, unresolved items) — **no new owner interaction**,
 and regenerating it from the same artifacts is byte-identical.
 
+**Carry the section→element map into the plan (Story 18.93, #668).** The
+argument plan's **section-intents** block (each section → its element id(s),
+content obligation, and evidence pointers) is a run-workspace intermediate that
+vanishes with the workspace. Project it into the durable plan so the owner's
+N-sections-vs-N-lessons review stays mechanical from one file:
+
+- **Frontmatter `sections:`** — a **one-line JSON array** (the flat plan
+  frontmatter parses no nested YAML), one item per section in order:
+  `sections: [{"title": "Signals, not verdicts", "elements": ["el-signals-not-verdicts"]}, …]`.
+  Every element id listed **must be in `consumed:`** (the writer refuses a
+  section that places an element the draft never consumed — the grouping
+  cannot drift from the consumption record). A multi-element section is a
+  grouped cluster and is legal — recording it is exactly what makes the
+  grouping reviewable.
+- **Body `## Section plan`** — per section, the content obligation, its
+  evidence pointers (pinned, carried verbatim), and the element's **CAP-9
+  declared membership-rule one-liner**, so the grouping justification survives
+  the workspace.
+
+`sections:` is **additive** — a plan without it validates exactly as before,
+`consumed:` stays the consumption-exclusion key, and downstream consumers are
+unchanged.
+
 Assemble the plan text from run state and hand it to the sanctioned writer,
 which validates fail-closed and places it. **Every source pointer in the plan
 body must be pinned — `path:line@sha`, never bare `path:line` (#410, Tanuki
