@@ -548,6 +548,45 @@ sys.exit(1 if fail else 0)
 PYEOF
 [ $? -eq 0 ] || fail=1
 
+# --- #651: the direction clip is RENDER-ONLY; the brief carries the full claim
+python3 - "$D" <<'PYEOF' || fail=1
+import importlib.util, sys
+spec = importlib.util.spec_from_file_location("d", sys.argv[1])
+mod = importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)
+fail = []
+def check(cond, msg):
+    print(("ok:   " if cond else "FAIL: ") + msg, file=sys.stdout if cond else sys.stderr)
+    if not cond: fail.append(msg)
+
+# A claim-bearing subtopic whose Lesson line runs well past the old 120-char
+# derivation clip and ends on a whole word.
+claim = ("Absence-based verification is three valued not two because "
+         "absent with evidence requires both the run count and the corroborating "
+         "signal before the regression may be recorded as genuinely resolved")
+assert len(claim) > 120 and len(claim.split()) >= 5
+sub = {"subtopic": "verification", "id": "T9.1",
+       "items": [{"family": "hub-lessons", "title": claim, "slug": "verification"}],
+       "density": {"evidence_pointers": 3}}
+direction = mod._coverage_direction(sub)
+check(claim in direction,
+      "the full claim is carried into the DERIVATION, not clipped at 120 chars")
+
+# The brief composed from the index carries the whole claim, ending on the
+# source's own last word before the owner's note — never a mid-word cut.
+cands = [dict(sub, direction=direction, kind="single")]
+brief = mod.brief_from_answer(
+    {"index": "T9.1", "note": "my angle", "pin": "p@1"}, cands, "p@1")["brief"]
+check(claim in brief and brief.endswith("resolved — my angle"),
+      "the composed brief carries the full claim and ends on a source word, never mid-word")
+
+# An element summary is carried whole for the same reason (the element path
+# carried the same clip since 18.80).
+ed = mod._element_direction({"kind": "reversal", "summary": claim, "date": "2026-07-23"})
+check(claim in ed, "an element summary is carried whole into its direction too")
+sys.exit(1 if fail else 0)
+PYEOF
+[ $? -eq 0 ] || fail=1
+
 # --- elements reach the surface and are pickable (18.80, #641) --------------
 python3 - "$work/big-cands.json" "$work/view.md" "$work/big-map.json" "$D" <<'PYEOF' || fail=1
 import importlib.util, json, re, sys

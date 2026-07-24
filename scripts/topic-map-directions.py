@@ -157,9 +157,6 @@ def _subtopics(map_data):
     return rows
 
 
-ELEMENT_SUMMARY_CHARS = 120
-
-
 def _elements(map_data):
     """Every element in the map, each carrying its STABLE ID (Story 18.80,
     #641).
@@ -184,8 +181,11 @@ def _elements(map_data):
 def _element_direction(el):
     """An element as a coverage direction — the wording that becomes the brief
     if the owner adopts it, so it names the material in the owner's terms and
-    carries no internal marker (#637's rule, unchanged for the new kind)."""
-    summary = _clip(str(el.get("summary") or "").strip(), ELEMENT_SUMMARY_CHARS)
+    carries no internal marker (#637's rule, unchanged for the new kind). The
+    summary is carried in FULL: clipping is a render-only concern (#651), so
+    the string the brief is composed from ends where the source did, never
+    mid-word — the View bounds the displayed line itself (`_clip_line`)."""
+    summary = str(el.get("summary") or "").strip()
     kind = "reversal" if el.get("kind") == "reversal" else "decision"
     if not summary:
         # Never a bare enum on the owner surface: describe what it is instead.
@@ -432,13 +432,16 @@ def _coverage_direction(sub):
     cover, never a thesis or an article shape (the no-second-proposer boundary,
     `specs/spec-topic-map/SPEC.md:125`). The claim lives in the DERIVATION, not
     in the rendering, because this wording becomes the owner's brief the moment
-    they adopt it — the same reason #637's placeholder rule lives here.
+    they adopt it — the same reason #637's placeholder rule lives here. It is
+    carried in FULL for the same reason: a length clip is a render-only concern
+    (#651), so the brief ends at a boundary the source wrote, never mid-word;
+    the View bounds the displayed line itself (`_clip_line`).
     """
     subject = _coverage_subject(sub)
     claim = _subtopic_claim(sub)
     if not claim:
         return f"cover {subject}"
-    return f"cover {subject} — {_clip(claim, ELEMENT_SUMMARY_CHARS)}"
+    return f"cover {subject} — {claim}"
 
 
 def _id_order(sub):
