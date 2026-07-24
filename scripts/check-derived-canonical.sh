@@ -185,9 +185,9 @@ if m:
         dp._strip_emission_trailer(derived).encode("utf-8")).hexdigest() else bad)(
         "the derivation's trailer uses the variant trailer's hash convention")
 
-# CAP-4: the ancestry block records the SOURCE hash, same convention.
+# CAP-4: the ancestry pin records the SOURCE hash, same convention.
 anc, defect = ac.parse_ancestry(fields)
-(ok if anc and not defect else bad)(f"the ancestry block parses (defect: {defect})")
+(ok if anc and not defect else bad)(f"the ancestry pin parses (defect: {defect})")
 src = open(os.path.join(work, "drafts", "retry-storms.md"), encoding="utf-8").read()
 src_sha = hashlib.sha256(dp._strip_emission_trailer(src).encode("utf-8")).hexdigest()
 if anc:
@@ -244,13 +244,18 @@ assert not any(p.endswith('.ja.md') for p in paths), paths
 " && ok "the derived canonical is never graded as a stale variant of its source" \
   || err "the derived canonical was listed as a variant of its source"
 
-# --- CAP-4: a corrupted ancestry block is NAMED, not swallowed ---------------
+# --- CAP-4: the ancestry pin is the ratified scalar `<slug>@<sha>` ------------
+grep -Eq '^adapted_from: retry-storms@[0-9a-f]{64}$' "$work/drafts/retry-storms.ja.md" \
+  && ok "the written ancestry is the scalar pin \`<slug>@<sha>\`, not a mapping" \
+  || err "the written ancestry is not the scalar pin: $(grep '^adapted_from:' "$work/drafts/retry-storms.ja.md")"
+
+# --- CAP-4: a corrupted ancestry pin is NAMED, not swallowed ------------------
 $A lint-ancestry --derived "$work/drafts/retry-storms.ja.md" --root "$work/host" \
   >/dev/null 2>&1 \
-  && ok "a well-formed ancestry block lints clean" \
-  || err "the freshly written ancestry block failed its own lint"
+  && ok "a well-formed ancestry pin lints clean" \
+  || err "the freshly written ancestry pin failed its own lint"
 
-sed 's/^adapted_from: .*/adapted_from: { slug: no-such-article, canonical_sha256: '"$(printf '0%.0s' $(seq 64))"' }/' \
+sed 's/^adapted_from: .*/adapted_from: no-such-article@'"$(printf '0%.0s' $(seq 64))"'/' \
   "$work/drafts/retry-storms.ja.md" > "$work/drafts/orphan.ja.md"
 $A lint-ancestry --derived "$work/drafts/orphan.ja.md" --root "$work/host" \
   > "$work/lint-orphan.json" 2>&1 \
@@ -262,18 +267,18 @@ grep -q 'no-such-article' "$work/lint-orphan.json" \
   && ok "the lint names the unresolvable source" \
   || err "the lint does not name the unresolvable source"
 
-sed 's/^adapted_from: .*/adapted_from: not-a-mapping/' \
+sed 's/^adapted_from: .*/adapted_from: not-a-pin/' \
   "$work/drafts/retry-storms.ja.md" > "$work/drafts/malformed.ja.md"
 $A lint-ancestry --derived "$work/drafts/malformed.ja.md" --root "$work/host" \
   > "$work/lint-mal.json" 2>&1 \
-  && err "a malformed ancestry block passed the lint" \
+  && err "a malformed ancestry pin passed the lint" \
   || grep -q 'malformed-ancestry' "$work/lint-mal.json" \
-     && ok "a malformed ancestry block is named" \
+     && ok "a malformed ancestry pin is named" \
      || err "malformed ancestry not named: $(cat "$work/lint-mal.json")"
 
 # A hash matching no source content is named too (the staleness chain, Story
 # 18.58, turns this into a publish blocker; the lint's job is to name it).
-sed 's/^adapted_from: { slug: retry-storms, canonical_sha256: [0-9a-f]*/adapted_from: { slug: retry-storms, canonical_sha256: '"$(printf 'a%.0s' $(seq 64))"'/' \
+sed 's/^adapted_from: .*/adapted_from: retry-storms@'"$(printf 'a%.0s' $(seq 64))"'/' \
   "$work/drafts/retry-storms.ja.md" > "$work/drafts/moved.ja.md"
 $A lint-ancestry --derived "$work/drafts/moved.ja.md" --root "$work/host" \
   > "$work/lint-moved.json" 2>&1 \
