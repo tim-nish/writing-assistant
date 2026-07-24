@@ -211,9 +211,22 @@ Ratified constraints binding the implementation whenever it is ordered:
   pinned, lessons first**; the hub's **Q&A history archive is never a harvest
   source** (promotion to the recall surface is the only path).
 - **Published text carries public repository links only.**
+- **Destination (amended 2026-07-24, #653):** the email and web-archive
+  renderings land in the destination repo's **`newsletter/` section** — a
+  distinct section with its own light schema, separate from the article
+  backlog (different layer/lifecycle), web-archived so SEO accrues to the owned
+  domain (`consulted: product-lab@90877fa4e77e1353b527a76607ed2ea06daf2b27
+  topics/articles.md:61,66`). This is a **fourth permitted destination write
+  surface** recorded in SPEC-writing-assistant (#653) — *not* the drafts
+  variant surface of the "Intermediates" clause above, whose "only the variant
+  files land at `output.drafts` … and nothing else lands anywhere" now reads
+  against that extended surface. Emission still uses the same declared-profile
+  machinery; only the destination section differs.
 
-This section orders no build — it records the contract so the later
-implementation order needs no policy attachments.
+This section recorded the contract; **the build is ordered by #653
+(2026-07-24)**, which added the destination write-surface amendment above and
+closes the SPEC-policy-realignment F2 drift (the working-note/newsletter
+constraints were "nowhere in this repo" until this amendment).
 
 ## Non-goals
 
