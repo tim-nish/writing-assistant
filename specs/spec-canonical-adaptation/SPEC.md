@@ -99,16 +99,19 @@ source material ──draft flow──▶ EN canonical ──emit──▶ devto
   - **intent:** The output is persisted at the resolved `output.drafts` as
     `{slug}.ja.md` with full canonical frontmatter: its own `slug`
     (`{slug}.ja`), `mode: canonical`, `language: ja`, the target
-    `audience`/`audience_id`, and an **ancestry block**
-    `adapted_from: {slug: <source slug>, canonical_sha256: <source hash>}`
-    recording the source canonical's content hash — the same hash convention
-    the variant trailer uses (sha256 over content without trailer). It carries
+    `audience`/`audience_id`, and an **ancestry pin**
+    `adapted_from: <source slug>@<source hash>` recording the source
+    canonical's content hash — the same hash convention the variant trailer
+    uses (sha256 over content without trailer), spelled to reuse the
+    articles-repo plans' existing `pin: <repo>@<sha>` idiom rather than
+    inventing a second ancestry convention (ratified 2026-07-23; `consulted:
+    product-lab@e9d11071 topics/articles.md:22, GLOSSARY.md:14`). It carries
     its own `canonical-sha256` trailer like any canonical. It is eligible for
     review as a canonical; claim *verification* does not re-run (claims are
     inherited under CAP-2), review scope is language/framing quality plus
     claims-conformance against the source.
   - **success:** `emit variants` accepts the derived canonical by slug with
-    zero special-casing; review-article runs over it; the ancestry block
+    zero special-casing; review-article runs over it; the ancestry pin
     resolves to an existing source canonical and hash or a lint names the
     defect.
 

@@ -160,7 +160,7 @@ preceded it, live in the run workspace.
 Only after that answer, and only when it was **approve** or **modify**. Author
 the target-language prose from the approved plan, then hand it to the writer —
 never hand-write the file, and never place it yourself: the path, the
-frontmatter, the ancestry block and the trailer are all the writer's.
+frontmatter, the ancestry pin and the trailer are all the writer's.
 
 ```
 python3 ${CLAUDE_PLUGIN_ROOT}/scripts/adapt-canonical.py write \
@@ -173,15 +173,16 @@ you. What comes out is an ordinary canonical at
 `<output.drafts>/<slug>.<language>.md`: its own `slug` (`<slug>.<language>`),
 `mode: canonical`, the target's `language` and reader, every other declared
 schema field carried from the source verbatim, its own `canonical-sha256`
-trailer, and the ancestry block
+trailer, and the ancestry pin
 
 ```
-adapted_from: { slug: <source slug>, canonical_sha256: <source hash> }
+adapted_from: <source slug>@<source hash>
 ```
 
-The source hash is the **same convention the variant trailer uses** (sha256
-over content without the trailer) — there is one hash convention in this
-pipeline, not two.
+spelled to reuse the articles-repo plans' existing `pin: <repo>@<sha>` idiom
+(ratified 2026-07-23). The source hash is the **same convention the variant
+trailer uses** (sha256 over content without the trailer) — there is one hash
+convention in this pipeline, not two.
 
 `write` re-reads the gate's recorded answer from `$WS` and refuses without one,
 so the CAP-3 ordering is mechanical rather than remembered: a `stop` answer, a
@@ -206,7 +207,7 @@ claim-set comparison to reuse** — `verify-provenance.py` grades one map agains
 one fact sheet, and map positions are per-artifact — so this comparison is new,
 built on the shipped map parser rather than a second map format.
 
-**Ancestry lint (CAP-4).** A block that does not resolve is named, never
+**Ancestry lint (CAP-4).** A pin that does not resolve is named, never
 swallowed:
 
 ```
@@ -214,7 +215,7 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/adapt-canonical.py lint-ancestry \
   --derived <output.drafts>/<slug>.<language>.md --root <host-repo>
 ```
 
-It names a malformed block, a `slug` that resolves to no canonical, and a
+It names a malformed pin, a `slug` that resolves to no canonical, and a
 recorded hash that matches no source content (reported with the hash pair).
 
 ## Step 6 — the staleness chain
