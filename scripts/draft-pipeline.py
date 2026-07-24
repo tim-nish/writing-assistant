@@ -4859,6 +4859,42 @@ def cmd_complete(args):
             "no plan exists at the resolved destination — write it first "
             "(write-article-plan.py write --slug " + args.slug + ")")
 
+    # Destination-repo schema lint at the completion gate (Story 18.99, #674).
+    # Run the articles repo's own `lint-article` on the persisted canonical —
+    # authoritative BY POINTER, never a copy of its rules. Schema-class findings
+    # (`schema`, `title` — the frontmatter bounds) are a HARD ERROR, the same
+    # contract as a failed product write: no `next_stage: done` checkpoint, so a
+    # run never reports complete over a canonical the destination repo rejects on
+    # schema. Every other class (`pointer`, `headings`, `links`, `template`, …)
+    # is a disclosed WARNING in the completion summary (the INDEX.md warning
+    # precedent, #540) — style rules never block completion.
+    # Hard-gate on frontmatter BOUNDS specifically (summary > 240, title > 70 —
+    # the #674 defect), not on config-schema-dependent classes like a missing
+    # field (caught by the framework fill and review's lint backstop) — the
+    # completion gate must not couple to the resolved config's required-field
+    # list. Bounds violations are deterministic and self-contained.
+    _LINT_BOUNDS = re.compile(r"chars \(> \d+\)")
+    lint_schema_fail, lint_style_warn = [], []
+    lcmd = [sys.executable, os.path.join(here, "lint-article"), canonical_path]
+    if args.root:
+        lcmd += ["--root", args.root]
+    lr = subprocess.run(lcmd, capture_output=True, text=True)
+    for ln in lr.stdout.splitlines():
+        m = re.search(r":\s*\[([a-z-]+)\]\s*(.*)$", ln)
+        if not m:
+            continue
+        code, msg = m.group(1), m.group(2).strip()
+        if code in ("schema", "title") and _LINT_BOUNDS.search(msg):
+            lint_schema_fail.append(f"[{code}] {msg}")
+        else:
+            lint_style_warn.append(f"[{code}] {msg}")
+    if lint_schema_fail:
+        return product_error(
+            "canonical draft (drafts/{slug}.md)", canonical_path,
+            "the destination repo's lint-article rejects it on schema — "
+            + "; ".join(lint_schema_fail)
+            + "; a run may not report complete over a schema-invalid canonical")
+
     # Both products verified — NOW (and only now) the run may be marked done.
     checkpoint_path = None
     if args.ws:
@@ -4930,6 +4966,10 @@ def cmd_complete(args):
         "index": index_result,
         "checkpoint": checkpoint_path,
     }
+    if lint_style_warn:
+        # Disclosed style-lint warnings (#674) — the completion summary relays
+        # them; they never blocked completion (schema-class already hard-errored).
+        out["lint_warnings"] = lint_style_warn
     print(json.dumps(out, indent=2))
     return 0
 
