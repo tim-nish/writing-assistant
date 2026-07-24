@@ -25,6 +25,36 @@ sources:
 > for what this map must contain: it exists to *feed* the brief, not to replace
 > it.
 
+> **Amended 2026-07-24 (triage, #669)** per /triage-gh. Before a map candidate
+> is offered, its usability is resolved **mechanically** against the target
+> repo's declared sources — the hub lesson's Evidence pointers, its `projects:`
+> attribution, and any `journey:` entry carrying the lesson's slug (#671) matched
+> against the fact sheet / `resolve-writing-sources.py files` enumeration — with a
+> **three-valued verdict** (deliberately the hub's own three-valued-absence
+> lesson applied to itself, served: `consulted: product-lab@4799d96d
+> topics/knowledge-architecture.md:53` — present / absent-with-evidence /
+> cannot-determine, collapsing to two-valued is the defect): **matched** (≥1
+> evidence pointer resolves into declared sources → offer as draft-ready, evidence
+> pre-located); **episodic-unrecorded** (the hub records a concrete episode but no
+> declared source carries it → **emit a NEEDS-RECORDING task** naming the lesson
+> slug, the episode, and the target repo/file — for tanuki, a `journey:` entry per
+> #671 — never a silent drop; the unusable topic **is** the map's product, a named
+> backfill worklist); **no-episode** (abstract lesson, no locatable episode →
+> offerable only as owner-attributed framing, Story 17.1 attribution tier, stated
+> as such at offer time). Silently filtering to `matched` is **rejected** — it
+> reproduces the "constrained excludes silently" defect the owner ratified against
+> (served: `topics/knowledge-architecture.md:57` — constrained excludes VISIBLY),
+> hiding the unusable majority and starving the recording flywheel. The join
+> **locates** evidence, it never **supplies** it: each verdict carries the
+> pointers checked (audited), the offer is a proposal the owner ratifies (seam
+> invariant 2, #670), and **no hub line ever becomes a SOURCE pointer** (invariant
+> 1). It reuses harvest's shipped bounded pass — **not a second reader and not a
+> second structure proposer** (served: `topics/articles.md:34`). **Legality
+> precondition:** the map acting as a recommendation surface at all rests on the
+> seam CAP-2 positive reframe (#670); the recording destination is the `journey:`
+> element (#671). This amendment strains the seam's ≤2-topic read bound, which
+> #670 deliberately does **not** widen — a separate decision (OQ, below).
+
 # Topic Map
 
 ## Why

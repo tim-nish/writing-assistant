@@ -229,6 +229,40 @@ grep -q 'resume-disclosure' "$SKILL" && grep -qi 'binds identically on a resumed
   && ok "SKILL wires resume disclosure + orderly stop on the resume path" \
   || err "SKILL missing resume-disclosure / resume-path budget-stop wiring"
 
+# Stop disclosure (Story 18.91, #665): every invocation ends with a run-status
+# line — the stop-side twin of resume-disclosure — on every exit path.
+WS7="$work/ws7"; mkdir -p "$WS7"
+# No checkpoint yet: still speaks, names the workspace, says no draft persisted.
+line=$(python3 "$DP" stop-disclosure --ws "$WS7")
+printf '%s' "$line" | grep -q 'workspace ws7' \
+  && printf '%s' "$line" | grep -q 'no draft persisted yet' \
+  && printf '%s' "$line" | grep -q 'resumes at harvest' \
+  && ok "stop-disclosure: a run with no checkpoint still discloses (workspace + no-draft)" \
+  || err "stop-disclosure silent/wrong on a checkpoint-less run: '$line'"
+# Stopped mid-run: names the stopped-at stage and the no-draft note.
+printf '{"stage":"interview","next_stage":"fill"}' | python3 "$DP" checkpoint --ws "$WS7" - >/dev/null
+line=$(python3 "$DP" stop-disclosure --ws "$WS7")
+printf '%s' "$line" | grep -q 'stopped at stage fill' \
+  && printf '%s' "$line" | grep -q 'no draft persisted yet' \
+  && ok "stop-disclosure: a mid-run stop states next_stage + no-draft (#665)" \
+  || err "stop-disclosure wrong on a mid-run stop: '$line'"
+# --repo renders the concrete resume invocation.
+line=$(python3 "$DP" stop-disclosure --ws "$WS7" --repo tanuki)
+printf '%s' "$line" | grep -q 'draft-article tanuki' \
+  && printf '%s' "$line" | grep -q 'resumes at fill' \
+  && ok "stop-disclosure: --repo renders the concrete resume invocation" \
+  || err "stop-disclosure did not render the repo-specific resume invocation: '$line'"
+# A completed run defers to the complete gate, never says 'no draft persisted'.
+printf '{"stage":"complete","next_stage":"done"}' | python3 "$DP" checkpoint --ws "$WS7" - >/dev/null
+line=$(python3 "$DP" stop-disclosure --ws "$WS7")
+printf '%s' "$line" | grep -q 'complete (next_stage=done)' \
+  && ! printf '%s' "$line" | grep -q 'no draft persisted' \
+  && ok "stop-disclosure: a completed run defers to the complete gate" \
+  || err "stop-disclosure wrong on a completed run: '$line'"
+grep -q 'stop-disclosure' "$SKILL" \
+  && ok "SKILL mandates the stop-disclosure run-status line on every exit" \
+  || err "SKILL missing stop-disclosure wiring"
+
 if [ "$fail" -eq 0 ]; then
   printf '\nAll checkpoint/resume checks passed.\n'; exit 0
 else
