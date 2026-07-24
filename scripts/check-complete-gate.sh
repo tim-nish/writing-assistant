@@ -103,7 +103,8 @@ assert d['checkpoint'], d
 python3 -c "
 import json,sys
 d=json.load(open('$ws/checkpoint.json'))
-assert d=={'stage':'complete','next_stage':'done'}, d
+assert d['stage']=='complete' and d['next_stage']=='done', d
+assert d.get('canonical_slug')=='$slug', d   # no-clobber ownership record (#666)
 " && ok "done-checkpoint written only through the gate" || err "done-checkpoint wrong/missing"
 
 # 2. Emission-trailer hash matches the variants-stage convention: the trailer
@@ -132,6 +133,37 @@ python3 "$DP" complete --draft "$a/drafts/$slug.md" --slug "$slug" --root "$h" -
   && [ "$first" = "$(cat "$a/drafts/$slug.md")" ] \
   && ok "complete over the persisted canonical re-verifies to the same bytes" \
   || err "trailer was hashed into its own hash on re-run"
+
+# 3b. No-clobber gate (Story 18.92, #666): a DIFFERENT canonical minting a
+#     colliding slug is refused, not silently overwritten.
+# (a) A different run (fresh workspace, no ownership) writing DIFFERENT content
+#     to the same slug is refused; the on-disk canonical is untouched.
+wsc="$work/wsc"; mkdir -p "$wsc"
+sed 's/late\./late again — a wholly different draft body\./' "$ws/draft.md" > "$wsc/draft.md"
+before=$(cat "$a/drafts/$slug.md")
+if python3 "$DP" complete --draft "$wsc/draft.md" --slug "$slug" --root "$h" --ws "$wsc" \
+     >/dev/null 2>"$work/e_clobber"; then
+  err "no-clobber gate: an unowned slug collision was allowed to overwrite"
+else
+  grep -q 'slug collision' "$work/e_clobber" \
+    && [ "$before" = "$(cat "$a/drafts/$slug.md")" ] \
+    && ok "no-clobber gate: unowned slug collision refused, canonical untouched (#666)" \
+    || err "no-clobber refusal wrong: $(cat "$work/e_clobber")"
+fi
+[ ! -f "$wsc/checkpoint.json" ] \
+  && ok "no-clobber gate: no checkpoint on a refused collision" \
+  || err "checkpoint written despite refused collision"
+# (b) --replace-canonical overrides the refusal deliberately.
+python3 "$DP" complete --draft "$wsc/draft.md" --slug "$slug" --root "$h" --ws "$wsc" --replace-canonical >/dev/null \
+  && grep -q 'wholly different draft body' "$a/drafts/$slug.md" \
+  && ok "no-clobber gate: --replace-canonical overwrites deliberately" \
+  || err "--replace-canonical did not override the collision refusal"
+# (c) The owning run (ws checkpoint records the slug) may revise its own canonical.
+sed 's/late\./late — revised by the owning run\./' "$ws/draft.md" > "$ws/draft2.md"
+python3 "$DP" complete --draft "$ws/draft2.md" --slug "$slug" --root "$h" --ws "$ws" >/dev/null \
+  && grep -q 'revised by the owning run' "$a/drafts/$slug.md" \
+  && ok "no-clobber gate: the owning run's revision loop proceeds (#666)" \
+  || err "owned same-run revision was refused"
 
 # 4. Plan missing → hard error naming product + path, NO checkpoint, even
 #    though the canonical write succeeded (partial success still hard-errors).
