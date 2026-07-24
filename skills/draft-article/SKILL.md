@@ -1838,6 +1838,27 @@ verdicts file. A clean map passes
 with no findings; any finding blocks stage progression. (These judge spawns cost
 turns against the pipeline budget — see #118's durability/resume constraint.)
 
+**Grade `sourced` spans for ATTRIBUTION entailment, not only pointer resolution
+(Story 18.97, #672).** A sourced pointer resolving into the fact sheet proves the
+*topic* is grounded — it does **not** prove the sentence's **attribution** (which
+actor/component acted, and at what scope) is what the pointer supports. A claim
+about the wrong actor can cite a real, related line and pass. So add
+`--list-sourced` to the judge hand-off and instruct the isolated judge, **for
+each sourced span**: *does this pointer SUPPORT this claim AS STATED, including
+its attributed actor/scope?* A span whose **topic the pointer supports but whose
+attributed actor/scope it contradicts** is a failure the judge reports as
+`POS ~ "<the sentence>": contradicted-attribution — <what the source actually
+says vs. what the sentence claims>`. `verify-provenance` consumes it as a gate
+failure like any other. The check is **scoped to attribution**: a sourced span
+making no actor/scope claim, or one the pointer supports, passes silently — so
+ordinary grounded claims are unaffected. The judge stays isolated (NFR13): it
+sees only the sourced spans `--list-sourced` surfaces and their cited fact-sheet
+entries, never the drafting rationale.
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/verify-provenance.py --map "$WS/provenance-map.txt" --draft <draft> --list-sourced
+```
+
 The marker format is **exactly `[VERIFY: <reason>]`** (uppercase, colon-space,
 non-empty reason) so Stage 4 and the lint (Story 5.1) can find every one. Check
 the filled draft with:

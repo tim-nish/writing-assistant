@@ -177,6 +177,22 @@ python3 "$VP" --map "$work/anch-map.txt" --draft "$work/anch-draft.md" \
 python3 "$VP" --map "$work/good.txt" --list-derived | grep -q 'P1.S2: fs-12, fs-14' \
   && ok "derived claims are listable for the judge" || err "--list-derived wrong"
 
+# Story 18.97/#672 — sourced spans are graded for ATTRIBUTION entailment.
+# The judge receives sourced spans + their pointers via --list-sourced, and a
+# supported-topic-but-contradicted-attribution verdict is a gate failure.
+python3 "$VP" --map "$work/good.txt" --list-sourced | grep -q 'P1.S1: fs-15' \
+  && ok "#672: sourced claims are listable for the judge (attribution grading)" \
+  || err "--list-sourced did not list the sourced span + pointer"
+{ printf 'attestation: draft-sha256=%s\ngraded: P1.S1,P1.S2,P1.S3\n' "$PLAINH"
+  printf 'P1.S1: contradicted-attribution — the source attributes the reconcile to the attended pass, not the overnight loop\n'; } > "$work/verdicts-attr.txt"
+out=$(python3 "$VP" --map "$work/good.txt" --fact-sheet "$work/ids.txt" --draft "$work/plain-draft.md" --judge-findings "$work/verdicts-attr.txt" 2>&1) && rc=0 || rc=$?
+[ "$rc" -eq 1 ] && printf '%s' "$out" | grep -q 'contradicted-attribution' \
+  && ok "#672: a judge contradicted-attribution verdict on a sourced span is a gate failure" \
+  || err "contradicted-attribution not a gate failure (rc=$rc): $out"
+grep -q 'list-sourced' "$SKILL" && grep -qi 'contradicted-attribution' "$SKILL" \
+  && ok "#672: draft SKILL instructs sourced attribution-entailment grading" \
+  || err "SKILL missing the sourced-attribution grading instruction"
+
 # --- Story 13.67 (#364): fail-closed judge attestation ---
 # Comment-only file: absence of verdicts is never PASS.
 printf '# isolated-judge verdicts: all positions PASS\n' > "$work/att-comment.txt"
