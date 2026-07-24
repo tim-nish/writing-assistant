@@ -263,6 +263,22 @@ grep -q 'stop-disclosure' "$SKILL" \
   && ok "SKILL mandates the stop-disclosure run-status line on every exit" \
   || err "SKILL missing stop-disclosure wiring"
 
+# Elective pause is an owner gate (Story 18.94, #667): rendered as a selection,
+# only at enumerated sanctioned points, never before a bounded contracted step.
+grep -qi 'elective pause is an owner gate\|ELECTIVE pause is an owner gate' "$SKILL" \
+  && ok "SKILL states an elective pause is an owner gate" \
+  || err "SKILL missing the elective-pause gate contract"
+grep -qi 'bounded contracted step is NOT a pause point\|bounded contracted step is not a pause point' "$SKILL" \
+  && ok "SKILL states a bounded contracted step is not a pause point (#667)" \
+  || err "SKILL missing the bounded-step-not-a-pause-point rule"
+grep -qi 'enumerated sanctioned point' "$SKILL" \
+  && ok "SKILL enumerates sanctioned pause points (default: continue the chain)" \
+  || err "SKILL missing the enumerated-sanctioned-point rule"
+grep -q 'PAUSED (elective)' "$SKILL" \
+  && grep -qi 'no elective pause' "$SKILL" \
+  && ok "SKILL leads with the PAUSED banner and requires a selection" \
+  || err "SKILL missing the leading pause banner / selection requirement"
+
 if [ "$fail" -eq 0 ]; then
   printf '\nAll checkpoint/resume checks passed.\n'; exit 0
 else
