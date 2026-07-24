@@ -56,9 +56,9 @@ own `slug` (`<slug>.<language>`), `mode: canonical`, the target language and
 reader, and its own `canonical-sha256` trailer — through the pipeline's ONE
 canonical write path (`draft-pipeline.py _persist_canonical`), so no second
 hasher and no second writer exists. The only thing that marks it as derived is
-declaration, not behaviour: an ancestry block
+declaration, not behaviour: an ancestry pin
 
-    adapted_from: { slug: <source slug>, canonical_sha256: <source hash> }
+    adapted_from: <source slug>@<source hash>
 
 whose hash is the SAME convention the emission trailer uses (sha256 over the
 content without the trailer). Downstream stages consume it with zero
@@ -427,12 +427,13 @@ def compose_payload(plan):
 # --------------------------------------------------------------------------
 # The derived canonical (CAP-4)
 
-# The ancestry block, written as a ONE-LINE inline mapping — the same flow-style
-# convention the shipped canonical frontmatter already uses for `related:`, so
-# the pipeline's frontmatter reader keeps parsing it (as the raw string this
-# parser then reads) and no second frontmatter grammar appears.
+# The ancestry pin, spelled as ONE scalar `<slug>@<sha>` — reusing the
+# articles-repo plans' existing `pin: <repo>@<sha>` idiom rather than inventing a
+# second ancestry convention (ratified 2026-07-23). It is an ordinary scalar
+# frontmatter value, so the pipeline's frontmatter reader returns it as the raw
+# string this parser then splits, and no second frontmatter grammar appears.
 ANCESTRY_KEY = "adapted_from"
-_ANCESTRY_FIELD = re.compile(r"(\w+)\s*:\s*([^,}]+)")
+_ANCESTRY_PIN = re.compile(r"^(?P<slug>[^\s@]+)@(?P<sha>[0-9a-f]{64})$")
 
 # Frontmatter keys the derivation OWNS: the derived canonical is a canonical in
 # its own right, so these are re-declared for the target reader rather than
@@ -452,30 +453,27 @@ def canonical_hash(text):
 
 
 def parse_ancestry(fields):
-    """Read the ancestry block out of already-parsed frontmatter. Returns
-    (ancestry_or_None, defect_or_None) — an absent block is neither (the file
-    is simply not a derivation); a malformed one is a NAMED defect."""
+    """Read the ancestry pin out of already-parsed frontmatter. Returns
+    (ancestry_or_None, defect_or_None) — an absent pin is neither (the file
+    is simply not a derivation); a malformed one is a NAMED defect. The pin is
+    the scalar `<slug>@<sha>` (ratified 2026-07-23); the internal shape stays
+    `{slug, canonical_sha256}` so downstream (staleness, lint) is untouched."""
     raw = fields.get(ANCESTRY_KEY)
     if raw is None:
         return None, None
-    if not isinstance(raw, str) or not raw.strip().startswith("{"):
-        return None, f"`{ANCESTRY_KEY}` is not an inline mapping: {raw!r}"
-    found = dict((k, v.strip().strip('"\''))
-                 for k, v in _ANCESTRY_FIELD.findall(raw.strip().lstrip("{")))
-    slug, sha = found.get("slug"), found.get("canonical_sha256")
-    if not slug or not sha:
-        return None, (f"`{ANCESTRY_KEY}` must declare both `slug` and "
-                      f"`canonical_sha256`; got {sorted(found)}")
-    if not re.fullmatch(r"[0-9a-f]{64}", sha):
-        return None, (f"`{ANCESTRY_KEY}.canonical_sha256` is not a sha256 digest: "
-                      f"{sha!r}")
-    return {"slug": slug, "canonical_sha256": sha}, None
+    if not isinstance(raw, str):
+        return None, f"`{ANCESTRY_KEY}` is not a scalar pin: {raw!r}"
+    m = _ANCESTRY_PIN.match(raw.strip().strip('"\''))
+    if not m:
+        return None, (f"`{ANCESTRY_KEY}` must be the scalar pin `<slug>@<sha>` "
+                      f"(a slug, `@`, and a 64-char sha256 digest); got {raw!r}")
+    return {"slug": m.group("slug"), "canonical_sha256": m.group("sha")}, None
 
 
 def compose_derived(source_text, source_fields, plan, target, ancestry, body):
     """Build the derived canonical's text: the source's frontmatter with the
     derivation-owned keys re-declared for the target reader plus the ancestry
-    block, over the skill-authored target-language body. Every other declared
+    pin, over the skill-authored target-language body. Every other declared
     field (date, topics, related, ...) is carried verbatim — the derived file
     conforms to the same frontmatter schema because it is the same kind of
     file."""
@@ -504,8 +502,7 @@ def compose_derived(source_text, source_fields, plan, target, ancestry, body):
     for key, val in overrides.items():
         if key not in written:
             out.append(f'{key}: "{val}"' if key in ("title",) else f"{key}: {val}")
-    out.append(f'{ANCESTRY_KEY}: {{ slug: {ancestry["slug"]}, '
-               f'canonical_sha256: {ancestry["canonical_sha256"]} }}')
+    out.append(f'{ANCESTRY_KEY}: {ancestry["slug"]}@{ancestry["canonical_sha256"]}')
     return "---\n" + "\n".join(out) + "\n---\n\n" + body.strip("\n") + "\n"
 
 

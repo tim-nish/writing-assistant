@@ -1958,11 +1958,11 @@ def cmd_variants(args):
 
 
 _CANONICAL_SHA = re.compile(r"canonical-sha256=([0-9a-f]{64})")
-# A derived canonical declares its source in an inline `adapted_from` mapping
-# (SPEC-canonical-adaptation CAP-4). This is a PRESENCE test only — the block's
+# A derived canonical declares its source in a scalar `adapted_from: <slug>@<sha>`
+# pin (SPEC-canonical-adaptation CAP-4). This is a PRESENCE test only — the pin's
 # contents are read and graded by the adaptation invocation, never here — this
 # stage neither invokes it nor knows what a derivation means (CAP-1).
-_ADAPTED_FROM = re.compile(r"^adapted_from:\s*\{", re.MULTILINE)
+_ADAPTED_FROM = re.compile(r"^adapted_from:\s*[^\s@]+@[0-9a-f]{64}\s*$", re.MULTILINE)
 
 
 def _declares_ancestry(path):

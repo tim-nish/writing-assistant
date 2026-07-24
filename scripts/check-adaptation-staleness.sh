@@ -265,7 +265,7 @@ $A staleness --root "$work/host" >/dev/null
   || err "the staleness check mutated output.drafts"
 
 # --- a derivation whose source cannot be resolved is never silently fresh ----
-sed 's/^adapted_from: .*/adapted_from: { slug: no-such-article, canonical_sha256: '"$(printf '0%.0s' $(seq 64))"' }/' \
+sed 's/^adapted_from: .*/adapted_from: no-such-article@'"$(printf '0%.0s' $(seq 64))"'/' \
   "$work/drafts/retry-storms.ja.md" > "$work/drafts/orphan.ja.md"
 $A staleness --root "$work/host" > "$work/orphan.json"
 python3 -c "
