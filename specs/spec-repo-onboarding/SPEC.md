@@ -17,6 +17,19 @@ transcript and folded into Constraints below.
 > schedule as the config keys (SPEC-policy-topic-at-draft CAP-3). The
 > declining-consequence statement is unchanged.
 
+> **Amended 2026-07-24 (triage, #671)** per /triage-gh, config-surface half of
+> the `journey:` writing-sources element (semantics owned by SPEC-writing-assistant
+> CAP-2). The optional `journey:` key — one or more episode-record files inside
+> the declared source set — is validated like every other source element:
+> `validate-config` reports a `journey:` entry resolving to no readable file as a
+> stage-0 configuration defect naming the key and fix (the same lint shape used
+> for source `include:` paths and variant-profile target directories);
+> `resolve-writing-sources.py files` enumerates a declared `journey:` file into
+> the source set so harvest reads it as ordinary declared prose. The `setup`
+> skill (CAP-1) may **offer** a `journey:` declaration when it detects a
+> plausible episode-record file, and the config writer (CAP-2) persists it — an
+> absent `journey:` key is valid and changes nothing.
+
 ## Problem
 
 Preparing a repository for the article pipeline today requires manual YAML
