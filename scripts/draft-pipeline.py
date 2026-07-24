@@ -4578,7 +4578,57 @@ class _CanonicalWriteError(Exception):
         self.reason = reason
 
 
-def _persist_canonical(text, slug, root, create_out=False):
+def _ws_owns_slug(ws, slug):
+    """True if the run workspace checkpoint records that THIS run persists
+    `<slug>` — the same-run revision discriminator for the no-clobber gate
+    (Story 18.92, #666). No ws / no checkpoint / different slug ⇒ not owned."""
+    if not ws:
+        return False
+    path = _checkpoint_path(ws)
+    if not os.path.isfile(path):
+        return False
+    try:
+        with open(path, encoding="utf-8") as f:
+            st = json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return False
+    return isinstance(st, dict) and st.get("canonical_slug") == slug
+
+
+def _record_canonical_ownership(ws, slug, sha):
+    """Record that this run persisted `<slug>` into its workspace checkpoint so a
+    later same-run persist (the revision loop) is recognized as owning the slug
+    rather than refused as a collision (Story 18.92). Best-effort and additive —
+    merges into the existing checkpoint, never disturbing stage/progress keys."""
+    if not ws:
+        return
+    path = _checkpoint_path(ws)
+    # Only annotate an EXISTING run checkpoint — never mint one. A real run has
+    # checkpointed through its stages by the time it persists; minting a file on
+    # a run that failed a later gate (e.g. the missing-plan hard error) would
+    # leave a spurious partial checkpoint behind.
+    if not os.path.isfile(path):
+        return
+    try:
+        with open(path, encoding="utf-8") as f:
+            st = json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return
+    if not isinstance(st, dict):
+        return
+    st["canonical_slug"] = slug
+    st["canonical_sha"] = sha
+    try:
+        tmp = path + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(st, f, indent=2)
+        os.replace(tmp, path)
+    except OSError:
+        pass
+
+
+def _persist_canonical(text, slug, root, create_out=False, ws=None,
+                       replace=False, owned=False):
     """Persist `text` as the canonical draft at `<output.drafts>/<slug>.md`,
     stamped with the emission trailer — THE one canonical write path (Story
     13.68), reused verbatim by review's post-arbitration re-entry (Story 13.70)
@@ -4618,6 +4668,32 @@ def _persist_canonical(text, slug, root, create_out=False):
     canonical_sha = hashlib.sha256(body.encode("utf-8")).hexdigest()
     content = body + \
         f"\n<!-- writing-assistant: canonical-sha256={canonical_sha} -->\n"
+    # No-clobber gate (Story 18.92, #666): never silently replace a DIFFERENT
+    # canonical that happens to mint a colliding slug. A byte-identical re-run
+    # (the existing trailer sha equals the sha we are about to write) is
+    # idempotent and proceeds unchanged. A DIFFERING existing file proceeds only
+    # when this run owns the slug — the same-run revision loop (ws checkpoint) or
+    # the sanctioned review re-entry path (`owned`) — or under an explicit
+    # `--replace-canonical` override. Otherwise, including a trailer-less file of
+    # unknown provenance, it refuses with a named error rather than overwriting.
+    if os.path.isfile(canonical_path):
+        try:
+            existing = _read_text(canonical_path)
+        except OSError as e:
+            raise _CanonicalWriteError(
+                canonical_path, f"cannot read the existing canonical to compare: {e}")
+        m = _CANONICAL_SHA.search(existing)
+        existing_sha = m.group(1) if m else None
+        if existing_sha != canonical_sha:
+            if not (replace or owned or _ws_owns_slug(ws, slug)):
+                raise _CanonicalWriteError(
+                    canonical_path,
+                    "slug collision — a different canonical already exists at "
+                    f"{canonical_path} (existing canonical-sha256="
+                    f"{existing_sha or 'none: no trailer, provenance unknown'}, "
+                    f"about to write {canonical_sha}) and this run has no record "
+                    "of owning this slug. Resolution: pick a different slug, or "
+                    "re-run with --replace-canonical to overwrite deliberately")
     try:
         tmp = canonical_path + ".tmp"
         with open(tmp, "w", encoding="utf-8") as fh:
@@ -4625,6 +4701,7 @@ def _persist_canonical(text, slug, root, create_out=False):
         os.replace(tmp, canonical_path)
     except OSError as e:
         raise _CanonicalWriteError(canonical_path, f"write failed: {e}")
+    _record_canonical_ownership(ws, slug, canonical_sha)
     return canonical_path, canonical_sha
 
 
@@ -4691,7 +4768,9 @@ def cmd_complete(args):
                              f"cannot read the workspace draft: {e}")
     try:
         canonical_path, canonical_sha = _persist_canonical(
-            text, args.slug, args.root, create_out=getattr(args, "create_out", False))
+            text, args.slug, args.root, create_out=getattr(args, "create_out", False),
+            ws=getattr(args, "ws", None),
+            replace=getattr(args, "replace_canonical", False))
     except _CanonicalWriteError as e:
         return product_error("canonical draft (drafts/{slug}.md)",
                              e.path, e.reason)
@@ -4725,10 +4804,25 @@ def cmd_complete(args):
             sys.stderr.write(f"error: run workspace does not exist: {args.ws}\n")
             return 1
         checkpoint_path = _checkpoint_path(args.ws)
+        # Merge rather than overwrite so the no-clobber gate's ownership record
+        # (canonical_slug, #666) survives completion — a re-completion of THIS
+        # run with revised content is then recognized as owning the slug.
+        st = {}
+        if os.path.isfile(checkpoint_path):
+            try:
+                with open(checkpoint_path, encoding="utf-8") as f:
+                    st = json.load(f)
+            except (OSError, json.JSONDecodeError):
+                st = {}
+        if not isinstance(st, dict):
+            st = {}
+        st["stage"] = "complete"
+        st["next_stage"] = DONE_STAGE
+        st["canonical_slug"] = args.slug        # no-clobber ownership record (#666)
+        st["canonical_sha"] = canonical_sha
         tmp = checkpoint_path + ".tmp"
         with open(tmp, "w", encoding="utf-8") as f:
-            json.dump({"stage": "complete", "next_stage": DONE_STAGE}, f,
-                      indent=2)
+            json.dump(st, f, indent=2)
         os.replace(tmp, checkpoint_path)
 
     # Browsing-surface view (Story 18.43, #540) — NOT a third declared product.
@@ -4878,7 +4972,9 @@ def cmd_review_reentry(args):
         return 1
     try:
         canonical_path, canonical_sha = _persist_canonical(
-            text, args.slug, args.root, create_out=getattr(args, "create_out", False))
+            text, args.slug, args.root, create_out=getattr(args, "create_out", False),
+            ws=getattr(args, "ws", None), owned=True,
+            replace=getattr(args, "replace_canonical", False))
     except _CanonicalWriteError as e:
         sys.stderr.write(
             "error: review-reentry: reviewed canonical not persisted — "
@@ -5366,6 +5462,9 @@ def main(argv=None):
                          "repo (inside the host it is created automatically, per #213)")
     sp.add_argument("--ws", help="run workspace; the final `next_stage: done` checkpoint is written here "
                                  "only after BOTH products verify")
+    sp.add_argument("--replace-canonical", action="store_true",
+                    help="overwrite an existing DIFFERENT canonical at <slug>.md deliberately "
+                         "(the no-clobber gate refuses an unowned slug collision by default, #666)")
     sp = sub.add_parser("review-reentry",
                         help="post-arbitration re-entry: persist the reviewed canonical, revalidate "
                              "the rebuilt map, report scoped checks, mark variants stale, STOP (Story 13.70)")
@@ -5378,6 +5477,9 @@ def main(argv=None):
                          "repo (inside the host it is created automatically, per #213)")
     sp.add_argument("--ws", required=True, help="run workspace; the done/reviewed checkpoint is written "
                                                 "here only after the rebuilt map validates")
+    sp.add_argument("--replace-canonical", action="store_true",
+                    help="overwrite an existing DIFFERENT canonical at <slug>.md deliberately "
+                         "(the no-clobber gate refuses an unowned slug collision by default, #666)")
     sp.add_argument("--applied", type=int, default=1,
                     help="accepted findings applied this round (default 1); 0 = strict no-op — "
                          "nothing persisted, nothing marked stale, no checkpoint")
