@@ -211,9 +211,42 @@ Ratified constraints binding the implementation whenever it is ordered:
   pinned, lessons first**; the hub's **Q&A history archive is never a harvest
   source** (promotion to the recall surface is the only path).
 - **Published text carries public repository links only.**
+- **Destination (amended 2026-07-24, #653):** the email and web-archive
+  renderings land in the destination repo's **`newsletter/` section** — a
+  distinct section with its own light schema, separate from the article
+  backlog (different layer/lifecycle), web-archived so SEO accrues to the owned
+  domain (`consulted: product-lab@90877fa4e77e1353b527a76607ed2ea06daf2b27
+  topics/articles.md:61,66`). This is a **fourth permitted destination write
+  surface** recorded in SPEC-writing-assistant (#653) — *not* the drafts
+  variant surface of the "Intermediates" clause above, whose "only the variant
+  files land at `output.drafts` … and nothing else lands anywhere" now reads
+  against that extended surface. Emission still uses the same declared-profile
+  packaging machinery; only the destination section differs.
+- **Routing — a separate working-note emission lane (amended 2026-07-24, #657/#658):**
+  a working-note (F5) draft selects its newsletter platforms **directly from the
+  resolvable newsletter profiles**, *not* through the language-keyed
+  `syndication.policy` that routes ordinary articles. The article variant flow
+  resolves platforms from `syndication.policy[<language>].variants`
+  (`scripts/draft-pipeline.py:1754`; a platform absent from that list is
+  rejected as "not configured", `scripts/check-stage5-variants.sh:164-173`),
+  which is keyed by language alone and has no article-type dimension — so a
+  working-note cannot ride it without mis-routing every article of its language.
+  The working-note lane is therefore its own selection path in `cmd_variants`,
+  consistent with the newsletter being a separate layer/lifecycle
+  (`consulted: product-lab@90877fa4e77e1353b527a76607ed2ea06daf2b27
+  topics/articles.md:29-30,66` — extend with a separate lane rather than
+  overload the variant mechanism). `syndication.policy` is left untouched; the
+  packaging profiles themselves are still declared exactly like every platform.
+  This is the one **mechanism** the working-note adds beyond declaration —
+  narrowing the earlier "no new mechanism" wording, which held for packaging but
+  not for platform *selection*.
 
-This section orders no build — it records the contract so the later
-implementation order needs no policy attachments.
+This section recorded the contract; **the build is ordered by #653
+(2026-07-24)**, which added the destination write-surface amendment above and
+closes the SPEC-policy-realignment F2 drift (the working-note/newsletter
+constraints were "nowhere in this repo" until this amendment). The
+**routing lane** for how a working-note selects those platforms is settled by
+#657/#658 (2026-07-24), amended above.
 
 ## Non-goals
 

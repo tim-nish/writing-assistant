@@ -1674,6 +1674,21 @@ def _strip_emission_trailer(text):
     return text
 
 
+_NEWSLETTER_SECTION = "newsletter"
+
+
+def _targets_newsletter_section(profile):
+    """True if a platform profile's packaging.layout targets the destination
+    repo's `newsletter/` section (Story 18.87, #657). This is how the
+    working-note emission lane recognises a newsletter platform — a declaration,
+    not a hardcoded id list, so adding a newsletter platform is one profile
+    file. `dir` is matched on its leading path segment, so `newsletter/` and
+    `newsletter/issues/` both count while `articles/` does not."""
+    layout = ((profile or {}).get("packaging", {}) or {}).get("layout", {}) or {}
+    d = str(layout.get("dir", "")).strip().strip("/")
+    return d == _NEWSLETTER_SECTION or d.startswith(_NEWSLETTER_SECTION + "/")
+
+
 def cmd_variants(args):
     """Emit platform-ready variants of the PERSISTED canonical draft as
     PROJECTIONS through declared platform profiles (Story 16.3; Story 13.69 —
@@ -1751,12 +1766,38 @@ def cmd_variants(args):
     cfg_args = argparse.Namespace(config_json=args.config_json, root=args.root,
                                   global_config=args.global_config, repo_config=args.repo_config)
     cfg = rf.load_config(cfg_args)
-    policy = cfg.get("syndication", {}).get("policy", {}).get(lang)
-    if not policy:
-        sys.stderr.write(f"error: no syndication.policy for language {lang!r} in config\n")
-        return 1
     owner_variants = cfg.get("syndication", {}).get("variants", {})
-    available = list(policy.get("variants", []))
+
+    # Working-note lane (Story 18.87, #657; SPEC-platform-variants slim-profile
+    # "Routing"): a working-note (F5) selects its newsletter platforms DIRECTLY
+    # from the resolvable profiles whose packaging.layout targets the
+    # `newsletter/` section — it does NOT consult the language-keyed
+    # `syndication.policy` that routes ordinary articles, which has no
+    # article-type dimension. Any other framework (or none) keeps the article
+    # routing unchanged.
+    _fw = getattr(args, "framework", None)
+    is_working_note = bool(_fw) and resolve_framework(_fw) in SLIM_PROFILE_FRAMEWORKS
+    if is_working_note:
+        pp = _load("resolve-platform-profiles.py")
+        pdir = pp.profiles_dir(pp.host_root(args.root), None)
+        nl_profiles, _nl_findings = pp.load_profiles(pdir)
+        available = sorted(name for name, prof in nl_profiles.items()
+                           if _targets_newsletter_section(prof))
+        if not available:
+            sys.stderr.write(
+                "error: no resolvable newsletter platform profile (a profile whose "
+                "packaging.layout targets the `newsletter/` section) — seed one, e.g. "
+                "`resolve-platform-profiles.py seed newsletter-email` "
+                "(SPEC-platform-variants working-note lane)\n")
+            return 1
+        policy_mode = "newsletter"
+    else:
+        policy = cfg.get("syndication", {}).get("policy", {}).get(lang)
+        if not policy:
+            sys.stderr.write(f"error: no syndication.policy for language {lang!r} in config\n")
+            return 1
+        available = list(policy.get("variants", []))
+        policy_mode = policy.get("mode")
 
     # Emission is per explicit publish decision (Story 16.4, CAP-3): the pipeline
     # NEVER auto-emits all configured platforms. The owner's choice arrives as
@@ -1792,7 +1833,7 @@ def cmd_variants(args):
                                "Nothing is emitted until you approve its plan.")})
             else:
                 direct.append(name)
-        out = {"stage": "variants", "language": lang, "mode": policy.get("mode"),
+        out = {"stage": "variants", "language": lang, "mode": policy_mode,
                "available": available, "direct": direct,
                "emitted": [], "written": False,
                "note": "choose platforms to emit with --platforms <ids|all>; "
@@ -1943,7 +1984,7 @@ def cmd_variants(args):
         "stage": "variants",
         "next_stage": "review",           # draft exits into SPEC-article-review
         "language": lang,
-        "mode": policy.get("mode"),
+        "mode": policy_mode,
         "available": available,
         "chosen": chosen,                 # the owner's explicit publish decision
         "emitted": emitted,
@@ -5558,6 +5599,12 @@ def main(argv=None):
     sp.add_argument("--list-platforms", action="store_true",
                     help="report the configured platforms for this draft and emit "
                          "nothing (feeds the in-conversation emission choice)")
+    sp.add_argument("--framework", dest="framework", default=None,
+                    help="the draft's article framework/type (Story 18.87): when it "
+                         "resolves to the working-note slim profile, emission takes "
+                         "the working-note lane — newsletter platforms selected from "
+                         "resolvable profiles targeting the `newsletter/` section, "
+                         "bypassing syndication.policy")
 
     st = sub.add_parser("variant-staleness")
     st.add_argument("draft", nargs="?", default="-", help="canonical draft, or - for stdin")
