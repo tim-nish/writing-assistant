@@ -331,6 +331,7 @@ import json,sys
 o=json.load(sys.stdin)
 assert o['review_evidence_class']=='ancestry', o
 assert o['ancestry_validation']['ok'] is True, o
+assert o['ancestry_validation']['pin_shape'] == 'well-formed', o
 assert 'map_validation' not in o, o
 " && ok "#704: it reports the ancestry evidence class and no map validation" \
   || err "#704: re-entry JSON wrong"
@@ -351,18 +352,41 @@ body = re.sub(r"\n*<!-- writing-assistant: canonical-sha256=[0-9a-f]{64} -->\s*$
 assert hashlib.sha256((body.rstrip("\n") + "\n").encode()).hexdigest() == m.group(1)
 PYT
 
-# (2) A BROKEN ancestry pin refuses, fail-closed, with no checkpoint.
+# (2) A MALFORMED pin refuses, fail-closed, with no checkpoint. Shape is what
+#     the gate can judge alone; whether the pin RESOLVES is the reported check's
+#     job (#704 re-triage — the gate may not call the ancestry lint).
 rm -rf "$d/ws2"; mkdir -p "$d/ws2"
-mk_derived "$(python3 -c 'print("c"*64)')"
-if python3 "$DP" review-reentry --draft "$d/edited.ja.md" --slug retry-storms.ja \
+sed 's/^adapted_from: .*/adapted_from: not-a-valid-pin/' "$d/edited.ja.md" \
+  > "$d/malformed.ja.md"
+if python3 "$DP" review-reentry --draft "$d/malformed.ja.md" --slug retry-storms.ja \
      --root "$d/host" --ws "$d/ws2" --applied 3 >/dev/null 2>"$d/e2"; then
-  err "#704: a derivation whose pin matches no source content was checkpointed"
+  err "#704: a derivation with a malformed ancestry pin was checkpointed"
 else
   grep -q 'invalid-ancestry' "$d/e2" \
     && [ ! -f "$d/ws2/checkpoint.json" ] \
-    && ok "#704: a broken ancestry pin refuses by name and writes no checkpoint" \
+    && ok "#704: a malformed ancestry pin refuses by name and writes no checkpoint" \
     || err "#704: wrong refusal: $(cat "$d/e2")"
 fi
+
+# (2b) The RESOLUTION check is reported, not run — the same status
+#      verify-provenance has for an authored draft.
+rm -rf "$d/ws2b"; mkdir -p "$d/ws2b"
+mk_derived "$src_sha"
+python3 "$DP" review-reentry --draft "$d/edited.ja.md" --slug retry-storms.ja \
+  --root "$d/host" --ws "$d/ws2b" --applied 3 2>/dev/null \
+  | python3 -c "
+import json,sys
+o=json.load(sys.stdin)
+checks=[c['check'] for c in o['required_checks']]
+assert 'lint-ancestry' in checks, o
+assert 'verify-provenance' not in checks, o
+" && ok "#704: the ancestry RESOLUTION check is reported in the worklist, not run" \
+  || err "#704: the worklist does not carry lint-ancestry for a derived draft"
+# And the pipeline never names the adaptation module — CAP-1's boundary, which
+# is why the resolution check is reported rather than executed here.
+[ "$(grep -c 'adapt-canonical' "$DP" || true)" -eq 0 ] \
+  && ok "#704: the pipeline still never references the adaptation invocation" \
+  || err "#704: the pipeline now references adaptation — CAP-1's boundary broken"
 
 # (3) An AUTHORED canonical still requires --map — the class was typed, not
 #     weakened.

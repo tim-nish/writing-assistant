@@ -5109,42 +5109,50 @@ def cmd_complete(args):
 # a done/reviewed checkpoint over an INVALID map is impossible because the
 # command that validates the map is the command that writes the checkpoint.
 
-def _derived_ancestry_evidence(draft_text, draft_path, root):
+# The ancestry pin's grammar — the ONE scalar `<slug>@<sha256>` ratified
+# 2026-07-23. Matched here only to judge the pin's SHAPE (below); whether it
+# RESOLVES is the ancestry lint's business, reported as a
+# required check rather than run from this module (#704).
+_ANCESTRY_PIN_SHAPE = re.compile(r"^[^\s@]+@[0-9a-f]{64}$")
+
+
+def _derived_ancestry_evidence(draft_text):
     """Ancestry evidence for a DERIVED canonical's review re-entry (Story
-    18.110, #704). Returns (evidence_dict, problems_list).
+    18.110, #704). Returns (evidence_dict_or_None, problems_list).
 
     A derived canonical owns no claims of its own — they are inherited under
     SPEC-canonical-adaptation CAP-2 — so it has no provenance map, and requiring
     one would re-attest claims that are not its to attest. Its completion
-    evidence is its ANCESTRY instead: the `adapted_from` pin resolves to a real
-    source canonical at a real content hash.
+    evidence is its ANCESTRY instead.
 
-    The check is DELEGATED to `adapt-canonical.py lint-ancestry`, the one place
-    that names the three defect classes (malformed pin, unresolvable slug, hash
-    matching no source content). It runs as a subprocess for a structural
-    reason, not a stylistic one: `adapt-canonical` imports THIS module, so
-    importing it back would be a cycle. Same pattern as the completion gate's
-    `lint-article` call (#674).
+    WHAT THIS FUNCTION JUDGES, AND WHAT IT DELIBERATELY DOES NOT
+    ------------------------------------------------------------
+    It judges the pin's SHAPE only: present, and the ratified scalar
+    `<slug>@<64-hex>`. Whether that pin RESOLVES — a real source canonical at a
+    matching content hash — is `lint-ancestry`'s business, and this module does
+    not call it: the adaptation invocation imports THIS module, and CAP-1's
+    boundary forbids the draft pipeline from referencing adaptation at all — the
+    guard is a grep for the module's NAME, so this file does not even spell it.
+    The resolution check is REPORTED in the required-checks worklist instead,
+    exactly as `verify-provenance` is for an authored canonical — this command
+    emits worklists and runs no checks.
+
+    Accepted cost, decided at the #704 re-triage and recorded in
+    SPEC-canonical-adaptation: the checkpoint is therefore written before the
+    ancestry is known to RESOLVE. A malformed pin refuses here; an unresolvable
+    one is caught by the reported check.
     """
     fields, _body = _read_frontmatter(draft_text)
-    pin = (fields or {}).get("adapted_from")
-    if not pin:
+    raw = (fields or {}).get("adapted_from")
+    if raw is None:
         return None, []                      # not a derivation
-    here = os.path.dirname(os.path.realpath(__file__))
-    cmd = [sys.executable, os.path.join(here, "adapt-canonical.py"),
-           "lint-ancestry", "--derived", draft_path]
-    if root:
-        cmd += ["--root", root]
-    try:
-        r = subprocess.run(cmd, capture_output=True, text=True)
-    except OSError as e:
-        return {"pin": str(pin)}, [f"cannot run the ancestry lint: {e}"]
-    if r.returncode != 0:
-        detail = (r.stderr or r.stdout or "").strip().splitlines()
-        return ({"pin": str(pin)},
-                [f"ancestry lint failed: {line}" for line in detail] or
-                ["ancestry lint failed with no diagnostic"])
-    return {"pin": str(pin), "lint_ancestry": "clean"}, []
+    pin = str(raw).strip().strip('"\'')
+    if not _ANCESTRY_PIN_SHAPE.match(pin):
+        return ({"pin": pin},
+                [f"`adapted_from` is not the scalar pin `<slug>@<sha256>` "
+                 f"(a slug, `@`, and a 64-char sha256 digest); got {raw!r}"])
+    return {"pin": pin, "pin_shape": "well-formed",
+            "resolution_check": "reported, not run — see required_checks"}, []
 
 
 def cmd_review_reentry(args):
@@ -5243,8 +5251,7 @@ def cmd_review_reentry(args):
         sys.stderr.write(
             f"error: review-reentry: cannot read the edited draft: {e}\n")
         return 1
-    ancestry_evidence, ancestry_problems = _derived_ancestry_evidence(
-        text, args.draft, args.root)
+    ancestry_evidence, ancestry_problems = _derived_ancestry_evidence(text)
     evidence_class = "ancestry" if ancestry_evidence is not None else "provenance-map"
     if ancestry_evidence is None and not args.map:
         sys.stderr.write(
@@ -5308,12 +5315,29 @@ def cmd_review_reentry(args):
             return 1
 
     # (c) The scoped regression worklist — reported, never run here.
-    required_checks = [{
-        "check": "verify-provenance",
-        "reason": "the draft changed in review, so the prior judge run's "
-                  "attestation (Story 13.67) no longer binds to this content "
-                  "hash — a FRESH isolated judge must grade the rebuilt map",
-    }]
+    if ancestry_evidence is not None:
+        # A DERIVED canonical's evidence is its ancestry, and the half this
+        # command cannot reach — does the pin RESOLVE to a real source at a
+        # matching content hash — is reported exactly as verify-provenance is
+        # for an authored draft (#704). Calling the lint from here would put the
+        # pipeline in reference to adaptation, which CAP-1's boundary forbids.
+        required_checks = [{
+            "check": "lint-ancestry",
+            "reason": "this draft is a DERIVED canonical, so its re-entry "
+                      "evidence is its ancestry; the gate verified the pin's "
+                      "SHAPE only — run the ancestry lint on this draft to "
+                      "confirm it RESOLVES (a real source "
+                      "canonical at a matching content hash). The checkpoint is "
+                      "written before this runs, by decision at the #704 "
+                      "re-triage; an unresolvable pin is this check's to catch",
+        }]
+    else:
+        required_checks = [{
+            "check": "verify-provenance",
+            "reason": "the draft changed in review, so the prior judge run's "
+                      "attestation (Story 13.67) no longer binds to this content "
+                      "hash — a FRESH isolated judge must grade the rebuilt map",
+        }]
     if args.rubric_applied:
         required_checks.append({
             "check": "quality-gate-mechanical",
