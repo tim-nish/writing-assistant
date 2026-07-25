@@ -165,6 +165,67 @@ python3 "$DP" complete --draft "$ws/draft2.md" --slug "$slug" --root "$h" --ws "
   && ok "no-clobber gate: the owning run's revision loop proceeds (#666)" \
   || err "owned same-run revision was refused"
 
+# 3b-bis. Comparison basis is CONTENT, not the trailer (Story 18.104, #695).
+#     An operationally hand-edited canonical carries a stale trailer; reading it
+#     as the basis converted a byte-identical re-persist into a refusal.
+# (d) Stale trailer + byte-identical content ⇒ idempotent, from an UNOWNED run.
+python3 - "$a/drafts/$slug.md" <<'EOF'
+import re, sys
+p = sys.argv[1]
+t = open(p, encoding="utf-8").read()
+# Falsify the attestation only — the content is untouched.
+t = re.sub(r"canonical-sha256=[0-9a-f]{64}", "canonical-sha256=" + "0"*64, t)
+open(p, "w", encoding="utf-8").write(t)
+EOF
+stale_before=$(cat "$a/drafts/$slug.md")
+wsi="$work/wsidem"; mkdir -p "$wsi"
+cp "$ws/draft2.md" "$wsi/draft.md"      # same content as the persisted canonical
+if python3 "$DP" complete --draft "$wsi/draft.md" --slug "$slug" --root "$h" --ws "$wsi" \
+     >/dev/null 2>"$work/e_stale"; then
+  grep -q 'revised by the owning run' "$a/drafts/$slug.md" \
+    && ok "no-clobber gate: stale trailer does not block a byte-identical re-persist (#695)" \
+    || err "re-persist over a stale trailer changed the content"
+else
+  err "stale trailer refused an idempotent re-persist: $(cat "$work/e_stale")"
+fi
+# The write re-stamps the trailer it just blessed — no separate re-stamp path.
+python3 - "$a/drafts/$slug.md" <<'EOF' && ok "no-clobber gate: the sanctioned write re-stamps a stale trailer (#695)" || err "trailer not re-stamped by the write"
+import hashlib, re, sys
+t = open(sys.argv[1], encoding="utf-8").read()
+m = re.search(r"canonical-sha256=([0-9a-f]{64})", t)
+assert m and m.group(1) != "0"*64, "trailer left stale"
+body = re.sub(r"\n*<!-- writing-assistant: canonical-sha256=[0-9a-f]{64} -->\s*$", "", t)
+body = body.rstrip("\n") + "\n"
+assert hashlib.sha256(body.encode("utf-8")).hexdigest() == m.group(1)
+EOF
+# (e) A DIFFERING canonical still refuses when the run owns nothing — the #666
+#     promise must survive the basis change, stale trailer or not.
+python3 - "$a/drafts/$slug.md" <<'EOF'
+import re, sys
+p = sys.argv[1]
+t = open(p, encoding="utf-8").read()
+open(p, "w", encoding="utf-8").write(
+    re.sub(r"canonical-sha256=[0-9a-f]{64}", "canonical-sha256=" + "0"*64, t))
+EOF
+foreign_before=$(cat "$a/drafts/$slug.md")
+wsf="$work/wsforeign"; mkdir -p "$wsf"
+sed 's/late\./late — a foreign canonical colliding on the slug\./' "$ws/draft.md" > "$wsf/draft.md"
+if python3 "$DP" complete --draft "$wsf/draft.md" --slug "$slug" --root "$h" --ws "$wsf" \
+     >/dev/null 2>"$work/e_foreign"; then
+  err "no-clobber gate: a foreign collision was allowed over a stale-trailer canonical"
+else
+  grep -q 'slug collision' "$work/e_foreign" \
+    && grep -q 'existing content hashes to' "$work/e_foreign" \
+    && [ "$foreign_before" = "$(cat "$a/drafts/$slug.md")" ] \
+    && ok "no-clobber gate: foreign collision still refuses, on content grounds (#695)" \
+    || err "foreign-collision refusal wrong: $(cat "$work/e_foreign")"
+fi
+grep -q 'disagrees with its own content' "$work/e_foreign" \
+  && ok "no-clobber refusal reports trailer drift without deciding on it (#695)" \
+  || err "refusal did not disclose the trailer drift it declined to use"
+# Restore a coherent canonical for the checks that follow.
+python3 "$DP" complete --draft "$ws/draft2.md" --slug "$slug" --root "$h" --ws "$ws" >/dev/null
+
 # 3c. Completion-gate lint (Story 18.99, #674): a frontmatter BOUNDS violation
 #     (summary > 240) is a hard error with no done checkpoint; style-class
 #     findings are disclosed warnings, never blocking completion.
