@@ -28,6 +28,20 @@ python3 -c "import py_compile; py_compile.compile('$DP', doraise=True)" 2>/dev/n
   && ok "pipeline helper compiles" || { err "helper syntax error"; printf '\nFAILED.\n' >&2; exit 1; }
 
 work=$(mktemp -d); trap 'rm -rf "$work"' EXIT
+# Isolation (Story 18.102, #689): this harness invokes `complete`, whose persist
+# path resolves `output.drafts`. Declare the run as a test (WRITING_ASSISTANT_TEST=1)
+# so the 18.53 destination gate arms on the persist layer, and isolate config +
+# state under the temp tree so no writing-sources.yaml or profile lands in the
+# real ~/.config/writing-assistant. The `complete` calls below pass --root at a
+# temp host whose output.drafts resolves UNDER $work — never the owner's real
+# ~/work/articles/drafts (which is how the test canonical t.md leaked there).
+export WRITING_ASSISTANT_TEST=1
+export XDG_CONFIG_HOME="$work/xdg"
+export XDG_STATE_HOME="$work/state"
+qh="$work/qhost"; mkdir -p "$qh"; git -C "$qh" init -q
+qdrafts="$work/qart/drafts"; mkdir -p "$qdrafts"
+python3 "$root/scripts/resolve-writing-sources.py" --root "$qh" \
+  set-draft-location "$qdrafts/" >/dev/null 2>&1
 
 # A clean, well-mixed draft + map + all-pass judge verdicts. Carries the
 # pipeline-internal `audience` field (a gate precondition since Story 13.41).
@@ -326,7 +340,7 @@ python3 "$DP" quality-gate --draft "$work/good.md" --map "$work/good-map.txt" --
 # #492 regression) and writes no checkpoint; a complete record clears the block.
 wsp="$work/wsp"; mkdir -p "$wsp"
 printf 'dim1: pass\ndim2: pass\n' > "$wsp/rubric-verdicts.txt"
-if python3 "$DP" complete --draft "$work/good.md" --slug t --ws "$wsp" >/dev/null 2>"$work/e_rv"; then
+if python3 "$DP" complete --draft "$work/good.md" --slug t --root "$qh" --ws "$wsp" >/dev/null 2>"$work/e_rv"; then
   err "a partial verdict record did not block completion"
 else
   grep -q 'verdict record is partial' "$work/e_rv" && grep -q 'dim3, dim4' "$work/e_rv" \
@@ -339,7 +353,7 @@ fi
 # it — any later error is a different product, never the partial-record message).
 wsc="$work/wsc"; mkdir -p "$wsc"
 cp "$rv" "$wsc/rubric-verdicts.txt"
-python3 "$DP" complete --draft "$work/good.md" --slug t --ws "$wsc" >/dev/null 2>"$work/e_rvc" || true
+python3 "$DP" complete --draft "$work/good.md" --slug t --root "$qh" --ws "$wsc" >/dev/null 2>"$work/e_rvc" || true
 grep -q 'verdict record is partial' "$work/e_rvc" \
   && err "a complete verdict record wrongly tripped the partial-record block" \
   || ok "a complete four-dimension record clears the completion verdict gate"

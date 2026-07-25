@@ -240,6 +240,33 @@ grep -q 'cp config/platform-profiles' "$EMIT" \
   && err "emit-variants still instructs the owner to cp an example file" \
   || ok "no cp-the-example instruction remains in the emit-variants preflight"
 
+# --- Story 18.102 (#689): seeding refuses a DISPOSABLE host root ---------------
+# A host root under the system temp dir must not accrue durable machine-global
+# config: seeding it with no isolated destination composes platform-profiles/
+# beneath the real ~/.config/writing-assistant/repos/<tmp-key>/, leaving throwaway
+# config behind (71 such dirs were found). The predicate is the DESTINATION
+# (matching 18.53): a temp root writing UNDER the temp tree resolves normally.
+# $work is under the temp dir. Point config home OUTSIDE temp so the resolved
+# destination is durable; the seed must refuse and write nothing there.
+cfg689="$HOME/.writing-assistant-check-689-profiles"
+rm -rf "$cfg689"
+set +e
+serr=$(XDG_CONFIG_HOME="$cfg689" $PY seed devto --root "$work" 2>&1); rc=$?
+set -e
+[ "$rc" -ne 0 ] && printf '%s' "$serr" | grep -q 'disposable host root' \
+  && ok "seed refuses a disposable (under-temp) root writing durable config (#689)" \
+  || err "seed did not refuse a disposable root: rc=$rc msg=$serr"
+[ ! -e "$cfg689" ] \
+  && ok "the refused seed created nothing under the durable config home (#689)" \
+  || { err "the refused seed left config at $cfg689"; rm -rf "$cfg689"; }
+# Not vacuous: the SAME temp root seeding UNDER the temp tree (an explicit
+# --profiles-dir fixture) still resolves normally — that is what harnesses use.
+tmpseed="$work/isolated-profiles"
+$PY seed devto --root "$work" --profiles-dir "$tmpseed" >/dev/null 2>&1 \
+  && [ -f "$tmpseed/devto.yaml" ] \
+  && ok "a temp root seeding under the temp tree still resolves normally (#689)" \
+  || err "an in-temp seed destination was wrongly refused"
+
 if [ "$fail" -eq 0 ]; then
   printf 'All platform-profile checks passed.\n'; exit 0
 else

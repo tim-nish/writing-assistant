@@ -188,6 +188,23 @@ per publish decision.**
   (`$WS`); only the variant files land at the `output.drafts` destination — an
   external articles repo by default, never required to be inside the host repo
   (plugin-layout) — and nothing else lands anywhere (footprint invariant).
+- **Variant placement follows the destination repo's projection-dir layout
+  (amended 2026-07-25, triage #688).** A variant lands in the profile's declared
+  `packaging.layout.dir` **within** the `output.drafts` destination repo — not
+  co-located beside the canonical in the drafts root — conforming to the
+  hub-ratified articles-repo structure (`drafts/` = canonical source of truth;
+  `articles/` (Zenn) + `devto/` = regenerated projection directories;
+  `consulted: product-lab@4f36029e topics/articles.md:76`, layout authority is the
+  destination repo's actual directory structure checked by existence, `:75`). A
+  profile that declares **no** `layout.dir` falls back to the `output.drafts`
+  root (the prior behavior), so single-dir destinations are unaffected.
+  **Staleness discovery reads through the same declared layout** — the
+  slug-prefix scan enumerates each profile's `layout.dir`, not only the drafts
+  root — so a projected variant is still found for the stale-variant publish
+  blocker. The `packaging.layout.dir` existence check the platform lint already
+  performs is unchanged; this makes emission and discovery *route through* the
+  directory the lint validates. Co-locating variants in the drafts root was a
+  conformance divergence from the ratified layout, corrected here.
 - Inherited from the pipeline spec unchanged: no invented evidence; attention
   budget ≤10 minutes per article including all variant touchpoints; validator
   convergence (#206) applies to the platform lint — the lint's rejectable forms

@@ -1693,6 +1693,22 @@ def _under_tmp(path):
     return real == tmp or real.startswith(tmp + os.sep)
 
 
+def _env_test_declared():
+    """A non-flag, positive test signal for the persist path (Story 18.102,
+    #689). `complete` (the persist chokepoint `_persist_canonical` →
+    `_resolve_drafts_dir`) has NO `--allow-external-draft` escape, so before this
+    a check harness that reached the persist path without a temp-resolving
+    `--root` bypassed the 18.53 gate entirely (`_TEST_DECLARED` was False) and
+    wrote a test canonical into the real configured `output.drafts` — the `t.md`
+    leak. A harness declares itself with `WRITING_ASSISTANT_TEST=1`, and that OR
+    the flag arms the SAME 18.53 destination gate on the persist layer. An
+    ordinary OWNER run never sets it, so its legitimate write to the real drafts
+    dir is unaffected — the gate still only refuses a NON-temp destination, and
+    only for a test-declared run."""
+    v = os.environ.get("WRITING_ASSISTANT_TEST", "")
+    return v.strip().lower() not in ("", "0", "false", "no")
+
+
 def _resolve_drafts_dir(root):
     """Resolve output.drafts via resolve-writing-sources.py (Story 1.3). Exit 3
     there means the location is undeclared — surface that, no silent default.
@@ -1716,7 +1732,8 @@ def _resolve_drafts_dir(root):
     if _TEST_DECLARED and not _under_tmp(resolved):
         raise SystemExit(
             f"error: refusing the configured output.drafts ({resolved}) for a "
-            "test-declared run (--allow-external-draft): it lies outside this "
+            "test-declared run (--allow-external-draft or WRITING_ASSISTANT_TEST=1): "
+            "it lies outside this "
             f"run's own disposable tree ({tempfile.gettempdir()}) and is very "
             "likely the owner's real articles repo, where a test canonical is "
             "indistinguishable from a real one by location (#573). Pass an "
@@ -5899,10 +5916,14 @@ def main(argv=None):
     rd.add_argument("--slug", help="draft slug for the diff labels (default: AFTER filename stem)")
 
     args = p.parse_args(argv)
-    # The one place the test-declared signal is read off the command line
-    # (#573); the guard itself lives in _resolve_drafts_dir.
+    # The test-declared signal (#573): the `--allow-external-draft` flag (which
+    # only `variants` carries), OR the non-flag `WRITING_ASSISTANT_TEST=1` env a
+    # check harness sets so the SAME gate covers the persist path `complete`
+    # reaches, which has no such flag (Story 18.102, #689). The guard itself
+    # lives in _resolve_drafts_dir; an owner run sets neither.
     global _TEST_DECLARED
-    _TEST_DECLARED = bool(getattr(args, "allow_external_draft", False))
+    _TEST_DECLARED = (bool(getattr(args, "allow_external_draft", False))
+                      or _env_test_declared())
     return {
         "start": cmd_start, "consume": cmd_consume, "interview": cmd_interview,
         "structures": cmd_structures,
