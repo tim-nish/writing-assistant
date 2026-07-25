@@ -3,7 +3,7 @@
 ## Lint checklist (CAP-1 — script, zero tokens)
 
 - Frontmatter parses and conforms to the `article` schema (`docs/content-guide.md`): required fields, enum values, `mode`/body rules.
-- Title ≤ 70 chars and contains a claim verb (heuristic: warn if title is a bare noun phrase).
+- Title ≤ 70 chars (language-independent) and contains a claim verb (heuristic: warn if title is a bare noun phrase). **The claim-verb half is language-keyed (amended 2026-07-25, #701):** the shipped heuristic is an English verb set plus English inflection matching, so it fired on *every* Japanese title — including one that carries a verb — and a check that cannot judge a whole artifact class must not report on it. The verb test is declared per language beside `register` and `terminology` in `config/language-conventions.yaml`; a language with **no declared verb test is skipped, with the skip disclosed** rather than reported as a bare-noun-phrase defect. Absent a declaration the check says nothing, which is the honest verdict — silence over a false positive that trains the owner to ignore the lint.
 - Pointer block present (site URL `tim-nish.dev` appears in the final section).
 - Heading density: no gap > ~250 words between headings.
 - All links resolve (HTTP 200/301) or are flagged.
