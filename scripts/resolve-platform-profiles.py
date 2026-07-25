@@ -65,6 +65,18 @@ import json
 import os
 import subprocess
 import sys
+import tempfile
+
+
+def _under_tmp(path):
+    """True when `path` is inside the system temporary directory. Both sides
+    realpath-canonicalized so a symlinked TMPDIR compares correctly. The same
+    temp-under predicate the draft pipeline's isolation gate uses (Story 18.53);
+    reused here, not re-derived, to keep one self-evident notion of "disposable"
+    (Story 18.102, #689)."""
+    tmp = os.path.realpath(tempfile.gettempdir())
+    real = os.path.realpath(path)
+    return real == tmp or real.startswith(tmp + os.sep)
 
 # The complete top-level declaration set (exhaustive — an open-ended profile
 # would be an untyped dimension). packaging is a map; the rest are scalars.
@@ -265,6 +277,27 @@ def cmd_seed(args):
     """
     root = host_root(args.root)
     pdir = profiles_dir(root, args.profiles_dir)
+
+    # Isolation (Story 18.102, #689): a DISPOSABLE host root — one resolving
+    # under the system temp dir — must not accrue DURABLE machine-global config.
+    # Seeding against a `/tmp/...` test host with no isolated destination
+    # composes `platform-profiles/` beneath the real per-repo config home keyed by
+    # the temp root, leaving throwaway config dirs behind after the temp tree is
+    # gone (71 such dirs were found). Refuse it. The predicate is the
+    # DESTINATION, matching 18.53: a temp root writing UNDER the temp tree (an
+    # explicit `--profiles-dir` fixture, or an isolated XDG_CONFIG_HOME) resolves
+    # normally — that is what check harnesses use and it leaves no residue. An
+    # ordinary owner root (not under temp) is never refused.
+    if _under_tmp(root) and not _under_tmp(pdir):
+        sys.stderr.write(
+            f"error: refusing to seed durable config for a disposable host root "
+            f"({root}) — it resolves under the system temp dir but the profile "
+            f"destination ({pdir}) does not, so the seeded profile would outlive "
+            f"the throwaway root as machine-global residue (#689). Point "
+            f"--profiles-dir under the temp tree, or set XDG_CONFIG_HOME to an "
+            f"isolated location, so a test host leaves no durable config behind.\n")
+        return 1
+
     src = os.path.join(examples_dir(args.examples_dir),
                        f"{args.platform}.example.yaml")
     if not os.path.isfile(src):

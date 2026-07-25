@@ -40,6 +40,13 @@ ok()  { printf 'ok:   %s\n' "$1"; }
 # --- Isolated fake state root + clean host git repo -----------------------
 work=$(mktemp -d); trap 'rm -rf "$work"' EXIT
 export XDG_STATE_HOME="$work/state"
+# Isolate the config home too (Story 18.102, #689): this harness writes per-repo
+# config (set-draft-location's writing-sources.yaml, seeded platform-profiles)
+# for a /tmp host root. Without an isolated XDG_CONFIG_HOME those land in the real
+# machine-global config home keyed by the temp root and outlive the temp tree —
+# exactly the throwaway config-dir residue #689 closes. Under a temp config home
+# they resolve under $work and vanish with it.
+export XDG_CONFIG_HOME="$work/config"
 HOST="$work/host-repo"; mkdir -p "$HOST"
 git -C "$HOST" init -q
 git -C "$HOST" config user.email t@e.st
@@ -392,6 +399,76 @@ if sh "$root/scripts/check-stage5-variants.sh" >/dev/null 2>&1; then
   ok "check-stage5-variants.sh passes unmodified (#213 consent path intact)"
 else
   err "check-stage5-variants.sh regressed: $(sh "$root/scripts/check-stage5-variants.sh" 2>&1 | grep FAIL | head -3)"
+fi
+
+# --- The PERSIST layer is covered too, via WRITING_ASSISTANT_TEST (18.102, #689) -
+# The 18.53 gate lives at the ONE chokepoint every writer calls (_resolve_drafts_
+# dir), but `complete` — the persist path — carries NO --allow-external-draft
+# flag, so before #689 nothing could arm the gate on it: a harness reaching the
+# persist path without a temp-resolving --root wrote a test canonical into the
+# real configured output.drafts (the t.md leak). WRITING_ASSISTANT_TEST=1 is the
+# non-flag test signal that arms the SAME destination gate on the persist layer.
+tcslug=persist-declared-probe
+tcws="$work/tc-ws"; mkdir -p "$tcws"
+cat > "$tcws/draft.md" <<EOF
+---
+slug: $tcslug
+title: "A persist probe"
+language: en
+audience: en-practitioner
+audience_id: en-practitioner
+---
+
+## Hook
+
+A persist probe body line.
+EOF
+# Destination OUTSIDE the temp tree (the owner's-real-drafts class); $HOME stand-in.
+poutside="$HOME/.writing-assistant-check-689"
+rm -rf "$poutside"
+python3 "$root/scripts/resolve-writing-sources.py" --root "$HOST" \
+  set-draft-location "$poutside" >/dev/null 2>&1
+pout=$(WRITING_ASSISTANT_TEST=1 python3 "$DP" complete --draft "$tcws/draft.md" \
+         --slug "$tcslug" --root "$HOST" --ws "$tcws" 2>&1) && prc=0 || prc=$?
+if [ "${prc:-0}" -ne 0 ] \
+   && printf '%s' "$pout" | grep -q 'refusing the configured output.drafts' \
+   && printf '%s' "$pout" | grep -q 'WRITING_ASSISTANT_TEST'; then
+  ok "test-declared complete refuses a non-temp output.drafts (persist layer, #689)"
+else
+  err "the persist path was not refused for a test-declared run: $pout"
+fi
+if [ ! -e "$poutside" ]; then
+  ok "the refused persist wrote no canonical at the non-temp destination"
+else
+  err "the refused persist left something at $poutside"; rm -rf "$poutside"
+fi
+# An in-temp destination still persists normally under the same test signal (the
+# harness's own isolated tree) — the gate refuses only the NON-temp destination.
+python3 "$root/scripts/resolve-writing-sources.py" --root "$HOST" \
+  set-draft-location "$DEST/drafts/" >/dev/null 2>&1
+cat > "$work/plan-tc.md" <<EOF
+---
+kind: article-plan
+slug: $tcslug
+intent: probe
+claim: probe claim
+status: drafted
+run_id: 20260725T000000-000000
+pin: host@a1b2c3d4e5f6a7b8
+---
+
+## Section plan
+
+- probe / README.md:1@a1b2c3d4e5f6a7b8
+EOF
+python3 "$root/scripts/write-article-plan.py" write --slug "$tcslug" --root "$HOST" \
+  "$work/plan-tc.md" >/dev/null 2>&1
+if WRITING_ASSISTANT_TEST=1 python3 "$DP" complete --draft "$tcws/draft.md" \
+     --slug "$tcslug" --root "$HOST" --ws "$tcws" >/dev/null 2>&1 \
+   && [ -f "$DEST/drafts/$tcslug.md" ]; then
+  ok "test-declared complete resolves an in-temp destination normally (#689)"
+else
+  err "an in-temp persist was refused under the test signal (should resolve normally)"
 fi
 
 if [ "$fail" -eq 0 ]; then
