@@ -192,8 +192,12 @@ EOF
 python3 -c "
 import json
 d=json.load(open('$ws/checkpoint.json'))
-assert d=={'stage':'review','next_stage':'done','reviewed':True}, d
-" && ok "done/reviewed checkpoint written by the re-entry gate" \
+# The checkpoint records WHICH evidence class it was written on (#704), so
+# 'reviewed' never silently means two different things. An authored canonical's
+# is the provenance map.
+assert d=={'stage':'review','next_stage':'done','reviewed':True,
+           'review_evidence_class':'provenance-map'}, d
+" && ok "done/reviewed checkpoint written by the re-entry gate, naming its evidence class" \
   || err "done/reviewed checkpoint wrong/missing"
 # Without --rubric-applied the mechanical-dims re-check is not required.
 rm -f "$ws/checkpoint.json"
@@ -257,6 +261,145 @@ assert d['noop'] is True and d['applied']==0, d
 " && ok "--applied 0 reports the strict no-op" || err "no-op JSON wrong"
 [ -z "$(ls -A "$a2/drafts")" ] && ok "no-op persisted nothing" || err "no-op wrote into output.drafts"
 [ ! -f "$ws3/checkpoint.json" ] && ok "no-op wrote no checkpoint" || err "no-op wrote a checkpoint"
+
+# --- re-entry evidence is typed by ARTIFACT CLASS (Story 18.110, #704) --------
+# A DERIVED canonical owns no claims of its own (CAP-2), so it has no provenance
+# map by design — and --map was unconditionally required, which made a reviewed
+# derivation permanently unable to checkpoint.
+d="$work/derived"; mkdir -p "$d/host" "$d/a/drafts" "$d/ws"
+cat > "$d/host/writing-sources.yaml" <<YAML
+sources:
+  - path: .
+output:
+  drafts: $d/a/drafts/
+YAML
+mk_src() {   # the EN source the derivation pins to
+  cat > "$d/a/drafts/retry-storms.md" <<'EOF'
+---
+slug: retry-storms
+title: "Retry storms doubled our token spend"
+date: 2026-07-09
+mode: canonical
+language: en
+audience: en-practitioner
+audience_id: en-practitioner
+summary: s.
+topics: [llm-ops]
+related: { projects: [], publications: [], products: [] }
+---
+
+## The incident
+
+The retry storm doubled token spend.
+EOF
+}
+mk_src
+src_sha=$(python3 -c "
+import hashlib,sys
+t=open('$d/a/drafts/retry-storms.md',encoding='utf-8').read().rstrip('\n')+'\n'
+print(hashlib.sha256(t.encode()).hexdigest())")
+mk_derived() {   # $1 = the pin sha to record
+  cat > "$d/edited.ja.md" <<EOF
+---
+slug: retry-storms.ja
+title: "リトライ暴走を止める"
+date: 2026-07-09
+mode: canonical
+language: ja
+audience: ja-practitioner
+audience_id: ja-practitioner
+summary: "指数バックオフに上限を設けました。"
+topics: [llm-ops]
+related: { projects: [], publications: [], products: [] }
+adapted_from: retry-storms@$1
+---
+
+## 結論
+
+指数バックオフに上限を設け、予算アラートを追加しました。
+EOF
+}
+
+# (1) A derived draft re-enters with NO --map and checkpoints on ancestry.
+mk_derived "$src_sha"
+out=$(python3 "$DP" review-reentry --draft "$d/edited.ja.md" --slug retry-storms.ja \
+        --root "$d/host" --ws "$d/ws" --applied 3 2>"$d/e1") \
+  && ok "#704: a derived canonical re-enters with no --map" \
+  || err "#704: derived re-entry refused: $(cat "$d/e1")"
+printf '%s' "$out" | python3 -c "
+import json,sys
+o=json.load(sys.stdin)
+assert o['review_evidence_class']=='ancestry', o
+assert o['ancestry_validation']['ok'] is True, o
+assert o['ancestry_validation']['pin_shape'] == 'well-formed', o
+assert 'map_validation' not in o, o
+" && ok "#704: it reports the ancestry evidence class and no map validation" \
+  || err "#704: re-entry JSON wrong"
+python3 -c "
+import json
+c=json.load(open('$d/ws/checkpoint.json'))
+assert c['reviewed'] is True and c['next_stage']=='done', c
+assert c['review_evidence_class']=='ancestry', c
+" && ok "#704: the checkpoint records the ancestry evidence class" \
+  || err "#704: checkpoint missing or wrong evidence class"
+# The sanctioned write re-stamped the trailer over the reviewed content.
+python3 - "$d/a/drafts/retry-storms.ja.md" <<'PYT' && ok "#704: the reviewed derivation's trailer is re-stamped by the write path" || err "#704: trailer not re-stamped"
+import hashlib, re, sys
+t = open(sys.argv[1], encoding="utf-8").read()
+m = re.search(r"canonical-sha256=([0-9a-f]{64})", t)
+assert m, "no trailer"
+body = re.sub(r"\n*<!-- writing-assistant: canonical-sha256=[0-9a-f]{64} -->\s*$", "", t)
+assert hashlib.sha256((body.rstrip("\n") + "\n").encode()).hexdigest() == m.group(1)
+PYT
+
+# (2) A MALFORMED pin refuses, fail-closed, with no checkpoint. Shape is what
+#     the gate can judge alone; whether the pin RESOLVES is the reported check's
+#     job (#704 re-triage — the gate may not call the ancestry lint).
+rm -rf "$d/ws2"; mkdir -p "$d/ws2"
+sed 's/^adapted_from: .*/adapted_from: not-a-valid-pin/' "$d/edited.ja.md" \
+  > "$d/malformed.ja.md"
+if python3 "$DP" review-reentry --draft "$d/malformed.ja.md" --slug retry-storms.ja \
+     --root "$d/host" --ws "$d/ws2" --applied 3 >/dev/null 2>"$d/e2"; then
+  err "#704: a derivation with a malformed ancestry pin was checkpointed"
+else
+  grep -q 'invalid-ancestry' "$d/e2" \
+    && [ ! -f "$d/ws2/checkpoint.json" ] \
+    && ok "#704: a malformed ancestry pin refuses by name and writes no checkpoint" \
+    || err "#704: wrong refusal: $(cat "$d/e2")"
+fi
+
+# (2b) The RESOLUTION check is reported, not run — the same status
+#      verify-provenance has for an authored draft.
+rm -rf "$d/ws2b"; mkdir -p "$d/ws2b"
+mk_derived "$src_sha"
+python3 "$DP" review-reentry --draft "$d/edited.ja.md" --slug retry-storms.ja \
+  --root "$d/host" --ws "$d/ws2b" --applied 3 2>/dev/null \
+  | python3 -c "
+import json,sys
+o=json.load(sys.stdin)
+checks=[c['check'] for c in o['required_checks']]
+assert 'lint-ancestry' in checks, o
+assert 'verify-provenance' not in checks, o
+" && ok "#704: the ancestry RESOLUTION check is reported in the worklist, not run" \
+  || err "#704: the worklist does not carry lint-ancestry for a derived draft"
+# And the pipeline never names the adaptation module — CAP-1's boundary, which
+# is why the resolution check is reported rather than executed here.
+[ "$(grep -c 'adapt-canonical' "$DP" || true)" -eq 0 ] \
+  && ok "#704: the pipeline still never references the adaptation invocation" \
+  || err "#704: the pipeline now references adaptation — CAP-1's boundary broken"
+
+# (3) An AUTHORED canonical still requires --map — the class was typed, not
+#     weakened.
+rm -rf "$d/ws3"; mkdir -p "$d/ws3"
+if python3 "$DP" review-reentry --draft "$d/a/drafts/retry-storms.md" --slug retry-storms \
+     --root "$d/host" --ws "$d/ws3" --applied 1 >/dev/null 2>"$d/e3"; then
+  err "#704: an authored canonical re-entered with no --map"
+else
+  grep -q 'required for an AUTHORED canonical' "$d/e3" \
+    && [ ! -f "$d/ws3/checkpoint.json" ] \
+    && ok "#704: an authored canonical still requires --map, and says why" \
+    || err "#704: wrong authored-class refusal: $(cat "$d/e3")"
+fi
 
 if [ "$fail" -eq 0 ]; then
   printf '\nAll review-reentry checks passed.\n'; exit 0

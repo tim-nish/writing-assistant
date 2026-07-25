@@ -67,8 +67,10 @@ applied any accepted finding:
 - **≥1 applied edit**: the edited draft re-enters the gate regime — follow
   *Post-arbitration re-entry* below. The `review-reentry` subcommand writes
   the done/reviewed checkpoint itself; **never hand-write the checkpoint after
-  edits** — the subcommand refuses to checkpoint over an invalid provenance
-  map, and hand-writing would bypass exactly that refusal (#362).
+  edits** — the subcommand refuses to checkpoint over invalid evidence (an
+  invalid provenance map, or for a derived canonical an ancestry pin that does
+  not resolve — #704), and hand-writing would bypass exactly that refusal
+  (#362).
 
 (Only when the draft came from a run workspace; a direct-path review of an
 external draft has no workspace to mark.)
@@ -734,7 +736,35 @@ lines under a done/reviewed checkpoint, unclassified review-authored sentences,
 and an auto re-emitted variant). Run these steps **in order** after applying
 the accepted findings:
 
-1. **Rebuild the provenance map for the edited draft.** Every sentence of the
+**Which steps apply is decided by ARTIFACT CLASS (#704).** A **derived
+canonical** — one carrying `adapted_from` — owns no claims of its own (they are
+inherited, SPEC-canonical-adaptation CAP-2), so it has **no provenance map** and
+steps 1–2 below do not apply to it: its re-entry evidence is its **ancestry**,
+and `review-reentry` takes **no `--map`** for it. Do not synthesise a map for a
+derivation — that would re-attest claims it does not own.
+
+**You run the ancestry lint; the gate only names it (#704).** `review-reentry`
+verifies the pin's **shape** and then reports `lint-ancestry` in its
+required-checks worklist — the same status `verify-provenance` has for an
+authored draft, and for the same reason: this command emits worklists and runs no
+checks. So run it yourself over the edited derivation:
+
+```
+python3 /home/tomoya/work/writing-assistant/scripts/adapt-canonical.py lint-ancestry \
+  --derived <edited-draft> --root <host-repo>
+```
+
+A defect it names — malformed pin, unresolvable slug, a hash matching no source
+content — is a **publish blocker**, and note the ordering honestly: the
+`done/reviewed` checkpoint is written *before* this runs, so a failure here means
+a reviewed record exists over an ancestry that does not resolve. Report it as a
+blocker rather than treating the checkpoint as absolution. The evidence rule is
+defined once in CAP-4 and not restated here; the steps below are the **authored
+canonical's** path. Step 4 binds both classes, and the checkpoint it writes
+records which evidence class the run used.
+
+1. **Rebuild the provenance map for the edited draft** (authored canonicals).
+   Every sentence of the
    edited draft is classified — **review-authored sentences (wording an
    applied fix introduced) are classified like any other sentence** (sourced /
    derived / narration / verify), so the zero-unmarked-claims guarantee
@@ -774,8 +804,14 @@ the accepted findings:
    #496):
 
    ```
+   # authored canonical — evidence is the rebuilt provenance map
    python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py review-reentry \
      --draft <edited-draft> --map <rebuilt-map> --slug <slug> \
+     --root <host-repo> --ws "$WS" --applied <n> [--rubric-applied]
+
+   # derived canonical (carries `adapted_from`) — evidence is its ancestry; NO --map
+   python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py review-reentry \
+     --draft <edited-draft> --slug <slug>.<language> \
      --root <host-repo> --ws "$WS" --applied <n> [--rubric-applied]
    ```
 
