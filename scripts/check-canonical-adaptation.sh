@@ -82,6 +82,7 @@ cat > "$work/fill.json" <<'EOF'
     {"source_section": "What it cost", "disposition": "drop", "note": "internal staffing cost carries no meaning for this reader"}
   ],
   "recomposed_title": "Retry policy runaway: capping backoff before the bill arrives",
+  "recomposed_summary": "A capped backoff and a budget alarm, after retries doubled our token spend.",
   "omissions": [
     {"section": "What it cost", "what": "the two engineer-days figure", "reason": "an internal staffing number the target reader cannot use"}
   ]

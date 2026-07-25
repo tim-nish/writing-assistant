@@ -89,7 +89,7 @@ declared `register` and `terminology` for that language, and the source's
 
 ## Step 2 — author the plan
 
-You author exactly four slots, as JSON, against that skeleton. Everything else
+You author exactly five slots, as JSON, against that skeleton. Everything else
 in the plan is declared data and is not yours to propose:
 
 - `refounded_opening` — what context the target reader lacks or already has, and
@@ -100,6 +100,12 @@ in the plan is declared data and is not yours to propose:
   payoff-first for JA tech-article norms vs an EN incident-led narrative);
 - `recomposed_title` — the title re-composed for the target reader, not
   translated;
+- `recomposed_summary` — the `summary` frontmatter field, **authored in the
+  target language** (#700). A summary is a telling of the article, so the
+  derivation owns it: inheriting the source's left a `language: ja` canonical
+  describing itself in English. Not a translation of the EN summary — write what
+  this reader needs to know the piece is about. The ≤240-character bound is
+  `lint-article`'s and applies to it like any canonical's;
 - `omissions` — `{section, what, reason}` for every deliberate omission.
 
 Adaptation depth varies per article: a how-to may map nearly 1:1, an incident
@@ -171,9 +177,10 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/adapt-canonical.py write \
 `--body` carries **only the article body** — the frontmatter is composed for
 you. What comes out is an ordinary canonical at
 `<output.drafts>/<slug>.<language>.md`: its own `slug` (`<slug>.<language>`),
-`mode: canonical`, the target's `language` and reader, every other declared
-schema field carried from the source verbatim, its own `canonical-sha256`
-trailer, and the ancestry pin
+`mode: canonical`, the target's `language` and reader, the **target-language
+`summary`** from the approved plan, every other declared schema field —
+`date`, `topics`, `related`, `generated_by` — carried from the source verbatim,
+its own `canonical-sha256` trailer, and the ancestry pin
 
 ```
 adapted_from: <source slug>@<source hash>
