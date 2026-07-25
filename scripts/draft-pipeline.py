@@ -1494,12 +1494,31 @@ def cmd_episode_select(args):
     return 0
 
 
+
+# A frontmatter VALUE never carries a trailing `#` comment — the comment is
+# documentation for a human reading the file, never part of the datum
+# (SPEC-writing-assistant, "One frontmatter-value reading", #713). This is the
+# SAME expression `resolve-user-config.load_yaml` applies, deliberately
+# character-for-character: whitespace must precede the `#`, so a value whose own
+# data contains one (`https://x.test/p#frag`) is untouched, and the two readers
+# cannot drift apart on the cases that matter.
+_INLINE_COMMENT_RE = re.compile(r"\s+#.*$")
+
+
+def _strip_inline_comment(value):
+    return _INLINE_COMMENT_RE.sub("", value)
+
 def _read_frontmatter(text):
     """Parse the leading `---` article frontmatter into a dict. Stdlib-only
     line surgery (host repos have no PyYAML): top-level `key: value` pairs, with
     `[a, b]` lists split and a folded `key: >` block collapsing its indented
     continuation lines. Returns (fields, body) — body is everything after the
     closing fence, verbatim (the full article text).
+
+    Scalar values carry NO trailing `#` comment (#713), matching
+    `resolve-user-config.load_yaml` exactly — including its two boundaries: a
+    `#` with no preceding whitespace is data, and a folded block's continuation
+    lines are left alone (prose may legitimately contain one).
     """
     lines = text.splitlines()
     if not lines or lines[0].strip() != "---":
@@ -1530,11 +1549,16 @@ def _read_frontmatter(text):
                 i += 1
             fields[key] = " ".join(block)
             continue
-        if val.startswith("[") and val.endswith("]"):
-            inner = val[1:-1].strip()
+        if val.startswith("["):
+            # Slice BETWEEN the brackets rather than requiring the value to end
+            # with `]`, so a commented list (`topics: [a, b]   # note`) still
+            # parses as a list. It previously fell through to the scalar branch
+            # and became a string — the second divergence from `load_yaml`
+            # found while fixing the first (#713).
+            inner = val[val.find("[") + 1:val.rfind("]")].strip()
             fields[key] = [t.strip().strip('"\'') for t in inner.split(",") if t.strip()]
         else:
-            fields[key] = val.strip().strip('"\'')
+            fields[key] = _strip_inline_comment(val).strip().strip('"\'')
         i += 1
 
     body = "\n".join(lines[end + 1:]).lstrip("\n")
@@ -4815,15 +4839,10 @@ def _assert_birth_record(text, canonical_path):
     """
     fields, _body = _read_frontmatter(text)
     val = (fields or {}).get("generated_by")
-    if isinstance(val, str):
-        # The renderer emits the field WITH a trailing comment
-        # (`generated_by: <rec>   # immutable birth record — set at creation...`,
-        # render-frontmatter.py), and this module's frontmatter reader keeps that
-        # comment inside the value while the reader `lint-article` uses
-        # (resolve-user-config.load_yaml) strips it. Normalize the same way here,
-        # or this assertion would refuse every real pipeline-authored canonical.
-        # The contracted form contains no `#`, so cutting at the first one is safe.
-        val = val.split("#", 1)[0]
+    # No local comment-stripping here (removed by Story 18.113, #713): the
+    # reader now returns a value with no trailing comment, engine-wide, so a
+    # second normalization at this call site would be the pattern the invariant
+    # exists to forbid — one whose omission elsewhere fails silently.
     if not isinstance(val, str) or not val.strip():
         raise _CanonicalWriteError(
             canonical_path,
