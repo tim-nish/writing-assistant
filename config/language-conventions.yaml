@@ -18,10 +18,127 @@
 # `language-conventions.yaml` in its resolved repo-config directory
 # (`resolve-paths.py repo-config-dir`); the override replaces this file whole.
 
+# `title_claim_verb` (added 2026-07-25, #701) declares the review lint's
+# claim-verb test for a language: `words` are whole tokens that count as a claim
+# verb, `suffixes` are token endings that do. Both are DATA — the checker is
+# generic, so no language is a branch in `lint-article` either. The English set
+# lived in code until a Japanese title carrying the verb 言わせる was reported as
+# "a bare noun phrase" on every run; a check that cannot judge a language must
+# say nothing about it, so a language declaring NO `title_claim_verb` is SKIPPED
+# and the skip is disclosed (review-prompts.md, Lint checklist). The ≤70-char
+# title bound is language-independent and is not declared here.
+
 languages:
   en:
     register: plain contemporary technical English, one register throughout
     terminology: technical terms in their established English form, never invented synonyms
+    # NOTE for editors: this file is read by the repo's stdlib YAML SUBSET
+    # parser, which supports single-line flow lists and block sequences but NOT
+    # a flow list wrapped across lines — one would silently truncate the list
+    # and swallow the entries after it. Keep `words` a block sequence.
+    title_claim_verb:
+      suffixes: [ed, ing]
+      words:
+        - is
+        - are
+        - was
+        - were
+        - be
+        - beat
+        - beats
+        - kill
+        - kills
+        - cut
+        - cuts
+        - break
+        - breaks
+        - broke
+        - ship
+        - ships
+        - find
+        - finds
+        - fix
+        - fixes
+        - make
+        - makes
+        - made
+        - turn
+        - turns
+        - save
+        - saves
+        - cost
+        - costs
+        - double
+        - doubles
+        - triple
+        - triples
+        - halve
+        - halves
+        - win
+        - wins
+        - won
+        - fail
+        - fails
+        - catch
+        - catches
+        - reduce
+        - reduces
+        - add
+        - adds
+        - drop
+        - drops
+        - speed
+        - speeds
+        - run
+        - runs
+        - ran
+        - build
+        - builds
+        - built
+        - scale
+        - scales
+        - boost
+        - boosts
+        - slash
+        - slashes
+        - power
+        - powers
+        - drive
+        - drives
+        - solve
+        - solves
+        - handle
+        - handles
+        - replace
+        - replaces
+        - why
+        - how
+        - keep
+        - keeps
+        - kept
+        - let
+        - lets
+        - give
+        - gives
+        - gave
+        - teach
+        - teaches
+        - taught
+        - prevent
+        - prevents
+        - avoid
+        - avoids
+        - enable
+        - enables
+        - unlock
+        - unlocks
+        - stop
+        - stops
   ja:
     register: です/ます (polite form), consistent throughout, no mixed 常体
     terminology: technical terms kept in English or established katakana, never force-translated
+    # No `title_claim_verb`: what should count as a claim verb in a Japanese
+    # title (です/ます predicates, する-compounds, plain-form endings) is an open
+    # language-data question, and a wrong test is a false positive with extra
+    # steps. Until it is authored, JA titles are skipped with disclosure — which
+    # is the honest verdict, not a gap being hidden.

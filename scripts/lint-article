@@ -10,7 +10,11 @@ Checks (all against the config `article` schema, never a hardcoded site schema):
 
   1. frontmatter — parses and conforms: every field in `frontmatter.schema` is
      present, `mode`/`language` are within their config enums, `summary` <= 240.
-  2. title       — <= 70 chars AND carries a claim verb (a bare noun phrase warns).
+  2. title       — <= 70 chars (language-independent) AND carries a claim verb (a
+     bare noun phrase warns). The claim-verb test is DECLARATION DATA keyed by
+     language in `language-conventions.yaml` (#701); a language declaring none is
+     skipped and the skip is disclosed on stderr as a `[note]`, never reported as
+     a defect — the English-only heuristic had been firing on every JA title.
   3. pointer     — the owner's `owner.site_url` (from config) appears in the draft;
      the framework's mandatory pointer block is what carries it.
   4. headings    — no gap wider than ~250 words between headings.
@@ -56,23 +60,14 @@ SUMMARY_MAX = 240           # `article` schema limit (config/user-config.example
 HEADING_WORD_GAP = 250      # review-prompts.md: no gap > ~250 words between headings
 
 # Claim-verb heuristic (review-prompts.md: "warn if title is a bare noun phrase").
-# A title carries a claim verb if any token ends in a verb inflection or is one of
-# these common present-tense claim verbs. Deliberately excludes bare `-s` (too many
-# plurals) to avoid flagging noun-heavy-but-verbed titles.
-_PRESENT_VERBS = {
-    "is", "are", "was", "were", "be", "beat", "beats", "kill", "kills", "cut",
-    "cuts", "break", "breaks", "broke", "ship", "ships", "find", "finds",
-    "fix", "fixes", "make", "makes", "made", "turn", "turns", "save", "saves",
-    "cost", "costs", "double", "doubles", "triple", "triples", "halve", "halves",
-    "win", "wins", "won", "fail", "fails", "catch", "catches", "reduce",
-    "reduces", "add", "adds", "drop", "drops", "speed", "speeds", "run", "runs",
-    "ran", "build", "builds", "built", "scale", "scales", "boost", "boosts",
-    "slash", "slashes", "power", "powers", "drive", "drives", "solve", "solves",
-    "handle", "handles", "replace", "replaces", "beats", "why", "how",
-    "keep", "keeps", "kept", "let", "lets", "give", "gives", "gave",
-    "teach", "teaches", "taught", "prevent", "prevents", "avoid", "avoids",
-    "enable", "enables", "unlock", "unlocks", "stop", "stops",
-}
+# The test is DECLARATION DATA, keyed by language, in `language-conventions.yaml`
+# beside `register` and `terminology` (#701): `words` are whole tokens that count
+# as a claim verb, `suffixes` are token endings that do. It lived here as an
+# English set until it reported every Japanese title — including one carrying the
+# verb 言わせる — as a bare noun phrase. A language declaring NO test is SKIPPED
+# and the skip is disclosed: a check that cannot judge a whole artifact class must
+# say nothing about it rather than train the owner to ignore the lint.
+CONVENTIONS_FILE = "language-conventions.yaml"
 
 
 # --------------------------------------------------------------------------
@@ -133,9 +128,62 @@ def split_frontmatter(text):
     return None, None, 1, "frontmatter block is not closed (missing terminating `---`)"
 
 
-def has_claim_verb(title):
-    for raw in re.findall(r"[A-Za-z][A-Za-z'-]*", title.lower()):
-        if raw.endswith("ed") or raw.endswith("ing") or raw in _PRESENT_VERBS:
+def conventions_path(root, override):
+    """The language-conventions declaration, resolved the way the adaptation
+    stage resolves it (`adapt-canonical.py conventions_path`): an explicit
+    override, else a per-repo file under the resolved repo-config directory, else
+    the shipped default in this plugin's `config/`. Same order, so lint and
+    adaptation can never read different declarations for the same language."""
+    if override:
+        return os.path.realpath(override)
+    cmd = [sys.executable, os.path.join(HERE, "resolve-paths.py"), "repo-config-dir"]
+    if root:
+        cmd += ["--root", root]
+    r = subprocess.run(cmd, capture_output=True, text=True)
+    if r.returncode == 0:
+        repo_local = os.path.join(r.stdout.strip(), CONVENTIONS_FILE)
+        if os.path.isfile(repo_local):
+            return repo_local
+    return os.path.realpath(os.path.join(HERE, "..", "config", CONVENTIONS_FILE))
+
+
+def resolve_claim_verb_test(root, override, language):
+    """The declared claim-verb test for `language`, or None when the language
+    declares none (⇒ the check is skipped and the skip is disclosed, #701).
+    Returns `(words:set, suffixes:tuple)`. An unreadable or absent declaration
+    file yields None for every language — a disclosed skip, never a silent pass
+    of an unjudged title."""
+    if not language:
+        return None
+    path = conventions_path(root, override)
+    if not os.path.isfile(path):
+        return None
+    try:
+        data = load_yaml(open(path, encoding="utf-8").read())
+    except Exception:
+        return None
+    entry = ((data or {}).get("languages") or {}).get(language)
+    if not isinstance(entry, dict):
+        return None
+    test = entry.get("title_claim_verb")
+    if not isinstance(test, dict):
+        return None
+    words = {str(w).strip().lower() for w in (test.get("words") or []) if str(w).strip()}
+    suffixes = tuple(str(s).strip().lower() for s in (test.get("suffixes") or [])
+                     if str(s).strip())
+    if not words and not suffixes:
+        return None
+    return words, suffixes
+
+
+def has_claim_verb(title, test):
+    """True when the title carries a claim verb under the DECLARED test. Token
+    extraction is script-agnostic: word characters rather than `[A-Za-z]`, so a
+    declaration for a non-Latin language works with this same matcher and no
+    language becomes a branch here (CAP-6's rule, applied to the lint)."""
+    words, suffixes = test
+    for raw in re.findall(r"[^\W\d_]+(?:['-][^\W\d_]+)*", title.lower(), re.UNICODE):
+        if raw in words or (suffixes and raw.endswith(suffixes)):
             return True
     return False
 
@@ -182,14 +230,24 @@ def check_generated_by(fm, findings):
                          f"generated_by={val!r} is not <tool>@<version>+<commit>"))
 
 
-def check_title(fm, findings):
+def check_title(fm, findings, verb_test, notes):
     title = fm.get("title")
     if not isinstance(title, str) or not title.strip():
         return  # missing title already reported by schema check
     title = title.strip()
+    # Language-independent: a display bound, not a judgment about the prose.
     if len(title) > TITLE_MAX:
         findings.append((1, "title", f"title is {len(title)} chars (> {TITLE_MAX})"))
-    if not has_claim_verb(title):
+    # Language-keyed (#701). No declared test ⇒ no verdict, and the skip is
+    # DISCLOSED: silence a reader can see, rather than a check that quietly
+    # stopped applying.
+    if verb_test is None:
+        lang = fm.get("language") or "unknown"
+        notes.append(f"claim-verb check skipped: language {lang!r} declares no "
+                     f"`title_claim_verb` test in {CONVENTIONS_FILE} — the title's "
+                     "length was checked, its claim was not")
+        return
+    if not has_claim_verb(title, verb_test):
         findings.append((1, "title",
                          "title is a bare noun phrase — no claim verb (state the claim)"))
 
@@ -354,8 +412,8 @@ def check_trailer_consistency(text, total_lines, findings):
 # --------------------------------------------------------------------------
 # Driver
 # --------------------------------------------------------------------------
-def lint_file(path, cfg, check_http):
-    findings = []
+def lint_file(path, cfg, check_http, root=None, conventions=None):
+    findings, notes = [], []
     with open(path, encoding="utf-8") as fh:
         text = fh.read()
     lines = text.split("\n")
@@ -374,7 +432,9 @@ def lint_file(path, cfg, check_http):
     if fm is not None:
         check_frontmatter(fm, cfg, findings)
         check_generated_by(fm, findings)
-        check_title(fm, findings)
+        check_title(fm, findings,
+                    resolve_claim_verb_test(root, conventions, fm.get("language")),
+                    notes)
     check_pointer_block(text, cfg, len(lines), findings)
     check_heading_density(lines, body_start, findings)
     check_links(lines, path, check_http, findings)
@@ -382,7 +442,7 @@ def lint_file(path, cfg, check_http):
     check_trailer_consistency(text, len(lines), findings)
     check_template_residue(lines, body_start, findings)
     findings.sort(key=lambda f: (f[0], f[1]))
-    return findings
+    return findings, notes
 
 
 def main(argv=None):
@@ -394,6 +454,9 @@ def main(argv=None):
     p.add_argument("--root")
     p.add_argument("--global-config")
     p.add_argument("--repo-config")
+    p.add_argument("--conventions",
+                   help="language-conventions.yaml override (tests); default "
+                        "resolution matches adapt-canonical's")
     p.add_argument("--check-http", action="store_true",
                    help="also verify http(s) links resolve (network; off by default)")
     args = p.parse_args(argv)
@@ -405,9 +468,15 @@ def main(argv=None):
             print(f"{path}:0: [io] no such file", file=sys.stderr)
             total += 1
             continue
-        findings = lint_file(path, cfg, args.check_http)
+        findings, notes = lint_file(path, cfg, args.check_http, args.root,
+                                    args.conventions)
         for lineno, code, msg in findings:
             print(f"{path}:{lineno}: [{code}] {msg}")
+        # Disclosures are NOT defects: they go to stderr and never affect the
+        # exit status, so a skipped check is visible without failing a clean
+        # draft (#701).
+        for note in notes:
+            print(f"{path}: [note] {note}", file=sys.stderr)
         total += len(findings)
     if total:
         print(f"\n{total} defect(s) found.", file=sys.stderr)

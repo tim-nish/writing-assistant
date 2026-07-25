@@ -331,6 +331,110 @@ else
   ok "a canonical with no trailer emits no trailer finding (#695)"
 fi
 
+# --- claim-verb test is language-keyed (Story 18.108, #701) -------------------
+# The heuristic was an English verb set, so it reported EVERY Japanese title as a
+# bare noun phrase — including one carrying the verb 言わせる. The test is now
+# declaration data; a language declaring none is skipped WITH DISCLOSURE.
+mk_titled() {   # $1 basename  $2 title  $3 language
+  cat > "$work/$1.md" <<EOF
+---
+slug: $1
+title: "$2"
+date: 2026-07-25
+mode: canonical
+language: $3
+summary: s.
+topics: [a]
+related: { projects: [], publications: [], products: [] }
+generated_by: writing-assistant@1.0.0+abc1234
+---
+
+## H
+
+Body more at [example.com](https://example.com).
+EOF
+}
+mk_titled ja-title "自動化に「わからない」と言わせる4つの仕組み" ja
+mk_titled en-noverb "Retry configuration and setup notes" en
+mk_titled en-verb "Retry storms doubled our token spend" en
+
+ja_out=$(python3 "$LINT" "$work/ja-title.md" --config-json "$work/cfg.json" 2>"$work/ja.err" || true)
+printf '%s' "$ja_out" | grep -q '\[title\].*bare noun phrase' \
+  && err "#701: a JA title was still reported as a bare noun phrase" \
+  || ok "#701: a JA title emits no claim-verb finding"
+grep -q 'claim-verb check skipped' "$work/ja.err" \
+  && ok "#701: the skip is DISCLOSED, not silent" \
+  || err "#701: the skipped check was not disclosed: $(cat "$work/ja.err")"
+python3 "$LINT" "$work/ja-title.md" --config-json "$work/cfg.json" >/dev/null 2>&1 \
+  && ok "#701: the disclosure is not a defect (clean draft still exits 0)" \
+  || err "#701: a disclosed skip made a clean draft fail"
+
+python3 "$LINT" "$work/en-noverb.md" --config-json "$work/cfg.json" 2>/dev/null \
+  | grep -q '\[title\].*bare noun phrase' \
+  && ok "#701: the EN test still fires on a bare noun phrase (declaration read as data)" \
+  || err "#701: the EN claim-verb check stopped working"
+python3 "$LINT" "$work/en-verb.md" --config-json "$work/cfg.json" >/dev/null 2>&1 \
+  && ok "#701: an EN title with a claim verb still passes" \
+  || err "#701: a valid EN title was flagged"
+
+# The length bound is language-independent: it still fires on a long JA title.
+long_ja=$(python3 -c "print('自動化に'*20)")
+mk_titled ja-long "$long_ja" ja
+python3 "$LINT" "$work/ja-long.md" --config-json "$work/cfg.json" 2>/dev/null \
+  | grep -q '\[title\].*chars (> 70)' \
+  && ok "#701: the 70-char bound still applies to a JA title" \
+  || err "#701: the length bound was language-scoped by mistake"
+
+# A language whose test IS declared gets judged by it — proving the mechanism is
+# data-driven rather than an en-only special case.
+cat > "$work/conv.yaml" <<'EOF'
+languages:
+  ja:
+    register: です/ます
+    terminology: technical terms kept in English
+    title_claim_verb:
+      suffixes: [ます, せる, った]
+      words: [なぜ]
+EOF
+python3 "$LINT" "$work/ja-title.md" --config-json "$work/cfg.json" \
+  --conventions "$work/conv.yaml" >/dev/null 2>"$work/ja2.err" \
+  && ok "#701: a JA title passes its OWN declared verb test (言わせる matches せる)" \
+  || err "#701: a declared JA test did not judge the title: $(cat "$work/ja2.err")"
+grep -q 'claim-verb check skipped' "$work/ja2.err" \
+  && err "#701: a declared test still reported itself as skipped" \
+  || ok "#701: no skip disclosed once the language declares a test"
+mk_titled ja-nouny "自動化の設定と手順のメモ" ja
+python3 "$LINT" "$work/ja-nouny.md" --config-json "$work/cfg.json" \
+  --conventions "$work/conv.yaml" 2>/dev/null \
+  | grep -q '\[title\].*bare noun phrase' \
+  && ok "#701: under a declared JA test, a verbless JA title IS flagged" \
+  || err "#701: the declared JA test never fires (a test that cannot fail is not a test)"
+
+# The shipped declaration is what the default resolution finds — and it must
+# survive the repo's stdlib YAML SUBSET parser WHOLE. Adding the verb list as a
+# multi-line flow list truncated it and swallowed the `ja` entry after it, so
+# adaptation reported "language 'ja' declares no register/terminology": a
+# declaration file is only a declaration if the parser reads all of it.
+python3 - <<'PY' && ok "#701: the shipped conventions file parses WHOLE (verb data + every language's conventions)" || err "#701: the shipped conventions declaration does not fully parse"
+import importlib.util, sys
+spec = importlib.util.spec_from_file_location("ruc", "scripts/resolve-user-config.py")
+m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+langs = (m.load_yaml(open("config/language-conventions.yaml", encoding="utf-8").read())
+         or {}).get("languages") or {}
+problems = []
+if not langs.get("en", {}).get("title_claim_verb", {}).get("words"):
+    problems.append("en declares no title_claim_verb words")
+# Every declared language keeps the adaptation stage's own required keys — the
+# regression the truncation caused was in THIS property, not in the verb data.
+for code, entry in langs.items():
+    for key in ("register", "terminology"):
+        if not (entry or {}).get(key):
+            problems.append(f"{code} lost its {key} declaration")
+for p in problems:
+    print("  " + p, file=sys.stderr)
+sys.exit(1 if problems else 0)
+PY
+
 if [ "$fail" -eq 0 ]; then
   printf '\nAll lint-article checks passed.\n'; exit 0
 else
