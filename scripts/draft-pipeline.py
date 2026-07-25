@@ -1869,14 +1869,81 @@ def _delivered_stem(slug, platform, profile):
     return slug.replace(".", "-")
 
 
+def _identity_from_basename(profile):
+    """Whether the platform derives its published identity from the delivered
+    filename (`packaging.layout.identity_from_basename`).
+
+    This — never the presence of `packaging.layout.dir` — is the discriminator
+    for whether an undeclared basename mapping is a defect (#719). Every shipped
+    profile declares a `layout.dir`, but a directory is only sometimes an
+    externally imposed delivery target: some are our own organizational choice
+    and constrain no name at all (the hub draws exactly that distinction,
+    `consulted: product-lab@34a6119666896f232e1aa00789c3f916bc2b6dad
+    topics/articles.md:13`). Keying on the directory would report every profile
+    that merely files its output somewhere. So the profile states the fact and
+    the code branches on no platform — the rule is declared THERE, as with
+    every other packaging fact in this module.
+    """
+    layout = ((profile or {}).get("packaging", {}) or {}).get("layout", {}) or {}
+    return bool(layout.get("identity_from_basename"))
+
+
+def _undeclared_basename_findings(stem, platform, profile):
+    """Disclosure that an identity-bearing target is being delivered into under
+    the pipeline's own literal name, as CAP-6 publish-blocker dicts (#719).
+
+    The variant is still written — this is a disclosure, not a refusal. A
+    *wrong* declaration (an unknown rule) hard-fails at emission because the
+    profile asserted something this version cannot honour; a *missing* one
+    cannot be distinguished from an owner who has not migrated yet, so it is
+    reported at the grade the failure actually has.
+    """
+    if not _identity_from_basename(profile) or _layout_basename_decl(profile):
+        return []
+    return [{
+        "platform": platform,
+        "blocker": "undeclared-delivered-basename",
+        "delivered_basename": stem,
+        "detail": (
+            f"delivering the literal {stem + '.md'!r} into {platform}'s "
+            f"identity-bearing target, but the profile declares no "
+            f"`packaging.layout.basename` mapping — so the delivered name is "
+            f"the pipeline's own convention rather than one {platform} "
+            f"constrains. The delivered basename is this article's permanent "
+            f"identity on the platform, so declare the mapping before first "
+            f"publish."),
+    }]
+
+
 def _delivered_slug_findings(stem, platform, profile):
     """Legality of a delivered basename against the platform's declared slug
     rule (`packaging.layout.basename.slug_pattern`), as CAP-6 publish-blocker
     dicts. Charset and length are reported as SEPARATE reasons — "illegal" alone
-    does not tell the owner which way to fix the name."""
+    does not tell the owner which way to fix the name.
+
+    With no declared pattern the legality is **cannot-determine**, never a pass
+    (#719): an unevaluated rule is not a satisfied one, and reporting silence
+    for both made the #715 fix look effective on a profile that had never
+    acquired it. The cannot-determine finding is emitted only for an
+    identity-bearing target — elsewhere there is no rule to be undetermined
+    about, and `<slug>.<platform>.md` is the contracted outcome.
+    """
     decl = _layout_basename_decl(profile) or {}
     pattern = decl.get("slug_pattern")
-    if not pattern or re.match(str(pattern), stem):
+    if not pattern:
+        if not _identity_from_basename(profile):
+            return []
+        return [{
+            "platform": platform,
+            "blocker": "delivered-slug-cannot-determine",
+            "delivered_basename": stem,
+            "detail": (
+                f"the delivered basename {stem!r} was NOT checked for legality "
+                f"— {platform}'s profile declares no "
+                f"`packaging.layout.basename.slug_pattern` to check it against. "
+                f"This is cannot-determine, not a pass."),
+        }]
+    if re.match(str(pattern), stem):
         return []
     reasons = []
     charset = decl.get("slug_charset")
@@ -2315,6 +2382,7 @@ def cmd_variants(args):
         except ValueError as e:
             sys.stderr.write(f"error: {e}\n")
             return 1
+        delivered_blockers.extend(_undeclared_basename_findings(stem, name, profile))
         delivered_blockers.extend(_delivered_slug_findings(stem, name, profile))
         path = os.path.join(emit_dir, f"{stem}.md")
         if not args.dry_run:

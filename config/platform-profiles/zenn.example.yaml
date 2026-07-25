@@ -45,6 +45,12 @@ packaging:
     # The delivered basename is the article's PERMANENT identity (its URL).
     # Renaming after first publish forks the article, so decide it before the
     # first `published: true` and treat it as immutable per article afterwards.
+    # Zenn derives the published identity from the delivered filename, so an
+    # absent `basename` mapping below is a defect rather than the contracted
+    # default (#719). Declared here and NOT inferred from `dir:` — `devto/`
+    # and `newsletter/` are our own organizational choices and constrain no
+    # name, so inferring from the directory would report them falsely.
+    identity_from_basename: true
     basename:
       rule: slug-dots-to-hyphens   # tanuki-x.ja + zenn -> tanuki-x-ja
       slug_pattern: '^[a-z0-9_-]{12,50}$'

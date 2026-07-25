@@ -271,6 +271,69 @@ for name, found in want.items():
 sys.exit(1 if bad else 0)
 PY
 
+# --- 8. the identity_from_basename discriminator (#719) ------------------
+python3 - "$root" <<'PY' || fail=1
+import importlib.util, sys
+spec = importlib.util.spec_from_file_location("dp", sys.argv[1] + "/scripts/draft-pipeline.py")
+m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+bad = []
+def check(cond, msg):
+    print(("ok:   " if cond else "FAIL: ") + msg, file=sys.stdout if cond else sys.stderr)
+    if not cond: bad.append(msg)
+
+def prof(**layout):
+    return {"packaging": {"layout": layout}}
+
+# The discriminator is the DECLARED flag, never the presence of `dir:`. All
+# four shipped profiles declare a dir; only zenn's target is externally
+# imposed, so keying on the directory would report the other three falsely.
+for d in ("devto/", "newsletter/", "articles/"):
+    p = prof(dir=d)
+    check(m._undeclared_basename_findings("x.zenn", "devto", p) == [],
+          f"a profile declaring only dir: {d} reports nothing")
+    check(m._delivered_slug_findings("x.zenn", "devto", p) == [],
+          f"legality stays silent for dir: {d} with no identity claim")
+
+# Identity-bearing target, no mapping: both findings, and still written.
+p = prof(dir="articles/", identity_from_basename=True)
+und = m._undeclared_basename_findings("tanuki-x.ja.zenn", "zenn", p)
+check(len(und) == 1 and und[0]["blocker"] == "undeclared-delivered-basename",
+      "identity-bearing target with no mapping reports undeclared-delivered-basename")
+check(und and und[0].get("delivered_basename") == "tanuki-x.ja.zenn",
+      "the disclosure names the literal basename being delivered")
+cd_ = m._delivered_slug_findings("tanuki-x.ja.zenn", "zenn", p)
+check(len(cd_) == 1 and cd_[0]["blocker"] == "delivered-slug-cannot-determine",
+      "legality with no declared pattern is cannot-determine, not a pass")
+check(cd_ and "not a pass" in cd_[0]["detail"],
+      "the cannot-determine finding says so in words")
+
+# Identity-bearing target WITH a mapping: #715 behaviour, unchanged.
+p = prof(dir="articles/", identity_from_basename=True,
+         basename={"rule": "slug-dots-to-hyphens",
+                   "slug_pattern": r"^[a-z0-9_-]{12,50}$"})
+check(m._undeclared_basename_findings("tanuki-xyz-ja", "zenn", p) == [],
+      "a declared mapping silences the undeclared-basename disclosure")
+check(m._delivered_slug_findings("tanuki-xyz-ja", "zenn", p) == [],
+      "a legal name under a declared pattern still passes clean")
+check(m._delivered_stem("tanuki-xyz.ja", "zenn", p) == "tanuki-xyz-ja",
+      "the mapped stem is unchanged by this story")
+sys.exit(1 if bad else 0)
+PY
+
+# --- 9. the shipped examples declare the flag exactly where it is true ----
+if grep -q "identity_from_basename: true" "$root/config/platform-profiles/zenn.example.yaml"; then
+  echo "ok:   the shipped zenn example declares identity_from_basename"
+else
+  err "the shipped zenn example must declare identity_from_basename"
+fi
+for other in devto newsletter-email web-archive; do
+  if grep -q "identity_from_basename" "$root/config/platform-profiles/$other.example.yaml"; then
+    err "$other must NOT declare identity_from_basename (its dir is our own choice)"
+  else
+    echo "ok:   $other does not claim an identity-bearing target"
+  fi
+done
+
 if [ "$fail" -eq 0 ]; then
   printf '\nAll delivered-basename checks passed.\n'
 else
