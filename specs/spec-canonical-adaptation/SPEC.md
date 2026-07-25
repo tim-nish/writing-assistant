@@ -10,6 +10,8 @@ sources:
   # distill. Mechanism public, provenance private.
 ---
 
+> **Amended 2026-07-25 (triage, #693)** per /triage-gh on an unreachable re-derivation: CAP-4's write went through the pipeline's one canonical write path with **no ownership channel** (`scripts/adapt-canonical.py:561-562` passed neither `ws`, `owned`, nor `replace`), so the #666 no-clobber gate refused every re-derivation of an already-derived slug while the first one succeeded, and CAP-5's clearing instruction — "re-adaptation is a FRESH owner decision through this invocation" — pointed at an invocation that dead-ended at the refusal. **The owner's recorded answer at the CAP-3 gate IS the ownership token for the derived slug**: a `write` whose workspace holds a presented payload for *this* derived slug and a latest recorded answer of `approve` or `modify` is authorized to replace the existing derived canonical, and the refusal for a **foreign** collision (no gate, no recorded answer) survives unchanged. The token is that **verified conjunction**, never a bare override flag — `adapt-canonical write` exposes no `--replace-canonical`, so the only path to a re-derivation remains the gate itself (`consulted: product-lab@34a6119666896f232e1aa00789c3f916bc2b6dad topics/knowledge-architecture.md:67, topics/claude-code-ops.md:19`). Note the mechanism this cannot reuse: an adaptation workspace holds `presented-payloads.jsonl` but **no** `checkpoint.json`, so the draft flow's checkpoint-based `_ws_owns_slug` discriminator (`scripts/draft-pipeline.py:4744-4759`) is false by construction here — ownership is read from the **recorded-answer log**, which is the artifact this invocation actually produces. The gate's comparison basis and the trailer's demotion to a non-authoritative attestation are SPEC-article-draft-pipeline's (amended same sitting, #693/#695); this spec states only what authorizes the adaptation write.
+
 > **Canonical contract.** This SPEC introduces the **adaptation step**: a
 > standalone, owner-gated invocation that derives a target-language canonical
 > (first target: Japanese) from a reviewed English canonical. It exists to keep
@@ -113,7 +115,11 @@ source material ──draft flow──▶ EN canonical ──emit──▶ devto
   - **success:** `emit variants` accepts the derived canonical by slug with
     zero special-casing; review-article runs over it; the ancestry pin
     resolves to an existing source canonical and hash or a lint names the
-    defect.
+    defect. **A re-derivation of a slug that already has a derived canonical
+    persists** — the write carries the recorded gate answer as its ownership
+    token (amended 2026-07-25, #693) — **while a write over a foreign
+    canonical that happens to mint the same slug, with no gate and no
+    recorded answer, still refuses by name.**
 
 - **CAP-5 (staleness chains through the derivation)**
   - **intent:** Editing the source canonical marks the derived canonical
@@ -127,6 +133,10 @@ source material ──draft flow──▶ EN canonical ──emit──▶ devto
   - **success:** A staleness check over a derivation whose source moved reports
     the derived canonical and its variants in the blocker bucket with the
     hash pair; a fresh adaptation records the new source hash and clears it.
+    **That clearing path is reachable, not merely named** (amended 2026-07-25,
+    #693): the fresh adaptation's write is authorized by its own recorded gate
+    answer, so a stale derived canonical never sits in `publish_blockers` with
+    its only sanctioned exit ending in a collision refusal.
 
 - **CAP-6 (no per-language code path)**
   - **intent:** `ja` is the first target, not a special case: the target

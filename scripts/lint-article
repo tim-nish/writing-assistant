@@ -25,6 +25,11 @@ Checks (all against the config `article` schema, never a hardcoded site schema):
      text, and an unfilled GATE slot is not publishable — checked mechanically
      here because self-review is unreliable on this defect class. Fenced code
      blocks and inline code spans are exempt.
+  8. trailer     — a `canonical-sha256` trailer must attest the content it sits
+     on (#695): the trailer is the pipeline's attestation of what it last
+     blessed, so a hash disagreeing with its own content is reported as a stale
+     attestation. Never auto-fixed here, and never schema-class — the completion
+     gate must not be blocked by it. Files carrying no trailer are out of scope.
 
 Config source: `--config-json FILE` (or `-` for stdin), else `resolve-user-config.py`
 resolves it exactly as every other skill does (machine-global + repo-local override).
@@ -37,6 +42,7 @@ parser is reused from the sibling `resolve-user-config.py`.
 """
 
 import argparse
+import hashlib
 import importlib.util
 import json
 import os
@@ -309,6 +315,42 @@ def check_template_residue(lines, body_start, findings):
                              "renderer NOT PUBLISHABLE marker present"))
 
 
+_TRAILER_SHA_RE = re.compile(r"<!--\s*writing-assistant:\s*canonical-sha256="
+                             r"([0-9a-f]{64})\s*-->")
+# The same trailer-stripping regex the one canonical write path uses, so lint and
+# the writer agree on what "the content" is by construction rather than by
+# convention (`_EMISSION_TRAILER_RE`, scripts/draft-pipeline.py).
+_TRAILER_STRIP_RE = re.compile(
+    r"\n*<!--\s*writing-assistant:\s*canonical-sha256=[0-9a-f]{64}\s*-->\s*$")
+
+
+def check_trailer_consistency(text, total_lines, findings):
+    """The `canonical-sha256` trailer must attest the content it sits on
+    (Story 18.104, #695). The trailer is the pipeline's attestation of the
+    content it last blessed — never a comparison basis and never an authority
+    (SPEC-article-draft-pipeline, amended 2026-07-25) — so a trailer disagreeing
+    with its own content is an ACCURACY defect: reported here, and never
+    auto-fixed by lint. A canonical that carries no trailer is out of scope: only
+    files claiming an attestation can misstate one.
+
+    Deliberately NOT a `schema`/`title` kind, so the completion gate's #674
+    partition routes it to the disclosed-warning bucket rather than the
+    hard-error one — a stale trailer must never block completion."""
+    m = _TRAILER_SHA_RE.search(text)
+    if not m:
+        return
+    claimed = m.group(1)
+    body = _TRAILER_STRIP_RE.sub("", text).rstrip("\n") + "\n"
+    actual = hashlib.sha256(body.encode("utf-8")).hexdigest()
+    if actual != claimed:
+        findings.append((total_lines, "trailer",
+                         f"canonical-sha256 trailer claims {claimed[:8]}… but the "
+                         f"content hashes to {actual[:8]}… — the attestation is "
+                         "stale (an edit that bypassed the pipeline's write "
+                         "path); it is re-stamped by the next sanctioned write, "
+                         "never by lint"))
+
+
 # --------------------------------------------------------------------------
 # Driver
 # --------------------------------------------------------------------------
@@ -337,6 +379,7 @@ def lint_file(path, cfg, check_http):
     check_heading_density(lines, body_start, findings)
     check_links(lines, path, check_http, findings)
     check_verify_markers(lines, findings)
+    check_trailer_consistency(text, len(lines), findings)
     check_template_residue(lines, body_start, findings)
     findings.sort(key=lambda f: (f[0], f[1]))
     return findings

@@ -4833,32 +4833,51 @@ def _persist_canonical(text, slug, root, create_out=False, ws=None,
     canonical_sha = hashlib.sha256(body.encode("utf-8")).hexdigest()
     content = body + \
         f"\n<!-- writing-assistant: canonical-sha256={canonical_sha} -->\n"
-    # No-clobber gate (Story 18.92, #666): never silently replace a DIFFERENT
-    # canonical that happens to mint a colliding slug. A byte-identical re-run
-    # (the existing trailer sha equals the sha we are about to write) is
-    # idempotent and proceeds unchanged. A DIFFERING existing file proceeds only
-    # when this run owns the slug — the same-run revision loop (ws checkpoint) or
-    # the sanctioned review re-entry path (`owned`) — or under an explicit
-    # `--replace-canonical` override. Otherwise, including a trailer-less file of
-    # unknown provenance, it refuses with a named error rather than overwriting.
+    # No-clobber gate (Story 18.92, #666; comparison basis fixed by Story
+    # 18.104, #695): never silently replace a DIFFERENT canonical that happens
+    # to mint a colliding slug — where DIFFERENT means CONTENT, never
+    # attestation. The basis is sha256 over the existing file's TRAILER-STRIPPED
+    # content, computed exactly the way the incoming hash above is computed, so a
+    # byte-identical re-persist is idempotent REGARDLESS of the state of the
+    # existing trailer. The trailer is the pipeline's attestation of the content
+    # it last blessed, never a comparison basis and never an authority: an
+    # operationally hand-edited canonical carries a stale trailer (lint-article
+    # reports that as a style-class finding), and reading it here converted the
+    # contracted idempotent re-run into a refusal (#695). A DIFFERING existing
+    # file proceeds only when this run owns the slug — the same-run revision loop
+    # (ws checkpoint) or the sanctioned review re-entry path (`owned`) — or under
+    # an explicit `--replace-canonical` override. Otherwise, including a
+    # trailer-less file of unknown provenance, it refuses with a named error.
     if os.path.isfile(canonical_path):
         try:
             existing = _read_text(canonical_path)
         except OSError as e:
             raise _CanonicalWriteError(
                 canonical_path, f"cannot read the existing canonical to compare: {e}")
-        m = _CANONICAL_SHA.search(existing)
-        existing_sha = m.group(1) if m else None
-        if existing_sha != canonical_sha:
+        existing_body = _EMISSION_TRAILER_RE.sub("", existing).rstrip("\n") + "\n"
+        existing_content_sha = hashlib.sha256(
+            existing_body.encode("utf-8")).hexdigest()
+        if existing_content_sha != canonical_sha:
             if not (replace or owned or _ws_owns_slug(ws, slug)):
+                m = _CANONICAL_SHA.search(existing)
+                trailer_sha = m.group(1) if m else None
+                trailer_note = ""
+                if trailer_sha is None:
+                    trailer_note = " (no trailer, provenance unknown)"
+                elif trailer_sha != existing_content_sha:
+                    # Report the drift rather than compare against it: the
+                    # refusal must never look like it was decided by a trailer.
+                    trailer_note = (f" (its trailer claims {trailer_sha}, which "
+                                    "disagrees with its own content — a separate "
+                                    "attestation defect lint-article reports)")
                 raise _CanonicalWriteError(
                     canonical_path,
                     "slug collision — a different canonical already exists at "
-                    f"{canonical_path} (existing canonical-sha256="
-                    f"{existing_sha or 'none: no trailer, provenance unknown'}, "
-                    f"about to write {canonical_sha}) and this run has no record "
-                    "of owning this slug. Resolution: pick a different slug, or "
-                    "re-run with --replace-canonical to overwrite deliberately")
+                    f"{canonical_path} (existing content hashes to "
+                    f"{existing_content_sha}{trailer_note}, about to write "
+                    f"{canonical_sha}) and this run has no record of owning this "
+                    "slug. Resolution: pick a different slug, or re-run with "
+                    "--replace-canonical to overwrite deliberately")
     try:
         tmp = canonical_path + ".tmp"
         with open(tmp, "w", encoding="utf-8") as fh:

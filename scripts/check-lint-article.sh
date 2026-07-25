@@ -266,6 +266,71 @@ else
   err "malformed generated_by not flagged"
 fi
 
+# Trailer-vs-content consistency (Story 18.104, #695): a canonical claiming an
+# attestation that disagrees with its own content is a named defect; a canonical
+# carrying no trailer is out of scope; the finding is never schema-class, so the
+# completion gate's #674 partition can never route it to the hard-error bucket.
+cat > "$work/trailer.md" <<'EOF'
+---
+slug: trailer
+title: "A stale attestation breaks the idempotent re-persist"
+date: 2026-07-25
+mode: canonical
+language: en
+summary: s.
+topics: [a]
+related: { projects: [], publications: [], products: [] }
+generated_by: writing-assistant@1.0.0+abc1234
+---
+
+## H
+
+Body more at [example.com](https://example.com).
+EOF
+cp "$work/trailer.md" "$work/trailer-clean.md"
+# A correct attestation over this exact content: computed, never hardcoded.
+python3 - "$work/trailer-clean.md" <<'EOF'
+import hashlib, sys
+p = sys.argv[1]
+body = open(p, encoding="utf-8").read().rstrip("\n") + "\n"
+sha = hashlib.sha256(body.encode("utf-8")).hexdigest()
+open(p, "a", encoding="utf-8").write(
+    f"\n<!-- writing-assistant: canonical-sha256={sha} -->\n")
+EOF
+if python3 "$LINT" "$work/trailer-clean.md" --config-json "$work/cfg.json" 2>/dev/null \
+     | grep -q '\[trailer\]'; then
+  err "a trailer that matches its content was flagged"
+else
+  ok "a matching canonical-sha256 trailer is clean (#695)"
+fi
+# Falsify the attestation only; the content is untouched.
+sed 's/canonical-sha256=[0-9a-f]*/canonical-sha256=0000000000000000000000000000000000000000000000000000000000000000/' \
+  "$work/trailer-clean.md" > "$work/trailer-stale.md"
+out_trailer=$(python3 "$LINT" "$work/trailer-stale.md" --config-json "$work/cfg.json" 2>/dev/null || true)
+if printf '%s' "$out_trailer" | grep -q '\[trailer\].*stale'; then
+  ok "a stale canonical-sha256 trailer is flagged (#695)"
+else
+  err "stale trailer not flagged: $out_trailer"
+fi
+if printf '%s' "$out_trailer" | grep 'trailer claims' | grep -q '\[schema\]\|\[title\]'; then
+  err "trailer drift reported as schema/title class — the completion gate would hard-error on it"
+else
+  ok "trailer drift is not schema/title class, so completion only warns (#695/#674)"
+fi
+# Lint reports, never repairs.
+before_stale=$(cat "$work/trailer-stale.md")
+python3 "$LINT" "$work/trailer-stale.md" --config-json "$work/cfg.json" >/dev/null 2>&1 || true
+[ "$before_stale" = "$(cat "$work/trailer-stale.md")" ] \
+  && ok "lint never auto-fixes the trailer it flags (#695)" \
+  || err "lint rewrote the draft it was asked to check"
+# No trailer at all ⇒ out of scope (only a claimed attestation can be wrong).
+if python3 "$LINT" "$work/trailer.md" --config-json "$work/cfg.json" 2>/dev/null \
+     | grep -q '\[trailer\]'; then
+  err "a trailer-less canonical was flagged for trailer drift"
+else
+  ok "a canonical with no trailer emits no trailer finding (#695)"
+fi
+
 if [ "$fail" -eq 0 ]; then
   printf '\nAll lint-article checks passed.\n'; exit 0
 else
