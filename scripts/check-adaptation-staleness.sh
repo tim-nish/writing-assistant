@@ -125,7 +125,9 @@ python3 "$DP" variants --slug retry-storms.ja --root "$work/host" \
   --config-json "$work/cfg.json" --platforms zenn --ws "$work/ws" \
   > "$work/emit.json" 2>"$work/e-emit" \
   || { err "fixture emission failed: $(cat "$work/e-emit")"; printf '\nFAILED.\n' >&2; exit 1; }
-[ -f "$work/drafts/articles/retry-storms.ja.zenn.md" ] \
+# Delivered basename comes from the profile mapping (#715):
+# `retry-storms.ja` + zenn -> `retry-storms-ja`.
+[ -f "$work/drafts/articles/retry-storms-ja.md" ] \
   && ok "fixture: the derivation and its zenn variant (under layout.dir) both exist" \
   || err "fixture emission wrote no variant: $(ls -R "$work/drafts")"
 
@@ -204,7 +206,7 @@ check(sbi.get("upstream", "").endswith("retry-storms.ja.md"),
 check(sbi.get("recorded_sha256") == sd.get("recorded_sha256")
       and sbi.get("current_sha256") == cur,
       "the inherited blocker carries the same hash pair as its upstream")
-check(sbi.get("path", "").endswith(".zenn.md"),
+check(sbi.get("path", "").endswith("retry-storms-ja.md"),
       "the inherited blocker names the variant file")
 
 # The variant's OWN hash still matches its derivation — inheritance is the only

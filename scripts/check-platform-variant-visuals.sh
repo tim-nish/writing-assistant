@@ -102,7 +102,8 @@ printf '%s' "$out" | python3 -c '
 import json,sys; d=json.load(sys.stdin)
 assert "render_blockers" not in d, d' \
   && ok "mermaid-embedded profile → no render blocker" || err "mermaid-embedded mechanism wrong"
-grep -q '```mermaid' "$work/o/articles/p.zenn.md" \
+# Delivered basename comes from the profile mapping (#715): `p.zenn` -> `p`.
+grep -q '```mermaid' "$work/o/articles/p.md" \
   && ok "mermaid-embedded profile → Mermaid left inline" || err "Mermaid not left inline"
 
 # 4. The standalone variants skill file (Story 13.69) still documents the

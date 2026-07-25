@@ -1807,6 +1807,137 @@ def _variant_layout_subdir(profile):
     return d or None
 
 
+# The delivered basename (SPEC-platform-variants "The delivered basename is the
+# platform's to constrain, and the profile declares the mapping", triage #715).
+#
+# For a platform whose sync contract derives an article's identity from the
+# delivered filename, `<slug>.<platform>.md` is not ours to carry across the
+# boundary — a platform slug rule may forbid characters our convention uses, and
+# then every delivery is rejected on sync. A projection dir is "an externally
+# imposed delivery target of the sync contract" and a profile is "a conformance
+# record of [the platform's] sync contract"
+# (`consulted: product-lab@34a6119666896f232e1aa00789c3f916bc2b6dad
+# topics/articles.md:13,86`), so the rule is declared THERE and never here: no
+# platform is named in this module (Profiles carry the platform, code carries
+# none — asserted by scripts/check-stage5-variants.sh).
+#
+# ONE rule id is supported, by design: the mapping is declaration, and an
+# unknown rule is a profile defect reported at emission rather than a silent
+# fallback to the illegal name.
+_BASENAME_RULE_DOTS_TO_HYPHENS = "slug-dots-to-hyphens"
+
+
+def _layout_basename_decl(profile):
+    """A profile's declared delivered-basename mapping (`packaging.layout.
+    basename`), or None when it declares none — in which case delivery keeps
+    `<slug>.<platform>.md`, exactly as before, so no other platform is
+    affected."""
+    layout = ((profile or {}).get("packaging", {}) or {}).get("layout", {}) or {}
+    decl = layout.get("basename")
+    if not decl:
+        return None
+    if not isinstance(decl, dict):        # `basename: <rule>` shorthand
+        return {"rule": str(decl).strip()}
+    return decl
+
+
+def _delivered_stem(slug, platform, profile):
+    """The delivered basename WITHOUT the `.md` extension.
+
+    Resolution is FORWARD only — slug + platform + profile -> name — and never
+    inverted. That is deliberate: the dots-to-hyphens rule is *not* invertible
+    (nothing in `tanuki-x-ja` says which hyphen was a dot), so every consumer
+    that needs to find a delivered variant computes the expected name from the
+    canonical it already holds instead of parsing one. See `_variant_scan_dirs`'
+    callers for the discovery half.
+
+    Raises ValueError for an unknown declared rule: a profile naming a rule this
+    version does not implement is a defect to report, never a silent fallback to
+    the illegal name the rule exists to avoid.
+    """
+    decl = _layout_basename_decl(profile)
+    if not decl:
+        return f"{slug}.{platform}"
+    rule = str(decl.get("rule", "")).strip()
+    if rule != _BASENAME_RULE_DOTS_TO_HYPHENS:
+        raise ValueError(
+            f"profile for {platform!r} declares unknown "
+            f"packaging.layout.basename.rule {rule!r}; this version implements "
+            f"only {_BASENAME_RULE_DOTS_TO_HYPHENS!r}")
+    # The platform suffix is dropped: on the delivery target the file IS the
+    # article, so the platform is implied by the directory it was delivered to.
+    return slug.replace(".", "-")
+
+
+def _delivered_slug_findings(stem, platform, profile):
+    """Legality of a delivered basename against the platform's declared slug
+    rule (`packaging.layout.basename.slug_pattern`), as CAP-6 publish-blocker
+    dicts. Charset and length are reported as SEPARATE reasons — "illegal" alone
+    does not tell the owner which way to fix the name."""
+    decl = _layout_basename_decl(profile) or {}
+    pattern = decl.get("slug_pattern")
+    if not pattern or re.match(str(pattern), stem):
+        return []
+    reasons = []
+    charset = decl.get("slug_charset")
+    if charset and re.search(str(charset), stem):
+        reasons.append(f"illegal character(s) for {platform}")
+    lo, hi = decl.get("slug_min_length"), decl.get("slug_max_length")
+    if lo and len(stem) < int(lo):
+        reasons.append(f"{len(stem)} characters, below the {lo} minimum")
+    if hi and len(stem) > int(hi):
+        reasons.append(f"{len(stem)} characters, above the {hi} maximum")
+    return [{
+        "platform": platform,
+        "blocker": "illegal-delivered-slug",
+        "delivered_basename": stem,
+        "slug_pattern": str(pattern),
+        "detail": (
+            f"the delivered basename {stem!r} does not satisfy {platform}'s "
+            f"declared slug rule {pattern}"
+            + (" — " + "; ".join(reasons) if reasons else "")
+            + ". The delivered basename is this article's permanent identity on "
+              "the platform, so fix it before first publish."),
+    }]
+
+
+def _delivered_variant_paths(slug, out_dir, root):
+    """Existing delivered variants of `slug` found by FORWARD resolution
+    (#715): for each resolvable profile that declares a basename mapping,
+    compute the name that profile would deliver and test whether it exists.
+
+    This is the replacement discovery mechanism the layout's stated
+    discovery property requires — "any future change separating variants from
+    their canonical must supply a replacement discovery mechanism instead of
+    silently breaking one" (`consulted:
+    product-lab@34a6119666896f232e1aa00789c3f916bc2b6dad topics/articles.md:14`).
+    A mapped basename is unparseable back to `(slug, platform)`, so callers
+    UNION this with the slug-prefix scan rather than replacing it: profiles
+    with no declared mapping keep being found exactly as before.
+    """
+    try:
+        pp = _load("resolve-platform-profiles.py")
+        pdir = pp.profiles_dir(pp.host_root(root), None)
+        profiles, _ = pp.load_profiles(pdir)
+    except Exception:  # pragma: no cover - defensive: discovery never hard-fails
+        return []
+    repo_root = _dest_repo_root(out_dir)
+    found = []
+    for name, prof in (profiles or {}).items():
+        if not _layout_basename_decl(prof):
+            continue          # no mapping: the prefix scan already finds it
+        try:
+            stem = _delivered_stem(slug, name, prof)
+        except ValueError:
+            continue          # unknown rule is reported at emission, not here
+        sub = _variant_layout_subdir(prof)
+        d = os.path.join(repo_root, sub) if sub else out_dir
+        p = os.path.join(d, f"{stem}.md")
+        if os.path.isfile(p):
+            found.append(p)
+    return found
+
+
 def _dest_repo_root(out_dir):
     """The destination repo root a profile's `packaging.layout.dir` resolves
     against — the `output.drafts` repo root (the lint's `--dest-repo`;
@@ -2133,6 +2264,7 @@ def cmd_variants(args):
 
     emitted = []
     blockers = []
+    delivered_blockers = []           # illegal delivered basenames (#715)
     lede_proposals = []
     for name in chosen:
         profile = profiles.get(name)
@@ -2176,7 +2308,15 @@ def cmd_variants(args):
         # the --create-out consent above already governs.
         subdir = _variant_layout_subdir(profile)
         emit_dir = os.path.join(_dest_repo_root(out_dir), subdir) if subdir else out_dir
-        path = os.path.join(emit_dir, f"{slug}.{name}.md")
+        # The delivered basename comes from the profile's declared mapping
+        # (#715); with none declared this is `<slug>.<platform>` as before.
+        try:
+            stem = _delivered_stem(slug, name, profile)
+        except ValueError as e:
+            sys.stderr.write(f"error: {e}\n")
+            return 1
+        delivered_blockers.extend(_delivered_slug_findings(stem, name, profile))
+        path = os.path.join(emit_dir, f"{stem}.md")
         if not args.dry_run:
             os.makedirs(emit_dir, exist_ok=True)
             with open(path, "w", encoding="utf-8") as fh:
@@ -2228,8 +2368,9 @@ def cmd_variants(args):
     # `$WS` — it can never see the review run's checkpoint. #716 proposed it as
     # the substrate; recorded here because the next reader will reach for it
     # again.
+    publish_blockers = list(delivered_blockers)
     if not _review_evidence(slug, out_dir):
-        out["publish_blockers"] = [{
+        publish_blockers.append({
             "slug": slug,
             "blocker": "review-evidence-not-found",
             "detail": (
@@ -2240,7 +2381,9 @@ def cmd_variants(args):
                 "of a record is not absence of a review. If a review ran, its "
                 "record is not where this check looks; if none ran, a "
                 "claims-bearing canonical owes one."),
-        }]
+        })
+    if publish_blockers:
+        out["publish_blockers"] = publish_blockers
     if lede_proposals:
         out["lede_proposals"] = lede_proposals   # SKILL presents one per variant
     print(json.dumps(out, indent=2))
@@ -2309,6 +2452,11 @@ def _staleness_report(text, paths=None, out_dir=None, root=None):
         for d in _variant_scan_dirs(out_dir, root):
             paths.extend(os.path.join(d, f) for f in sorted(os.listdir(d))
                          if f.startswith(pattern) and f.endswith(".md"))
+        # UNION with forward-resolved delivered names (#715): a profile-declared
+        # basename is not `<slug>.` prefixed, so the scan above cannot see it.
+        if slug:
+            paths.extend(p for p in _delivered_variant_paths(slug, out_dir, root)
+                         if p not in paths)
         # A DERIVED CANONICAL shares this filename shape (`<slug>.<language>.md`,
         # SPEC-canonical-adaptation CAP-4) but is a canonical, not a projection:
         # it declares its own reader and carries an `adapted_from` ancestry
@@ -5500,6 +5648,12 @@ def cmd_review_reentry(args):
             os.path.join(d, f) for f in sorted(os.listdir(d))
             if f.startswith(f"{args.slug}.") and f.endswith(".md")
             and f != f"{args.slug}.md")
+    # UNION with forward-resolved delivered names (#715), same reason as the
+    # staleness command's scan: a profile-declared basename is not `<slug>.`
+    # prefixed, so a review-applied edit would otherwise leave it ungraded.
+    variant_paths.extend(
+        p for p in _delivered_variant_paths(args.slug, out_dir, args.root)
+        if p not in variant_paths)
     staleness = _staleness_report(
         open(canonical_path, encoding="utf-8").read(), paths=variant_paths)
     stale_variants = [v for v in staleness["variants"]

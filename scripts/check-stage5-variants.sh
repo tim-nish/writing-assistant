@@ -155,7 +155,13 @@ assert [e["platform"] for e in d["emitted"]]==["zenn"], d
 assert "render_blockers" not in d, d  # Zenn renders Mermaid natively — no blocker
 ' && ok "JA emits a Zenn variant, Mermaid embedded (no blocker)" || err "JA variant/blocker wrong"
 
-ZENN="$work/o/articles/retry-arashi.zenn.md"
+# The DELIVERED basename comes from the profile's declared mapping (#715):
+# this profile maps dots to hyphens and drops the platform suffix, because the
+# platform derives the article slug from the filename. The projection-dir
+# assertion (#688) is unchanged — only the expected name is.
+ZENN="$work/o/articles/retry-arashi.md"
+[ -f "$ZENN" ] && ok "the delivered basename is the profile-mapped name (#715)" || err "mapped delivery missing: $ZENN"
+[ ! -f "$work/o/articles/retry-arashi.zenn.md" ] && ok "the pre-#715 dotted delivery name is not written" || err "dotted delivery name still written"
 [ ! -f "$work/o/retry-arashi.zenn.md" ] && ok "Zenn variant lands under layout.dir (articles/), not the drafts root (#688)" || err "Zenn variant still in the drafts root"
 grep -q '^type: "tech"$' "$ZENN" && grep -q '^emoji:' "$ZENN" && grep -q '^published: false$' "$ZENN" \
   && ok "Zenn frontmatter (emoji/type/published) from the profile" || err "Zenn frontmatter wrong"
@@ -253,6 +259,7 @@ assert d["chosen"]==["devto"] and [e["platform"] for e in d["emitted"]]==["devto
   && ok "owner picks dev.to only; choice recorded in the summary" || err "single-choice emission wrong"
 [ -f "$work/e8/devto/retry-storms.devto.md" ] \
   && [ ! -f "$work/e8/articles/retry-storms.zenn.md" ] && [ ! -f "$work/e8/retry-storms.zenn.md" ] \
+  && [ ! -f "$work/e8/articles/retry-storms.md" ] \
   && ok "picking dev.to leaves no Zenn file anywhere (FR57)" || err "unwanted variant file present"
 
 # 8d. Emission metadata: the canonical draft's content hash rides with the variant.

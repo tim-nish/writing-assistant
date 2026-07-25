@@ -143,7 +143,8 @@ python3 "$DP" variants --slug retry-storms --root "$work/host" \
   --config-json "$work/cfg.json" --platforms zenn --ws "$work/ws" \
   > "$work/mixed.json" 2>"$work/e-mixed" \
   || { err "the deliberate mixed-language emission was refused: $(cat "$work/e-mixed")"; }
-[ -f "$dest/drafts/articles/retry-storms.zenn.md" ] \
+# Delivered basename comes from the profile mapping (#715).
+[ -f "$dest/drafts/articles/retry-storms.md" ] \
   && ok "an owner who deliberately wants the mixed-language variant still gets it" \
   || err "the mixed-language variant is no longer reachable"
 python3 -c "
@@ -153,12 +154,12 @@ assert o['emitted'][0]['lede_retarget'] is True, o
 " && ok "the cross-audience retarget trigger still fires on that deliberate emission" \
   || err "the retarget trigger changed"
 python3 "$LINT" --platform zenn --profiles-dir "$ppdir" --root "$work/host" \
-  "$dest/drafts/articles/retry-storms.zenn.md" > "$work/lint-mixed.txt" 2>&1 \
+  "$dest/drafts/articles/retry-storms.md" > "$work/lint-mixed.txt" 2>&1 \
   && err "the mixed-language variant passed the lint silently" \
   || grep -q 'language-mismatch' "$work/lint-mixed.txt" \
      && ok "the shipped language-mismatch publish blocker still reports the outcome" \
      || err "no language-mismatch blocker: $(cat "$work/lint-mixed.txt")"
-rm -f "$dest/drafts/articles/retry-storms.zenn.md"
+rm -f "$dest/drafts/articles/retry-storms.md"
 
 # --- the derived JA canonical offers zenn NORMALLY ---------------------------
 cat > "$work/fill.json" <<'EOF'
