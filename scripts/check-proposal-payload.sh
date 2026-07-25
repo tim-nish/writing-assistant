@@ -145,6 +145,72 @@ python3 "$V" "$ws/premise-effect.json" 2>&1 | grep -q 'choices\[0\].effect' \
   && ok "#567: the rule reaches choice EFFECT text, not just where/why" \
   || err "choice effect text escapes the premise rule"
 
+# --- the ANSWER envelope is validated at record time (Story 18.106, #694) -----
+# `--answer` appended whatever JSON arrived and reported ok:true, so a
+# selection-less answer was captured and failed stages later at its consumer.
+aws="$ws/answers"; mkdir -p "$aws"
+log="$aws/presented-payloads.jsonl"
+# An ask to answer (kept minimal — the ask side is covered above).
+printf '{"items":[{"where":"Where it is","why":"Why it matters","choices":[{"label":"approve","effect":"keeps it"}]}]}' \
+  | python3 "$V" --ws "$aws" --surface test >/dev/null
+
+# The observed defect, by name: the exact payload recorded ok:true on 2026-07-25
+# during the #683 adaptation run, and only failed at `adapt-canonical write`.
+if printf '%s' '{"choice":"approve"}' | python3 "$V" --ws "$aws" --answer 1 >/dev/null 2>"$ws/e-choice"; then
+  err "#694: a selection-less answer ({\"choice\":...}) was recorded as ok"
+else
+  grep -q 'answer.selection' "$ws/e-choice" \
+    && ok "#694: an answer with no \`selection\` is blocked, naming the field" \
+    || err "#694: wrong diagnostic: $(cat "$ws/e-choice")"
+fi
+grep -q '"kind": "answer"' "$log" 2>/dev/null \
+  && err "#694: a blocked answer was captured anyway" \
+  || ok "#694: a blocked answer is never appended to the capture log"
+
+printf '%s' '{"selection":"   ","free_text":"x"}' | python3 "$V" --ws "$aws" --answer 1 >/dev/null 2>&1 \
+  && err "#694: an empty/whitespace selection was recorded" \
+  || ok "#694: an empty selection is blocked"
+printf '%s' '{"selection":["approve"]}' | python3 "$V" --ws "$aws" --answer 1 >/dev/null 2>&1 \
+  && err "#694: a non-string selection was recorded" \
+  || ok "#694: a non-string selection is blocked"
+printf '%s' '{"selection":"approve","free_text":3}' | python3 "$V" --ws "$aws" --answer 1 >/dev/null 2>&1 \
+  && err "#694: a non-string free_text was recorded" \
+  || ok "#694: a non-string free_text is blocked"
+printf '%s' '["approve"]' | python3 "$V" --ws "$aws" --answer 1 >/dev/null 2>&1 \
+  && err "#694: a non-object answer envelope was recorded" \
+  || ok "#694: a non-object envelope is blocked"
+# An ask payload piped into --answer names the cause, not the symptom.
+printf '{"items":[{"where":"w","why":"y","choices":[{"label":"approve","effect":"e"}]}]}' \
+  | python3 "$V" --ws "$aws" --answer 1 >/dev/null 2>"$ws/e-askpayload" \
+  && err "#694: an ask payload was recorded as an answer" \
+  || grep -q 'ASK payload' "$ws/e-askpayload" \
+    && ok "#694: an ask payload misrouted into --answer is named as such" \
+    || err "#694: misrouted ask payload not diagnosed: $(cat "$ws/e-askpayload")"
+
+# The shipped convention passes, unchanged.
+printf '%s' '{"selection":"approve","free_text":""}' | python3 "$V" --ws "$aws" --answer 1 >/dev/null \
+  && ok "#694: the shipped {selection, free_text} envelope still records" \
+  || err "#694: a well-formed answer was blocked"
+grep -q '"selection": "approve"' "$log" \
+  && ok "#694: the accepted answer is captured verbatim (CAP-2)" \
+  || err "#694: accepted answer not captured"
+# SHAPE, not VOCABULARY: a selection this gate would reject is still recordable.
+printf '%s' '{"selection":"maybe later","free_text":""}' | python3 "$V" --ws "$aws" --answer 1 >/dev/null \
+  && ok "#694: vocabulary stays with the consuming gate (any non-empty selection records)" \
+  || err "#694: the validator started policing selection values"
+# An extra key the topic-map surface already writes is not an unknown shape.
+printf '%s' '{"selection":"stop here","index":"T1.1","free_text":""}' \
+  | python3 "$V" --ws "$aws" --answer 1 >/dev/null \
+  && ok "#694: a surface-specific extra key (index) is accepted" \
+  || err "#694: an existing writer's envelope was rejected"
+# Owner prose is not machine-authored text: the marker/budget rules must not
+# reach it (an owner may type backticks, or write at length).
+long_free=$(python3 -c "print('とても長い自由記述。'*40)")
+printf '%s' "{\"selection\":\"modify\",\"free_text\":\"use \`retry\` and $long_free\"}" \
+  | python3 "$V" --ws "$aws" --answer 1 >/dev/null \
+  && ok "#694: presented-text budgets/markers do not police the owner's own words" \
+  || err "#694: the answer path applied the ask side's plain-text/budget rules"
+
 if [ "$fail" -eq 0 ]; then
   printf '\nAll proposal-payload checks passed.\n'; exit 0
 else
