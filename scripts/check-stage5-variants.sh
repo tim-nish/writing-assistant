@@ -104,8 +104,9 @@ assert d.get("render_blockers")==[{"platform":"devto","blocker":"unrendered-merm
 ' && ok "EN emits exactly a dev.to variant (config-selected, profile-projected)" \
   || err "EN variant selection/shape wrong"
 
-DEVTO="$work/o/retry-storms.devto.md"
-[ -f "$DEVTO" ] && ok "dev.to file written to the output location" || err "dev.to file not written"
+DEVTO="$work/o/devto/retry-storms.devto.md"
+[ -f "$DEVTO" ] && ok "dev.to file written under the profile's layout.dir (devto/), not the root" || err "dev.to file not written"
+[ ! -f "$work/o/retry-storms.devto.md" ] && ok "dev.to variant no longer co-located in the drafts root (#688)" || err "dev.to variant still in the drafts root"
 grep -q '^canonical_url: https://example.com/articles/retry-storms$' "$DEVTO" \
   && ok "dev.to canonical_url composed from owner value + profile format" || err "canonical_url wrong"
 grep -q 'The retry storm doubled token spend' "$DEVTO" \
@@ -154,7 +155,8 @@ assert [e["platform"] for e in d["emitted"]]==["zenn"], d
 assert "render_blockers" not in d, d  # Zenn renders Mermaid natively — no blocker
 ' && ok "JA emits a Zenn variant, Mermaid embedded (no blocker)" || err "JA variant/blocker wrong"
 
-ZENN="$work/o/retry-arashi.zenn.md"
+ZENN="$work/o/articles/retry-arashi.zenn.md"
+[ ! -f "$work/o/retry-arashi.zenn.md" ] && ok "Zenn variant lands under layout.dir (articles/), not the drafts root (#688)" || err "Zenn variant still in the drafts root"
 grep -q '^type: "tech"$' "$ZENN" && grep -q '^emoji:' "$ZENN" && grep -q '^published: false$' "$ZENN" \
   && ok "Zenn frontmatter (emoji/type/published) from the profile" || err "Zenn frontmatter wrong"
 grep -q '本文。' "$ZENN" && ok "Zenn projection carries the full body" || err "Zenn body missing"
@@ -206,7 +208,7 @@ fi
 [ ! -d "$work/external-drafts" ] && ok "refusal created nothing" || err "refusal created the directory"
 python3 "$DP" variants "$work/en.md" --allow-external-draft --config-json "$work/cfg.json" \
   --root "$work/host" --create-out --platforms devto >/dev/null 2>/dev/null \
-  && [ -f "$work/external-drafts/retry-storms.devto.md" ] \
+  && [ -f "$work/external-drafts/devto/retry-storms.devto.md" ] \
   && ok "--create-out consents to creating the external destination" \
   || err "--create-out did not create/write the external destination"
 rm -f "$work/host/writing-sources.yaml"
@@ -249,11 +251,12 @@ printf '%s' "$out" | python3 -c '
 import json,sys; d=json.load(sys.stdin)
 assert d["chosen"]==["devto"] and [e["platform"] for e in d["emitted"]]==["devto"], d' \
   && ok "owner picks dev.to only; choice recorded in the summary" || err "single-choice emission wrong"
-[ -f "$work/e8/retry-storms.devto.md" ] && [ ! -f "$work/e8/retry-storms.zenn.md" ] \
+[ -f "$work/e8/devto/retry-storms.devto.md" ] \
+  && [ ! -f "$work/e8/articles/retry-storms.zenn.md" ] && [ ! -f "$work/e8/retry-storms.zenn.md" ] \
   && ok "picking dev.to leaves no Zenn file anywhere (FR57)" || err "unwanted variant file present"
 
 # 8d. Emission metadata: the canonical draft's content hash rides with the variant.
-grep -q 'canonical-sha256=[0-9a-f]\{64\}' "$work/e8/retry-storms.devto.md" \
+grep -q 'canonical-sha256=[0-9a-f]\{64\}' "$work/e8/devto/retry-storms.devto.md" \
   && ok "emitted variant carries the canonical content hash (for 16.7 stale detection)" \
   || err "canonical-sha256 metadata missing from the variant"
 
@@ -282,7 +285,7 @@ assert props[0]["register"]=="です/ます", d' \
   || err "lede-retarget trigger wrong"
 
 # 9b. The pipeline-internal audience field is stripped from emitted variants.
-grep -q '^audience:' "$work/e9/retry-storms.devto.md" \
+grep -q '^audience:' "$work/e9/devto/retry-storms.devto.md" \
   && err "audience field leaked into the emitted variant" \
   || ok "audience is stripped from emitted variant frontmatter"
 
@@ -310,7 +313,7 @@ assert not d.get("lede_proposals"), d' \
   || err "same-reader emission still fired the lede trigger"
 
 # 9e. audience_id is stripped from emitted variants like audience.
-grep -q '^audience_id:' "$work/e9d/retry-storms.devto.md" \
+grep -q '^audience_id:' "$work/e9d/devto/retry-storms.devto.md" \
   && err "audience_id leaked into the emitted variant" \
   || ok "audience_id is stripped from emitted variant frontmatter (13.71)"
 
@@ -362,10 +365,10 @@ out=$(python3 "$DP" variants --slug retry-storms --config-json "$work/cfg.json" 
 printf '%s' "$out" | python3 -c '
 import json,sys; d=json.load(sys.stdin)
 assert [e["platform"] for e in d["emitted"]]==["devto"], d' \
-  && [ -f "$work/e10/retry-storms.devto.md" ] \
+  && [ -f "$work/e10/devto/retry-storms.devto.md" ] \
   && ok "sanctioned --slug form emits from the persisted canonical (13.69)" \
   || err "--slug form did not emit from the persisted canonical"
-python3 - "$work/drafts/retry-storms.md" "$work/e10/retry-storms.devto.md" <<'EOF' \
+python3 - "$work/drafts/retry-storms.md" "$work/e10/devto/retry-storms.devto.md" <<'EOF' \
   && ok "variant records the persisted canonical trailer's own hash (one convention)" \
   || err "variant hash differs from the persisted canonical trailer"
 import re, sys
@@ -428,6 +431,76 @@ if printf '%s' "$art_list" | python3 -c 'import sys,json; d=json.load(sys.stdin)
 else
   err "article routing changed: $art_list"
 fi
+
+# 13. Story 18.103 (#688) — variant PLACEMENT + staleness discovery route
+#     through the profile's declared packaging.layout.dir; an undeclared layout
+#     falls back to the drafts root (single-dir destinations unaffected). Each
+#     assertion fails against the old drafts-root co-location behavior.
+# 13a. WITH layout.dir (devto profile → devto/): under the projection dir, not root.
+rm -rf "$work/e13"
+python3 "$DP" variants "$work/en.md" --allow-external-draft --config-json "$work/cfg.json" \
+  --root "$work/host" --out "$work/e13" --platforms devto >/dev/null
+[ -f "$work/e13/devto/retry-storms.devto.md" ] && [ ! -f "$work/e13/retry-storms.devto.md" ] \
+  && ok "layout.dir profile: variant lands under the projection dir, not the drafts root (#688)" \
+  || err "layout.dir variant not routed to the projection dir"
+
+# 13b. WITHOUT layout.dir: fallback to the output.drafts root (prior behavior).
+cat > "$ppdir/plainplat.yaml" <<'EOF'
+platform: plainplat
+audience: en-practitioner
+language: en
+packaging:
+  frontmatter: [title, published, description, tags]
+  tag_cap: 4
+  tldr_placement: none
+  cover: optional
+  canonical_url: { policy: none }
+  visuals: mermaid-embedded
+distribution_hook: newsletter-follow
+EOF
+cat > "$work/cfg-plain.json" <<'EOF'
+{"syndication":{"policy":{"en":{"mode":"canonical","variants":["plainplat"]}}}}
+EOF
+rm -rf "$work/e13b"
+python3 "$DP" variants "$work/en.md" --allow-external-draft --config-json "$work/cfg-plain.json" \
+  --root "$work/host" --out "$work/e13b" --platforms plainplat >/dev/null
+[ -f "$work/e13b/retry-storms.plainplat.md" ] \
+  && ok "no layout.dir: variant falls back to the drafts root (single-dir unaffected)" \
+  || err "undeclared-layout variant did not fall back to the root"
+[ ! -d "$work/e13b/plainplat" ] \
+  && ok "no spurious projection subdir for an undeclared-layout profile" \
+  || err "created a projection subdir for a profile with no layout"
+
+# 13c. Staleness discovery reads THROUGH the layout.dir: a variant living under
+#      the projection dir is still found and flagged stale when the canonical
+#      changes (the old root-only scan would have missed it entirely).
+mutated="$work/e13/mutated.md"
+sed 's/doubled our token spend/tripled our token spend/' "$work/en.md" > "$mutated"
+python3 "$DP" variant-staleness "$mutated" --out "$work/e13" --root "$work/host" | python3 -c '
+import json,sys; d=json.load(sys.stdin)
+paths=[v["path"] for v in d["variants"]]
+assert any(p.endswith("/devto/retry-storms.devto.md") for p in paths), paths
+bl=d.get("publish_blockers",[])
+assert any(b["path"].endswith("/devto/retry-storms.devto.md") and b["blocker"]=="stale-variant" for b in bl), d' \
+  && ok "staleness discovery finds a variant under layout.dir and flags it stale (#688)" \
+  || err "staleness discovery missed the projected variant under layout.dir"
+
+# 13d. The projection dir is the destination REPO ROOT's layout.dir — a SIBLING
+#      of the drafts dir, NOT nested inside it (hub-ratified articles-repo layout:
+#      output.drafts=<repo>/drafts/, projections at <repo>/<layout.dir>/). Emitting
+#      into a git destination repo lands the variant at the repo root, never in
+#      drafts/ or under drafts/<layout.dir>/.
+destrepo="$work/destrepo"; mkdir -p "$destrepo/drafts"
+git -C "$destrepo" init -q
+python3 "$DP" variants "$work/en.md" --allow-external-draft --config-json "$work/cfg.json" \
+  --root "$work/host" --out "$destrepo/drafts" --platforms devto >/dev/null
+[ -f "$destrepo/devto/retry-storms.devto.md" ] \
+  && [ ! -f "$destrepo/drafts/devto/retry-storms.devto.md" ] \
+  && [ ! -f "$destrepo/drafts/retry-storms.devto.md" ] \
+  && ok "projection dir is a repo-root sibling of drafts/, never nested in it (#688, hub layout)" \
+  || err "variant not placed at the destination repo root's projection dir"
+
+rm -f "$ppdir/plainplat.yaml"
 
 # 12. AC1/AC4 — the draft-flow SKILL carries no platform decision point: the
 #     Stage-5 emission flow is gone, no platform identifiers or emission flags

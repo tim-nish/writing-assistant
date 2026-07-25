@@ -89,7 +89,7 @@ import json,sys; d=json.load(sys.stdin)
 assert d.get("render_blockers")==[{"platform":"devto","blocker":"unrendered-mermaid"}], d' \
   && ok "html-comment-blocked profile → emitter raises a render blocker" \
   || err "html-comment-blocked mechanism wrong"
-grep -q '<!-- render blocker' "$work/o/p.devto.md" \
+grep -q '<!-- render blocker' "$work/o/devto/p.devto.md" \
   && ok "html-comment-blocked profile → Mermaid wrapped in an HTML comment" \
   || err "Mermaid not HTML-commented"
 
@@ -102,7 +102,7 @@ printf '%s' "$out" | python3 -c '
 import json,sys; d=json.load(sys.stdin)
 assert "render_blockers" not in d, d' \
   && ok "mermaid-embedded profile → no render blocker" || err "mermaid-embedded mechanism wrong"
-grep -q '```mermaid' "$work/o/p.zenn.md" \
+grep -q '```mermaid' "$work/o/articles/p.zenn.md" \
   && ok "mermaid-embedded profile → Mermaid left inline" || err "Mermaid not left inline"
 
 # 4. The standalone variants skill file (Story 13.69) still documents the

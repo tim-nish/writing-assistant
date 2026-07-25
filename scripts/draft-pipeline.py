@@ -1768,6 +1768,75 @@ def _targets_newsletter_section(profile):
     return d == _NEWSLETTER_SECTION or d.startswith(_NEWSLETTER_SECTION + "/")
 
 
+def _variant_layout_subdir(profile):
+    """A profile's declared projection directory (`packaging.layout.dir`),
+    normalized to a repo-relative subpath, or None when the profile declares
+    none. SPEC-platform-variants placement amendment (2026-07-25, triage #688):
+    a variant lands in this subdir WITHIN the output.drafts destination — the
+    ratified articles-repo projection dir — not co-located beside the canonical
+    in the drafts root. A profile with no `layout.dir` falls back to the drafts
+    root (prior behavior), so single-dir destinations are unaffected. `dir`
+    comes from the profile alone — no per-platform code path (Profiles carry the
+    platform, code carries none)."""
+    layout = ((profile or {}).get("packaging", {}) or {}).get("layout", {}) or {}
+    d = str(layout.get("dir", "")).strip().strip("/")
+    return d or None
+
+
+def _dest_repo_root(out_dir):
+    """The destination repo root a profile's `packaging.layout.dir` resolves
+    against — the `output.drafts` repo root (the lint's `--dest-repo`;
+    hub-ratified layout `consulted: product-lab@4f36029e topics/articles.md:76`:
+    the canonical `drafts/` and the regenerated per-platform projection dirs are
+    all SIBLINGS at the destination repo root, so a projection dir is a sibling
+    of the drafts dir, never nested inside it).
+    Resolved as the git top-level containing out_dir; when out_dir is not inside
+    a git work tree (e.g. a disposable --out under a temp tree), out_dir itself
+    is treated as the root, so single-dir/test destinations stay self-contained.
+    """
+    try:
+        r = subprocess.run(["git", "-C", out_dir, "rev-parse", "--show-toplevel"],
+                           capture_output=True, text=True)
+        top = r.stdout.strip()
+        if r.returncode == 0 and top:
+            return top
+    except OSError:  # pragma: no cover - defensive: git absent
+        pass
+    return out_dir
+
+
+def _variant_scan_dirs(out_dir, root):
+    """The directories a slug-prefix staleness scan must enumerate: the
+    output.drafts root (the fallback for undeclared-layout profiles) plus each
+    resolved profile's declared `packaging.layout.dir` under the destination
+    repo root (the projection dirs emission now routes through —
+    SPEC-platform-variants placement amendment, 2026-07-25 #688). Deduped by
+    real path, existing dirs only, so a variant that now lives in a projection
+    dir is still found for the stale-variant publish blocker. Profile-resolution
+    failure degrades to the root scan (never a hard error in a discovery
+    helper)."""
+    dirs = [out_dir]
+    repo_root = _dest_repo_root(out_dir)
+    try:
+        pp = _load("resolve-platform-profiles.py")
+        pdir = pp.profiles_dir(pp.host_root(root), None)
+        profiles, _ = pp.load_profiles(pdir)
+    except Exception:  # pragma: no cover - defensive: discovery never hard-fails
+        profiles = {}
+    for prof in (profiles or {}).values():
+        sub = _variant_layout_subdir(prof)
+        if sub:
+            dirs.append(os.path.join(repo_root, sub))
+    seen, result = set(), []
+    for d in dirs:
+        rp = os.path.realpath(d)
+        if rp in seen or not os.path.isdir(d):
+            continue
+        seen.add(rp)
+        result.append(d)
+    return result
+
+
 def cmd_variants(args):
     """Emit platform-ready variants of the PERSISTED canonical draft as
     PROJECTIONS through declared platform profiles (Story 16.3; Story 13.69 —
@@ -2034,9 +2103,19 @@ def cmd_variants(args):
         # can detect a variant whose source draft has since changed.
         content = content.rstrip("\n") + \
             f"\n\n<!-- writing-assistant: canonical-sha256={canonical_sha} -->\n"
-        path = os.path.join(out_dir, f"{slug}.{name}.md")
+        # Placement routes through the profile's declared projection dir
+        # (SPEC-platform-variants placement amendment, #688): a variant lands in
+        # `packaging.layout.dir` at the output.drafts DESTINATION REPO ROOT — a
+        # sibling of the drafts dir per the hub-ratified layout, not co-located
+        # beside the canonical in the drafts root — or falls back to the drafts
+        # root (out_dir) when the profile declares no layout. The projection dir
+        # is created if missing, inside the same destination repo whose out_dir
+        # the --create-out consent above already governs.
+        subdir = _variant_layout_subdir(profile)
+        emit_dir = os.path.join(_dest_repo_root(out_dir), subdir) if subdir else out_dir
+        path = os.path.join(emit_dir, f"{slug}.{name}.md")
         if not args.dry_run:
-            os.makedirs(out_dir, exist_ok=True)
+            os.makedirs(emit_dir, exist_ok=True)
             with open(path, "w", encoding="utf-8") as fh:
                 fh.write(content)
         entry = {"platform": name, "path": path, "canonical_sha256": canonical_sha,
@@ -2130,8 +2209,15 @@ def _staleness_report(text, paths=None, out_dir=None, root=None):
         except SystemExit:
             slug = None
         pattern = f"{slug}." if slug else ""
-        paths = [os.path.join(out_dir, f) for f in sorted(os.listdir(out_dir))
-                 if f.startswith(pattern) and f.endswith(".md")] if os.path.isdir(out_dir) else []
+        # Discovery reads through each profile's declared projection dir, not
+        # only the drafts root (SPEC-platform-variants placement amendment,
+        # #688) — a variant now living in a projection dir is still found
+        # for the stale-variant publish blocker; the root scan remains the
+        # fallback for undeclared-layout profiles.
+        paths = []
+        for d in _variant_scan_dirs(out_dir, root):
+            paths.extend(os.path.join(d, f) for f in sorted(os.listdir(d))
+                         if f.startswith(pattern) and f.endswith(".md"))
         # A DERIVED CANONICAL shares this filename shape (`<slug>.<language>.md`,
         # SPEC-canonical-adaptation CAP-4) but is a canonical, not a projection:
         # it declares its own reader and carries an `adapted_from` ancestry
@@ -5145,10 +5231,15 @@ def cmd_review_reentry(args):
     # (d) Mark existing variants stale — the staleness comparison, reused,
     # over the just-persisted canonical (its trailer-stripped hash).
     out_dir = os.path.dirname(canonical_path)
-    variant_paths = [
-        os.path.join(out_dir, f) for f in sorted(os.listdir(out_dir))
-        if f.startswith(f"{args.slug}.") and f.endswith(".md")
-        and f != f"{args.slug}.md"]
+    # Discover variants through the profile projection dirs too, not only the
+    # drafts root (SPEC-platform-variants placement amendment, #688), so a
+    # review-applied canonical edit still marks a projected variant stale.
+    variant_paths = []
+    for d in _variant_scan_dirs(out_dir, args.root):
+        variant_paths.extend(
+            os.path.join(d, f) for f in sorted(os.listdir(d))
+            if f.startswith(f"{args.slug}.") and f.endswith(".md")
+            and f != f"{args.slug}.md")
     staleness = _staleness_report(
         open(canonical_path, encoding="utf-8").read(), paths=variant_paths)
     stale_variants = [v for v in staleness["variants"]
