@@ -74,16 +74,19 @@ ws="$work/ws"; mkdir -p "$ws"
 cat > "$ws/edited.md" <<'EOF'
 ---
 slug: retry-storms
+generated_by: writing-assistant@0.0.0-test+deadbee   # immutable birth record (#709)
 ---
 
 The retry storm tripled load before the breaker fired.
 Review sharpened this sentence during arbitration.
 EOF
 # The rebuilt map: anchors resolve to real non-blank lines of the edited draft;
-# the review-authored sentence (L6) is classified like any other.
+# the review-authored sentence (L7) is classified like any other. NOTE: these
+# anchors are line-coupled to the frontmatter above — adding the birth record
+# (#709) shifted the body down one line, so L5/L6 became L6/L7.
 cat > "$ws/map.txt" <<'EOF'
-P1.S1[L5]: sourced <- docs/retries.md:12
-P1.S2[L6]: narration
+P1.S1[L6]: sourced <- docs/retries.md:12
+P1.S2[L7]: narration
 EOF
 # A previously emitted variant recording the PRE-EDIT canonical's hash.
 old_sha=$(printf 'the pre-edit canonical body\n' | python3 -c \
@@ -228,8 +231,11 @@ assert d['publish_blockers'][0]['blocker']=='stale-variant', d
 
 # --- (b) INVALID map → non-zero, named error, NO checkpoint -----------------
 # The origin failure: an anchor dangling on a blank line (L4 is blank).
+# The dangling anchor: L5 is the BLANK line after the frontmatter (the #362
+# origin failure). Line-coupled to the frontmatter above like the good map —
+# adding the birth record (#709) shifted the blank line from L4 to L5.
 cat > "$ws/bad-map.txt" <<'EOF'
-P1.S1[L4]: sourced <- docs/retries.md:12
+P1.S1[L5]: sourced <- docs/retries.md:12
 EOF
 ws2="$work/ws2"; mkdir -p "$ws2"
 if python3 "$DP" review-reentry --draft "$ws/edited.md" --map "$ws/bad-map.txt" \
@@ -283,6 +289,7 @@ mode: canonical
 language: en
 audience: en-practitioner
 audience_id: en-practitioner
+generated_by: writing-assistant@0.0.0-test+deadbee   # immutable birth record (#709)
 summary: s.
 topics: [llm-ops]
 related: { projects: [], publications: [], products: [] }
@@ -308,6 +315,7 @@ mode: canonical
 language: ja
 audience: ja-practitioner
 audience_id: ja-practitioner
+generated_by: writing-assistant@0.0.0-test+deadbee   # immutable birth record (#709)
 summary: "指数バックオフに上限を設けました。"
 topics: [llm-ops]
 related: { projects: [], publications: [], products: [] }

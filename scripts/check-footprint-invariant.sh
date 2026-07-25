@@ -187,6 +187,7 @@ title: "A probe draft"
 language: en
 audience: en-practitioner
 audience_id: en-practitioner
+generated_by: writing-assistant@0.0.0-test+deadbee   # immutable birth record (#709)
 ---
 
 ## Hook
@@ -331,6 +332,7 @@ mode: canonical
 language: en
 audience: en-practitioner
 audience_id: en-practitioner
+generated_by: writing-assistant@0.0.0-test+deadbee   # immutable birth record (#709)
 summary: A short summary.
 topics: [probes]
 ---
@@ -417,6 +419,7 @@ title: "A persist probe"
 language: en
 audience: en-practitioner
 audience_id: en-practitioner
+generated_by: writing-assistant@0.0.0-test+deadbee   # immutable birth record (#709)
 ---
 
 ## Hook

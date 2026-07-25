@@ -4792,6 +4792,56 @@ def _record_canonical_ownership(ws, slug, sha):
         pass
 
 
+# The birth record's contracted form, matching `lint-article`'s
+# `_GENERATED_BY_RE` — one shape, checked in two places for two purposes: the
+# lint REPORTS it on any draft, this asserts it before a canonical is persisted.
+_BIRTH_RECORD_RE = re.compile(r"^[\w.-]+@[\w.\-+]+\+\S+$")
+
+
+def _assert_birth_record(text, canonical_path):
+    """Refuse to persist a canonical with no well-formed `generated_by` birth
+    record (Story 18.112, #709).
+
+    The record is contracted as IMMUTABLE — set at creation, never updated — and
+    it is the join key to the run artifact. That makes a miss UNRECOVERABLE: a
+    value written afterwards would not record what it claims to. The pipeline
+    writes the field itself (`render-frontmatter.py`), so a canonical arriving
+    here without it is a WRITER defect, and the enforced-mechanism invariant says
+    a value the pipeline is contracted to write is asserted where it is written —
+    the same posture harvest's cache population takes (#534), rather than being
+    graded later by a lint that cannot fix it.
+
+    Reports, never repairs: this refuses, and never writes the field itself.
+    """
+    fields, _body = _read_frontmatter(text)
+    val = (fields or {}).get("generated_by")
+    if isinstance(val, str):
+        # The renderer emits the field WITH a trailing comment
+        # (`generated_by: <rec>   # immutable birth record — set at creation...`,
+        # render-frontmatter.py), and this module's frontmatter reader keeps that
+        # comment inside the value while the reader `lint-article` uses
+        # (resolve-user-config.load_yaml) strips it. Normalize the same way here,
+        # or this assertion would refuse every real pipeline-authored canonical.
+        # The contracted form contains no `#`, so cutting at the first one is safe.
+        val = val.split("#", 1)[0]
+    if not isinstance(val, str) or not val.strip():
+        raise _CanonicalWriteError(
+            canonical_path,
+            "no `generated_by` birth record — the record is immutable (set at "
+            "creation, never updated) and is the join key to the run artifact, so "
+            "it cannot be added later without recording something untrue. A "
+            "canonical reaching the write without it is a generation defect: the "
+            "frontmatter renderer must emit `<tool>@<version>+<commit>`. Nothing "
+            "was persisted")
+    if not _BIRTH_RECORD_RE.match(val.strip()):
+        raise _CanonicalWriteError(
+            canonical_path,
+            f"the `generated_by` birth record {val.strip()!r} is not "
+            "`<tool>@<version>+<commit>` — the join key must resolve to a real "
+            "run artifact, and a malformed one resolves to nothing. Nothing was "
+            "persisted")
+
+
 def _persist_canonical(text, slug, root, create_out=False, ws=None,
                        replace=False, owned=False):
     """Persist `text` as the canonical draft at `<output.drafts>/<slug>.md`,
@@ -4829,6 +4879,9 @@ def _persist_canonical(text, slug, root, create_out=False, ws=None,
             raise _CanonicalWriteError(
                 canonical_path,
                 f"could not create the output.drafts directory {out_dir}: {e}")
+    # The birth record is asserted BEFORE any hash or write, so a refusal leaves
+    # output.drafts untouched (Story 18.112, #709).
+    _assert_birth_record(text, canonical_path)
     body = _EMISSION_TRAILER_RE.sub("", text).rstrip("\n") + "\n"
     canonical_sha = hashlib.sha256(body.encode("utf-8")).hexdigest()
     content = body + \
