@@ -227,12 +227,47 @@ assert o['available']==['zenn'], o
   || err "the derivation did not resolve as a ja canonical"
 
 # No branch anywhere distinguishes a derived canonical from an authored one at
-# emission: the only mention of ancestry in the pipeline is the presence test
-# that keeps staleness from grading a canonical as a variant.
-hits=$(grep -c 'adapted_from' "$DP" || true)
-[ "$hits" -le 3 ] \
-  && ok "no derived-vs-authored branch in the emission path (ancestry mentions: $hits)" \
-  || err "the pipeline branches on ancestry $hits times — CAP-4 forbids special-casing"
+# EMISSION: the only mention of ancestry there is the presence test that keeps
+# staleness from grading a canonical as a variant. Scope matters — CAP-4's
+# zero-special-casing promise is about DOWNSTREAM CONSUMPTION, and review
+# re-entry deliberately DOES branch by artifact class (#704; CAP-4 amended
+# 2026-07-25: a derived canonical re-enters on ancestry evidence). So this
+# excludes the re-entry evidence functions BY NAME and stays strict everywhere
+# else, rather than being loosened to a bigger number that would stop catching
+# an accidental emission branch.
+python3 - "$DP" <<'PYGUARD'
+import ast, sys
+path = sys.argv[1]
+text = open(path, encoding="utf-8").read()
+lines = text.splitlines()
+# EXACT function ranges via ast — a `def`-boundary text scan mis-attributes
+# module-level code that follows a function to that function, which is how an
+# earlier version of this guard "found" an ancestry branch inside cmd_variants
+# that was really a module-level regex constant.
+tree = ast.parse(text)
+SANCTIONED = {"cmd_review_reentry", "_derived_ancestry_evidence"}
+excluded = set()
+for node in ast.walk(tree):
+    if isinstance(node, ast.FunctionDef) and node.name in SANCTIONED:
+        excluded.update(range(node.lineno, (node.end_lineno or node.lineno) + 1))
+mentions = [(i, l.strip()) for i, l in enumerate(lines, 1)
+            if "adapted_from" in l and i not in excluded]
+# Cap 4, and what each one is: the module-level comment + `_ADAPTED_FROM` regex
+# (a constant, not a branch), the staleness presence test's comment, and the
+# `--map` help text naming the derived class (documentation, #704). None is a
+# branch, which is what CAP-4 forbids at emission — so an ADDED branch still
+# trips this.
+if len(mentions) > 4:
+    print(f"  {len(mentions)} ancestry mentions outside review re-entry (cap 4):",
+          file=sys.stderr)
+    for ln, src_line in mentions:
+        print(f"    {path}:{ln}: {src_line[:100]}", file=sys.stderr)
+    sys.exit(1)
+sys.exit(0)
+PYGUARD
+[ $? -eq 0 ] \
+  && ok "no derived-vs-authored branch outside the sanctioned re-entry evidence path" \
+  || err "the pipeline special-cases ancestry outside review re-entry — CAP-4 forbids it at emission"
 
 # --- CAP-4/CAP-5 seam: the derivation is not a stale VARIANT of its source ----
 python3 "$DP" variant-staleness "$work/drafts/retry-storms.md" \

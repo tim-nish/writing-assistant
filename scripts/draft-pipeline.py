@@ -5109,6 +5109,44 @@ def cmd_complete(args):
 # a done/reviewed checkpoint over an INVALID map is impossible because the
 # command that validates the map is the command that writes the checkpoint.
 
+def _derived_ancestry_evidence(draft_text, draft_path, root):
+    """Ancestry evidence for a DERIVED canonical's review re-entry (Story
+    18.110, #704). Returns (evidence_dict, problems_list).
+
+    A derived canonical owns no claims of its own — they are inherited under
+    SPEC-canonical-adaptation CAP-2 — so it has no provenance map, and requiring
+    one would re-attest claims that are not its to attest. Its completion
+    evidence is its ANCESTRY instead: the `adapted_from` pin resolves to a real
+    source canonical at a real content hash.
+
+    The check is DELEGATED to `adapt-canonical.py lint-ancestry`, the one place
+    that names the three defect classes (malformed pin, unresolvable slug, hash
+    matching no source content). It runs as a subprocess for a structural
+    reason, not a stylistic one: `adapt-canonical` imports THIS module, so
+    importing it back would be a cycle. Same pattern as the completion gate's
+    `lint-article` call (#674).
+    """
+    fields, _body = _read_frontmatter(draft_text)
+    pin = (fields or {}).get("adapted_from")
+    if not pin:
+        return None, []                      # not a derivation
+    here = os.path.dirname(os.path.realpath(__file__))
+    cmd = [sys.executable, os.path.join(here, "adapt-canonical.py"),
+           "lint-ancestry", "--derived", draft_path]
+    if root:
+        cmd += ["--root", root]
+    try:
+        r = subprocess.run(cmd, capture_output=True, text=True)
+    except OSError as e:
+        return {"pin": str(pin)}, [f"cannot run the ancestry lint: {e}"]
+    if r.returncode != 0:
+        detail = (r.stderr or r.stdout or "").strip().splitlines()
+        return ({"pin": str(pin)},
+                [f"ancestry lint failed: {line}" for line in detail] or
+                ["ancestry lint failed with no diagnostic"])
+    return {"pin": str(pin), "lint_ancestry": "clean"}, []
+
+
 def cmd_review_reentry(args):
     """Post-arbitration re-entry into the gate regime (Story 13.70). Invoked by
     the review SKILL after an arbitration round that applied >=1 accepted
@@ -5118,8 +5156,14 @@ def cmd_review_reentry(args):
       (a) persist the reviewed canonical to `<output.drafts>/<slug>.md` via
           the SAME write path as the draft flow's `complete` gate
           (`_persist_canonical` — one write path, one trailer convention);
-      (b) structurally validate the rebuilt map against the edited draft,
-          anchors required (the `provenance --map --draft` checks, reused);
+      (b) validate the re-entry EVIDENCE, typed by artifact class (#704): an
+          AUTHORED canonical's is the rebuilt map, structurally validated
+          against the edited draft with anchors required (the
+          `provenance --map --draft` checks, reused); a DERIVED canonical's
+          (one carrying `adapted_from`) is its ANCESTRY — `lint-ancestry`
+          clean — because it owns no claims of its own (CAP-2) and a map over
+          it would re-attest claims that are not its to attest. `--map` is
+          required for the first class and unused by the second;
       (c) report the scoped regression checks the SKILL must now run — this
           command spawns NO judges; it emits the worklist (verify-provenance
           re-run always; the quality gate's mechanical dims when
@@ -5131,8 +5175,11 @@ def cmd_review_reentry(args):
           checkpoint and re-emission stays a fresh explicit publish decision
           (`variants --slug <slug>`).
 
-    An invalid map is a refusal: non-zero, named error, NO checkpoint — the
-    dangling-anchor-under-done/reviewed failure (#362) cannot recur. With
+    Invalid evidence is a refusal in either class: non-zero, named error, NO
+    checkpoint — the dangling-anchor-under-done/reviewed failure (#362) cannot
+    recur, and neither can a derived canonical checkpointed over an ancestry pin
+    that resolves to nothing. The checkpoint records WHICH class it was written
+    on, so "reviewed" never silently means two different things. With
     `--applied 0` the command is a strict no-op: nothing persisted, nothing
     marked, exit 0."""
     if args.applied == 0:
@@ -5187,13 +5234,28 @@ def cmd_review_reentry(args):
                 "written.\n")
             return 1
 
-    # (a) Persist the reviewed canonical — the completion gate's write path.
+    # Read the edited draft first: its own frontmatter decides which evidence
+    # class this re-entry runs under (Story 18.110, #704), and that decides
+    # whether --map is required at all.
     try:
         text = _read_text(args.draft)
     except OSError as e:
         sys.stderr.write(
             f"error: review-reentry: cannot read the edited draft: {e}\n")
         return 1
+    ancestry_evidence, ancestry_problems = _derived_ancestry_evidence(
+        text, args.draft, args.root)
+    evidence_class = "ancestry" if ancestry_evidence is not None else "provenance-map"
+    if ancestry_evidence is None and not args.map:
+        sys.stderr.write(
+            "error: review-reentry: --map is required for an AUTHORED canonical — "
+            "it owns its claims, so its re-entry evidence is the provenance map "
+            "rebuilt against the edited draft. (A DERIVED canonical, one carrying "
+            "`adapted_from`, re-enters on ancestry evidence instead and needs no "
+            "map: SPEC-canonical-adaptation CAP-4.) No checkpoint written.\n")
+        return 1
+
+    # (a) Persist the reviewed canonical — the completion gate's write path.
     try:
         canonical_path, canonical_sha = _persist_canonical(
             text, args.slug, args.root, create_out=getattr(args, "create_out", False),
@@ -5205,29 +5267,45 @@ def cmd_review_reentry(args):
             f"{e.reason} (path: {e.path})\n")
         return 1
 
-    # (b) Structurally validate the rebuilt map against the edited draft —
-    # anchors required, exactly the `provenance --map --draft` standard.
-    try:
-        map_text = _read_text(args.map)
-    except OSError as e:
-        sys.stderr.write(
-            f"error: review-reentry: cannot read the rebuilt map: {e}\n")
-        return 1
-    draft_lines = _strip_emission_trailer(text).splitlines()
-    try:
-        entries = parse_provenance_map(map_text)
-        tally, problems = _provenance_problems(entries, draft_lines)
-    except ValueError as e:
-        entries, tally, problems = [], {}, [str(e)]
-    if problems:
-        sys.stderr.write(
-            "error: review-reentry: invalid-provenance-map — the rebuilt map "
-            "does not validate against the edited draft, and a done/reviewed "
-            "checkpoint over an INVALID map is refused (no checkpoint "
-            "written):\n")
-        for pr in problems:
-            sys.stderr.write(f"  {pr}\n")
-        return 1
+    # (b) Validate the re-entry EVIDENCE — typed by artifact class (Story
+    # 18.110, #704). An AUTHORED canonical's evidence is its rebuilt provenance
+    # map, validated against the edited draft (anchors required, the
+    # `provenance --map --draft` standard). A DERIVED canonical owns no claims
+    # of its own (CAP-2), so it carries no map by design; its evidence is its
+    # ANCESTRY. Both refuse the same way: non-zero, named, NO checkpoint.
+    entries, tally = [], {}
+    if ancestry_evidence is not None:
+        if ancestry_problems:
+            sys.stderr.write(
+                "error: review-reentry: invalid-ancestry — this draft is a "
+                "DERIVED canonical, so its re-entry evidence is its ancestry "
+                "pin, and a done/reviewed checkpoint over an ancestry that does "
+                "not resolve is refused (no checkpoint written):\n")
+            for pr in ancestry_problems:
+                sys.stderr.write(f"  {pr}\n")
+            return 1
+    else:
+        try:
+            map_text = _read_text(args.map)
+        except OSError as e:
+            sys.stderr.write(
+                f"error: review-reentry: cannot read the rebuilt map: {e}\n")
+            return 1
+        draft_lines = _strip_emission_trailer(text).splitlines()
+        try:
+            entries = parse_provenance_map(map_text)
+            tally, problems = _provenance_problems(entries, draft_lines)
+        except ValueError as e:
+            entries, tally, problems = [], {}, [str(e)]
+        if problems:
+            sys.stderr.write(
+                "error: review-reentry: invalid-provenance-map — the rebuilt map "
+                "does not validate against the edited draft, and a done/reviewed "
+                "checkpoint over an INVALID map is refused (no checkpoint "
+                "written):\n")
+            for pr in problems:
+                sys.stderr.write(f"  {pr}\n")
+            return 1
 
     # (c) The scoped regression worklist — reported, never run here.
     required_checks = [{
@@ -5270,7 +5348,11 @@ def cmd_review_reentry(args):
     tmp = checkpoint_path + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump({"stage": "review", "next_stage": DONE_STAGE,
-                   "reviewed": True}, f, indent=2)
+                   "reviewed": True,
+                   # Which evidence class this "reviewed" was written on
+                   # (#704): a later reader must be able to tell an
+                   # ancestry-evidenced review from a provenance-evidenced one.
+                   "review_evidence_class": evidence_class}, f, indent=2)
     os.replace(tmp, checkpoint_path)
 
     out = {
@@ -5280,8 +5362,11 @@ def cmd_review_reentry(args):
         "applied": args.applied,
         "canonical": {"path": canonical_path,
                       "canonical_sha256": canonical_sha},
-        "map_validation": {"ok": True, "entries": len(entries),
-                           "tally": tally},
+        "review_evidence_class": evidence_class,
+        **({"ancestry_validation": {"ok": True, **ancestry_evidence}}
+           if ancestry_evidence is not None else
+           {"map_validation": {"ok": True, "entries": len(entries),
+                               "tally": tally}}),
         # The rubric's OWN dimension count (from quality-rubric.md) — the
         # completion summary quotes THIS when it reports the quality-gate
         # outcome, never a hardcoded literal (#496: "all six dimensions" over a
@@ -5698,7 +5783,11 @@ def main(argv=None):
                         help="post-arbitration re-entry: persist the reviewed canonical, revalidate "
                              "the rebuilt map, report scoped checks, mark variants stale, STOP (Story 13.70)")
     sp.add_argument("--draft", required=True, help="the edited (reviewed) draft to persist as the canonical")
-    sp.add_argument("--map", required=True, help="the provenance map rebuilt against the edited draft")
+    sp.add_argument("--map", help="the provenance map rebuilt against the edited "
+                                  "draft — required for an AUTHORED canonical; a "
+                                  "DERIVED canonical (one carrying `adapted_from`) "
+                                  "re-enters on ancestry evidence instead and needs "
+                                  "no map (#704)")
     sp.add_argument("--slug", required=True, help="the article slug — names the canonical and its variants")
     sp.add_argument("--root", help="host-repo root (default: git top-level of cwd; errors outside a git repo)")
     sp.add_argument("--create-out", action="store_true",
