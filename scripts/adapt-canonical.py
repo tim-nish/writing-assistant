@@ -506,10 +506,8 @@ def compose_derived(source_text, source_fields, plan, target, ancestry, body):
     return "---\n" + "\n".join(out) + "\n---\n\n" + body.strip("\n") + "\n"
 
 
-def recorded_answer(ws):
-    """The owner's recorded answer to the adaptation gate (CAP-3). Returns the
-    selection string, or raises Refusal — `write` is the step AFTER the gate, so
-    an unanswered gate means nothing may be written."""
+def _payload_records(ws):
+    """Every record in the run workspace's presented-payload log, in order."""
     path = os.path.join(ws, "presented-payloads.jsonl")
     records = []
     try:
@@ -524,6 +522,16 @@ def recorded_answer(ws):
             "--ws <ws> --surface adaptation-plan`) and record the answer first.")
     except json.JSONDecodeError as exc:
         raise Refusal(f"presented-payload log {path} is unreadable: {exc}")
+    return records
+
+
+def recorded_answer(ws):
+    """The owner's recorded answer to the adaptation gate (CAP-3). Returns
+    `(selection, ask_id)` — the ask_id is what ties the answer to the ask it
+    answers, which is half of the write's ownership conjunction (Story 18.105,
+    #693). Raises Refusal — `write` is the step AFTER the gate, so an unanswered
+    gate means nothing may be written."""
+    records = _payload_records(ws)
     answers = [r for r in records if r.get("kind") == "answer"]
     if not answers:
         raise Refusal(
@@ -541,7 +549,29 @@ def recorded_answer(ws):
             f"the recorded answer's selection is {selection!r}; the adaptation gate's "
             "options are approve / modify / stop, and only approve or modify write a "
             "derived canonical")
-    return selection
+    return selection, answers[-1].get("ask_id")
+
+
+def gate_presented_slug(ws, dslug, ask_id):
+    """True when the ask this answer answers is the adaptation gate for THIS
+    derived slug (Story 18.105, #693).
+
+    The other half of the write's ownership conjunction. `compose_payload` names
+    the derived file `<source slug>.<language>.md` in both writing choices'
+    Effect lines, so the ask record itself carries which artifact the owner was
+    deciding about — the check is against that record, never against the
+    caller's word for it. A recorded approve for a DIFFERENT slug therefore
+    authorizes nothing here, which is what keeps this from becoming the bare
+    flag the contract refuses (SPEC-canonical-adaptation, amended 2026-07-25).
+    """
+    if ask_id is None:
+        return False
+    needle = f"{dslug}.md"
+    for rec in _payload_records(ws):
+        if rec.get("kind") != "ask" or rec.get("ask_id") != ask_id:
+            continue
+        return needle in json.dumps(rec.get("payload") or {}, ensure_ascii=False)
+    return False
 
 
 def cmd_write(args):
@@ -549,7 +579,7 @@ def cmd_write(args):
     before it. The write itself goes through the pipeline's ONE canonical write
     path, so the derived file carries its own emission trailer under the same
     hash convention as every other canonical."""
-    selection = recorded_answer(args.ws)
+    selection, ask_id = recorded_answer(args.ws)
     source_path, text, fields = resolve_source(args)
     plan = _build(args)
     target = plan["target"]
@@ -560,12 +590,39 @@ def cmd_write(args):
     ancestry = {"slug": fields.get("slug"), "canonical_sha256": canonical_hash(text)}
     derived_text = compose_derived(text, fields, plan, target, ancestry, body)
     dslug = derived_slug(fields.get("slug"), target["language"])
+    # Ownership for the no-clobber gate (Story 18.105, #693). The recorded owner
+    # answer at the CAP-3 gate IS the authorization to replace this derived
+    # canonical — the judgment is the owner's, and this write is its mechanical
+    # execution. It is a VERIFIED CONJUNCTION, never a bare flag: an approve/modify
+    # selection (established above) AND an ask record showing the gate presented
+    # THIS derived slug. A foreign collision — some other canonical minting the
+    # same slug, with no gate for it — still refuses, which is #666's whole point.
+    #
+    # The draft flow's checkpoint discriminator (`dp._ws_owns_slug`) cannot serve
+    # here: an adaptation workspace holds `presented-payloads.jsonl` but no
+    # `checkpoint.json`, so it is false by construction. Ownership is read from
+    # the recorded-answer log — the artifact this invocation actually produces.
+    owned = gate_presented_slug(args.ws, dslug, ask_id)
     try:
         path, sha = dp._persist_canonical(derived_text, dslug, args.root,
-                                          create_out=args.create_out)
+                                          create_out=args.create_out,
+                                          ws=args.ws, owned=owned)
     except dp._CanonicalWriteError as exc:
+        reason = exc.reason
+        if "slug collision" in reason:
+            # The writer's generic remedy names `--replace-canonical`, a flag this
+            # surface deliberately does not expose (#693): the sanctioned path to a
+            # re-derivation is the gate itself, so say that instead of advertising
+            # an escape hatch that does not exist here.
+            reason = reason.split(". Resolution:")[0] + (
+                ". Resolution: this run's recorded answer does not cover this "
+                f"derived slug ({dslug}), so the write is not authorized — present "
+                "the adaptation gate for it and record the owner's answer, or pick "
+                "a different slug if the existing canonical is a genuinely "
+                "different article. `adapt-canonical write` exposes no override "
+                "flag by design.")
         raise Refusal(f"could not persist the derived canonical at {exc.path}: "
-                      f"{exc.reason}")
+                      f"{reason}")
     print(json.dumps({"stage": "adapt-write", "selection": selection,
                       "source": {"path": source_path, "slug": fields.get("slug"),
                                  "canonical_sha256": ancestry["canonical_sha256"]},

@@ -343,6 +343,72 @@ for f in ('structure','section order','payoff position','framing','register','ti
 " && ok "structure, order, payoff position, framing, register and title are never reported" \
   || err "the claims check reports something CAP-2 leaves free"
 
+# --- CAP-4 re-derivation: the recorded answer is the ownership token ---------
+# Story 18.105 (#693): the first derivation succeeded and EVERY re-derivation was
+# refused, because `write` passed no ownership to the shared writer — the write
+# path failed only when it was needed. The recorded approve at the CAP-3 gate is
+# the authorization; the conjunction (approve/modify AND an ask naming THIS
+# derived slug) is what keeps it from being a bare flag.
+sed 's/発見が遅れた。/発見が遅れた。これは書き直した本文である。/' "$work/body.ja.md" > "$work/body2.ja.md"
+grep -q '書き直した本文' "$work/body2.ja.md" \
+  || { err "fixture: the revised ja body is identical to the first — the re-derivation test would be vacuous"; printf '\nFAILED.\n' >&2; exit 1; }
+$A write --slug retry-storms --target zenn $ARGS --fill "$work/fill.json" \
+  --body "$work/body2.ja.md" --ws "$work/ws" > "$work/rewritten.json" 2>"$work/e-rewrite" \
+  && ok "a re-derivation of an already-derived slug persists (#693)" \
+  || err "re-derivation refused: $(cat "$work/e-rewrite")"
+grep -q '書き直した本文' "$work/drafts/retry-storms.ja.md" \
+  && ok "the re-derivation's content actually replaced the earlier derivation" \
+  || err "the re-derivation reported success without replacing the content"
+
+# A FOREIGN canonical minting the same derived slug is still refused: the gate
+# record must name this slug, so an approve recorded for another article
+# authorizes nothing here (#666 preserved).
+wsf="$work/wsforeign"; mkdir -p "$wsf"
+cp "$work/drafts/retry-storms.ja.md" "$work/foreign-backup.md"
+python3 - "$work/drafts/retry-storms.ja.md" <<'PY'
+import sys
+p = sys.argv[1]
+t = open(p, encoding="utf-8").read()
+t2 = t.replace("書き直した本文", "全く別の記事の本文")
+assert t2 != t, "fixture: nothing to replace — the foreign-collision test would be vacuous"
+open(p, "w", encoding="utf-8").write(t2)
+PY
+# A well-formed gate record in a FRESH workspace, but presented for a different
+# derived slug — mechanically the same shape, semantically not this artifact.
+python3 - "$wsf" <<'PY'
+import json, os, sys
+ws = sys.argv[1]
+ask = {"kind": "ask", "ask_id": 1, "surface": "adaptation-plan",
+       "payload": {"items": [{"where": "Adaptation of canonical other-article for target zenn",
+                              "why": "w",
+                              "choices": [{"label": "approve",
+                                           "effect": "writes the derived canonical other-article.ja.md"}]}]}}
+ans = {"kind": "answer", "ask_id": 1, "answer": {"selection": "approve", "free_text": ""}}
+with open(os.path.join(ws, "presented-payloads.jsonl"), "w", encoding="utf-8") as fh:
+    fh.write(json.dumps(ask) + "\n" + json.dumps(ans) + "\n")
+PY
+before_foreign=$(cat "$work/drafts/retry-storms.ja.md")
+if $A write --slug retry-storms --target zenn $ARGS --fill "$work/fill.json" \
+     --body "$work/body.ja.md" --ws "$wsf" >/dev/null 2>"$work/e-foreign"; then
+  err "an approve recorded for a DIFFERENT slug authorized this write (#666 broken)"
+else
+  grep -q 'slug collision' "$work/e-foreign" \
+    && [ "$before_foreign" = "$(cat "$work/drafts/retry-storms.ja.md")" ] \
+    && ok "an approve for another slug authorizes nothing; collision still refused (#666)" \
+    || err "foreign-collision refusal wrong: $(cat "$work/e-foreign")"
+fi
+# The refusal must not advertise an override this surface does not expose.
+grep -q 'replace-canonical' "$work/e-foreign" \
+  && err "the refusal names --replace-canonical, which \`adapt-canonical write\` has no flag for" \
+  || ok "the refusal names the gate, not a nonexistent --replace-canonical flag (#693)"
+grep -q 'present the adaptation gate' "$work/e-foreign" \
+  && ok "the refusal names the sanctioned path: present the gate for this slug" \
+  || err "the refusal does not say how to proceed legitimately"
+$A write --help 2>&1 | grep -q 'replace-canonical' \
+  && err "\`adapt-canonical write\` grew a --replace-canonical flag (#693 forbids it)" \
+  || ok "no override flag on the adaptation surface (authorization is the gate)"
+cp "$work/foreign-backup.md" "$work/drafts/retry-storms.ja.md"
+
 # --- lockstep: the SKILL states the shipped mechanics ------------------------
 for token in 'adapt-canonical.py write' 'adapted_from' 'claims-check' \
              'lint-ancestry' 'emit variants' 'zero special-casing'; do
