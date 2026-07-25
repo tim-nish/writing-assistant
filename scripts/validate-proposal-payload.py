@@ -43,6 +43,14 @@ is a failure — content is made to fit by AUTHORSHIP (write shorter), never by
 clipping. Budgets live here, with the implementation, not in the contract prose
 (interview-architecture.md O2).
 
+The ANSWER half (`--answer <ask_id>`, added 2026-07-25, #694) is validated too:
+the recorded answer is the other half of the interaction this gate protects, and
+its shape is contract — "the owner's selection + free text" (SPEC-draft-article-ux
+CAP-2). A non-empty `selection` string is required, `free_text` must be a string
+when present, and a blocked answer is never captured. Which selection VALUES are
+legal stays with the consuming gate (shape, not vocabulary), and the presented-text
+rules above deliberately do NOT apply to an owner's own words.
+
 Exit 0 = presentable; non-zero = blocked, with a per-field report.
 """
 
@@ -195,6 +203,55 @@ def validate(payload):
 CAPTURE_FILE = "presented-payloads.jsonl"
 
 
+def validate_answer(payload):
+    """Yield (path, reason) for every shape defect in an ANSWER envelope
+    (Story 18.106, #694).
+
+    The answer record is the other half of the owner interaction this gate
+    exists to protect, and its shape is contract: the capture holds "the owner's
+    selection + free text" (SPEC-draft-article-ux CAP-2). Recording an envelope
+    with no usable selection deferred the error to whichever consumer happened to
+    read it — so `{"choice": "approve"}` was captured with `ok: true` and only
+    failed stages later at `adapt-canonical write`.
+
+    Two boundaries, both deliberate:
+
+    * SHAPE, never VOCABULARY. Which selection *values* are legal belongs to the
+      gate that offered them (approve/modify/stop here, something else there), so
+      any non-empty selection string passes.
+    * The presented-payload checks do NOT apply. Budgets and the plain-text
+      marker rules govern machine-authored text shown to the owner; free text is
+      the owner's own words, and clipping or rejecting those would be this
+      gate protecting the wrong party."""
+    if not isinstance(payload, dict):
+        yield "answer", (f"the answer envelope is {type(payload).__name__}, not an "
+                         "object — record {\"selection\": \"...\", \"free_text\": \"...\"}")
+        return
+    # An ask payload piped into --answer by mistake: name it, rather than let a
+    # missing `selection` describe the symptom instead of the cause.
+    for ask_key in ("items", "choices", "where", "why"):
+        if ask_key in payload:
+            yield "answer", (f"this looks like an ASK payload (it carries {ask_key!r}), "
+                             "not an answer envelope — record the owner's selection, "
+                             "or drop --answer to validate it as a payload")
+            return
+    if "selection" not in payload:
+        yield "answer.selection", ("missing — the recorded answer must name the option "
+                                   "the owner chose (SPEC-draft-article-ux CAP-2)")
+    else:
+        sel = payload["selection"]
+        if not isinstance(sel, str):
+            yield "answer.selection", (f"is {type(sel).__name__}, not a string — the "
+                                       "recorded selection is the option's label")
+        elif not sel.strip():
+            yield "answer.selection", ("is empty — an answer with no selection records "
+                                       "no decision, and fails at whichever stage reads "
+                                       "it next")
+    if "free_text" in payload and not isinstance(payload["free_text"], str):
+        yield "answer.free_text", (f"is {type(payload['free_text']).__name__}, not a "
+                                   "string — free text is the owner's prose, or absent")
+
+
 def _capture_append(ws, record):
     """Append one record to the run's presented-payload log (append-only,
     verbatim — SPEC-draft-article-ux CAP-2, Story 13.28) and return its
@@ -227,7 +284,10 @@ def main(argv=None):
     p.add_argument("--answer", type=int, metavar="ASK_ID",
                    help="record-answer mode: append the owner's selection + free "
                    "text (JSON on stdin or in PAYLOAD) for the given ask_id; "
-                   "requires --ws, skips payload validation")
+                   "requires --ws. The ANSWER envelope's shape is validated (a "
+                   "non-empty `selection` string, optional string `free_text`) "
+                   "and a blocked answer is never captured; which selection "
+                   "VALUES are legal stays with the consuming gate")
     args = p.parse_args(argv)
 
     raw = sys.stdin.read() if args.payload == "-" else open(args.payload, encoding="utf-8").read()
@@ -241,6 +301,14 @@ def main(argv=None):
         if not args.ws:
             sys.stderr.write("error: --answer requires --ws\n")
             return 2
+        answer_defects = list(validate_answer(payload))
+        if answer_defects:
+            # Blocked answers are never captured — the same posture a blocked ask
+            # payload has, so the log never holds an unusable interaction record.
+            sys.stderr.write("answer BLOCKED — not a usable answer record:\n")
+            for path, reason in answer_defects:
+                sys.stderr.write(f"  {path}: {reason}\n")
+            return 1
         _capture_append(args.ws, {"kind": "answer", "ask_id": args.answer,
                                   "answer": payload})
         print(json.dumps({"ok": True, "kind": "answer", "ask_id": args.answer}))
