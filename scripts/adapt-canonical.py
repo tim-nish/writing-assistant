@@ -526,6 +526,18 @@ _ANCESTRY_PIN = re.compile(r"^(?P<slug>[^\s@]+)@(?P<sha>[0-9a-f]{64})$")
 # OQ3), so it is not re-decided here.
 DERIVED_KEYS = ("slug", "title", "language", "audience", "audience_id", "summary")
 
+# Frontmatter keys the derivation DROPS rather than inherits — CAP-4's stated
+# exception (Story 18.111, #710). The reason is a CLASS, not a field name:
+# `syndication` is PACKAGING ROUTING, and routing belongs to the canonical whose
+# profile names it. The ratified chain assigns it per canonical per language
+# (EN -> devto, EN -> adapt -> JA -> zenn), so an EN source's devto entry is the
+# EN canonical's fact; carrying it onto a `language: ja` derivation made that
+# file declare a dev.to canonical_url for the English piece. Not re-declared
+# either: emission resolves platforms from `syndication.policy.<language>` in
+# config and never reads the draft's frontmatter, so a re-declared block would be
+# a second authority with no reader.
+DROPPED_KEYS = ("syndication",)
+
 
 def derived_slug(source_slug, language):
     return f"{source_slug}.{language}"
@@ -573,7 +585,8 @@ def compose_derived(source_text, source_fields, plan, target, ancestry, body):
     pin, over the skill-authored target-language body. Every other declared
     field (date, topics, related, ...) is carried verbatim — the derived file
     conforms to the same frontmatter schema because it is the same kind of
-    file."""
+    file — EXCEPT the keys in `DROPPED_KEYS`, which are packaging routing that
+    belongs to the source canonical and are emitted nowhere (#710)."""
     lines = source_text.splitlines()
     end = next(i for i in range(1, len(lines)) if lines[i].strip() == "---")
     overrides = {
@@ -586,25 +599,31 @@ def compose_derived(source_text, source_fields, plan, target, ancestry, body):
         "mode": "canonical",
     }
     out, written = [], set()
-    skipping_block = False
+    skipping_value = False
     for line in lines[1:end]:
         m = re.match(r"^([A-Za-z_][\w-]*):\s*(.*)$", line)
         key = m.group(1) if m else None
-        # An overridden key whose source value was a BLOCK SCALAR (`>` or `|`)
-        # continues over indented lines that match no key — they belong to the
-        # value being replaced, so they are dropped with it. Without this, an
-        # overridden `summary: >` kept the old English prose as stray lines
-        # under the new value (Story 18.107, #700).
-        if skipping_block:
+        # A key whose value continues over INDENTED lines — a block scalar
+        # (`>`/`|`) or a nested mapping — owns those lines, and the regex above
+        # matches no indented line, so they arrive with `key is None`. When such a
+        # key is replaced or dropped, its continuation goes with it. Without this,
+        # an overridden `summary: >` kept the old English prose as stray lines
+        # (Story 18.107, #700) and a dropped `syndication:` would strand its
+        # `devto:`/`canonical_url:` children as orphans (Story 18.111, #710).
+        if skipping_value:
             if key is None and (line.startswith((" ", "\t")) or not line.strip()):
                 continue
-            skipping_block = False
+            skipping_value = False
         if key == ANCESTRY_KEY:
             continue                      # never inherit a grandparent's ancestry
+        if key in DROPPED_KEYS:
+            # Emitted nowhere: this key is not the derivation's to carry.
+            skipping_value = True
+            continue
         if key in overrides:
             out.append(_fm_scalar(key, overrides[key]))
             written.add(key)
-            skipping_block = m.group(2).strip() in (">", "|", ">-", "|-", ">+", "|+")
+            skipping_value = m.group(2).strip() in (">", "|", ">-", "|-", ">+", "|+")
             continue
         out.append(line)
     for key, val in overrides.items():
