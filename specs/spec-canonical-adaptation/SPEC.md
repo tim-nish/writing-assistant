@@ -73,6 +73,18 @@ source material ──draft flow──▶ EN canonical ──emit──▶ devto
     `complete` remedy, exactly as the variant stage refuses one. Whether an
     article gets a JA canonical at all is a per-article owner decision at this
     invocation's gate — there is no standing "always adapt" rule.
+  - **The same-reader precondition needs a test that exercises a REAL canonical**
+    (added 2026-07-25, #713). Its text above was correct throughout; the
+    implementation was not: the equality test reads `audience_id` through a
+    frontmatter reader that kept the value's trailing comment, so it compared
+    `'en-practitioner'` against
+    `'en-practitioner   # pipeline-internal compatibility id …'` and was always
+    False. Verified dead 2026-07-25 — `plan --target devto` over a real canonical
+    returned a skeleton where this precondition requires a refusal. The reader
+    split is fixed engine-wide (SPEC-writing-assistant, "One frontmatter-value
+    reading"); what belongs here is that **the suites never tried a same-reader
+    target against a comment-bearing canonical**, so a precondition could ship
+    dead and stay dead. A test does.
   - **success:** No draft-flow stage and no emission path invokes adaptation;
     an article the owner never chose to adapt has no derived canonical anywhere;
     the invocation over an unreviewed or marker-carrying draft aborts naming the
