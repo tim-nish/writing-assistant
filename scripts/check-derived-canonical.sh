@@ -470,6 +470,92 @@ $A write --help 2>&1 | grep -q 'replace-canonical' \
   || ok "no override flag on the adaptation surface (authorization is the gate)"
 cp "$work/foreign-backup.md" "$work/drafts/retry-storms.ja.md"
 
+# --- CAP-3: the gate discloses a REPLACEMENT (Story 18.109, #705) -------------
+# The payload said "writes the derived canonical ..." whether or not one was
+# already on disk, so an owner approving a replacement read it as a creation.
+# By now this fixture HAS a derived canonical (written above), so the payload
+# composed here is the replacement case.
+$A payload --slug retry-storms --target zenn $ARGS --fill "$work/fill.json" \
+  > "$work/payload-replace.json"
+python3 - "$work/payload-replace.json" "$work/drafts/retry-storms.ja.md" <<'PY'
+import json, sys
+item = (json.load(open(sys.argv[1], encoding="utf-8"))["items"])[0]
+derived_path = sys.argv[2]
+fail = []
+def ok(m): print(f"ok:   {m}")
+def bad(m): fail.append(m); print(f"FAIL: {m}", file=sys.stderr)
+
+effects = " | ".join(c.get("effect", "") for c in item["choices"])
+(ok if "replaces the existing derived canonical" in effects else bad)(
+    "#705: the approve effect says the existing derivation is REPLACED")
+(ok if "writes the derived canonical" not in effects else bad)(
+    "#705: a replacement is not also described as a first write")
+
+line = (item.get("plan") or {}).get("existing derivation")
+(ok if line else bad)("#705: the plan block carries the existing-derivation disclosure")
+if line:
+    (ok if derived_path in line else bad)(
+        "#705: the disclosure names the file being replaced")
+    # Plain-text contract (g): the disclosure renders no markup.
+    (ok if not any(m in line for m in ("`", "**", "__", "](")) else bad)(
+        "#705: the disclosure is plain text (no backticks, bold, or links)")
+sys.exit(1 if fail else 0)
+PY
+[ $? -eq 0 ] || err "#705 replacement-disclosure checks failed"
+# The whole payload still validates, budgets included.
+python3 "$VP" --ws "$work/ws" --surface adaptation-plan "$work/payload-replace.json" >/dev/null \
+  && ok "#705: the replacement payload still passes the presentation gate (budgets, plain text)" \
+  || err "#705: the disclosure broke payload validation"
+
+# A STALE existing derivation additionally reports the hash pair.
+python3 - "$work/drafts/retry-storms.ja.md" <<'PY'
+import re, sys
+p = sys.argv[1]
+t = open(p, encoding="utf-8").read()
+# Repin the derivation to a source hash that is not the source's current one.
+t = re.sub(r"(adapted_from: [^@\n]+@)[0-9a-f]{64}", r"\g<1>" + "b" * 64, t)
+open(p, "w", encoding="utf-8").write(t)
+PY
+$A payload --slug retry-storms --target zenn $ARGS --fill "$work/fill.json" \
+  > "$work/payload-stale.json"
+python3 - "$work/payload-stale.json" <<'PY'
+import json, sys
+item = (json.load(open(sys.argv[1], encoding="utf-8"))["items"])[0]
+line = (item.get("plan") or {}).get("existing derivation") or ""
+fail = []
+def ok(m): print(f"ok:   {m}")
+def bad(m): fail.append(m); print(f"FAIL: {m}", file=sys.stderr)
+(ok if "no longer matches" in line else bad)(
+    "#705: a stale existing derivation is reported as stale")
+(ok if "bbbbbbbb" in line else bad)(
+    "#705: the disclosure carries the RECORDED source hash")
+(ok if "clears that staleness" in line else bad)(
+    "#705: it says the re-derivation clears the staleness (CAP-5), not that it collides")
+sys.exit(1 if fail else 0)
+PY
+[ $? -eq 0 ] || err "#705 stale-pin disclosure checks failed"
+
+# A FIRST derivation is unchanged: no disclosure, original wording.
+rm -f "$work/drafts/retry-storms.ja.md"
+$A payload --slug retry-storms --target zenn $ARGS --fill "$work/fill.json" \
+  > "$work/payload-first.json"
+python3 - "$work/payload-first.json" <<'PY'
+import json, sys
+item = (json.load(open(sys.argv[1], encoding="utf-8"))["items"])[0]
+fail = []
+def ok(m): print(f"ok:   {m}")
+def bad(m): fail.append(m); print(f"FAIL: {m}", file=sys.stderr)
+(ok if "existing derivation" not in (item.get("plan") or {}) else bad)(
+    "#705: a first derivation carries no replacement disclosure")
+effects = " | ".join(c.get("effect", "") for c in item["choices"])
+(ok if "writes the derived canonical" in effects else bad)(
+    "#705: a first derivation keeps the original write wording")
+(ok if "replaces the existing" not in effects else bad)(
+    "#705: a first derivation never claims to replace anything")
+sys.exit(1 if fail else 0)
+PY
+[ $? -eq 0 ] || err "#705 first-derivation checks failed"
+
 # --- lockstep: the SKILL states the shipped mechanics ------------------------
 for token in 'adapt-canonical.py write' 'adapted_from' 'claims-check' \
              'lint-ancestry' 'emit variants' 'zero special-casing'; do

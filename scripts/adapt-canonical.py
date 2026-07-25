@@ -390,6 +390,62 @@ def merge_fill(plan, fill):
 # The gate payload (CAP-3): one screen, approve / modify / stop
 
 
+def _existing_derived(args, source_fields, target, source_text):
+    """Facts about a derived canonical ALREADY on disk at the target slug, or
+    None when this is a first derivation (Story 18.109, #705).
+
+    The gate must not present a replacement as a creation. Both facts it needs
+    are cheap right here, where the destination is resolved and the source text
+    is in hand: whether the file exists, and whether its recorded `adapted_from`
+    pin still matches the source's current content hash — the same pin-vs-current
+    pair CAP-5's staleness check reads, so no second comparison is introduced.
+
+    Read-only and best-effort: an unreadable or malformed existing file yields
+    `pin: None` rather than raising, because this probe exists to INFORM the
+    gate, and failing the whole adaptation over a damaged neighbour would be a
+    worse outcome than saying the pin could not be read.
+    """
+    dslug = derived_slug(source_fields.get("slug"), target["language"])
+    try:
+        out_dir = dp._resolve_drafts_dir(args.root)
+    except SystemExit:
+        raise
+    path = os.path.abspath(os.path.join(out_dir, f"{dslug}.md"))
+    if not os.path.isfile(path):
+        return None
+    pin = None
+    try:
+        existing_fields, _body = dp._read_frontmatter(dp._read_text(path))
+        ancestry, _defect = parse_ancestry(existing_fields or {})
+        if ancestry:
+            pin = ancestry["canonical_sha256"]
+    except (OSError, ValueError, KeyError):
+        pin = None
+    current = canonical_hash(source_text)
+    return {"path": path, "slug": dslug, "recorded_source_sha256": pin,
+            "current_source_sha256": current,
+            "stale": bool(pin) and pin != current}
+
+
+def _existing_derived_line(existing):
+    """The gate's one-line disclosure about the derivation being replaced.
+
+    Plain text only (proposal contract (g)): no backticks around the path or the
+    digests, because the selection surface renders none. Digests are shown as
+    8-char prefixes - enough to compare by eye, and the full pair is on disk."""
+    head = f"REPLACED: {existing['path']}"
+    pin = existing.get("recorded_source_sha256")
+    if pin is None:
+        return (head + " - it records no readable ancestry pin, so whether it was "
+                "derived from this source at all cannot be determined from it.")
+    if existing.get("stale"):
+        return (head + f" - its recorded source hash {pin[:8]} no longer matches the "
+                f"source's current {existing['current_source_sha256'][:8]}, so this "
+                "re-derivation clears that staleness (CAP-5).")
+    return (head + f" - its recorded source hash {pin[:8]} still matches the source's "
+            "current content, so you are replacing a derivation that is not stale.")
+
+
 def compose_payload(plan):
     """One proposal item carrying the whole plan, in the shape
     `validate-proposal-payload.py` accepts: plain text only, Where + Why, and
@@ -400,6 +456,14 @@ def compose_payload(plan):
                       "before composing the gate payload")
     src, tgt = plan["source"], plan["target"]
     derived = f"{src['slug']}.{tgt['language']}.md"
+    # A derived canonical already on disk makes this a REPLACEMENT, and the gate
+    # says so (Story 18.109, #705): the effect lines below name it, and the plan
+    # block carries the pin-vs-current hash pair when the existing derivation is
+    # stale, so the owner sees why re-derivation is CAP-5's sanctioned clearing
+    # act rather than a collision. The hash pair lives here rather than in an
+    # `effect` line because a path plus two digests cannot fit the 140-char
+    # effect budget (validate-proposal-payload BUDGETS).
+    existing = plan.get("existing_derived")
     item = {
         "where": (f"Adaptation of canonical {src['slug']} for target {tgt['platform']}: "
                   f"reader {tgt['audience']}, language {tgt['language']}. "
@@ -408,6 +472,7 @@ def compose_payload(plan):
                 "the claims stay fixed. Whether this article gets a derived canonical "
                 "at all is your decision here."),
         "plan": {
+            **({"existing derivation": _existing_derived_line(existing)} if existing else {}),
             "refounded opening": plan["refounded_opening"],
             "structural mapping": [
                 f"{r['source_section']} -> {r['disposition']}: {r['note']}"
@@ -422,11 +487,15 @@ def compose_payload(plan):
         },
         "choices": [
             {"label": "approve",
-             "effect": f"writes the derived canonical {derived} from this plan; the "
-                       "source canonical is untouched"},
+             "effect": (f"replaces the existing derived canonical {derived} from this "
+                        "plan; the source canonical is untouched") if existing else
+                       (f"writes the derived canonical {derived} from this plan; the "
+                        "source canonical is untouched")},
             {"label": "modify",
-             "effect": f"revises the plan from your answer, then writes {derived} from "
-                       "the revised plan"},
+             "effect": (f"revises the plan from your answer, then replaces {derived} "
+                        "from the revised plan") if existing else
+                       (f"revises the plan from your answer, then writes {derived} from "
+                        "the revised plan")},
             {"label": "stop",
              "effect": "writes nothing; this article stays single-canonical and no "
                        "derived canonical exists anywhere"},
@@ -915,6 +984,7 @@ def _build(args):
             "instead (`emit variants`), which is pure packaging")
     conv = resolve_conventions(args, target["language"])
     plan = skeleton(source_path, fields, target, conv, sections(text))
+    plan["existing_derived"] = _existing_derived(args, fields, target, text)
     if getattr(args, "fill", None):
         raw = sys.stdin.read() if args.fill == "-" else open(args.fill, encoding="utf-8").read()
         try:

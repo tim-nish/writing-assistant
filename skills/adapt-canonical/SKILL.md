@@ -138,6 +138,15 @@ no Markdown links (contract (g)). A non-zero exit means the payload is not
 presentable — fix the named field and re-validate; **a blocked payload is never
 shown**.
 
+**When a derived canonical already exists at the target slug, the payload says
+so (#705)** — the effect lines state that it is **replaced**, not written, and
+the plan block names the file plus, when its recorded `adapted_from` pin no
+longer matches the source's current content, the **hash pair** that makes this
+CAP-5's sanctioned clearing act rather than a collision. Relay that disclosure
+as-is: a re-derivation is never presented as a first creation, because the
+approval it collects is for a replacement. The payload composes this itself —
+do not add a second existence check here.
+
 The gate's options are **approve / modify / stop**, each stating its concrete
 effect on the artifact:
 
