@@ -175,6 +175,42 @@ per publish decision.**
   draft first, then variants are re-emitted. Stale-variant detection: a variant
   whose source canonical draft has changed since emission is a publish blocker
   (CAP-6 bucket), not a silent inconsistency.
+- **Emission asserts the reviewed-canonical promise it makes (amended
+  2026-07-25, triage #716).** This spec and SPEC-article-draft-pipeline both
+  describe emission as consuming the "persisted, **reviewed** canonical"
+  (`:74` here; `specs/spec-article-draft-pipeline/SPEC.md:30`, `:76`). Only
+  *persisted* was ever checked, so "reviewed" was a promise no mechanism
+  carried — the enforced-mechanism invariant (#534) applied and was unmet.
+  Emission therefore reads what durable review evidence exists for the source
+  canonical in the destination repo and, finding none, **emits and reports a
+  named publish blocker in the CAP-6 bucket**.
+  - **Disclosure, never refusal.** The owner may legitimately emit ahead of
+    review; a gate that refused would be deciding permission rather than
+    surfacing state: "a promotion threshold gates what surfaces by default,
+    not what the human may act on — below-bar items stay visible and the gate
+    can accept any of them" (`consulted: product-lab@34a6119
+    LESSONS.md:68`). This makes emission's posture identical to the
+    `language-mismatch` blocker beside it: the outcome is visible, not
+    forbidden.
+  - **Three-valued wording is part of the contract.** The blocker says *no
+    review evidence was found*, which is **cannot-determine**, never
+    "unreviewed". The pipeline does not write review records (a review "creates
+    no `reviews/` artifact", `skills/review-article/SKILL.md`), so absence of
+    evidence is not evidence of absence and the report must not claim
+    otherwise.
+  - **The checkpoint record is NOT the substrate**, though it is the obvious
+    candidate and #716 proposed it. `review_evidence_class` (#704) is written
+    to `<ws>/checkpoint.json` via `_checkpoint_path(ws)` — the *run
+    workspace*. Emission is a separate invocation with its own `$WS` and can
+    never read the review run's checkpoint. Written down because the next
+    reader will reach for it again.
+  - **Why it matters here:** a derived canonical is claims-bearing and earns
+    its own pass — "full rubric review runs once per **claims-bearing
+    artifact**, not once per article — a JA canonical earns its own review
+    pass because it is a canonical, not a variant" (`consulted:
+    product-lab@34a6119 topics/articles.md:56`). The diagnosing instance is
+    `tanuki-engineering-lessons.ja`, derived and emitted to Zenn in one
+    sitting with no review pass and no disclosure.
 - **Profiles carry the platform, code carries none** (owner policy: repo-specific
   and platform-specific assumptions live in declaration files, enforced by an
   "add a fresh platform" gate).
@@ -205,6 +241,49 @@ per publish decision.**
   performs is unchanged; this makes emission and discovery *route through* the
   directory the lint validates. Co-locating variants in the drafts root was a
   conformance divergence from the ratified layout, corrected here.
+- **The delivered basename is the platform's to constrain, and the profile
+  declares the mapping (amended 2026-07-25, triage #715).** The bullet above
+  routes placement through the profile's declared *directory* while leaving the
+  *filename* as the pipeline's own `<slug>.<platform>.md` convention. For a
+  platform whose sync contract derives an article's identity from the delivered
+  filename, that convention is not ours to carry across the boundary: Zenn's
+  slug rule is `^[a-z0-9_-]{12,50}$`, so every `<slug>.<platform>.md` delivery
+  is rejected on sync (dots are illegal) and continuous publication is blocked
+  for every article delivered under it. `articles/` is "an externally imposed
+  delivery target of the sync contract the repo must satisfy to publish at
+  all… a packaging fact the zenn profile declares" (`consulted:
+  product-lab@34a6119 topics/articles.md:13`), and the profile is "a
+  conformance record of Zenn's sync contract… with declared precedence"
+  (`:86`), which is exactly where a delivered-name rule belongs.
+  - **The profile declares the mapping**; emission applies it **only at
+    placement**. A profile declaring none keeps the `<slug>.<platform>.md`
+    delivery unchanged, so no other platform is affected. This stays
+    declaration, not code — adding a platform remains one profile file (CAP-6),
+    and no language or platform is branched on.
+  - **Every basename join resolves through the declared mapping — this is the
+    replacement discovery mechanism, not an afterthought.** Discovery was
+    promoted to a stated property of the layout precisely so this could not be
+    broken silently: "any future change separating variants from their
+    canonical must supply a replacement discovery mechanism instead of silently
+    breaking one" (`consulted: product-lab@34a6119 topics/articles.md:14`).
+    Three mechanisms join on the filename today — staleness/variant discovery
+    and the review-side variant scan (both `f.startswith(f"{slug}.")` over the
+    projection dirs, `scripts/draft-pipeline.py:2235`, `:2243`, `:5433-5435`)
+    and the platform lint's platform id (`parts[-2]` of the basename,
+    `scripts/lint-platform-variant:71-73`). All three run over the projection
+    dir, so a renamed delivery breaks all three: the mapping must be resolvable
+    back to `(slug, platform)` or discovery has no join at all. **A rename that
+    lands without moving these three sites is the defect, not a partial fix.**
+  - **Legality is checked at emission, as a named publish blocker** in the
+    CAP-6 bucket — charset and length against the platform's declared rule — so
+    an illegal delivery surfaces where the owner is working rather than as a
+    dashboard error after push.
+  - **The delivered basename is a permanent identity.** It is the article's
+    published URL, so renaming after first publish forks the article. The
+    mapping is decided **before** an article's first `published: true` and is
+    immutable per article afterwards. This is why the decision was taken now:
+    both delivered Zenn files sit at `published: false`, so nothing is
+    live-broken and the identity is still free to choose.
 - Inherited from the pipeline spec unchanged: no invented evidence; attention
   budget ≤10 minutes per article including all variant touchpoints; validator
   convergence (#206) applies to the platform lint — the lint's rejectable forms

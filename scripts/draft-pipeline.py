@@ -1861,6 +1861,45 @@ def _variant_scan_dirs(out_dir, root):
     return result
 
 
+# Durable review evidence for a canonical (SPEC-platform-variants "Emission
+# asserts the reviewed-canonical promise it makes", triage #716).
+#
+# THE PREDICATE IS STATED HERE because `reviews/` is an OWNER convention this
+# pipeline neither writes nor guarantees — a review "creates no `reviews/`
+# artifact" (`skills/review-article/SKILL.md`) — and a convention-keyed check
+# with an unstated convention is the next defect. A review record for slug S is
+# a file in `<destination repo>/reviews/` whose basename begins with
+# `S-panel-`.
+#
+# THE SEPARATOR IS LOAD-BEARING, not cosmetic. Slugs nest by construction: a
+# derived canonical is `<slug>.<language>` (SPEC-canonical-adaptation CAP-4), so
+# a bare `startswith(slug)` test would let an EN parent's panel record satisfy
+# its JA derivation — precisely the defect #716 exists to catch, since "full
+# rubric review runs once per claims-bearing artifact, not once per article — a
+# JA canonical earns its own review pass because it is a canonical, not a
+# variant" (`consulted: product-lab@34a6119666896f232e1aa00789c3f916bc2b6dad
+# topics/articles.md:56`). Requiring `-panel-` keeps them disjoint because `.`
+# is not `-`: `tanuki-honest-automation.ja-panel-…` does not start with
+# `tanuki-honest-automation-panel-`, and vice versa.
+_REVIEW_RECORD_SEP = "-panel-"
+
+
+def _review_evidence(slug, out_dir):
+    """Durable review records for `slug` in the destination repo.
+
+    An empty list is **cannot-determine**, never "unreviewed": the pipeline
+    writes no review records, so absence of a record is not absence of a
+    review. The caller's blocker wording carries that distinction.
+    """
+    reviews_dir = os.path.join(_dest_repo_root(out_dir), "reviews")
+    if not os.path.isdir(reviews_dir):
+        return []
+    prefix = f"{slug}{_REVIEW_RECORD_SEP}"
+    return sorted(os.path.join(reviews_dir, f)
+                  for f in os.listdir(reviews_dir)
+                  if f.startswith(prefix) and f.endswith(".md"))
+
+
 def cmd_variants(args):
     """Emit platform-ready variants of the PERSISTED canonical draft as
     PROJECTIONS through declared platform profiles (Story 16.3; Story 13.69 —
@@ -2174,6 +2213,34 @@ def cmd_variants(args):
     }
     if blockers:
         out["render_blockers"] = blockers
+    # The `reviewed` half of "persisted, reviewed canonical" (#716). Both this
+    # spec (CAP-3) and SPEC-article-draft-pipeline promise a *reviewed*
+    # canonical; only *persisted* was ever checked, so the promise carried no
+    # mechanism (#534). It is asserted here as a DISCLOSURE and never a
+    # refusal — the owner may legitimately emit ahead of review, and "a
+    # promotion threshold gates what surfaces by default, not what the human
+    # may act on" (`consulted: product-lab@34a6119666896f232e1aa00789c3f916bc2b6dad
+    # LESSONS.md:68`).
+    #
+    # DELIBERATELY NOT READ: the review re-entry's `review_evidence_class`
+    # (#704). It is written to `<ws>/checkpoint.json` via `_checkpoint_path`,
+    # the RUN WORKSPACE, and emission is a separate invocation with its own
+    # `$WS` — it can never see the review run's checkpoint. #716 proposed it as
+    # the substrate; recorded here because the next reader will reach for it
+    # again.
+    if not _review_evidence(slug, out_dir):
+        out["publish_blockers"] = [{
+            "slug": slug,
+            "blocker": "review-evidence-not-found",
+            "detail": (
+                "no review record found for this canonical under "
+                f"{os.path.join(_dest_repo_root(out_dir), 'reviews')} — this is "
+                "CANNOT-DETERMINE, not a finding that the canonical is "
+                "unreviewed: the pipeline writes no review records, so absence "
+                "of a record is not absence of a review. If a review ran, its "
+                "record is not where this check looks; if none ran, a "
+                "claims-bearing canonical owes one."),
+        }]
     if lede_proposals:
         out["lede_proposals"] = lede_proposals   # SKILL presents one per variant
     print(json.dumps(out, indent=2))
