@@ -202,6 +202,15 @@ An unchosen configured platform leaves **no file, anywhere**. Never widen the
 subset — not to "complete the set", not because a platform is configured, not
 because the previous emission included it.
 
+**Relay `publish_blockers` from this output verbatim, when present (#716).** A
+`review-evidence-not-found` entry means no review record for this canonical was
+found in the destination repo. Emission succeeded and the variant is written —
+this is a disclosure, not a failure, and it is **cannot-determine**, not a
+finding that the canonical is unreviewed. Relay its `detail` as written and do
+not soften it into "reviewed anyway" or harden it into "unreviewed"; a
+claims-bearing canonical owes its own pass, and whether to publish ahead of one
+is the owner's call.
+
 If a variant carries `lede_retarget: true`, perform the **single** judgment step
 `variants.md` defines for it and present it under the same proposal contract.
 That is the variant flow's only other owner touchpoint; when the trigger does
