@@ -123,9 +123,9 @@ python3 "$DP" variants --slug retry-storms.ja --root "$work/host" \
   --config-json "$work/cfg.json" --platforms zenn --ws "$work/ws" \
   > "$work/emit.json" 2>"$work/e-emit" \
   || { err "fixture emission failed: $(cat "$work/e-emit")"; printf '\nFAILED.\n' >&2; exit 1; }
-[ -f "$work/drafts/retry-storms.ja.zenn.md" ] \
-  && ok "fixture: the derivation and its zenn variant both exist" \
-  || err "fixture emission wrote no variant: $(ls "$work/drafts")"
+[ -f "$work/drafts/articles/retry-storms.ja.zenn.md" ] \
+  && ok "fixture: the derivation and its zenn variant (under layout.dir) both exist" \
+  || err "fixture emission wrote no variant: $(ls -R "$work/drafts")"
 
 # --- source unmoved: the shipped mechanism applies to the derivation, unchanged
 $A staleness --root "$work/host" > "$work/fresh.json"

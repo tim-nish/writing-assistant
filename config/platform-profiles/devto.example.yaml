@@ -35,6 +35,15 @@ packaging:
   # render Mermaid, so a diagram is HTML-commented and a render publish blocker
   # is raised (pre-render to an image before publishing).
   visuals: html-comment-blocked
+  # The projection TARGET DIRECTORY in the output.drafts destination repo. A
+  # CONFORMANCE RECORD of the ratified articles-repo layout (`drafts/` =
+  # canonical source of truth; `devto/` = regenerated projection dir), never an
+  # authority: the destination repo's actual structure is authoritative, checked
+  # by existence (Story 16.6 lint). Variant emission + staleness discovery route
+  # through this dir (Story 18.103, SPEC-platform-variants placement amendment).
+  layout:
+    repo: articles
+    dir: devto/
 
 # Where this audience's end-pointer points (the distribution call-to-action).
 distribution_hook: newsletter-follow

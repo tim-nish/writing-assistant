@@ -60,10 +60,10 @@ mkdir -p "$work/o"
 #    own lint — the packaging step and the lint read the same profile values.
 python3 "$DP" variants "$work/en.md" --allow-external-draft --config-json "$work/cfg.json" \
   --root "$work/host" --out "$work/o" --platforms devto >/dev/null
-if python3 "$LINT" "$work/o/retry-storms.devto.md" --root "$work/host" --ws "$work" >/dev/null 2>&1; then
+if python3 "$LINT" "$work/o/devto/retry-storms.devto.md" --root "$work/host" --ws "$work" >/dev/null 2>&1; then
   ok "a pipeline-emitted variant passes its own lint (validator convergence)"
 else
-  err "emitted variant failed its own lint: $(python3 "$LINT" "$work/o/retry-storms.devto.md" --root "$work/host" 2>&1)"
+  err "emitted variant failed its own lint: $(python3 "$LINT" "$work/o/devto/retry-storms.devto.md" --root "$work/host" 2>&1)"
 fi
 
 # 1b. Lint output lands in $WS.
@@ -71,19 +71,19 @@ fi
   && ok "lint output lands in \$WS" || err "no lint output in \$WS"
 
 # 2. Seeded defect: tags over the profile cap → reported with file/line.
-sed 's/^tags:.*/tags: a, b, c, d, e/' "$work/o/retry-storms.devto.md" > "$work/toomany.devto.md"
+sed 's/^tags:.*/tags: a, b, c, d, e/' "$work/o/devto/retry-storms.devto.md" > "$work/toomany.devto.md"
 out=$(python3 "$LINT" "$work/toomany.devto.md" --root "$work/host" 2>&1 || true)
 printf '%s' "$out" | grep -Eq 'toomany.devto.md:[0-9]+: tags has 5 entries; profile caps at 4' \
   && ok "seeded tag-cap defect reported with file/line" || err "tag-cap defect wrong: $out"
 
 # 3. Frontmatter schema: a missing profile-declared field is a defect.
-grep -v '^canonical_url:' "$work/o/retry-storms.devto.md" > "$work/nocu.devto.md"
+grep -v '^canonical_url:' "$work/o/devto/retry-storms.devto.md" > "$work/nocu.devto.md"
 python3 "$LINT" "$work/nocu.devto.md" --root "$work/host" 2>&1 \
   | grep -q "missing profile-declared field 'canonical_url'" \
   && ok "missing frontmatter field reported" || err "missing-field check wrong"
 
 # 4. Malformed canonical_url reported.
-sed 's#^canonical_url:.*#canonical_url: not-a-url#' "$work/o/retry-storms.devto.md" > "$work/badcu.devto.md"
+sed 's#^canonical_url:.*#canonical_url: not-a-url#' "$work/o/devto/retry-storms.devto.md" > "$work/badcu.devto.md"
 python3 "$LINT" "$work/badcu.devto.md" --root "$work/host" 2>&1 \
   | grep -q "not a well-formed" && ok "malformed canonical_url reported" || err "canonical_url check wrong"
 
@@ -111,11 +111,11 @@ python3 "$LINT" "$work/raw.devto.md" --root "$work/host" 2>&1 \
 # 6. Layout existence against the output.drafts DESTINATION repo (never the host):
 #    a declared target dir absent from the destination is a defect naming the
 #    profile; present → no defect (repo structure is authoritative).
-python3 "$LINT" "$work/o/retry-storms.devto.md" --platform zenn --root "$work/host" \
+python3 "$LINT" "$work/o/devto/retry-storms.devto.md" --platform zenn --root "$work/host" \
   --dest-repo "$work/nodest" 2>&1 | grep -q 'absent from the destination repo' \
   && ok "missing layout dir in the destination repo is a defect (profile is the defect)" \
   || err "layout-existence defect wrong"
-mkdir -p "$work/dest/articles"; cp "$work/o/retry-storms.devto.md" "$work/dest/ok.zenn.md"
+mkdir -p "$work/dest/articles"; cp "$work/o/devto/retry-storms.devto.md" "$work/dest/ok.zenn.md"
 if python3 "$LINT" "$work/dest/ok.zenn.md" --root "$work/host" --dest-repo "$work/dest" 2>&1 \
      | grep -q 'target directory'; then
   err "layout dir present but still flagged"
@@ -159,7 +159,7 @@ printf '%s' "$out" | grep -q 'です/ます' \
 
 # 7b. A body matching its profile language reports NO language-mismatch — the
 #     en/devto variant emitted above stays clean.
-python3 "$LINT" "$work/o/retry-storms.devto.md" --root "$work/host" 2>&1 \
+python3 "$LINT" "$work/o/devto/retry-storms.devto.md" --root "$work/host" 2>&1 \
   | grep -q 'language-mismatch' \
   && err "en body under an en profile wrongly flagged" \
   || ok "body matching its profile language reports no language-mismatch"

@@ -365,8 +365,8 @@ python3 "$root/scripts/resolve-writing-sources.py" --root "$HOST" \
   set-draft-location "$DEST/drafts/" >/dev/null 2>&1
 if python3 "$DP" variants "$tdraft" --allow-external-draft --root "$HOST" \
      --platforms devto >/dev/null 2>&1 \
-   && [ -f "$DEST/drafts/test-declared-probe.devto.md" ]; then
-  ok "test-declared run resolves a destination inside the temp tree normally"
+   && [ -f "$DEST/devto/test-declared-probe.devto.md" ]; then
+  ok "test-declared run resolves a destination inside the temp tree normally (variant under the repo-root projection dir, sibling of drafts/)"
 else
   err "an in-temp destination was refused; the #213 consent path stays testable"
 fi
@@ -375,7 +375,7 @@ fi
 mkdir -p "$work/tout-dir"
 python3 "$DP" variants "$tdraft" --allow-external-draft --root "$HOST" \
   --out "$work/tout-dir" --platforms devto >/dev/null 2>&1 \
-  && [ -f "$work/tout-dir/test-declared-probe.devto.md" ] \
+  && [ -f "$work/tout-dir/devto/test-declared-probe.devto.md" ] \
   && ok "test-declared run with an explicit --out writes under --out" \
   || err "--out given but no variant written there"
 
