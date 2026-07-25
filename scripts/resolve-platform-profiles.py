@@ -60,6 +60,7 @@ re-validating before reporting success.
 
 import argparse
 import glob
+import hashlib
 import importlib.util
 import json
 import os
@@ -233,7 +234,18 @@ def cmd_validate(args):
     Prints per-key findings to stderr in the `  [file] key: message` shape and
     exits 4 if any; silent, exit 0 when clean."""
     pdir = profiles_dir(host_root(args.root), args.profiles_dir)
-    _, findings = load_profiles(pdir)
+    profiles, findings = load_profiles(pdir)
+    # Seeded-profile drift (#719) is REPORT-ONLY and never changes the exit
+    # code: the failure is an absence, so its carrier is a signal that makes the
+    # absence visible, not a gate. Reported even when structural findings exist
+    # — the two are independent, and suppressing one behind the other would hide
+    # drift for exactly as long as an unrelated defect went unfixed.
+    for platform in sorted(profiles):
+        for key in seed_drift(platform, profiles[platform], args.examples_dir):
+            sys.stderr.write(
+                f"note: {platform}.yaml declares no {key!r}, which the shipped "
+                f"example has since gained — your edits are untouched; add it "
+                f"if you want the behaviour it enables (#719)\n")
     if findings:
         _emit_findings(findings)
         return VALIDATION_FAILED
@@ -247,6 +259,68 @@ def examples_dir(override=None):
         return os.path.realpath(override)
     here = os.path.dirname(os.path.realpath(__file__))
     return os.path.realpath(os.path.join(here, "..", "config", "platform-profiles"))
+
+
+def example_seed_version(text):
+    """The seed stamp for an example's content: a short sha256 over its bytes.
+
+    A CONTENT hash rather than a hand-bumped revision string, because a string
+    only records what someone remembered to bump. The noise a content hash would
+    normally carry — a comment-only example edit reading as drift — does not
+    arise here: the drift check below diffs DECLARED KEYS, never this stamp, so
+    the stamp is provenance ("seeded from the example that hashed to X") and the
+    check is independent of it.
+    """
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()[:12]
+
+
+def _declared_key_paths(node, prefix=""):
+    """Every declared key path in a profile map, dotted (`packaging.layout.dir`).
+
+    Only mapping structure is walked — a list value is a leaf. The comparison
+    this feeds is about which DECLARATIONS exist, never about their values.
+    """
+    paths = set()
+    if not isinstance(node, dict):
+        return paths
+    for key, value in node.items():
+        if str(key).startswith("_"):        # `_path` and friends are injected
+            continue
+        path = f"{prefix}{key}"
+        paths.add(path)
+        paths |= _declared_key_paths(value, path + ".")
+    return paths
+
+
+def seed_drift(platform, profile, examples_override=None):
+    """Key paths the shipped example declares that this seeded profile does not.
+
+    The conformance-copy mismatch check (#719, SPEC-platform-variants): seeding
+    correctly refuses to overwrite an owner-edited profile, so a load-bearing
+    declaration the example gains later never reaches an existing installation —
+    and where that declaration also gates a lint, its absence disables the very
+    check that would have reported the consequence.
+
+    REPORT-ONLY and PRESENCE-ONLY by contract. The example is authoritative for
+    which declarations exist, never for their values: a profile whose `tag_cap`
+    differs from the example's is a sovereign owner edit and reports nothing.
+    A profile with no `seed_version` is pre-stamp and is diffed anyway rather
+    than skipped — those are exactly the installations that predate the stamp
+    and so are the most likely to have drifted.
+    """
+    src = os.path.join(examples_dir(examples_override), f"{platform}.example.yaml")
+    if not os.path.isfile(src):
+        return []                # hand-authored profile: nothing to conform to
+    try:
+        example = uc.load_yaml(open(src, encoding="utf-8").read())
+    except uc.YamlSubsetError:
+        return []                # a broken example accuses no one
+    if not isinstance(example, dict):
+        return []
+    missing = _declared_key_paths(example) - _declared_key_paths(profile)
+    # A missing parent already tells the whole story; its children are noise.
+    return sorted(p for p in missing
+                  if not any(p.startswith(q + ".") for q in missing))
 
 
 def seedable(root, profiles_override=None, examples_override=None):
@@ -321,6 +395,12 @@ def cmd_seed(args):
         "# Seeded from the shipped example by `resolve-platform-profiles.py seed`\n"
         "# (Story 18.52, #568). Edit freely — this file is yours; re-seeding\n"
         "# refuses to overwrite it without --force. Original instructions:", 1)
+    # The seed stamp records WHICH example revision this copy came from (#719).
+    # Provenance only — `validate` reports drift from a key diff, never from
+    # this value — so an owner editing the file below never invalidates it.
+    body = (f"# Seeded from {os.path.basename(src)} @ "
+            f"{example_seed_version(body)}\n"
+            f"seed_version: {example_seed_version(body)}\n\n") + body
     tmp = dest + ".tmp"
     with open(tmp, "w", encoding="utf-8") as fh:
         fh.write(body)
@@ -412,7 +492,9 @@ def build_parser():
 
     with_dir(sub.add_parser("list", help="platform ids, one per line"))
     with_dir(sub.add_parser("resolved", help="all profiles as one JSON object"))
-    with_dir(sub.add_parser("validate", help="per-key findings, exit 4 if any"))
+    v = with_dir(sub.add_parser("validate", help="per-key findings, exit 4 if any"))
+    v.add_argument("--examples-dir",
+                   help="override the shipped examples directory (tests)")
     with_dir(sub.add_parser("dir", help="the resolved profiles directory"))
     g = with_dir(sub.add_parser("get", help="one profile as JSON"))
     g.add_argument("platform")
