@@ -259,6 +259,79 @@ if grep -rn "draft-pipeline.py" "$SKILL" >/dev/null 2>&1; then
   grep -q 'never a stage' "$SKILL" || err "the skill does not state it is never a draft-flow stage"
 fi
 
+# --- One frontmatter-value reading (Story 18.113, #713) -----------------------
+# Two readers disagreed about trailing `#` comments, and the cost was a DEAD
+# contract: CAP-1's same-reader precondition is an equality test on `audience_id`,
+# every canonical the renderer writes carries a trailing comment on that field, so
+# the test was always False and the precondition never fired.
+python3 - <<'PYR' && ok "#713: the two frontmatter readers agree on every case (comment, data-#, list, quoted, block)" || err "#713: the frontmatter readers still disagree"
+import importlib.util, sys
+def load(p, n):
+    s = importlib.util.spec_from_file_location(n, p)
+    m = importlib.util.module_from_spec(s); s.loader.exec_module(m); return m
+dp = load("scripts/draft-pipeline.py", "dp")
+ruc = load("scripts/resolve-user-config.py", "ruc")
+cases = [
+    ("audience_id: en-practitioner   # pipeline-internal compatibility id", "audience_id"),
+    ("url: https://x.test/p#frag   # trailing note", "url"),   # data-# survives
+    ("topics: [a, b]   # note", "topics"),                     # commented list stays a list
+    ("plain: value", "plain"),
+    ('quoted: "a value"   # note', "quoted"),
+]
+bad = []
+for line, key in cases:
+    a = dp._read_frontmatter(f"---\n{line}\n---\n\nbody\n")[0].get(key)
+    b = ruc.load_yaml(line + "\n").get(key)
+    if a != b:
+        bad.append(f"{key}: _read_frontmatter={a!r} load_yaml={b!r}")
+# A folded block's inner `#` is PRESERVED by both — prose may contain one.
+blk = "summary: >\n  a value with # a hash inside\n"
+a = dp._read_frontmatter(f"---\n{blk}---\n\nbody\n")[0].get("summary")
+b = ruc.load_yaml(blk).get("summary")
+if a != b or "#" not in (a or ""):
+    bad.append(f"block scalar: _read_frontmatter={a!r} load_yaml={b!r}")
+for line in bad:
+    print("  " + line, file=sys.stderr)
+sys.exit(1 if bad else 0)
+PYR
+
+# The precondition that was dead: a same-reader, same-language target refuses.
+# Exercised against a REAL comment-bearing canonical shape, which is the gap that
+# let it ship dead (CAP-1 note, #713).
+cat > "$work/drafts/same-reader.md" <<'EOF'
+---
+slug: same-reader
+title: "Retry storms doubled our token spend"
+date: 2026-07-09
+mode: canonical
+language: en
+audience: Engineers building automation   # pipeline-internal — stripped at packaging
+audience_id: en-practitioner   # pipeline-internal compatibility id (Story 13.71)
+generated_by: writing-assistant@0.0.0-test+deadbee   # immutable birth record
+summary: >
+  A canonical whose frontmatter carries the trailing comments the renderer emits.
+topics: [llm-ops]
+related: { projects: [], publications: [], products: [] }
+---
+
+## The incident
+
+The retry storm doubled token spend.
+EOF
+if python3 "$AC" plan --slug same-reader --target devto $ARGS >/dev/null 2>"$work/e-samereader"; then
+  err "#713: a same-reader target returned a plan instead of refusing (CAP-1 precondition dead)"
+else
+  grep -q 'same reader and language' "$work/e-samereader" \
+    && grep -q 'emit variants' "$work/e-samereader" \
+    && ok "#713: a same-reader target refuses and names emit variants (CAP-1 precondition alive)" \
+    || err "#713: wrong same-reader refusal: $(cat "$work/e-samereader")"
+fi
+# A DIFFERENT reader still adapts — the precondition discriminates rather than
+# blocking everything.
+python3 "$AC" plan --slug same-reader --target zenn $ARGS >/dev/null 2>"$work/e-diffreader" \
+  && ok "#713: a different-reader target still returns a plan" \
+  || err "#713: the precondition now blocks a legitimate adaptation: $(cat "$work/e-diffreader")"
+
 # --- lockstep: the SKILL prose describes exactly the mechanics checked above --
 [ -f "$SKILL" ] && ok "the adapt-canonical skill exists" || err "$SKILL missing"
 for token in 'never a stage of the draft flow' 'persisted canonical' 'complete' \
