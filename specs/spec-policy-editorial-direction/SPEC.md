@@ -42,6 +42,15 @@ every extension below must preserve:
   policy surface as well as repo state — e.g. a recorded position on what
   the owner's channel should emit shapes which article type is proposed.
   Seed quoted + pinned in the question's Why; recorded in `consulted:`.
+  *(Cross-ref, #687 — 2026-07-25 triage.)* This same audited-recommendation
+  shape now generalizes beyond article-type to **topic / story-element
+  candidacy**: it is one **instance** of the seam's four-invariant proposal
+  rule (SPEC-policy-source-seam §Constraints, amended #670 — "may PROPOSE …
+  hub-element candidacy"), and its mechanism for element candidacy is fully
+  contracted by SPEC-topic-map's #669 amendment (`spec-topic-map/SPEC.md:28-54`
+  — Evidence-pointer matching against the fact sheet, three-valued verdict,
+  and the no-episode → owner-attributed-framing tier, Story 17.1). No new
+  capability is owed here; #687 is resolved by those two amendments.
 - **CAP-2 — policy-seeded angle as a first-class slot.** The claim/angle
   question (presentation slot 1, spec-draft-article-ux CAP-4) is
   policy-seeded whenever the surface yields a tension or a recorded
