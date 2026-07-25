@@ -39,7 +39,9 @@ emitting path — the packaging step (draft-pipeline `variants`) reads the SAME
 `packaging` values this lint checks — so a variant the pipeline emits passes its
 own lint.
 
-The platform is taken from the file name `<slug>.<platform>.md` (or --platform).
+The platform is taken from the file name `<slug>.<platform>.md`, or for a
+profile-mapped delivered basename from the projection dir it sits in (#715), or
+from --platform.
 Lint output also lands in the run workspace when --ws is given. Exit 0 when the
 variant is clean, 1 on any defect, 2 on a usage error. Stdlib-only.
 """
@@ -65,7 +67,7 @@ def _load(mod_filename):
 pp = _load("resolve-platform-profiles.py")
 
 
-def infer_platform(path, override):
+def infer_platform(path, override, profiles=None):
     if override:
         return override
     base = os.path.basename(path)
@@ -73,6 +75,26 @@ def infer_platform(path, override):
     # <slug>.<platform>.md  ->  parts[-2]
     if len(parts) >= 3 and parts[-1] == "md":
         return parts[-2]
+    # A DELIVERED basename carries no `.<platform>` segment: the profile mapped
+    # it away because the platform's sync contract owns the filename (#715, e.g.
+    # `articles/tanuki-x-ja.md`). The name is unparseable back to a platform, so
+    # resolve by the projection DIRECTORY the file sits in — each profile
+    # declares its own `packaging.layout.dir`, so this is deterministic whenever
+    # exactly one profile claims that directory.
+    parent = os.path.basename(os.path.dirname(os.path.realpath(path)))
+    claimants = [
+        name for name, prof in (profiles or {}).items()
+        if str((((prof or {}).get("packaging", {}) or {}).get("layout", {}) or {})
+               .get("dir", "")).strip().strip("/") == parent
+    ]
+    if len(claimants) == 1:
+        return claimants[0]
+    if len(claimants) > 1:
+        sys.stderr.write(
+            f"error: {len(claimants)} profiles declare the projection dir "
+            f"{parent!r} ({', '.join(sorted(claimants))}), so the platform "
+            f"cannot be resolved from {base!r}; pass --platform\n")
+        raise SystemExit(2)
     sys.stderr.write(f"error: cannot infer platform from {base!r}; pass --platform\n")
     raise SystemExit(2)
 
@@ -255,9 +277,11 @@ def main(argv=None):
     if not os.path.isfile(args.variant):
         sys.stderr.write(f"error: no such variant file: {args.variant}\n")
         return 2
-    platform = infer_platform(args.variant, args.platform)
+    # Profiles load FIRST: a delivered basename resolves its platform from the
+    # projection dir each profile declares (#715), so inference needs them.
     pdir = pp.profiles_dir(pp.host_root(args.root), args.profiles_dir)
     profiles, _ = pp.load_profiles(pdir)
+    platform = infer_platform(args.variant, args.platform, profiles)
 
     findings = lint(args.variant, platform, profiles, args.dest_repo)
 

@@ -35,5 +35,22 @@ packaging:
   layout:
     repo: articles
     dir: articles/
+    # THE DELIVERED FILENAME IS ZENN'S SLUG (#715). Zenn derives an article's
+    # slug from the delivered basename and its rule forbids dots, so the
+    # pipeline's own `<slug>.<platform>.md` convention cannot cross this
+    # boundary: `articles/` is Zenn's externally imposed delivery target, and
+    # this profile is a conformance record of that sync contract. The mapping
+    # applies ONLY at delivery — the co-located `drafts/` name is untouched.
+    #
+    # The delivered basename is the article's PERMANENT identity (its URL).
+    # Renaming after first publish forks the article, so decide it before the
+    # first `published: true` and treat it as immutable per article afterwards.
+    basename:
+      rule: slug-dots-to-hyphens   # tanuki-x.ja + zenn -> tanuki-x-ja
+      slug_pattern: '^[a-z0-9_-]{12,50}$'
+      # Reported separately so a finding says WHICH way to fix the name.
+      slug_charset: '[^a-z0-9_-]'
+      slug_min_length: 12
+      slug_max_length: 50
 
 distribution_hook: zenn-follow
