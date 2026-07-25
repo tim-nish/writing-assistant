@@ -257,9 +257,39 @@ per publish decision.**
   (`:86`), which is exactly where a delivered-name rule belongs.
   - **The profile declares the mapping**; emission applies it **only at
     placement**. A profile declaring none keeps the `<slug>.<platform>.md`
-    delivery unchanged, so no other platform is affected. This stays
-    declaration, not code — adding a platform remains one profile file (CAP-6),
-    and no language or platform is branched on.
+    delivery unchanged. This stays declaration, not code — adding a platform
+    remains one profile file (CAP-6), and no language or platform is branched
+    on.
+  - **The silent fallback is legitimate only where the delivered name carries
+    no identity, and that is a DECLARED fact (amended 2026-07-26, triage
+    #719).** The original wording justified the fallback as "no other platform
+    is affected" — a blast-radius claim about *other* platforms, which silently
+    covered the platform the mapping exists for. Declaring `layout.dir` is not
+    the discriminator: all four shipped profiles declare one (`devto/`,
+    `newsletter/`, `newsletter/`, `articles/`) and only Zenn's target is
+    externally imposed — "`devto/` was *our* organizational choice; `articles/`
+    is *Zenn's* — an externally imposed delivery target" (`consulted:
+    product-lab@34a6119 topics/articles.md:13`). So the profile states the fact
+    directly:
+
+    ```yaml
+    layout:
+      identity_from_basename: true   # the platform derives its slug from the
+                                     # delivered filename
+    ```
+
+    Absent or false, the `<slug>.<platform>.md` delivery is the contracted
+    outcome and nothing is reported. True, the two clauses below bind.
+  - **Emission discloses a missing mapping on an identity-bearing target.** A
+    profile declaring `identity_from_basename: true` with no `basename` mapping
+    delivers a literal `<slug>.<platform>.md` into a target that will derive a
+    permanent identity from it — a CAP-6 publish blocker naming the delivered
+    basename and the absent declaration, never a silent default. Its legality
+    is reported **cannot-determine** (no declared `slug_pattern` to check
+    against), never as a pass: an unevaluated rule is not a satisfied one. The
+    rule is carried where it is violated — at emission — because a prohibition
+    stated one layer up is enforced by whichever consideration is strongest
+    when the moment arrives (`consulted: product-lab@34a6119 LESSONS.md:28`).
   - **Every basename join resolves through the declared mapping — this is the
     replacement discovery mechanism, not an afterthought.** Discovery was
     promoted to a stated property of the layout precisely so this could not be
@@ -284,6 +314,41 @@ per publish decision.**
     immutable per article afterwards. This is why the decision was taken now:
     both delivered Zenn files sit at `published: false`, so nothing is
     live-broken and the identity is still free to choose.
+- **A seeded platform profile is a conformance copy of the shipped example, so
+  it carries a mechanical drift check (added 2026-07-26, triage #719).** Seeding
+  copies the example once and then correctly refuses to overwrite an
+  owner-edited file, so a load-bearing declaration the example gains later
+  never reaches any existing installation — and where the missing declaration
+  also gates a lint, its absence disables the very check that would have
+  reported the consequence. Observed 2026-07-26: the live zenn profile,
+  seeded before the amendment above, has no `basename` block and no
+  `slug_pattern`, so both halves of the #715 fix were inert and a re-emission
+  delivered the illegal dot-name with no finding.
+
+  This is the conformance-copy shape and it is resolved the way that shape is
+  always resolved here — "a tool's config may hold copies of facts whose
+  authority lives elsewhere only under a declared precedence rule (which side
+  wins on mismatch) plus a mechanical mismatch check; a copy without one is a
+  second authority growing in the dark" (`consulted: product-lab@34a6119
+  LESSONS.md:55`). The precedence half is already declared for *layout* (the
+  destination repo wins, `topics/articles.md:86`); the missing half is the
+  check:
+  - a seeded profile carries a **`seed_version`** stamp written by the seeder;
+  - profile validation **diffs the seeded profile's declared key set against
+    the shipped example's** and reports keys the example has since gained;
+  - the report is **report-only** — the example is authoritative for schema
+    **presence** only, never for values. Owner edits stay sovereign, and no
+    profile is rewritten. An absent stamp means pre-stamp, and is diffed anyway
+    rather than skipped.
+
+  Report-only rather than refusal is deliberate: the failure is an *absence*,
+  which produces no event to gate, so its carrier is a signal that makes the
+  absence visible (`consulted: product-lab@34a6119 LESSONS.md:28`), and a
+  binary verdict over a graded migration manufactures confidence exactly where
+  the process is degrading (`LESSONS.md:35`). The emission disclosure above and
+  this check are **non-substitutable**: a drift report the owner never runs
+  still delivers the illegal name, and an emission blocker still leaves the
+  next example-gained key to drift silently.
 - Inherited from the pipeline spec unchanged: no invented evidence; attention
   budget ≤10 minutes per article including all variant touchpoints; validator
   convergence (#206) applies to the platform lint — the lint's rejectable forms
