@@ -89,6 +89,7 @@ cat > "$work/fill.json" <<'EOF'
     {"source_section": "What it cost", "disposition": "drop", "note": "internal staffing cost carries no meaning for this reader"}
   ],
   "recomposed_title": "リトライ暴走を止める",
+  "recomposed_summary": "指数バックオフに上限を設け、予算アラートを追加した経緯と結果をまとめました。",
   "omissions": [
     {"section": "What it cost", "what": "the two engineer-days figure",
      "reason": "an internal staffing number this reader cannot use",
@@ -342,6 +343,66 @@ for f in ('structure','section order','payoff position','framing','register','ti
     assert f in o['free'], (f, o['free'])
 " && ok "structure, order, payoff position, framing, register and title are never reported" \
   || err "the claims check reports something CAP-2 leaves free"
+
+# --- CAP-4: `summary` is authored for the target reader (Story 18.107, #700) --
+# A summary is a TELLING, so the derivation re-decides it; every other inherited
+# field stays verbatim. The source fixture's `summary:` is a folded BLOCK scalar,
+# which is the case that made this more than a dict entry: overriding the key
+# without dropping its continuation lines left the old English prose behind.
+python3 - "$work" <<'PY' || exit 1
+import sys, os, importlib.util
+work = sys.argv[1]
+here = os.path.join(os.getcwd(), "scripts")
+spec = importlib.util.spec_from_file_location("draft_pipeline", os.path.join(here, "draft-pipeline.py"))
+dp = importlib.util.module_from_spec(spec); spec.loader.exec_module(dp)
+fail = []
+def ok(m): print(f"ok:   {m}")
+def bad(m): fail.append(m); print(f"FAIL: {m}", file=sys.stderr)
+
+derived = open(os.path.join(work, "drafts", "retry-storms.ja.md"), encoding="utf-8").read()
+fields, body = dp._read_frontmatter(derived)
+summary = str(fields.get("summary") or "")
+(ok if "予算アラート" in summary else bad)(
+    f"derived `summary` is the authored target-language text (got {summary[:40]!r})")
+(ok if "innocuous retry policy" not in derived.split("---")[1] else bad)(
+    "the source's English summary is GONE from the derived frontmatter (block-scalar "
+    "continuation dropped with the value it belonged to)")
+# The fields the derivation does NOT own stay inherited, verbatim.
+(ok if fields.get("date") == "2026-07-09" else bad)(
+    f"`date` is still inherited from the source (OQ3 — got {fields.get('date')!r})")
+(ok if "llm-ops" in (fields.get("topics") or []) else bad)("`topics` still inherited")
+sys.exit(1 if fail else 0)
+PY
+[ $? -eq 0 ] || err "derived summary/inheritance checks failed"
+
+# A plan with no authored summary never reaches the owner.
+python3 - "$work/fill.json" > "$work/fill-nosummary.json" <<'PY'
+import json, sys
+d = json.load(open(sys.argv[1], encoding="utf-8")); d.pop("recomposed_summary", None)
+json.dump(d, sys.stdout, ensure_ascii=False)
+PY
+if $A plan --slug retry-storms --target zenn $ARGS --fill "$work/fill-nosummary.json" \
+     >/dev/null 2>"$work/e-nosummary"; then
+  err "a plan with no recomposed_summary was accepted"
+else
+  grep -q 'recomposed_summary' "$work/e-nosummary" \
+    && ok "a plan missing recomposed_summary is refused, naming the slot (#700)" \
+    || err "wrong refusal: $(cat "$work/e-nosummary")"
+fi
+python3 - "$work/fill.json" > "$work/fill-emptysummary.json" <<'PY'
+import json, sys
+d = json.load(open(sys.argv[1], encoding="utf-8")); d["recomposed_summary"] = "   "
+json.dump(d, sys.stdout, ensure_ascii=False)
+PY
+$A plan --slug retry-storms --target zenn $ARGS --fill "$work/fill-emptysummary.json" \
+  >/dev/null 2>&1 \
+  && err "an empty recomposed_summary was accepted" \
+  || ok "an empty recomposed_summary is refused (#700)"
+# The owner sees it at the gate they already answer — no second screen.
+$A payload --slug retry-storms --target zenn $ARGS --fill "$work/fill.json" \
+  | grep -q '予算アラート' \
+  && ok "the re-composed summary rides the CAP-3 gate payload (#700)" \
+  || err "the gate payload does not carry the summary the owner approves"
 
 # --- CAP-4 re-derivation: the recorded answer is the ownership token ---------
 # Story 18.105 (#693): the first derivation succeeded and EVERY re-derivation was

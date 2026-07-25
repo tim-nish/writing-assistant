@@ -96,6 +96,7 @@ cat > "$work/fill.json" <<'EOF'
     {"source_section": "What we changed", "disposition": "keep", "note": "the how-to core, unchanged in order"}
   ],
   "recomposed_title": "リトライ暴走を止める",
+  "recomposed_summary": "指数バックオフに上限を設け、予算アラートを追加した経緯と結果をまとめました。",
   "omissions": []
 }
 EOF
@@ -237,6 +238,7 @@ cat > "$work/fill2.json" <<'EOF'
     {"source_section": "What it cost", "disposition": "drop", "note": "internal staffing cost carries no meaning for this reader"}
   ],
   "recomposed_title": "リトライ暴走を止める",
+  "recomposed_summary": "指数バックオフに上限を設け、予算アラートを追加した経緯と結果をまとめました。",
   "omissions": [
     {"section": "What it cost", "what": "the engineer-days figure",
      "reason": "an internal staffing number this reader cannot use"}

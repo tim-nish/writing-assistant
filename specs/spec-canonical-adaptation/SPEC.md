@@ -12,6 +12,8 @@ sources:
 
 > **Amended 2026-07-25 (triage, #693)** per /triage-gh on an unreachable re-derivation: CAP-4's write went through the pipeline's one canonical write path with **no ownership channel** (`scripts/adapt-canonical.py:561-562` passed neither `ws`, `owned`, nor `replace`), so the #666 no-clobber gate refused every re-derivation of an already-derived slug while the first one succeeded, and CAP-5's clearing instruction — "re-adaptation is a FRESH owner decision through this invocation" — pointed at an invocation that dead-ended at the refusal. **The owner's recorded answer at the CAP-3 gate IS the ownership token for the derived slug**: a `write` whose workspace holds a presented payload for *this* derived slug and a latest recorded answer of `approve` or `modify` is authorized to replace the existing derived canonical, and the refusal for a **foreign** collision (no gate, no recorded answer) survives unchanged. The token is that **verified conjunction**, never a bare override flag — `adapt-canonical write` exposes no `--replace-canonical`, so the only path to a re-derivation remains the gate itself (`consulted: product-lab@34a6119666896f232e1aa00789c3f916bc2b6dad topics/knowledge-architecture.md:67, topics/claude-code-ops.md:19`). Note the mechanism this cannot reuse: an adaptation workspace holds `presented-payloads.jsonl` but **no** `checkpoint.json`, so the draft flow's checkpoint-based `_ws_owns_slug` discriminator (`scripts/draft-pipeline.py:4744-4759`) is false by construction here — ownership is read from the **recorded-answer log**, which is the artifact this invocation actually produces. The gate's comparison basis and the trailer's demotion to a non-authoritative attestation are SPEC-article-draft-pipeline's (amended same sitting, #693/#695); this spec states only what authorizes the adaptation write.
 
+> **Amended 2026-07-25 (triage, #700)** per /triage-gh on the first real derived canonical's inherited metadata (`drafts/tanuki-honest-automation.ja.md`): the derivation re-declared only `slug`, `title`, `language`, `audience`, `audience_id` (`scripts/adapt-canonical.py:441`) and inherited every other frontmatter field verbatim, so a file declaring `language: ja` carried an **English `summary`** and the **source's creation date**. Two fields, two different authorities, and the decision splits along that line. **`summary` is TELLING, so the adaptation re-decides it** — "adaptation re-decides telling, never truth" (`consulted: product-lab@34a6119666896f232e1aa00789c3f916bc2b6dad topics/articles.md:55`; note the ratified per-article list names *structure and depth*, so this **extends** that line to metadata rather than merely applying it). `summary` therefore joins CAP-3's authored slots and CAP-4's re-declared fields: the owner approves the target-language summary at the **same gate** that already carries the plan, so no new interaction appears. **`date` stays inherited, and this spec declares only that.** What the field *means* — the date this canonical came into being, or the date of the underlying work — is **undeclared anywhere today**: the articles repo's `## Schemas` block declares drafts' additions and the `adapted_from` pin but carries no `date` field, and this tool's config declares `date  # YYYY-MM-DD` (`config/user-config.example.yaml:82`), which is a format and not a semantics. That meaning belongs to the **articles-repo schema**, which is the declared authority for the field set a canonical carries (`consulted: product-lab@34a6119666896f232e1aa00789c3f916bc2b6dad topics/articles.md:32` — schema-is-the-API; a shipped-ahead writer does not amend a ratified decision by fait accompli, which is the *first-derivation-fixes-the-shape* failure this very artifact would otherwise commit). It is carried below as an **open question routed there**, not answered here, and the derivation's behavior for `date` is unchanged. Everything still outside CAP-4's re-declared set remains inherited verbatim by design.
+
 > **Canonical contract.** This SPEC introduces the **adaptation step**: a
 > standalone, owner-gated invocation that derives a target-language canonical
 > (first target: Japanese) from a reviewed English canonical. It exists to keep
@@ -87,7 +89,10 @@ source material ──draft flow──▶ EN canonical ──emit──▶ devto
     move, merge, or reorder — e.g. payoff-first for JA tech-article norms vs
     the EN incident-led narrative), register (です/ます for `ja`), terminology
     treatment (technical terms kept in English/established katakana, never
-    force-translated), the re-composed title, and any declared omission.
+    force-translated), the re-composed title, the **re-composed `summary`**
+    (amended 2026-07-25, #700 — a summary is a telling of the article, so it is
+    authored for the target reader rather than inherited in the source
+    language), and any declared omission.
     Adaptation depth varies per article — a how-to may map nearly 1:1, an
     incident narrative may restructure — so the plan is proposed fresh each
     time; only the invariants (register, terminology convention, CAP-2) are
@@ -101,7 +106,10 @@ source material ──draft flow──▶ EN canonical ──emit──▶ devto
   - **intent:** The output is persisted at the resolved `output.drafts` as
     `{slug}.ja.md` with full canonical frontmatter: its own `slug`
     (`{slug}.ja`), `mode: canonical`, `language: ja`, the target
-    `audience`/`audience_id`, and an **ancestry pin**
+    `audience`/`audience_id`, the **target-language `summary`** authored at the
+    CAP-3 gate (amended 2026-07-25, #700; every field outside this re-declared
+    set — `date`, `topics`, `related`, `generated_by` — stays inherited from the
+    source verbatim, by design), and an **ancestry pin**
     `adapted_from: <source slug>@<source hash>` recording the source
     canonical's content hash — the same hash convention the variant trailer
     uses (sha256 over content without trailer), spelled to reuse the
@@ -159,3 +167,19 @@ source material ──draft flow──▶ EN canonical ──emit──▶ devto
 - **OQ2 — review depth for derived canonicals.** Whether the full 9-axis rubric
   or a reduced language/framing + claims-conformance pass applies. CAP-4 sets
   the floor; the ceiling is an owner decision at first real use.
+- **OQ3 — what `date` MEANS on a canonical (routed OUT of this spec, not open
+  here).** Added 2026-07-25 (#700). Observed on the first derived canonical:
+  `tanuki-honest-automation.ja.md` was derived on 2026-07-25 and carries
+  `date: 2026-07-24`, the source's. Whether that is correct depends on a
+  semantics **no surface declares** — the articles repo's `## Schemas` block
+  carries no `date` field for drafts, and this tool's config declares
+  `date  # YYYY-MM-DD`, a format (`config/user-config.example.yaml:82`). The two
+  readings ("this canonical came into being" vs "the underlying work's date")
+  diverge on **every** derived canonical, so the field needs a stated meaning.
+  **This spec does not supply it**: the field set a canonical carries is the
+  articles-repo schema's contract and this tool is its implementation
+  (`consulted: product-lab@34a6119666896f232e1aa00789c3f916bc2b6dad
+  topics/articles.md:32`), so declaring it here would be the fait-accompli shape
+  that line forbids. The action is an edit to the articles repo's schema block;
+  until it lands, `date` is **inherited** (CAP-4) and that inheritance is
+  behavior, not a claim about what the field means.

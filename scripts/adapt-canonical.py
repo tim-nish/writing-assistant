@@ -108,7 +108,8 @@ DISPOSITIONS = ("keep", "move", "merge", "split", "drop")
 
 # Slots the invoking skill authors. Register and terminology are absent by
 # design — they are declared data, not per-article proposals.
-FILL_SLOTS = ("refounded_opening", "structural_mapping", "recomposed_title", "omissions")
+FILL_SLOTS = ("refounded_opening", "structural_mapping", "recomposed_title",
+              "recomposed_summary", "omissions")
 DECLARED_ONLY = ("register", "terminology")
 
 SECTION_RE = re.compile(r"^(#{2,6})\s+(.*\S)\s*$", re.MULTILINE)
@@ -300,12 +301,21 @@ def merge_fill(plan, fill):
 
     opening = str(fill.get("refounded_opening") or "").strip()
     title = str(fill.get("recomposed_title") or "").strip()
+    summary = " ".join(str(fill.get("recomposed_summary") or "").split())
     if not opening:
         raise Refusal("refounded_opening is empty — the plan must state what context "
                       "the target reader lacks or already has")
     if not title:
         raise Refusal("recomposed_title is empty — the plan must state the re-composed "
                       "title for the target reader")
+    # A summary is a TELLING of the article, so the derivation authors it rather
+    # than inheriting the source language's (Story 18.107, #700). Length is NOT
+    # checked here: the 240-char bound belongs to `lint-article` (SUMMARY_MAX),
+    # and a second copy of that number would be a second authority for it.
+    if not summary:
+        raise Refusal("recomposed_summary is empty — a summary is a telling of the "
+                      "article, so the derivation authors it for the target reader "
+                      "instead of inheriting the source language's")
 
     mapping = fill.get("structural_mapping")
     if not isinstance(mapping, list) or not mapping:
@@ -371,7 +381,7 @@ def merge_fill(plan, fill):
     plan = dict(plan)
     plan.update({"filled": True, "refounded_opening": opening,
                  "structural_mapping": rows, "recomposed_title": title,
-                 "omissions": oms})
+                 "recomposed_summary": summary, "omissions": oms})
     plan.pop("slots", None)
     return plan
 
@@ -405,6 +415,7 @@ def compose_payload(plan):
             "register": plan["register"],
             "terminology": plan["terminology"],
             "recomposed title": plan["recomposed_title"],
+            "recomposed summary": plan["recomposed_summary"],
             "declared omissions": [
                 f"{o['section'] or '(no section)'}: {o['what']} — {o['reason']}"
                 for o in plan["omissions"]] or ["none — every source claim is carried"],
@@ -437,8 +448,14 @@ _ANCESTRY_PIN = re.compile(r"^(?P<slug>[^\s@]+)@(?P<sha>[0-9a-f]{64})$")
 
 # Frontmatter keys the derivation OWNS: the derived canonical is a canonical in
 # its own right, so these are re-declared for the target reader rather than
-# inherited from the source.
-DERIVED_KEYS = ("slug", "title", "language", "audience", "audience_id")
+# inherited from the source. `summary` joined them 2026-07-25 (Story 18.107,
+# #700) because a summary is a TELLING of the article, and adaptation's contract
+# is that telling is re-decided per language — a file declaring `language: ja`
+# described itself in English until it did. Everything outside this set (`date`,
+# `topics`, `related`, `generated_by`) is inherited verbatim by design; what
+# `date` MEANS is the articles-repo schema's to declare (SPEC-canonical-adaptation
+# OQ3), so it is not re-decided here.
+DERIVED_KEYS = ("slug", "title", "language", "audience", "audience_id", "summary")
 
 
 def derived_slug(source_slug, language):
@@ -470,6 +487,17 @@ def parse_ancestry(fields):
     return {"slug": m.group("slug"), "canonical_sha256": m.group("sha")}, None
 
 
+def _fm_scalar(key, value):
+    """One frontmatter line. Prose-bearing values are emitted as double-quoted
+    scalars via `json.dumps` (YAML's double-quoted form is JSON-compatible for
+    these strings), so a title or summary containing a colon, a quote or a
+    fullwidth character cannot break the block it sits in. Enum-ish values stay
+    bare, exactly as before."""
+    if key in ("title", "summary"):
+        return f"{key}: {json.dumps(value, ensure_ascii=False)}"
+    return f"{key}: {value}"
+
+
 def compose_derived(source_text, source_fields, plan, target, ancestry, body):
     """Build the derived canonical's text: the source's frontmatter with the
     derivation-owned keys re-declared for the target reader plus the ancestry
@@ -485,23 +513,34 @@ def compose_derived(source_text, source_fields, plan, target, ancestry, body):
         "language": target["language"],
         "audience": target["audience"],
         "audience_id": target["audience"],
+        "summary": plan["recomposed_summary"],
         "mode": "canonical",
     }
     out, written = [], set()
+    skipping_block = False
     for line in lines[1:end]:
         m = re.match(r"^([A-Za-z_][\w-]*):\s*(.*)$", line)
         key = m.group(1) if m else None
+        # An overridden key whose source value was a BLOCK SCALAR (`>` or `|`)
+        # continues over indented lines that match no key — they belong to the
+        # value being replaced, so they are dropped with it. Without this, an
+        # overridden `summary: >` kept the old English prose as stray lines
+        # under the new value (Story 18.107, #700).
+        if skipping_block:
+            if key is None and (line.startswith((" ", "\t")) or not line.strip()):
+                continue
+            skipping_block = False
         if key == ANCESTRY_KEY:
             continue                      # never inherit a grandparent's ancestry
         if key in overrides:
-            out.append(f'{key}: "{overrides[key]}"' if key in ("title",)
-                       else f"{key}: {overrides[key]}")
+            out.append(_fm_scalar(key, overrides[key]))
             written.add(key)
+            skipping_block = m.group(2).strip() in (">", "|", ">-", "|-", ">+", "|+")
             continue
         out.append(line)
     for key, val in overrides.items():
         if key not in written:
-            out.append(f'{key}: "{val}"' if key in ("title",) else f"{key}: {val}")
+            out.append(_fm_scalar(key, val))
     out.append(f'{ANCESTRY_KEY}: {ancestry["slug"]}@{ancestry["canonical_sha256"]}')
     return "---\n" + "\n".join(out) + "\n---\n\n" + body.strip("\n") + "\n"
 
