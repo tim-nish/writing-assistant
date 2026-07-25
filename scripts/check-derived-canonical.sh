@@ -65,6 +65,9 @@ summary: >
   How an innocuous retry policy tripled load and what we changed.
 topics: [llm-ops, reliability]
 related: { projects: [], publications: [], products: [] }
+syndication:
+  devto:
+    canonical_url: https://example.com/retry-storms
 ---
 
 ## The incident
@@ -504,6 +507,57 @@ $A write --help 2>&1 | grep -q 'replace-canonical' \
   && err "\`adapt-canonical write\` grew a --replace-canonical flag (#693 forbids it)" \
   || ok "no override flag on the adaptation surface (authorization is the gate)"
 cp "$work/foreign-backup.md" "$work/drafts/retry-storms.ja.md"
+
+# --- CAP-4: `syndication` is DROPPED, not inherited (Story 18.111, #710) ------
+# The source fixture above carries a NESTED syndication block, which is the shape
+# that produced the defect: a `language: ja` derivation declaring a devto
+# canonical_url for the English piece. A naive key-line drop would also strand its
+# indented children as orphans and produce malformed frontmatter.
+python3 - "$work/drafts/retry-storms.ja.md" "$work/drafts/retry-storms.md" <<'PY' || exit 1
+import os, sys, importlib.util
+derived_path, source_path = sys.argv[1], sys.argv[2]
+here = os.path.join(os.getcwd(), "scripts")
+spec = importlib.util.spec_from_file_location("draft_pipeline", os.path.join(here, "draft-pipeline.py"))
+dp = importlib.util.module_from_spec(spec); spec.loader.exec_module(dp)
+fail = []
+def ok(m): print(f"ok:   {m}")
+def bad(m): fail.append(m); print(f"FAIL: {m}", file=sys.stderr)
+
+derived = open(derived_path, encoding="utf-8").read()
+fm_text = derived.split("---")[1]
+fields, _body = dp._read_frontmatter(derived)
+
+# The source really does carry it — otherwise this whole case is vacuous.
+source_text = open(source_path, encoding="utf-8").read()
+src_fields, _ = dp._read_frontmatter(source_text)
+# PRESENCE, not truthiness: the frontmatter reader does not recurse into a nested
+# mapping, so `syndication` parses to '' — a truthiness check here would report
+# the fixture as missing the block it demonstrably has.
+(ok if "syndication" in src_fields and "canonical_url:" in source_text.split("---")[1]
+ else bad)(
+    "#710 fixture: the SOURCE carries a nested syndication block (else this case "
+    "proves nothing)")
+
+(ok if "syndication" not in fields else bad)(
+    f"#710: the derivation carries no syndication key (got {fields.get('syndication')!r})")
+# Its indented children are gone with it — no orphaned fragments.
+for orphan in ("devto:", "canonical_url:"):
+    (ok if orphan not in fm_text else bad)(
+        f"#710: the dropped block's child {orphan!r} is not stranded in the frontmatter")
+# And the frontmatter still parses into the fields the schema needs.
+for key in ("slug", "title", "language", "audience", "summary", "date", "topics"):
+    if not fields.get(key):
+        bad(f"#710: frontmatter no longer parses field {key!r} after the drop")
+else:
+    ok("#710: the derived frontmatter still parses every schema field after the drop")
+# The other inherited fields are untouched — one exception, not a filter.
+(ok if fields.get("date") == "2026-07-09" else bad)(
+    "#710: `date` is still inherited (the exception is syndication alone)")
+(ok if "llm-ops" in (fields.get("topics") or []) else bad)(
+    "#710: `topics` is still inherited")
+sys.exit(1 if fail else 0)
+PY
+[ $? -eq 0 ] || err "#710 dropped-syndication checks failed"
 
 # --- CAP-3: the gate discloses a REPLACEMENT (Story 18.109, #705) -------------
 # The payload said "writes the derived canonical ..." whether or not one was
