@@ -74,6 +74,7 @@ mode: canonical
 language: en
 audience: en-practitioner
 audience_id: en-practitioner
+generated_by: writing-assistant@0.0.0-test+deadbee   # immutable birth record (#709)
 summary: >
   How an innocuous retry policy tripled load and what we changed.
 topics: [llm-ops, reliability]

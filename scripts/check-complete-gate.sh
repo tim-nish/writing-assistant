@@ -58,6 +58,7 @@ title: "Retry storms doubled our token spend"
 language: en
 audience: en-practitioner
 audience_id: en-practitioner
+generated_by: writing-assistant@0.0.0-test+deadbee   # immutable birth record (#709)
 ---
 
 ## Hook
@@ -226,6 +227,63 @@ grep -q 'disagrees with its own content' "$work/e_foreign" \
 # Restore a coherent canonical for the checks that follow.
 python3 "$DP" complete --draft "$ws/draft2.md" --slug "$slug" --root "$h" --ws "$ws" >/dev/null
 
+# 3b-ter. The birth record is ASSERTED AT THE WRITE (Story 18.112, #709).
+#     A missed record is unrecoverable — it is immutable and the join key to the
+#     run artifact — so the write refuses rather than letting the completion gate
+#     warn about it afterwards.
+wsb="$work/wsbirth"; mkdir -p "$wsb"
+sed '/^generated_by:/d' "$ws/draft.md" > "$wsb/draft.md"
+grep -q '^generated_by:' "$wsb/draft.md" \
+  && err "#709 fixture: the birth record was not actually removed (case is vacuous)" \
+  || ok "#709 fixture: a draft with the birth record stripped"
+before_birth=$(cat "$a/drafts/$slug.md")
+if python3 "$DP" complete --draft "$wsb/draft.md" --slug birth-probe --root "$h" --ws "$wsb" \
+     >/dev/null 2>"$work/e_birth"; then
+  err "#709: a canonical with no birth record was persisted"
+else
+  grep -q 'generated_by' "$work/e_birth" \
+    && grep -q 'Nothing was persisted' "$work/e_birth" \
+    && ok "#709: no birth record refuses the write, naming the field (#709)" \
+    || err "#709: wrong refusal: $(cat "$work/e_birth")"
+fi
+[ ! -f "$a/drafts/birth-probe.md" ] \
+  && ok "#709: nothing was persisted on the refusal" \
+  || err "#709: a canonical landed despite the refusal"
+[ ! -f "$wsb/checkpoint.json" ] \
+  && ok "#709: no checkpoint on a birth-record refusal" \
+  || err "#709: checkpoint written despite the refusal"
+# A MALFORMED record is refused too — presence alone is not the contract.
+sed 's|^generated_by:.*|generated_by: not-a-birth-record|' "$ws/draft.md" > "$wsb/draft-bad.md"
+python3 "$DP" complete --draft "$wsb/draft-bad.md" --slug birth-probe2 --root "$h" --ws "$wsb" \
+  >/dev/null 2>"$work/e_birth2" \
+  && err "#709: a malformed birth record was persisted" \
+  || grep -q 'is not' "$work/e_birth2" \
+     && ok "#709: a malformed birth record refuses the write" \
+     || err "#709: wrong malformed-record refusal: $(cat "$work/e_birth2")"
+# The renderer's real shape — value plus a trailing comment — still passes. This
+# is the case that would have made the assertion refuse every real canonical.
+python3 - <<'PYBR' && ok "#709: the renderer's trailing-comment shape is accepted (not refused)" || err "#709: the assertion rejects the shape the renderer emits"
+import importlib.util, os, sys
+spec = importlib.util.spec_from_file_location("dp", os.path.join("scripts", "draft-pipeline.py"))
+dp = importlib.util.module_from_spec(spec); spec.loader.exec_module(dp)
+text = ("---\nslug: x\n"
+        "generated_by: writing-assistant@0.1.0+07a3cd7   # immutable birth record — set at creation, never updated\n"
+        "---\n\nbody\n")
+try:
+    dp._assert_birth_record(text, "/tmp/x.md")
+except Exception as e:
+    print("  refused the renderer's own shape:", e, file=sys.stderr); sys.exit(1)
+PYBR
+# The #674 partition is UNCHANGED: birth-record is not moved to schema-class.
+python3 - <<'PYPART' && ok "#709: the #674 schema-vs-style partition is unchanged" || err "#709: the completion-gate partition was altered"
+import re, sys
+src = open("scripts/draft-pipeline.py", encoding="utf-8").read()
+if not re.search(r'code in \("schema", "title"\)', src):
+    print("  the schema/title partition test is gone", file=sys.stderr); sys.exit(1)
+if "birth-record" in src.split("lint_schema_fail")[1][:400]:
+    print("  birth-record was added to the hard-error partition", file=sys.stderr); sys.exit(1)
+PYPART
+
 # 3c. Completion-gate lint (Story 18.99, #674): a frontmatter BOUNDS violation
 #     (summary > 240) is a hard error with no done checkpoint; style-class
 #     findings are disclosed warnings, never blocking completion.
@@ -238,6 +296,7 @@ title: "A short title"
 language: en
 audience: en-practitioner
 audience_id: en-practitioner
+generated_by: writing-assistant@0.0.0-test+deadbee   # immutable birth record (#709)
 summary: "$long"
 ---
 
