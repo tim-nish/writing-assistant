@@ -108,10 +108,23 @@ check(z.get("profile_language") == "ja" and z.get("canonical_language") == "en",
       "the adapt-first entry names both languages")
 check("adapt canonical retry-storms for zenn" in z.get("route", ""),
       "the adapt-first entry names the route through adaptation")
-check("derives a ja canonical" in z.get("effect", "")
-      and "Nothing is emitted until" in z.get("effect", "")
-      and len(z["effect"]) <= 140,
-      "the adapt-first entry states its concrete effect on the artifact")
+# The effect line is asserted by PROPERTY, never by literal wording (#790).
+# Pinning the exact sentence is what froze "derives a ja canonical" in place:
+# the wording could not be fixed without failing this check, so a check meant
+# to protect the owner's screen was what kept jargon on it. These four
+# properties are the contract; the sentence is authoring.
+eff = z.get("effect", "")
+check(z.get("profile_language", "\0") in eff,
+      "the adapt-first effect names the target language")
+check("separate" in eff and "article" in eff,
+      "the adapt-first effect says a separate article is produced")
+check("Nothing is emitted until" in eff,
+      "the adapt-first effect states nothing is emitted before approval")
+check(len(eff) <= 140,
+      f"the adapt-first effect fits the 140-char budget (is {len(eff)})")
+jargon = [w for w in ("canonical", "projection", "retarget") if w in eff.lower()]
+check(not jargon,
+      f"the adapt-first effect speaks the owner's register (found: {jargon})")
 # Same-language behaviour is untouched: `available` is still the configured set.
 check(o["available"] == ["devto", "zenn"],
       "the configured set is reported unchanged (config truth is not rewritten)")

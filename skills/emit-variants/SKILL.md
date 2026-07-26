@@ -172,11 +172,17 @@ The preflight JSON splits the configured platforms in two: `direct` is what may
 be projected from this canonical, and `adapt_first` lists any platform whose
 profile `language` differs from the canonical's. Offer nothing from
 `adapt_first` as an emit choice. Offer it instead as its own option stating the
-route and its concrete effect on the artifact — the entry carries both:
+route and its concrete effect on the artifact — the entry carries both.
 
-> Adapt first for zenn — derives a ja canonical from this one; that canonical
-> emits to zenn with no retarget step. Nothing is emitted until you approve its
-> plan.
+The effect line speaks **the owner's register, not the pipeline's** (#790): the
+owner reads it at the moment of choosing and has nowhere to look up `canonical`,
+`projection` or `retarget`. `check-cross-language-offer.sh` asserts the line's
+properties — it names the target language, says a separate article is produced,
+states nothing is emitted before approval, and fits 140 characters — and
+deliberately does **not** pin its wording:
+
+> Adapt first for zenn — creates a separate ja article from this one; zenn
+> publishes that instead. Nothing is emitted until you approve its plan.
 
 Choosing it ends this invocation: adaptation is a separate, owner-gated
 invocation, and emission never fires it. `direct` platforms are offered
