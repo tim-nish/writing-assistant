@@ -105,7 +105,7 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/write-article-plan.py conformance \
 ## Completion summary
 
 End every run with the shared
-[**completion summary**](../completion-summary.md)
+[**completion summary**](../../completion-summary.md)
 (`${CLAUDE_PLUGIN_ROOT}/skills/completion-summary.md`): the three labelled buckets
 — **informational notes**, **publish blockers**, **optional cleanup** — followed
 by an explicit **next step presented as an in-conversation choice** (here: "run
@@ -195,7 +195,7 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py variants --slug <slug> -
 The full contract — platform listing, the owner's explicit emission choice,
 the lede re-targeting proposal, per-platform visual rendering, the platform
 lint, the stale-variant check, the post-publish site record, and those
-subcommands' flag reference — lives in [`variants.md`](variants.md)
+subcommands' flag reference — lives in [`variants.md`](../variants.md)
 (`${CLAUDE_SKILL_DIR}/variants.md`). A canonical that exists only in a run
 workspace is refused there with a pointed error naming the expected persisted
 path — run `complete` first.
@@ -207,7 +207,7 @@ pipeline order. This is the authoritative flag list — consult it instead of
 `--help` or the script source. Positional args are shown in `<angle brackets>`;
 `-` means "read from stdin". The variant-emission subcommands (`variants`,
 `variant-staleness`, `site-record`) are post-review, not part of this flow —
-their reference lives in [`variants.md`](variants.md).
+their reference lives in [`variants.md`](../variants.md).
 
 | Subcommand | Stage | Purpose | Args / flags |
 |---|---|---|---|
