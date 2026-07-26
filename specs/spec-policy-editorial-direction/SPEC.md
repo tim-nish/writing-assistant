@@ -47,7 +47,7 @@ every extension below must preserve:
   candidacy**: it is one **instance** of the seam's four-invariant proposal
   rule (SPEC-policy-source-seam §Constraints, amended #670 — "may PROPOSE …
   hub-element candidacy"), and its mechanism for element candidacy is fully
-  contracted by SPEC-topic-map's #669 amendment (`spec-topic-map/SPEC.md:28-54`
+  contracted by SPEC-terrain's #669 amendment (`spec-terrain/SPEC.md:28-56`
   — Evidence-pointer matching against the fact sheet, three-valued verdict,
   and the no-episode → owner-attributed-framing tier, Story 17.1). No new
   capability is owed here; #687 is resolved by those two amendments.

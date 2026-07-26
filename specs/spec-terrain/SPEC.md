@@ -1,5 +1,5 @@
 ---
-id: SPEC-topic-map
+id: SPEC-terrain
 companions: []
 sources:
   - ../spec-article-draft-pipeline/SPEC.md   # CAP-9 / the coverage brief and structure proposer this map feeds
@@ -55,7 +55,93 @@ sources:
 > element (#671). This amendment strains the seam's ≤2-topic read bound, which
 > #670 deliberately does **not** widen — a separate decision (OQ, below).
 
-# Topic Map
+> **Amended 2026-07-26 (triage, #726)** per /triage-gh. The mechanism is
+> **renamed Terrain**, and four owner-ratified design stances are recorded.
+> The rename is **owner-facing only**, by selection: see the machine-key clause
+> below for what it deliberately does not touch.
+>
+> **Why the name changes.** "Topic" already carries a different definition in
+> Tsurezure — the hub's per-realm digest files (`topics/*.md`) — and the hub's
+> own internal mechanism is named **Gloss**. The map's artifacts had already
+> drifted to the new word on their own: the View titles itself "the terrain"
+> and describes itself in those terms throughout
+> (`scripts/topic-map-directions.py:794,817,757`). The harm the rename fixes is
+> a **collision in reading**, so the rename cuts exactly where reading happens.
+>
+> **1. Provisional framing.** Terrain is a mechanism for **surveying the Gloss
+> of hub Lessons** — an overview of the article ideas represented in Tsurezure.
+> When the ideas Terrain presents diverge from the owner's understanding of the
+> hub Lessons, **Terrain's behavior is revised case by case**: a divergence is a
+> Terrain defect signal, not a hub defect signal, by default. This is the same
+> direction the CAP-2 derivation clause already takes for cluster naming ("a
+> declared name a cluster disagrees with is the tool's defect, never the repo's")
+> generalized from wording to the whole survey.
+>
+> **2. Evidence-independence.** Terrain is independent of Evidence: **Evidence
+> determines whether a selected idea is currently writable, never whether it
+> appears on Terrain.** An idea with insufficient Evidence still appears — that
+> appearance is precisely how Terrain exposes architectural deficiencies (an
+> idea the owner wants but cannot write). This **confirms and names** the
+> three-valued-verdict / no-silent-filtering amendment above (2026-07-24,
+> #669): matched / episodic-unrecorded / no-episode all surface, and
+> **writability is a per-idea verdict attached at selection, never a display
+> filter**. Nothing in the 2026-07-24 mechanism changes; it gains a name for the
+> property it was already protecting.
+>
+> **3. Cluster representation is provisional — under dogfood.** The
+> subtopic-cluster unit ships as designed (CAP-2, OQ1 closed 2026-07-23) and is
+> explicitly provisional. **Named risk:** material the owner considers suitable
+> for several separate articles collapsing into one large cluster — if that
+> happens, Tsurezure keeps accumulating history without producing writable
+> article ideas. If dogfooding confirms it, the unit may shift toward a
+> **Lesson-and-Journey-centered model** (elements primary, clusters derived)
+> rather than cluster-centered.
+> **Tripwire (one occurrence):** a cluster the owner splits into ≥2 article
+> ideas at selection time. Occurrences are recorded in
+> `docs/dogfood-findings.md`, each naming the cluster and the ideas it was split
+> into.
+> **Partly discharged already, and stated so rather than re-promised:** OQ4's
+> resolution (below) gives the map a **second projection — typed elements
+> beside the subtopic cluster, not replacing it** — so the element layer is
+> already first-class for the servable types (`decision`, `reversal`). The
+> design obligation this stance adds is only that future work keep it that way,
+> so the pivot stays a re-projection rather than a rebuild.
+>
+> **4. Gap exposure is a feature.** The NEEDS-RECORDING worklist and the
+> writability verdicts are **products, not noise**. Terrain's exposure of the
+> gap between the article ideas the owner wants and the Lessons and Journeys
+> actually available is a stated strength, and no future change may treat that
+> output as an error condition to be suppressed.
+>
+> **Machine keys are out of scope, by selection (#726, Alternative A).** The
+> rename cuts at the boundary between what a *reader* reads and what a
+> *machine* keys on. Owner-facing surfaces take the new name: this spec's id and
+> directory, the skill's name and invocation wording, the View's header, and
+> owner-facing prose. The following are **internal machine keys with no
+> owner-facing reading and are deliberately unchanged** — script filenames
+> (`scripts/topic-map.py`, `scripts/topic-map-directions.py`), the depth-
+> threshold config (`config/topic-depth-thresholds.yaml`), the CAP-3 fixed View
+> path and its constants (`<destination-repo>/topic-map/<repo-key>/topic-map-view.md`,
+> `scripts/resolve-paths.py:157-158,189-191`), the `topic-map-view` subcommand
+> name, and the map's internal `topic`/`subtopic` grouping keys. This **extends
+> the existing owner-readable-wording clause** (CAP-2, "'Good' governs the
+> WORDING too") from cluster names to the whole naming surface: the clause
+> already held that an internal placeholder reaching owner-facing wording is the
+> tool's defect — this states the converse, that owner-facing vocabulary is not
+> owed to a path. Where an internal `topic` grouping key remains visible, its
+> wording must not be readable as a Tsurezure Topic.
+> **Consequence, stated so it is not rediscovered:** the CAP-3 View path is a
+> published-artifact location with a live file today
+> (`<articles>/topic-map/<repo-key>/topic-map-view.md`) and no discovery
+> mechanism pointing at any other name. A future change renaming it must supply
+> the migration rather than assume regeneration covers it.
+> **Forward-only.** Closed stories and merged issue titles keep their original
+> wording; nothing is retrofitted.
+> **Consult:** `policy_lookup` returned no served position on spec-rename scope
+> or on forward-only versus retrofit sweeps (`coverage: low`) — this decision is
+> the owner's, taken without a discriminating served line.
+
+# Terrain
 
 ## Why
 
