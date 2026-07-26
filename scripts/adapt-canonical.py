@@ -1024,6 +1024,82 @@ def cmd_payload(args):
     return 0
 
 
+ADOPTED_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
+def cmd_adopt(args):
+    """Owner-confirmed adoption of a hand-authored canonical (#745; the
+    SPEC-canonical-adaptation 2026-07-26 amendment). Mints the TRUTHFUL birth
+    record — `generated_by: owner-authored, adopted <date>` — on a canonical
+    born outside the pipeline, recording exactly what is true (hand authorship
+    and the adoption date), never a fabricated run pointer.
+
+    Propose/confirm split, matching the plugin's gate convention: without
+    --confirm this prints the gate payload (the file and the EXACT record to be
+    written) and writes NOTHING; with --confirm — the invoking skill presents
+    the gate and passes --confirm only on the owner's approval — the record is
+    written through the ONE canonical write path. At most once per canonical:
+    a source already carrying ANY birth record refuses (immutability — the
+    record is set at creation and never updated)."""
+    drafts_dir = os.path.realpath(dp._resolve_drafts_dir(args.root))
+    canonical_path = os.path.join(drafts_dir, f"{args.slug}.md")
+    if not os.path.isfile(canonical_path):
+        raise Refusal(
+            f"no persisted canonical at {canonical_path} — adoption mints a birth "
+            "record on an existing hand-authored canonical; it never creates one")
+    text = dp._strip_emission_trailer(open(canonical_path, encoding="utf-8").read())
+    fields, _body = dp._read_frontmatter(text)
+    if fields is None:
+        raise Refusal(
+            f"{canonical_path} has no frontmatter block — adoption records the "
+            "birth record as frontmatter, so the canonical must carry the "
+            "`article` schema first (see lint-article's schema findings)")
+    existing = fields.get("generated_by")
+    if isinstance(existing, str) and existing.strip():
+        raise Refusal(
+            f"{canonical_path} already carries `generated_by: {existing.strip()}` — "
+            "a birth record is immutable (set at creation, never updated), so an "
+            "adopted or pipeline-born canonical is never adoptable again")
+    date = (args.date or "").strip()
+    if args.confirm and not ADOPTED_DATE_RE.match(date):
+        raise Refusal("--confirm requires --date YYYY-MM-DD (the adoption date the "
+                      "record will carry; passed in, never read from a clock here)")
+    record = f"owner-authored, adopted {date or '<YYYY-MM-DD>'}"
+    if not args.confirm:
+        print(json.dumps({
+            "stage": "adopt-propose",
+            "file": canonical_path,
+            "slug": args.slug,
+            "record": f"generated_by: {record}",
+            "written": False,
+            "gate": ("present this to the owner under the proposal contract: "
+                     "approve -> re-run with --confirm --date <YYYY-MM-DD> "
+                     "(writes exactly the record above through the canonical "
+                     "write path); decline -> nothing is written"),
+        }, indent=2))
+        return 0
+    # Insert the record into the frontmatter block, before its closing ---.
+    lines = text.splitlines(keepends=True)
+    close = None
+    for i, ln in enumerate(lines[1:], start=1):
+        if ln.strip() == "---":
+            close = i
+            break
+    lines.insert(close, f"generated_by: {record}   # adopted (#745) — immutable; set once, never updated\n")
+    adopted_text = "".join(lines)
+    # The one canonical write path (#666/#693): the owner's approval at the
+    # adoption gate is the authorization this differing write executes.
+    try:
+        path, sha = dp._persist_canonical(adopted_text, args.slug, args.root,
+                                          owned=True)
+    except dp._CanonicalWriteError as exc:
+        raise Refusal(f"could not persist the adopted canonical at {exc.path}: {exc.reason}")
+    print(json.dumps({"stage": "adopt", "file": path, "slug": args.slug,
+                      "record": f"generated_by: {record}", "written": True,
+                      "canonical_sha256": sha}, indent=2))
+    return 0
+
+
 def main(argv=None):
     p = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -1068,6 +1144,18 @@ def main(argv=None):
                                       "derivation at the resolved output.drafts)")
     st.add_argument("--root", help="host repo root (default: git toplevel of cwd)")
 
+    ad = sub.add_parser("adopt",
+                        help="owner-confirmed adoption (#745): mint `generated_by: "
+                             "owner-authored, adopted <date>` on a hand-authored "
+                             "canonical; propose by default, write with --confirm")
+    ad.add_argument("--slug", required=True,
+                    help="slug of the hand-authored canonical at <output.drafts>/<slug>.md")
+    ad.add_argument("--root", help="host repo root (default: git toplevel of cwd)")
+    ad.add_argument("--date", help="adoption date (YYYY-MM-DD) the record carries; "
+                                   "required with --confirm")
+    ad.add_argument("--confirm", action="store_true",
+                    help="the owner approved the presented record — write it")
+
     cc = sub.add_parser("claims-check",
                         help="compare source and derived claim sets (CAP-2)")
     cc.add_argument("--source-map", required=True,
@@ -1083,7 +1171,7 @@ def main(argv=None):
         return USAGE
     fn = {"plan": cmd_plan, "payload": cmd_payload, "write": cmd_write,
           "lint-ancestry": cmd_lint_ancestry, "staleness": cmd_staleness,
-          "claims-check": cmd_claims_check}[args.cmd]
+          "claims-check": cmd_claims_check, "adopt": cmd_adopt}[args.cmd]
     try:
         return fn(args)
     except Refusal as exc:
