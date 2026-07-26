@@ -42,7 +42,7 @@ paragraph did.
 
 The terrain surface matches hub Lesson Evidence pointers against declared
 sources under a three-valued verdict with no silent filtering
-(`consulted: product-lab@249a4eb3fe1d71e69694a20d209ae238f8282bdd
+(`consulted: product-lab@<private-pin>
 topics/articles.md:35,44`).
 
 **From the consumer side this leg cannot be computed.** The served lessons index

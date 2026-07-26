@@ -88,7 +88,7 @@ def responses(fixture):
             if names:
                 # Two served shapes, both real: the spec's bare `names` list,
                 # and the cite-carrying `lines` envelope the LIVE gateway
-                # actually returns (observed against product-lab@f7d5a73,
+                # actually returns (observed against product-lab@<private-pin>,
                 # 2026-07-23). `surface_envelope: "lines"` in the fixture
                 # selects the latter, so a reader that only reads `names`
                 # cannot pass the harness while silently enumerating nothing

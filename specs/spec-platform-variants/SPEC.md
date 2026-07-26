@@ -188,7 +188,7 @@ per publish decision.**
     review; a gate that refused would be deciding permission rather than
     surfacing state: "a promotion threshold gates what surfaces by default,
     not what the human may act on — below-bar items stay visible and the gate
-    can accept any of them" (`consulted: product-lab@34a6119
+    can accept any of them" (`consulted: hub@<private-pin>
     LESSONS.md:68`). This makes emission's posture identical to the
     `language-mismatch` blocker beside it: the outcome is visible, not
     forbidden.
@@ -208,7 +208,7 @@ per publish decision.**
     its own pass — "full rubric review runs once per **claims-bearing
     artifact**, not once per article — a JA canonical earns its own review
     pass because it is a canonical, not a variant" (`consulted:
-    product-lab@34a6119 topics/articles.md:56`). The diagnosing instance is
+    hub@<private-pin> topics/articles.md:56`). The diagnosing instance is
     `tanuki-engineering-lessons.ja`, derived and emitted to Zenn in one
     sitting with no review pass and no disclosure.
 - **Profiles carry the platform, code carries none** (owner policy: repo-specific
@@ -230,7 +230,7 @@ per publish decision.**
   co-located beside the canonical in the drafts root — conforming to the
   hub-ratified articles-repo structure (`drafts/` = canonical source of truth;
   `articles/` (Zenn) + `devto/` = regenerated projection directories;
-  `consulted: product-lab@4f36029e topics/articles.md:76`, layout authority is the
+  `consulted: hub@<private-pin> topics/articles.md:76`, layout authority is the
   destination repo's actual directory structure checked by existence, `:75`). A
   profile that declares **no** `layout.dir` falls back to the `output.drafts`
   root (the prior behavior), so single-dir destinations are unaffected.
@@ -252,7 +252,7 @@ per publish decision.**
   for every article delivered under it. `articles/` is "an externally imposed
   delivery target of the sync contract the repo must satisfy to publish at
   all… a packaging fact the zenn profile declares" (`consulted:
-  product-lab@34a6119 topics/articles.md:13`), and the profile is "a
+  hub@<private-pin> topics/articles.md:13`), and the profile is "a
   conformance record of Zenn's sync contract… with declared precedence"
   (`:86`), which is exactly where a delivered-name rule belongs.
   - **The profile declares the mapping**; emission applies it **only at
@@ -269,7 +269,7 @@ per publish decision.**
     `newsletter/`, `newsletter/`, `articles/`) and only Zenn's target is
     externally imposed — "`devto/` was *our* organizational choice; `articles/`
     is *Zenn's* — an externally imposed delivery target" (`consulted:
-    product-lab@34a6119 topics/articles.md:13`). So the profile states the fact
+    hub@<private-pin> topics/articles.md:13`). So the profile states the fact
     directly:
 
     ```yaml
@@ -289,13 +289,13 @@ per publish decision.**
     against), never as a pass: an unevaluated rule is not a satisfied one. The
     rule is carried where it is violated — at emission — because a prohibition
     stated one layer up is enforced by whichever consideration is strongest
-    when the moment arrives (`consulted: product-lab@34a6119 LESSONS.md:28`).
+    when the moment arrives (`consulted: hub@<private-pin> LESSONS.md:28`).
   - **Every basename join resolves through the declared mapping — this is the
     replacement discovery mechanism, not an afterthought.** Discovery was
     promoted to a stated property of the layout precisely so this could not be
     broken silently: "any future change separating variants from their
     canonical must supply a replacement discovery mechanism instead of silently
-    breaking one" (`consulted: product-lab@34a6119 topics/articles.md:14`).
+    breaking one" (`consulted: hub@<private-pin> topics/articles.md:14`).
     Three mechanisms join on the filename today — staleness/variant discovery
     and the review-side variant scan (both `f.startswith(f"{slug}.")` over the
     projection dirs, `scripts/draft-pipeline.py:2235`, `:2243`, `:5433-5435`)
@@ -329,7 +329,7 @@ per publish decision.**
   always resolved here — "a tool's config may hold copies of facts whose
   authority lives elsewhere only under a declared precedence rule (which side
   wins on mismatch) plus a mechanical mismatch check; a copy without one is a
-  second authority growing in the dark" (`consulted: product-lab@34a6119
+  second authority growing in the dark" (`consulted: hub@<private-pin>
   LESSONS.md:55`). The precedence half is already declared for *layout* (the
   destination repo wins, `topics/articles.md:86`); the missing half is the
   check:
@@ -343,7 +343,7 @@ per publish decision.**
 
   Report-only rather than refusal is deliberate: the failure is an *absence*,
   which produces no event to gate, so its carrier is a signal that makes the
-  absence visible (`consulted: product-lab@34a6119 LESSONS.md:28`), and a
+  absence visible (`consulted: hub@<private-pin> LESSONS.md:28`), and a
   binary verdict over a graded migration manufactures confidence exactly where
   the process is degrading (`LESSONS.md:35`). The emission disclosure above and
   this check are **non-substitutable**: a drift report the owner never runs
@@ -379,7 +379,7 @@ Ratified constraints binding the implementation whenever it is ordered:
   The published **`newsletter/` section** — a distinct section with its own
   light schema, separate from the article backlog (different layer/lifecycle),
   web-archived so SEO accrues to the owned domain
-  (`consulted: product-lab@90877fa4e77e1353b527a76607ed2ea06daf2b27
+  (`consulted: hub@<private-pin>
   topics/articles.md:52,60,61,66`) — is an **owner publish target**, not a
   plugin write location: `pipeline-proposes, owner-commits`, and a profile's
   `newsletter/` `layout.dir` is a conformance record of that target (exactly
@@ -398,7 +398,7 @@ Ratified constraints binding the implementation whenever it is ordered:
   working-note cannot ride it without mis-routing every article of its language.
   The working-note lane is therefore its own selection path in `cmd_variants`,
   consistent with the newsletter being a separate layer/lifecycle
-  (`consulted: product-lab@90877fa4e77e1353b527a76607ed2ea06daf2b27
+  (`consulted: hub@<private-pin>
   topics/articles.md:29-30,66` — extend with a separate lane rather than
   overload the variant mechanism). `syndication.policy` is left untouched; the
   packaging profiles themselves are still declared exactly like every platform.

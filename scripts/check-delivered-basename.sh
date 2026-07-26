@@ -9,7 +9,7 @@
 # The point of the story is NOT the rename. It is that a rename alone silently
 # breaks three joins that key on `<slug>.<platform>.md`, which is why the layout
 # spec requires a replacement discovery mechanism rather than a partial fix
-# (consulted: product-lab@34a6119 topics/articles.md:14). So the load-bearing
+# (consulted: product-lab@<private-pin> topics/articles.md:14). So the load-bearing
 # assertions here are the DISCOVERY and LINT cases: they fail against a naive
 # rename, and pass only because resolution is forward (slug -> name) at every
 # consumer.

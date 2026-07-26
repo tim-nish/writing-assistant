@@ -176,7 +176,7 @@ printf '%s\n' "$dout" | head -1 | grep -qx "pin: product-lab@$SHA" \
 # enumerates NOTHING against it — silently, at exit 0 — and
 # validate-config.py's topic-existence lint then reports every correctly
 # mapped topic as absent from the hub (a blocking stage-0 error; observed
-# against product-lab@f7d5a73 on 2026-07-23). Both shapes are fixtures now, so
+# against product-lab@<private-pin> on 2026-07-23). Both shapes are fixtures now, so
 # that silence cannot come back.
 python3 - "$work/fixture.json" "$work/lines-fixture.json" <<'PYEOF'
 import json, sys

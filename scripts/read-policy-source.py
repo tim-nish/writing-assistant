@@ -287,7 +287,7 @@ def surface_identifiers(payload):
     harmless miss: `validate-config.py`'s topic-existence lint treats a
     successful-but-empty enumeration as authoritative and reports every mapped
     topic as absent from the hub — a blocking stage-0 error for a mapping that
-    is in fact correct (observed 2026-07-23 against product-lab@f7d5a73). Both
+    is in fact correct (observed 2026-07-23 against product-lab@<private-pin>). Both
     shapes are accepted, so neither a current nor a future gateway can
     reintroduce that silence.
     """

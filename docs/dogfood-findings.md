@@ -152,7 +152,7 @@ join it renders is documented in `docs/evidence-gloss-consumption-join.md`.
 - **Leg (b) of the intended join is not computable from the consumer side** —
   `blocker` for the view as originally specified. The served lessons index
   carries `one_liner | slug | status | tags | date` (`LESSONS.md:9`, consulted
-  2026-07-26 at `product-lab@807a12f5`) and **no Evidence pointers**; those live
+  2026-07-26 at `product-lab@<private-pin>`) and **no Evidence pointers**; those live
   in the lesson body, which the seam does not serve (`SPEC-terrain` OQ3).
   The view therefore reports leg (b) as **cannot-determine** throughout rather
   than as "none" — an absence was never established, and printing one would

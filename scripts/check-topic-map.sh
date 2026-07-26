@@ -47,7 +47,7 @@ XDG_CONFIG_HOME="$work/xdg";  export XDG_CONFIG_HOME
 # ever spawning a server; the export matters from section 6 onward.)
 FX="$work/gateway.json"
 printf '{"pin": "product-lab@%s", "lessons": []}\n' \
-  "0123456789abcdef0123456789abcdef01234567" > "$FX"
+  "1111111111111111111111111111111111111111" > "$FX"
 WRITING_ASSISTANT_GATEWAY_CMD="python3 $root/scripts/fixtures/policy-gateway-stub.py $FX"
 export WRITING_ASSISTANT_GATEWAY_CMD
 
@@ -293,7 +293,7 @@ PYEOF
 python3 - "$FX" <<'PYEOF'
 import json, sys
 fx = json.load(open(sys.argv[1]))
-sha = "0123456789abcdef0123456789abcdef01234567"
+sha = "1111111111111111111111111111111111111111"
 fx["topics"] = {
     "delivery": [
         ["topics/delivery.md", 1, "# delivery"],
@@ -404,7 +404,7 @@ PYEOF
 # lines only" is asserted rather than assumed.
 python3 - "$FX" <<'PYEOF'
 import json, sys
-sha = "0123456789abcdef0123456789abcdef01234567"
+sha = "1111111111111111111111111111111111111111"
 json.dump({
     "pin": f"product-lab@{sha}",
     "lessons": [
@@ -427,7 +427,7 @@ assert {i["slug"] for i in seeds} == {"retry-storm", "cache-warmth", "team-shape
 one = [i for i in seeds if i["slug"] == "cache-warmth"][0]
 assert one["title"] == "Cache warmth", one
 # the seam's own file:line@commit cite, passed through, not recomposed
-assert one["evidence"] == ["LESSONS.md:4@0123456789abcdef0123456789abcdef01234567"], one
+assert one["evidence"] == ["LESSONS.md:4@" + "1" * 40], one
 # the heading line is not an index line
 assert not any(i["slug"].startswith("lessons") for i in seeds), seeds
 # a seed is available material, not a live article item
