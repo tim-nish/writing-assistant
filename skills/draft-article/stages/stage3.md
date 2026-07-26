@@ -94,7 +94,7 @@ CAP-2). A second gate or a second store is a contract violation, so assert both
 mechanically before reporting completion:
 
 ```
-python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py structure-record --plan <plans/<slug>.md> --journal "$WS/journal.json" [--expect-choice] [--brief-informed]
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py structure-record --plan <plans/<slug>.md> --journal "$WS/interview-journal.json" [--expect-choice] [--brief-informed]
 ```
 
 Exit 0 prints the disclosure payload — which structure, that it is recorded in

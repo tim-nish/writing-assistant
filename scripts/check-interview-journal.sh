@@ -83,6 +83,20 @@ python3 "$DP" journal --interview "$work/iv.json" --answers /dev/null >/dev/null
 grep -q 'draft-pipeline.py journal' "$SKILL" && grep -q '\$WS/interview-journal.json' "$SKILL" \
   && ok "SKILL writes the journal to the run workspace" || err "SKILL does not write the journal to \$WS"
 
+# Every CONSUMER names the same path the producer writes (#787). The assertion
+# above covers the producing stage only; stage3 documented `$WS/journal.json`
+# for months and sent agents to a file nothing ever wrote, because the consumer
+# side of this contract was never asserted. One canonical name, checked from
+# both ends.
+strays=$(grep -rn '\$WS/[A-Za-z0-9._-]*journal[A-Za-z0-9._-]*\.json' skills/ \
+         | grep -v '\$WS/interview-journal\.json' || true)
+if [ -n "$strays" ]; then
+  err "a skill file names a journal path other than \$WS/interview-journal.json:"
+  printf '%s\n' "$strays" >&2
+else
+  ok "every skill file names the canonical \$WS/interview-journal.json"
+fi
+
 # --- Decision-level consulted influence (Story 13.37) -------------------------
 # --seed-extra records a policy-shaped DECISION (article-type recommendation)
 # in the same consulted: grammar; a malformed pair fails closed.
