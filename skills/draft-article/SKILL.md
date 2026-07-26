@@ -236,6 +236,8 @@ CAP-9 adds is that the rule is **stated, not implicit**:
 - the **completion summary** repeats the per-element selection reasons in its
   informational bucket, so the owner sees *why each element is in the article*
   without opening a run artifact ([`completion-summary.md`](../completion-summary.md)).
+  Any consumption statement it makes **names the population it covers** — see
+  the population rule under Consumption exclusion below (CAP-9, #732).
 
 An element the run selected but whose reason cannot be stated is a defect, not a
 silent omission — disclosure is required wherever selection ran.
@@ -266,6 +268,28 @@ repeatedly from one repo does not reselect covered material by chance:
   claim **names the scanned location** (`plans/*.md`). When `project_plans` is
   **non-empty** you may **not** claim a first article: exclusion was checked
   against those plans, whether or not any element was skipped.
+- **Every consumption statement NAMES THE POPULATION it covers (CAP-9, #732).**
+  Same shape as the project-scoped claim above, for the same reason: a claim
+  whose scope is unstated is read at whatever scope the reader has in mind.
+  Wherever consumption is stated — the completion summary, a selection
+  disclosure, a gate item — say **which set**: *"all 4 of the 4 story elements
+  this run minted are consumed"*, or *"none of the 11 elements across this
+  project's plans is unconsumed"*. Never a bare quantifier.
+  **Forbidden, with the reason:** phrasing a consumption statement as coverage
+  of the hub's Lessons. A run reported **"every core lesson has been consumed"**
+  while the owner's estimate was that under 10% of the lessons learned building
+  the project had reached an article — and **both were true**. A story-element
+  id is derived from the *cluster's declared membership anchor* in the fact
+  sheet (`element-id`, above), so it is minted from **this repo's declared
+  sources** and is **never a hub Lesson slug**; the two quantify over disjoint
+  namespaces with nothing converting between them. So "core lesson", "all the
+  lessons", and any wording that reads as coverage of the hub Lesson pool are
+  **out** — not because they overstate, but because they name a set this run
+  cannot see.
+  **This adds no capability and no mapping.** The machine-readable
+  Lesson-citation join key does not exist and belongs to the articles repo, not
+  to this tool (CAP-9's own open question); the coverage question stays
+  unanswerable here. The rule is only that a statement says what it counted.
 - **When exclusion DOES fire, disclose it.** Every element skipped because a
   prior article on this project already consumed it is disclosed in the interview
   journal and the completion summary — the skipped element's **id** and the plan
