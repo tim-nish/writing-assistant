@@ -160,8 +160,13 @@ python3 "$VP" --map "$work/anch-map.txt" --draft "$work/anch-draft.md" \
   --judge-findings "$work/jf-bad.txt" 2>&1 | grep -q 'ANCHOR MISMATCH' \
   && ok "a judge verdict quoting the wrong sentence is caught mechanically (#304)" \
   || err "anchor mismatch not detected"
-# A judge quoting the real anchored sentence is graded as a normal finding.
-{ att; printf 'P1.S2 ~ "Under a binary rule, a sentence is either sourced": asserts a checkable proposition\n'; } \
+# A judge quoting the real sentence is graded as a normal finding. The quote is
+# taken from the hand-off itself — 19.16 (#755) prints the FULL reconstructed
+# sentence and the echo check compares byte-for-byte, so a real judge quotes
+# what it was handed, and this fixture does the same.
+S12=$(python3 "$VP" --map "$work/anch-map.txt" --draft "$work/anch-draft.md" \
+      --list-narration | awk -F': ' '/^P1.S2 /{sub(/^[^:]*: /,""); print; exit}')
+{ att; printf 'P1.S2 ~ "%s": asserts a checkable proposition\n' "$S12"; } \
   > "$work/jf-ok.txt"
 out=$(python3 "$VP" --map "$work/anch-map.txt" --draft "$work/anch-draft.md" \
       --judge-findings "$work/jf-ok.txt" 2>&1 || true)

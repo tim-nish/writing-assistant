@@ -91,6 +91,65 @@ def parse_map(text):
     return entries
 
 
+def segment_draft(draft_text):
+    """The DETERMINISTIC segmentation that defines `P{n}.S{m}` positions
+    (Story 19.16, #755): the single authority both the map author and the
+    judge worklists consume, so nobody re-derives sentence boundaries.
+
+    Skips frontmatter, headings, fenced code, HTML comments, `---` rules, and
+    the rendered pointer-block lines; groups the rest into paragraphs
+    (blank-line separated), splits each into sentences on `[.!?]` followed by
+    whitespace/end, and anchors each sentence at the 1-based physical line
+    where it starts. Two runs over the same bytes emit identical output.
+    Returns [(pos, anchor, sentence)]."""
+    lines = draft_text.splitlines()
+    skip = [False] * len(lines)
+    in_fm = in_fence = False
+    for i, l in enumerate(lines):
+        s = l.strip()
+        if i == 0 and s == "---":
+            in_fm = True
+            skip[i] = True
+            continue
+        if in_fm:
+            skip[i] = True
+            if s == "---":
+                in_fm = False
+            continue
+        if s.startswith("```"):
+            in_fence = not in_fence
+            skip[i] = True
+            continue
+        if (in_fence or l.startswith("#") or s.startswith("<!--")
+                or s == "---" or (s.startswith("*") and s.endswith("*"))):
+            skip[i] = True
+    paras, cur = [], []
+    for i, l in enumerate(lines):
+        if skip[i] or not l.strip():
+            if cur:
+                paras.append(cur)
+                cur = []
+            continue
+        cur.append((i + 1, l))
+    if cur:
+        paras.append(cur)
+    out = []
+    for pi, para in enumerate(paras, 1):
+        text = " ".join(l for _, l in para)
+        offs, pos = [], 0
+        for ln, l in para:
+            offs.append((pos, pos + len(l), ln))
+            pos += len(l) + 1
+        sents = list(re.finditer(r"[^.!?]*[.!?](?=\s|$)", text)) or [re.match(r".*", text)]
+        for si, m in enumerate(sents, 1):
+            st = m.start()
+            while st < len(text) and text[st] == " ":
+                st += 1
+            ln = next((l for a, b, l in offs if a <= st <= b), para[0][0])
+            out.append((f"P{pi}.S{si}", ln, m.group(0).strip()))
+    return out
+
+
 def anchored_text(anchor, draft_lines):
     """The verbatim draft line an anchor names — what the judge MATCHES against.
 
@@ -291,8 +350,16 @@ def main(argv=None):
                 print(f"graded: {','.join(pos for pos, _, _, _ in listed)}")
             if carried:
                 print(f"carried: {','.join(pos for pos, _, _, _ in carried)}")
+        # Story 19.16 (#755): the printed text is the FULL RECONSTRUCTED
+        # SENTENCE from the one segmentation authority (`segment_draft`), not
+        # the hard-wrapped physical line — the judge grades exactly what the
+        # tool prints, and boundary reconstruction stops being judge work.
+        # Fallback (a bare paragraph-level P<n>, or a position the skeleton
+        # does not carry): the anchored physical line, as before.
+        seg_by_pos = ({p: s for p, _a, s in segment_draft(_read(args.draft))}
+                      if args.draft else {})
         for pos, cls, ptrs, anchor in listed:
-            text = anchored_text(anchor, draft_lines)
+            text = seg_by_pos.get(pos) or anchored_text(anchor, draft_lines)
             if cls_wanted == "narration":
                 print(f"{pos} [L{anchor}]: {text}" if text is not None else pos)
             else:
@@ -354,6 +421,27 @@ def main(argv=None):
                                       "— the verdict cannot be trusted"))
                 continue
             if quoted is not None:
+                # Story 19.16 (#755): when the segmentation resolves this
+                # position, the judge's echo must equal the printed SENTENCE
+                # byte-for-byte — the hand-off printed it, so quoting it costs
+                # nothing and a paraphrase is a mislocation signal. Positions
+                # the skeleton does not carry keep the anchored-line
+                # containment check.
+                seg_sentence = None
+                if draft_lines is not None:
+                    if "_seg_cache" not in dir():
+                        _seg_cache = {p: s for p, _a, s in
+                                      segment_draft("\n".join(draft_lines))}
+                    seg_sentence = _seg_cache.get(pos)
+                if seg_sentence is not None:
+                    if quoted.strip() != seg_sentence:
+                        findings.append((pos, f"ANCHOR MISMATCH: judge graded "
+                                              f"{quoted.strip()!r} but {pos} is the "
+                                              f"sentence {seg_sentence!r} — the verdict "
+                                              "is about different text and is discarded"))
+                        continue
+                    findings.append((pos, reason or "judge flagged a provenance violation"))
+                    continue
                 actual = anchored_text(anchors[pos], draft_lines)
                 if actual is None:
                     findings.append((pos, "judge echoed a sentence but the map gives no "
