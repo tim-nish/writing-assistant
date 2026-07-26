@@ -201,6 +201,20 @@ open pass-throughs) as the `--items` file below, and carry its
   2026-07-18 regression: a policy-incompatible records-only answer was
   offered as an ordinary candidate, selected, and shipped unreconciled
   against `syndication.policy` EN-canonical config.)
+- **The gate banner states the machine's PARSE before the options, and "no
+  conflict" is a first-class option (#739).** A reconciliation item now
+  carries `parse` — which rule is being scoped, by what predicate the
+  conflict was computed, how the machine reads the served line (mandate /
+  permission / indeterminate), and whom it binds — and the banner renders it
+  **before** the options, in the contract's section-(g) plain text (it passes
+  `validate-proposal-payload.py` unchanged), so a misparse is catchable while
+  it is still cheap. The item's `options` array is presented as the
+  structured choices, with **"No conflict — both records stand"** first:
+  accepting it changes neither config nor policy, and the journal records
+  `reconciliation_outcome: no-conflict` (record it via `--selection
+  no-conflict` or an answer whose text opens with "No conflict"). The
+  truthful answer to a manufactured conflict must never exist only as
+  free-form.
 - **A constrained subject excludes VISIBLY — never by filtering (#566).** When
   a served line rules an answer out without determining one, the question is
   **still asked** and the ruled-out candidate **stays in the list**, marked

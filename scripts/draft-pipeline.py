@@ -2896,9 +2896,35 @@ def cmd_classify_policy(args):
             f"declares {c['config']['quote']} ({c['config']['pointer']}) — "
             f"these disagree on {subject['label']}. Which position governs "
             "this run, and should the losing record be updated?")
+        parse = dict(subject.get("parse") or {})
         reconciliation_items.append({
             "id": rid, "gap_type": "reconciliation",
             "positions": [c["policy"], c["config"]],
+            # The machine's parse, rendered in the gate banner BEFORE the
+            # options (#739): rule / predicate / reading / binds — so the owner
+            # can catch a misparse while it is still cheap.
+            "parse": parse,
+            # Structured outcomes (#739): "no conflict" is a first-class
+            # option, never only free-form — the incident's truthful answer
+            # had no structured carrier and all three options encoded the
+            # false premise.
+            "options": [
+                {"id": "no-conflict",
+                 "label": "No conflict — both records stand",
+                 "effect": "changes neither config nor policy; both records "
+                           "stay in force and the journal records "
+                           "reconciliation_outcome: no-conflict"},
+                {"id": "config-governs",
+                 "label": f"Config governs ({c['config']['quote']})",
+                 "effect": "the served line is recorded as not governing this "
+                           "run; the answer routes to a staging-candidate "
+                           "block proposing the policy-side update"},
+                {"id": "policy-governs",
+                 "label": "Policy governs (the served line stands)",
+                 "effect": "the config value is the losing record; a PROPOSED "
+                           "change routed via the staging candidate — never "
+                           "treated as current policy by this run"},
+            ],
             "question": question, "owner_answer": "",
         })
         journal_records.append({
@@ -3821,6 +3847,13 @@ def cmd_journal(args):
             entry["positions"] = [{"authority": p["authority"],
                                    "pointer": p["pointer"]}
                                   for p in t["positions"]]
+            # #739: the structured no-conflict outcome is recorded, not only
+            # readable from free text — acceptance changes neither config nor
+            # policy, and this key is its journal record.
+            sel = (answer_choice.get(qid) or {}).get("selection", "")
+            txt = answer_text.get(qid, "")
+            if sel == "no-conflict" or txt.strip().lower().startswith("no conflict"):
+                entry["reconciliation_outcome"] = "no-conflict"
         entries.append(entry)
 
     # The /ask-style consulted: line the run artifact must end with (CAP-5):
