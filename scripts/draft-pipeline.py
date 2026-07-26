@@ -3752,6 +3752,127 @@ def cmd_answer(args):
     return 0
 
 
+def _run_events_path(ws):
+    return os.path.join(ws, "run-events.jsonl")
+
+
+def cmd_run_event(args):
+    """Append one run-journal event (Story 19.8, #742): stage start/end,
+    retries, judge rounds, subagent spawns — one JSON line each, so post-hoc
+    cost attribution reads one file. Deterministic append; the timestamp is
+    the recording moment."""
+    import datetime
+    rec = {"ts": datetime.datetime.now(datetime.timezone.utc)
+           .isoformat(timespec="seconds"),
+           "stage": args.stage, "event": args.event}
+    if args.note:
+        rec["note"] = args.note
+    with open(_run_events_path(args.ws), "a", encoding="utf-8") as fh:
+        fh.write(json.dumps(rec) + "\n")
+    print(json.dumps({"stage": "run-event", "recorded": rec}))
+    return 0
+
+
+def _read_run_events(ws):
+    path = _run_events_path(ws)
+    if not os.path.isfile(path):
+        return []
+    out = []
+    for ln in open(path, encoding="utf-8"):
+        ln = ln.strip()
+        if ln:
+            try:
+                out.append(json.loads(ln))
+            except json.JSONDecodeError:
+                continue
+    return out
+
+
+def _cost_proxies(ws):
+    """Workspace-derivable cost proxies (#742). Output-token totals live in
+    harness transcripts this run cannot see, so the block is expressed over
+    what the workspace records: wall time, retries, judge rounds, subagents.
+    Substrate honesty: each proxy names its basis, and an absent basis reads
+    as absent, never as zero-cost."""
+    import datetime
+    events = _read_run_events(ws)
+    ts = []
+    for e in events:
+        try:
+            ts.append(datetime.datetime.fromisoformat(e["ts"]))
+        except (KeyError, ValueError):
+            pass
+    elapsed_min = round((max(ts) - min(ts)).total_seconds() / 60) if len(ts) >= 2 else None
+    retries = sum(1 for e in events if e.get("event") == "retry")
+    judge_rounds = sum(1 for e in events if e.get("event") == "judge-round")
+    subagents = sum(1 for e in events if e.get("event") == "subagent")
+    if judge_rounds == 0:
+        # Fallback basis: the judge artifact files the run wrote.
+        judge_rounds = len([f for f in os.listdir(ws) if f.startswith(
+            ("provenance-verdicts", "rubric-verdicts"))]) if os.path.isdir(ws) else 0
+    return {"elapsed_minutes": elapsed_min, "stage_retries": retries,
+            "judge_rounds": judge_rounds, "subagents": subagents,
+            "events_recorded": len(events),
+            "basis": "run-events.jsonl" + ("" if events else " (absent — proxies limited to judge artifacts)")}
+
+
+def cmd_cost_block(args):
+    """The completion summary's run-level cost block (Story 19.8, #742) —
+    derived entirely from workspace artifacts, no new harness instrumentation.
+    Relay the `lines` in the informational bucket."""
+    p = _cost_proxies(args.ws)
+    lines = [
+        f"run cost — elapsed: "
+        f"{'unknown (no run-events recorded)' if p['elapsed_minutes'] is None else str(p['elapsed_minutes']) + ' min'}"
+        f" · stage retries: {p['stage_retries']} · judge rounds: {p['judge_rounds']}"
+        f" · subagents: {p['subagents']} (basis: {p['basis']})",
+    ]
+    print(json.dumps({"stage": "cost-block", **p, "lines": lines}, indent=2))
+    return 0
+
+
+# Run-level budget thresholds (#742) over workspace-derivable proxies. Config
+# may override under `run_budget:` (user-config); the shipped defaults are
+# generous — the motivating run (~135 min, 13 judge rounds) breaches both,
+# while an ordinary run changes behavior not at all (AC: under-threshold runs
+# are unchanged except the cost block).
+RUN_BUDGET_DEFAULTS = {"elapsed_minutes": 120, "judge_rounds": 12}
+
+
+def cmd_budget_check(args):
+    """Run-level budget check (Story 19.8, #742): compare the workspace's cost
+    proxies against the configured thresholds. `breached: true` means the
+    invoking skill presents the existing budget-triage choice at the NEXT
+    stage boundary — continue, or the 13.85 orderly stop — never a silent
+    continue and never a hard kill here."""
+    budget = dict(RUN_BUDGET_DEFAULTS)
+    try:
+        rf = _load("render-frontmatter.py")
+        cfg = rf.load_config(argparse.Namespace(
+            config_json=None, root=args.root, global_config=None, repo_config=None))
+        for k, v in (cfg.get("run_budget") or {}).items():
+            if isinstance(v, (int, float)):
+                budget[k] = v
+    except Exception:
+        pass                      # config unreachable -> shipped defaults
+    p = _cost_proxies(args.ws)
+    reasons = []
+    if p["elapsed_minutes"] is not None and p["elapsed_minutes"] > budget["elapsed_minutes"]:
+        reasons.append(f"elapsed {p['elapsed_minutes']} min > budget {budget['elapsed_minutes']} min")
+    if p["judge_rounds"] > budget["judge_rounds"]:
+        reasons.append(f"judge rounds {p['judge_rounds']} > budget {budget['judge_rounds']}")
+    out = {"stage": "budget-check", "breached": bool(reasons), "reasons": reasons,
+           "budget": budget, **p}
+    if reasons:
+        out["ask"] = ("run-level budget breached (" + "; ".join(reasons) + ") — "
+                      "present at the next stage boundary: Continue past the "
+                      "budget (this run only) / Orderly stop (persist at the "
+                      "boundary with --stop-note, resume later). Never a "
+                      "silent continue.")
+    print(json.dumps(out, indent=2))
+    return 0
+
+
 def cmd_policy_prefilter(args):
     """Stage-2 policy-surface pre-filter (Story 19.7, #741) — a DETERMINISTIC,
     behavior-preserving reduction of the materialized policy surface to the
@@ -6391,6 +6512,27 @@ def main(argv=None):
     sp.add_argument("--profiles-dir",
                     help="override the platform-profiles directory for the "
                          "resolvability warning (tests / non-default locations)")
+    sp = sub.add_parser("run-event",
+                        help="append one run-journal event to <ws>/run-events.jsonl "
+                             "(#742): stage start/end, retry, judge-round, subagent")
+    sp.add_argument("--ws", required=True)
+    sp.add_argument("--stage", required=True)
+    sp.add_argument("--event", required=True,
+                    choices=("start", "end", "retry", "judge-round", "subagent"))
+    sp.add_argument("--note")
+
+    sp = sub.add_parser("cost-block",
+                        help="the completion summary's run-level cost block (#742), "
+                             "derived from workspace artifacts")
+    sp.add_argument("--ws", required=True)
+
+    sp = sub.add_parser("budget-check",
+                        help="run-level budget check over workspace proxies (#742); "
+                             "breached -> present continue/orderly-stop at the next "
+                             "stage boundary")
+    sp.add_argument("--ws", required=True)
+    sp.add_argument("--root")
+
     sp = sub.add_parser("policy-prefilter",
                         help="deterministic Stage-2 pre-filter of the policy surface "
                              "(#741): reduce to gate-relevant lines before model "
@@ -6710,6 +6852,9 @@ def main(argv=None):
         "stage0": cmd_stage0, "complete": cmd_complete,
         "classify-policy": cmd_classify_policy,
         "policy-prefilter": cmd_policy_prefilter,
+        "run-event": cmd_run_event,
+        "cost-block": cmd_cost_block,
+        "budget-check": cmd_budget_check,
         "policy-block-check": cmd_policy_block_check,
         "review-reentry": cmd_review_reentry,
         "review-checkpoint-proposal": cmd_review_checkpoint_proposal,
