@@ -105,8 +105,38 @@ def key_hash(path, bsha, ver):
     return hashlib.sha256(payload).hexdigest()
 
 
+def _resolve_file(args):
+    """Resolve --path for FILE ACCESS against --root, never against cwd (#754).
+
+    The key (`key_hash`) uses the basename, so keying is unaffected — but
+    `blob_sha` reads the file's bytes, and resolving a repo-relative path
+    against whatever cwd the caller happens to have crashed outside the host
+    repo and, worse, could hash the wrong file's bytes into the key. An
+    absolute --path is used as-is; a relative one joins the host root
+    (`--root`, defaulting to the git top-level of cwd like every sibling
+    script). A path that resolves to no readable file is a named error, not a
+    traceback.
+    """
+    path = args.path
+    if not os.path.isabs(path):
+        root = getattr(args, "root", None)
+        if not root:
+            out = subprocess.run(["git", "rev-parse", "--show-toplevel"],
+                                 capture_output=True, text=True)
+            root = out.stdout.strip() if out.returncode == 0 else None
+        if root:
+            path = os.path.join(root, path)
+    if not os.path.isfile(path):
+        sys.stderr.write(
+            f"error: --path {args.path!r} resolves to no file at {path!r} "
+            "(relative paths resolve against --root / the git top-level, "
+            "never the caller's cwd)\n")
+        raise SystemExit(2)
+    return path
+
+
 def _resolve_bsha(args):
-    return args.blob_sha if args.blob_sha else blob_sha(args.path)
+    return args.blob_sha if args.blob_sha else blob_sha(_resolve_file(args))
 
 
 def cmd_extractor_version(args):
@@ -115,7 +145,7 @@ def cmd_extractor_version(args):
 
 
 def cmd_blob_sha(args):
-    print(blob_sha(args.path))
+    print(blob_sha(_resolve_file(args)))
     return 0
 
 
@@ -157,6 +187,7 @@ def main(argv=None):
     sub.add_parser("extractor-version", help="print the current extractor-version (contract hash)")
 
     sp = sub.add_parser("blob-sha", help="print the git blob id of a file's bytes")
+    sp.add_argument("--root")
     sp.add_argument("--path", required=True)
 
     sp = sub.add_parser("path", help="print the cache directory")
