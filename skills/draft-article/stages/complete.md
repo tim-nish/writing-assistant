@@ -228,3 +228,11 @@ their reference lives in [`variants.md`](../variants.md).
 | `verify` | 4 | Build the owner verification worklist, one entry per marker | `<draft\|->` |
 | `reroute` | 4 | Reroute an over-budget section into a new bounded interview question (Story 4.5) | `--rewrites` (req) `--section` |
 | `complete` | completion | The dual-product completion gate (Story 13.68): persist the canonical to `<output.drafts>/<slug>.md`, verify `plans/<slug>.md`, then (and only then) write the `next_stage: done` checkpoint; the only sanctioned way to finish a run | `--draft` (req) `--slug` (req) `--root` `--ws` |
+
+---
+
+**Completion is the terminus — there is no next stage file.** The run ends
+**only** through the `complete` gate above ([`../SKILL.md`](../SKILL.md)); it is
+the only sanctioned way to finish a run. Variant emission is **not** part of
+this flow: it is a separate, post-review invocation documented in
+[`../variants.md`](../variants.md).
