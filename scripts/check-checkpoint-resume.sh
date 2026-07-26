@@ -311,6 +311,34 @@ python3 "$DP" stop-disclosure --ws "$wpin" --repo /x 2>/dev/null \
 git checkout -q -- "$touched"
 rm -rf "$wpin"
 
+# --- autostart disclosure + --fresh (Story 19.10, #746) ------------------------
+wfr=$(mktemp -d)
+mkdir -p "$wfr/host"; git -C "$wfr/host" init -q
+printf 'sources:\n  - path: .\noutput:\n  drafts: %s/drafts/\n' "$wfr" > "$wfr/host/writing-sources.yaml"
+export XDG_STATE_HOME="$wfr/state" XDG_CONFIG_HOME="$wfr/xdg"
+frd="$wfr/xdg/writing-assistant/repos/$(printf %s "$wfr/host" | tr / -)"
+mkdir -p "$frd"; cp "$wfr/host/writing-sources.yaml" "$frd/"
+ws1=$(python3 "$DP" autostart --root "$wfr/host" | python3 -c 'import json,sys;print(json.load(sys.stdin)["ws"])')
+printf '{"next_stage":"interview","run_state":{"framework":"F1","sources_raw":["."]}}' > "$ws1/s.json"
+python3 "$DP" checkpoint --ws "$ws1" "$ws1/s.json" >/dev/null 2>&1
+python3 "$DP" autostart --root "$wfr/host" | python3 -c '
+import json, sys
+d = json.load(sys.stdin)
+assert d["resumed"] and "resuming run" in d.get("resume_disclosure", "") \
+   and "framework F1" in d["resume_disclosure"] and "--fresh" in d["resume_disclosure"], d
+' && ok "#746: resume discloses run id + subject + the --fresh opt-out" \
+  || err "#746: resume disclosure missing or malformed"
+python3 "$DP" autostart --root "$wfr/host" --fresh | python3 -c '
+import json, sys
+d = json.load(sys.stdin)
+assert d["resumed"] is False and d.get("fresh_skipped"), d
+' && ok "#746: --fresh mints a new run and reports the untouched prior id" \
+  || err "#746: --fresh path wrong"
+[ -f "$ws1/checkpoint.json" ] && ok "#746: --fresh left the prior run untouched" \
+  || err "#746: --fresh deleted or moved the prior run"
+unset XDG_STATE_HOME XDG_CONFIG_HOME
+rm -rf "$wfr"
+
 if [ "$fail" -eq 0 ]; then
   printf '\nAll checkpoint/resume checks passed.\n'; exit 0
 else

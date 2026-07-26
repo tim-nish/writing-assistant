@@ -74,7 +74,14 @@ config or framework:
   the **newest in-progress run** (a workspace whose checkpoint records a
   `next_stage` other than `done`) when one exists, returning `"resumed": true`
   and the `next_stage` to continue from — **skip straight to that stage**, reusing
-  the persisted intermediates. Otherwise it mints a fresh workspace with
+  the persisted intermediates. **A resume announces itself at turn one (Story
+  19.10, #746):** relay the returned `resume_disclosure` line — run id, age,
+  and subject from checkpointed state — immediately after the #309 target
+  line, so a topic mismatch is visible before anything is spent. The owner's
+  explicit opt-out is `--fresh`: it mints a new workspace, leaves the
+  in-progress run untouched (its id returned as `fresh_skipped` with a
+  `fresh_note` to relay — nothing is deleted), and the ratified automatic
+  default is unchanged when `--fresh` is not asked for. Otherwise it mints a fresh workspace with
   `"resumed": false` and `next_stage: harvest` (the no-false-resume path). A large
   multi-source draft completing across several invocations is the **normal
   model** — a turn-ceiling casualty simply continues next invocation.
