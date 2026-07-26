@@ -3752,6 +3752,92 @@ def cmd_answer(args):
     return 0
 
 
+def cmd_policy_prefilter(args):
+    """Stage-2 policy-surface pre-filter (Story 19.7, #741) — a DETERMINISTIC,
+    behavior-preserving reduction of the materialized policy surface to the
+    lines Stage 2 actually classifies against, before the surface enters model
+    context. Observed cost without it: a 214KB (~55k-token) surface consumed
+    whole for ~10KB of outputs.
+
+    Allowlist, fail-open to inclusion:
+      * structural lines (the pin, `=== FILE @ sha` section headers);
+      * every line ANY comparable subject's patterns match — `policy_line` AND
+        `policy_line_excludes` — so no line class the conflict/constraint gate
+        reads is ever filtered out;
+      * every line mentioning a subject's `config_key` (or its head token);
+      * every line a candidate item's seed pointer names (`--items`);
+      * section headings (`## …`) and state lines, as cheap skeleton context.
+
+    Writes the filtered artifact BESIDE the full one (never over it) for
+    auditability, and prints the size disclosure the run status relays.
+    """
+    try:
+        text = open(args.surface, encoding="utf-8").read()
+    except OSError as e:
+        sys.stderr.write(f"error: cannot read policy surface {args.surface!r}: {e}\n")
+        return 2
+    seed_locs = set()
+    if args.items:
+        items = _load_json_state(args.items, "candidate policy items")
+        if isinstance(items, dict) and "items" in items:
+            items = items["items"]
+        for it in items if isinstance(items, list) else []:
+            ptr = str(((it or {}).get("seed") or {}).get("pointer", ""))
+            if ptr:
+                seed_locs.add(ptr.rsplit("@", 1)[0])   # file:line
+
+    key_tokens = set()
+    subj_patterns = []
+    for s in COMPARABLE_SUBJECTS:
+        subj_patterns.append(s["policy_line"])
+        excl = s.get("policy_line_excludes")
+        if excl is not None:
+            subj_patterns.append(excl)
+        key = s.get("config_key", "")
+        if key:
+            key_tokens.add(key)
+            key_tokens.add(key.split(".")[0])
+
+    kept, total = [], 0
+    current_file = None
+    line_re = re.compile(r"^(\d+):")
+    for raw in text.splitlines():
+        if raw.startswith("pin: ") or raw.startswith("=== ") or raw.startswith("miss: "):
+            if raw.startswith("=== "):
+                current_file = raw[4:].rsplit(" @ ", 1)[0].strip()
+            kept.append(raw)
+            continue
+        m = line_re.match(raw)
+        if not m:
+            kept.append(raw)          # fail-open: unrecognized shapes stay
+            continue
+        total += 1
+        body = raw.split(":", 1)[1]
+        keep = (
+            any(p.search(body) for p in subj_patterns)
+            or any(k in body for k in key_tokens)
+            or (current_file and f"{current_file}:{m.group(1)}" in seed_locs)
+            or body.lstrip().startswith("## ")
+            or body.lstrip().startswith("`state:")
+        )
+        if keep:
+            kept.append(raw)
+    out_path = args.out or (args.surface[:-4] + ".filtered.txt"
+                            if args.surface.endswith(".txt")
+                            else args.surface + ".filtered.txt")
+    with open(out_path, "w", encoding="utf-8") as fh:
+        fh.write("\n".join(kept) + "\n")
+    full_b, filt_b = len(text.encode()), os.path.getsize(out_path)
+    disclosure = (f"policy surface pre-filtered (#741): {full_b} -> {filt_b} bytes "
+                  f"({total} content lines -> {sum(1 for k in kept if line_re.match(k))} kept); "
+                  f"full surface retained at {args.surface}")
+    print(json.dumps({"stage": "policy-prefilter", "surface": args.surface,
+                      "filtered": out_path, "full_bytes": full_b,
+                      "filtered_bytes": filt_b, "disclosure": disclosure},
+                     indent=2))
+    return 0
+
+
 def cmd_journal(args):
     """Stage 2: assemble the interview journal — one entry per candidate question —
     from the triage (Story 10.2) and the recorded answers (Story 10.3), so a
@@ -6305,6 +6391,15 @@ def main(argv=None):
     sp.add_argument("--profiles-dir",
                     help="override the platform-profiles directory for the "
                          "resolvability warning (tests / non-default locations)")
+    sp = sub.add_parser("policy-prefilter",
+                        help="deterministic Stage-2 pre-filter of the policy surface "
+                             "(#741): reduce to gate-relevant lines before model "
+                             "context; writes <surface>.filtered.txt beside the full "
+                             "artifact, behavior-preserving for classify-policy")
+    sp.add_argument("--surface", required=True, help="the read-policy-source.py output")
+    sp.add_argument("--items", help="candidate policy items (seed pointers are allowlisted)")
+    sp.add_argument("--out", help="filtered output path (default: <surface>.filtered.txt)")
+
     sp = sub.add_parser("classify-policy",
                         help="CAP-7 policy-result classification: a mechanical "
                              "pre-step between the policy read and `interview` "
@@ -6614,6 +6709,7 @@ def main(argv=None):
         "progress": cmd_progress,
         "stage0": cmd_stage0, "complete": cmd_complete,
         "classify-policy": cmd_classify_policy,
+        "policy-prefilter": cmd_policy_prefilter,
         "policy-block-check": cmd_policy_block_check,
         "review-reentry": cmd_review_reentry,
         "review-checkpoint-proposal": cmd_review_checkpoint_proposal,

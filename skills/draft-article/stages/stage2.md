@@ -95,6 +95,22 @@ files is a **per-article decision made now, not a per-repo config**
    python3 ${CLAUDE_PLUGIN_ROOT}/scripts/read-policy-source.py --root "$HOST" read --topics <a.md> [<b.md>] > "$WS/policy-surface.txt"
    ```
 
+   **Then pre-filter the surface before it enters model context (Story 19.7,
+   #741):**
+
+   ```
+   python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py policy-prefilter \
+     --surface "$WS/policy-surface.txt" [--items "$WS/policy-items.json"]
+   ```
+
+   Author tension items and run `classify-policy` against the emitted
+   `policy-surface.filtered.txt` — a deterministic allowlist reduction
+   (subject patterns, config keys, seed pointers, headings; fail-open to
+   inclusion) that is behavior-preserving for classification by test. The
+   full surface stays on disk beside it for audit, and the command's
+   `disclosure` line (full → filtered size) is **relayed once** as an
+   informational note.
+
    (No approved topics → plain `read`: GLOSSARY + LESSONS only. The per-repo
    `track`/`topics` config keys were **removed** — Story 13.36,
    SPEC-policy-topic-at-draft CAP-3; a leftover key is a named stage-0
