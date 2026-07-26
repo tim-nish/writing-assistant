@@ -358,6 +358,22 @@ grep -q 'verdict record is partial' "$work/e_rvc" \
   && err "a complete verdict record wrongly tripped the partial-record block" \
   || ok "a complete four-dimension record clears the completion verdict gate"
 
+# --- #751 substrate assertion (Story 19.14): an emptied state refuses, never
+# a false evidence gap. The terminal done checkpoint drops fact_sheet; passing
+# it must exit 2 with the named substrate error and NO evidence verdict.
+printf '{"stage":"done","next_stage":"done","reviewed":true}' > "$work/done-cp.json"
+rc=0
+python3 "$DP" quality-gate --draft "$work/good.md" --map "$work/good-map.txt" \
+  --judge "$work/judge-pass.txt" \
+  --framework-file "skills/draft-article/frameworks/F1-project-introduction.md" \
+  --state "$work/done-cp.json" > "$work/sub.out" 2> "$work/sub.err" || rc=$?
+if [ "$rc" -eq 2 ] && grep -q "carries no fact sheet" "$work/sub.err" \
+   && ! grep -q "found_kinds" "$work/sub.out"; then
+  ok "#751: emptied state -> named substrate error (exit 2), never found_kinds: []"
+else
+  err "#751: emptied state not refused as a substrate error (rc=$rc)"
+fi
+
 if [ "$fail" -eq 0 ]; then
   printf '\nAll quality-gate checks passed.\n'; exit 0
 else
