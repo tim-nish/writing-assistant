@@ -117,6 +117,12 @@ nothing. Every owner-facing ask follows the shared
   `git status` in the host repo shows nothing but declared products.
 - **Budget triage is an orderly stop:** finish the unit in progress, persist
   at the boundary with `--stop-note`, exit clean (stages/complete.md).
+- **Run-level cost journal (#742):** record `run-event --ws "$WS" --stage <s>
+  --event start|end|retry|judge-round|subagent` at each stage boundary, retry,
+  and judge spawn; at each stage boundary consult `budget-check --ws "$WS"` —
+  `breached: true` presents the continue / orderly-stop choice (never a
+  silent continue). The completion summary's informational bucket carries
+  `cost-block --ws "$WS"`'s lines (stages/complete.md).
 
 | Stage | Enter by reading | The one command |
 |---|---|---|

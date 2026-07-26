@@ -118,6 +118,20 @@ this run produces an **article body**, the informational bucket includes a
 python3 ${CLAUDE_PLUGIN_ROOT}/scripts/reading-time.py --language <en|ja> <draft>
 ```
 
+**The informational bucket also carries the run-level cost block (Story 19.8,
+#742)** — elapsed wall time, stage retries, judge rounds, subagent count,
+derived from the workspace's `run-events.jsonl` (with its basis named; an
+absent journal reads as "unknown", never as zero cost):
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py cost-block --ws "$WS"
+```
+
+Relay its `lines` verbatim. The run-level `budget-check` (same data) fires the
+existing budget-triage choice at a stage boundary when the configured
+`run_budget` thresholds (config; shipped defaults 120 min / 12 judge rounds)
+are crossed — an over-budget run is a decision, never archaeology.
+
 The informational bucket also names **both persisted product paths** —
 `drafts/<slug>.md` and `plans/<slug>.md`, copy-pasteable, taken verbatim from
 the `complete` subcommand's JSON (the dual-product completion gate, Story
