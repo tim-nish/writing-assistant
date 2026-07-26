@@ -17,8 +17,31 @@ The rule above governs *gates*. This one governs *authored text*, because a
 claim can be wrong without any gate being raised.
 
 **Any spec, story, or issue text asserting what the recall surface does or does
-not record binds only after consulting it.** Carry the pin —
-`consulted: product-lab@<sha> <files:lines>` — at the point of use. Grounding
+not record binds only after consulting it.** Carry the pin — but **the pin is
+two-tier, and only its public half goes in the artifact** (#731,
+`specs/spec-writing-assistant/SPEC.md` §Publication boundary). This repository
+is public, so writing the hub's name or a real commit sha into tracked text is
+a boundary violation; the instruction that used to appear here mandated exactly
+the string the boundary check rejects, which made grounding a claim the act
+that leaked it.
+
+At the point of use, write the **public half** — a generic decision line:
+
+```
+owner decision record — YYYY-MM-DD (short title)
+```
+
+Record the **private half** — the full pin and the `files:lines` set — with
+`python3 scripts/provenance-pin.py record --decision "<that line>" --pin
+"<hub>@<sha>" --cites "<files:lines>"`. It lands machine-locally, outside every
+repository. `provenance-pin.py resolve` reads it back; `provenance-pin.py check`
+reports any public line with no private counterpart.
+
+**Precedence:** the private record wins on mismatch. A public decision line
+with **no** store entry is *unverified*, not grounded — mark it `unverified —`
+inline at the point of use, per the gate-item content-grounding rule.
+
+Grounding
 in this repository's own code is **not** grounding for such a claim: the
 declared authority for what the hub records is the seam read, and the shipped
 implementation is the authority for code facts only (that scope limit is stated
