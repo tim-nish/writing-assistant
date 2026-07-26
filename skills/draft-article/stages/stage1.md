@@ -95,3 +95,11 @@ here runs exactly as the full pipeline does:
   slim packaging profile (SPEC-platform-variants) at the separate post-review
   variants invocation, as with any draft.
 
+
+---
+
+**Stage 1 exit → Stage 2.** Read [`stage2.md`](stage2.md) and run:
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py interview --framework <F> [--items …] <state>
+```

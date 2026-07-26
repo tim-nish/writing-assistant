@@ -6,6 +6,23 @@
 
 Fill the chosen framework's slots from the fact sheet and the interview answers.
 
+**Who performs each sub-step.** Stage 3 is the one stage that interleaves
+authoring with validation, so read this before running anything: *you* write
+the prose sub-steps, and the commands only check what you wrote. A run that
+mistakes a validator for the generator waits for a draft no command will
+produce.
+
+| Sub-step | Who | What it is |
+|---|---|---|
+| argument plan (`$WS/argument-plan.md`) | **you (LLM)** | compose the thesis, arc, and section intents — no command generates this |
+| candidate structures (the `structures` sub-command, invoked in the CAP-4 block below) | mechanical | derives 2-3 candidates from the selected elements' evidence kinds; the **owner** chooses |
+| `structure-record` | mechanical | records the owner's choice into the plan; refuses a second gate or a second store |
+| per-section fill | **you (LLM)** | write the draft body against the section intents, with `[VERIFY]` markers |
+| provenance map (sidecar) | **you (LLM)** | author the per-position map alongside the draft |
+| `draft-pipeline.py provenance` / `verify-provenance` | mechanical | validate the map against the draft; never write prose |
+| visual-set plan | **you (LLM)**, ratified mechanically | propose the set; the ratification refuses a non-conforming plan |
+| isolated provenance judge | **LLM, separate context** | grades positions independently of the author |
+
 **Stage 3 opens with an argument-plan sub-step (CAP-1, #440/#434).** Before
 filling any slot, compose an explicit **argument plan** from the fact sheet
 (including the narrative kinds — `chronology | motivation | cost | reversal`,
@@ -573,3 +590,14 @@ Mermaid source, a figure spec, an image-generation prompt block, or ASCII —
 `mermaid-cli`, any image tooling, or an image-generation API — rendering is the
 owner's tooling. The plugin bundles no such tools.
 
+
+---
+
+**Stage 3 exit → the quality gate.** Read [`gate.md`](gate.md) and run:
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py quality-gate --draft … --map … --judge …
+```
+
+Stage 3 does not complete until that gate passes — it is a stage-progression
+precondition, not an advisory review.

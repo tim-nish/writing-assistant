@@ -696,3 +696,10 @@ Branch on the JSON:
 This gate is a **separate precondition at the same boundary** as the quality
 gate: it changes nothing about the quality gate or `[VERIFY]` markers.
 
+
+---
+
+**Stage 2 exit → Stage 3.** Write the journal to `$WS/interview-journal.json`
+(above), then read [`stage3.md`](stage3.md). Stage 3 opens with the
+argument-plan sub-step, which **you** author — see that file's "Who performs
+each sub-step" table before running any command.

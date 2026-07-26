@@ -205,3 +205,14 @@ like any stage.
 A **fact-sheet-stitched draft fails** this gate (dimension 4) and does **not**
 reach Stage 4 unrevised.
 
+
+---
+
+**Gate exit — two directions.** This is the pipeline's one non-linear
+transition, so it names both:
+
+- **Pass → Stage 4.** Read [`stage4.md`](stage4.md) and run
+  `draft-pipeline.py verify <draft>`, driving `verify-markers --count` to 0.
+- **Fail → back to Stage 3.** Return to [`stage3.md`](stage3.md) for the
+  bounded repair hop, then re-run the gate. The cycle is bounded; a
+  fact-sheet-stitched draft does not reach Stage 4 unrevised.

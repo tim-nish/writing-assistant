@@ -717,3 +717,15 @@ still `{audience_id}` — Story 13.71), fill both per the Stage-3 rule and
 re-run the quality gate; the variant stage's hard stop remains the mechanical
 backstop either way.
 
+
+---
+
+**Stage 0 exit → Stage 1.** Read [`stage1.md`](stage1.md) and run:
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py consume <harvest-doc>
+```
+
+(The harvest skill writes `$WS/fact-sheet.md` first; `consume` threads it into
+run state. The stage sequence and each stage's one command are the dispatcher's
+table in [`../SKILL.md`](../SKILL.md) — this line points at it, never restates it.)

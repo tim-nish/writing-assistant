@@ -52,3 +52,11 @@ Stage 4 exit: zero unmarked invented claims, zero `[VERIFY]` markers — the dra
 is ready for the article plan and the `complete` gate. Variant emission is
 **not** part of this flow (see the pointer section below).
 
+
+---
+
+**Stage 4 exit → completion.** Read [`complete.md`](complete.md) and run:
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py complete --draft … --slug … --root … --ws …
+```
