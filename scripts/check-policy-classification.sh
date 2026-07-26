@@ -70,6 +70,25 @@ d = json.load(open(sys.argv[1]))
 assert d["reconciliation_items"] == [], d["reconciliation_items"]
 PYEOF
 
+# --- 0c. #741: the pre-filter is behavior-preserving ---------------------------
+python3 "$PIPE" policy-prefilter --surface "$FIX/surface.txt" \
+  --items "$FIX/items.json" --out "$work/surface.filtered.txt" >/dev/null 2>&1 \
+  || err "#741: policy-prefilter failed"
+python3 "$PIPE" classify-policy --surface "$FIX/surface.txt" \
+  --config-json "$FIX/config.json" --items "$FIX/items.json" \
+  --config-version cfgv1 > "$work/cl-full.json" 2>/dev/null
+python3 "$PIPE" classify-policy --surface "$work/surface.filtered.txt" \
+  --config-json "$FIX/config.json" --items "$FIX/items.json" \
+  --config-version cfgv1 > "$work/cl-filt.json" 2>/dev/null
+python3 - "$work/cl-full.json" "$work/cl-filt.json" <<'PYEOF' \
+  && ok "#741: classification over the filtered surface is IDENTICAL to full" \
+  || err "#741: pre-filter changed classification output (not behavior-preserving)"
+import json, sys
+a, b = json.load(open(sys.argv[1])), json.load(open(sys.argv[2]))
+assert a == b, "outputs differ"
+assert a["reconciliation_items"], "fixture no longer produces the conflict"
+PYEOF
+
 # --- 1. The 2026-07-18 EN-topology replay ---------------------------------------
 # Fixture surface serves the records-only line at a pinned cite; fixture config
 # declares syndication.policy.en.mode: canonical; the candidate items carry the
