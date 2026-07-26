@@ -819,7 +819,10 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py consume <harvest-doc>
 
 This carries harvest's output forward **without re-reading any source** — it only
 reads the harvest document, so there is no second read path that could bypass the
-Story 3.1 scope boundary. It:
+Story 3.1 scope boundary. **Harvest-reuse on a rerun (#736/#737):** a resumed or
+re-entered run reuses the persisted fact sheet and its recorded per-source
+progress verbatim and re-executes only the stages after the last checkpoint —
+consume failing never means harvest re-ran. It:
 
 - holds **both** the fact sheet and the NEEDS-OWNER list, parsed against harvest's
   exact contract (a schema change surfaces here rather than being absorbed);

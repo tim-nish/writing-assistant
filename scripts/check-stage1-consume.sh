@@ -124,6 +124,22 @@ printf '# Fact sheet: x\n- Bad / a1b2c3d / opinion\n\n# NEEDS-OWNER\n' > "$work/
 python3 "$DP" consume "$work/badkind.md" >/dev/null 2>&1 && err "off-contract KIND absorbed silently" \
   || ok "off-contract fact-sheet KIND surfaces as an error"
 
+# 8. Sanctioned `premise:` clause (Story 19.1, #736): consume and the
+#    validator agree on the producer grammar — the lockstep clause, mechanical.
+fx="scripts/fixtures/needs-owner/sanctioned-premise-clause.md"
+python3 scripts/validate-needs-owner.py "$fx" >/dev/null 2>&1 \
+  && ok "validator accepts the sanctioned premise fixture" || err "validator rejects the sanctioned fixture"
+python3 "$DP" consume "$fx" | python3 -c '
+import json, sys
+d = json.load(sys.stdin)
+ps = [n.get("premise") for n in d["needs_owner"]]
+assert ps[0] == "unverified" and ps[1] and "@" in ps[1], ps
+' && ok "consume accepts both sanctioned premise forms and carries them" \
+  || err "consume diverged from the validator on the premise clause (#736)"
+printf '# Fact sheet: x\n\n# NEEDS-OWNER\n- Q? / r / other / premise: prose asserted as fact\n' > "$work/badprem.md"
+python3 "$DP" consume "$work/badprem.md" 2>&1 | grep -q "premise clause rejected" \
+  && ok "malformed premise names the clause, not TOPIC" || err "malformed premise misattributed"
+
 if [ "$fail" -eq 0 ]; then
   printf '\nAll stage-1 consume checks passed.\n'; exit 0
 else
