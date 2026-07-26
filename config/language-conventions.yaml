@@ -134,6 +134,43 @@ languages:
         - unlocks
         - stop
         - stops
+        # Bare-infinitive / imperative forms (#756): an imperative title
+        # ("Automate the user, not the code") IS a claim — its verb is the
+        # bare infinitive, so the declared set must carry those forms or every
+        # imperative-mood title reads as a bare noun phrase.
+        - automate
+        - use
+        - test
+        - write
+        - read
+        - delete
+        - remove
+        - measure
+        - trust
+        - treat
+        - think
+        - start
+        - design
+        - choose
+        - embrace
+        - forget
+        - review
+        - simulate
+        - validate
+        - verify
+        - refactor
+        - migrate
+        - deploy
+        - monitor
+        - profile
+        - benchmark
+        - simplify
+        - optimize
+        - generate
+        - never
+        - always
+        - don't
+        - do
   ja:
     register: です/ます (polite form), consistent throughout, no mixed 常体
     terminology: technical terms kept in English or established katakana, never force-translated
