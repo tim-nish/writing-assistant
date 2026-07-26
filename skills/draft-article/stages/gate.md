@@ -5,7 +5,7 @@
 ## Stage 3→4 — mandatory quality gate (Story 11.4)
 
 Before the draft reaches the owner's verification pass, it must **pass the
-article-quality gate** ([`quality-rubric.md`](quality-rubric.md)). This is a
+article-quality gate** ([`quality-rubric.md`](../quality-rubric.md)). This is a
 **stage-progression precondition** — like `verify-markers`, not an advisory
 review finding: **Stage 3 does not complete until the gate passes**, so the
 owner's ~4-minute budget never lands on a draft that reads like a stitched fact
@@ -20,7 +20,7 @@ mechanical **per-lesson skeleton detector** (an identical `##` heading repeated
 ≥3×) is the zero-token backstop; the dim1 judge owns the varied-structure and
 plan-conformance judgment. **This contract lives in three enforcement copies
 that move in lockstep** — `scripts/draft-pipeline.py` (the mechanical
-skeleton/stitched checks), [`quality-rubric.md`](quality-rubric.md) (the dim1
+skeleton/stitched checks), [`quality-rubric.md`](../quality-rubric.md) (the dim1
 contract the judge grades against), and this section — a change to one without
 the others is a defect.
 
@@ -65,7 +65,7 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py quality-gate \
   defect, **never a sentence- or paragraph-length artifact** — length is
   dimension 4's (mechanical), and a sentence split/merge made to satisfy dim4
   is neutral for dim1/dim2. This is the rubric's dimension-separation contract
-  ([`quality-rubric.md`](quality-rubric.md)) and is what lets the second-cycle
+  ([`quality-rubric.md`](../quality-rubric.md)) and is what lets the second-cycle
   delta re-check converge. The
   gate refuses an unparseable judge file with a named error (exit 2) before
   judging anything; re-spawn the judge with the grammar restated rather than

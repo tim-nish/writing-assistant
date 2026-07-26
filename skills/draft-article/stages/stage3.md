@@ -73,7 +73,7 @@ journey**, **single-incident deep thread**, and **thematic braid** — each
 returned with a one-line **rationale grounded in the selected elements' evidence
 kinds** (chronology-rich clusters suggest the journey; one dominant incident
 suggests the deep thread; shared themes suggest the braid). Present them under
-the [owner-facing proposal contract](../owner-facing-proposal-contract.md): the
+the [owner-facing proposal contract](../../owner-facing-proposal-contract.md): the
 owner **picks one, or counter-proposes free-form**. **Combining multiple
 selected elements into one narrative thread is a supported structure** — the
 journey/deep-thread/braid compose the elements as **beats** of one thread rather
@@ -149,7 +149,7 @@ same artifacts as today.
 **Applying a skipped input's declared slot effect (Story 10.5).** When the owner
 **skipped** the question feeding a slot, read that slot's `[SKIP: <effect>]` tag
 (declared in the framework template; see
-[`frameworks/CONVENTIONS.md`](frameworks/CONVENTIONS.md)) and apply exactly it —
+[`frameworks/CONVENTIONS.md`](../frameworks/CONVENTIONS.md)) and apply exactly it —
 the interview engine recorded only the skip disposition, so the **framework
 contract decides the consequence**:
 
@@ -404,7 +404,7 @@ Malformed markers fail; Stage 4 then resolves each `[VERIFY]` until
 
 **Before any individual visual proposal, propose the article's visual set as a
 whole** — one owner-ratifiable item under the
-[**owner-facing proposal contract**](../owner-facing-proposal-contract.md)
+[**owner-facing proposal contract**](../../owner-facing-proposal-contract.md)
 (Where/Why/Effect labels; plain-text payload per contract section (g)). The
 set-level question is always asked **deliberately**, instead of the effective
 zero-or-one outcome the per-slot reactive flow produced. The plan enumerates,
@@ -490,7 +490,7 @@ unasked. Each proposal is **two steps** (SPEC-draft-article-ux CAP-3, Story
 13.29) — the intent decision comes before any finished source, because the
 fallback ladder's table-vs-diagram choice depends on it. Both steps follow the
 shared
-[**owner-facing proposal contract**](../owner-facing-proposal-contract.md)
+[**owner-facing proposal contract**](../../owner-facing-proposal-contract.md)
 (`${CLAUDE_PLUGIN_ROOT}/skills/owner-facing-proposal-contract.md`):
 
 **Step 1 — intent.** Ask "what should a visual in {section} communicate?" with

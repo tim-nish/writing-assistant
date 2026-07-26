@@ -166,7 +166,7 @@ CAP-9 adds is that the rule is **stated, not implicit**:
   unconsumed, matched framework slot X"); and
 - the **completion summary** repeats the per-element selection reasons in its
   informational bucket, so the owner sees *why each element is in the article*
-  without opening a run artifact ([`completion-summary.md`](../completion-summary.md)).
+  without opening a run artifact ([`completion-summary.md`](../../completion-summary.md)).
   Any consumption statement it makes **names the population it covers** — see
   the population rule under Consumption exclusion below (CAP-9, #732).
 
@@ -229,7 +229,7 @@ repeatedly from one repo does not reselect covered material by chance:
   selection rule requires above).
 - The exclusion is an **owner-overridable default**, never a hard filter: the
   owner may **re-cover** a consumed element (surface it as a proposal under the
-  [proposal contract](../owner-facing-proposal-contract.md); a re-cover is the
+  [proposal contract](../../owner-facing-proposal-contract.md); a re-cover is the
   owner's to ratify). With **no plans for this project**, nothing is excluded and
   selection is exactly as today.
 
@@ -426,7 +426,7 @@ call**, so lesson-based selection defaults to the elements **absent** from it
 (see "Story-element selection" above); `project_plans` being **empty** is what
 licenses the "first article on this project" claim, and non-empty forbids it.
 From this surface you **may surface plan-grounded proposals** — each
-under the [owner-facing proposal contract](../owner-facing-proposal-contract.md),
+under the [owner-facing proposal contract](../../owner-facing-proposal-contract.md),
 **none auto-applied**:
 
 - "article Y already covered X — link to it instead of re-explaining";
@@ -473,7 +473,7 @@ draft article <type> from <sources> continuing <prior-slug>
    consultation.
 
 If `<prior-slug>` resolves to **no canonical or plan**, surface it under the
-[owner-facing proposal contract](../owner-facing-proposal-contract.md) —
+[owner-facing proposal contract](../../owner-facing-proposal-contract.md) —
 "no article `<prior-slug>` found; draft standalone, or correct the slug?" —
 never a hard failure. Continuation is an **enhancer**: with no modifier the run
 behaves exactly as today (auto plan-consultation only).

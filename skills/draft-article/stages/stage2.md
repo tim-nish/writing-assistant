@@ -14,7 +14,7 @@ it narrates, and why it matters — as **first-class items**, not only when a
 NEEDS-OWNER entry happens to name them. These items ride the **same ≤5 question
 budget** and the same journal/disposition machinery as every other question;
 they are owner judgment (opinion), so they are **`open`** items (owner-only
-knowledge, [`SPEC-policy-source-seam CAP-2`](../../specs/spec-policy-source-seam/SPEC.md)),
+knowledge, [`SPEC-policy-source-seam CAP-2`](../../../specs/spec-policy-source-seam/SPEC.md)),
 never a source-pointed recommendation. Their answers come back as **owner
 opinion** and reach the draft as **attributed prose spans** (Stage 3 below),
 not as atomic sourced claims — this is the prose-shaped channel the owner's
@@ -371,7 +371,7 @@ joins the candidates automatically (CAP-5) — the evidence GATE's interview
 fallback, surfacing the gap here instead of failing late at Stage 3.
 
 Present each surviving question under the
-[owner-facing proposal contract](../owner-facing-proposal-contract.md): show
+[owner-facing proposal contract](../../owner-facing-proposal-contract.md): show
 **where** the section it concerns sits in the article outline and a **short
 preview of the current section** (when one already exists), **why** the question
 is asked, and **choices whose labels state their concrete effect** — never a
@@ -587,7 +587,7 @@ notes when it names a pin.
 
 **On request — the policy-influence report.** When the owner asks what the
 policy changed in a run, produce the
-[policy-influence report](../policy-influence-report.md)
+[policy-influence report](../../policy-influence-report.md)
 (`${CLAUDE_PLUGIN_ROOT}/skills/policy-influence-report.md`): a view over the
 journal + presented payloads + `consulted:` lines — never a second draft or
 A/B run, and never emitted unasked (Story 13.40).

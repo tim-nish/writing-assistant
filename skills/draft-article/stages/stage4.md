@@ -15,7 +15,7 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py verify <draft>
 This lists every well-formed marker with its **line and reason** (a malformed
 marker blocks the pass — Stage 3 must have produced canonical `[VERIFY: <reason>]`
 forms). Present each marker to the owner under the
-[owner-facing proposal contract](../owner-facing-proposal-contract.md): **where**
+[owner-facing proposal contract](../../owner-facing-proposal-contract.md): **where**
 the claim sits in the article (its section, with the surrounding sentence as a
 preview), **why** it is flagged (the marker's reason), and choices whose labels
 state their **concrete effect on the article** — never a shorthand. A first-time
