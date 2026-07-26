@@ -283,6 +283,34 @@ jget 'any(e.get("selection")=="candidate:2+edited" and e.get("candidates") for e
 grep -q 'candidates' "$SKILL2" && grep -q 'owner-authored' "$SKILL2" \
   && ok "draft-article SKILL documents candidate/selection provenance" || err "SKILL does not document 18.28 provenance"
 
+# --- #758 (Story 19.13): a journal over asked questions with no payload log
+# names the loss; the log's presence silences it.
+wpc=$(mktemp -d)
+STATE758='{"fact_sheet":[],"needs_owner":[{"topic":"warning","candidate":"a gap"}]}'
+printf '%s' "$STATE758" | python3 "$DP" interview --framework F3 > "$wpc/iv.json"
+python3 - "$wpc" "$DP" <<'PY758'
+import json, subprocess, sys
+w, dp = sys.argv[1], sys.argv[2]
+iv = json.load(open(f"{w}/iv.json"))
+recs = []
+for q in iv["questions"]:
+    args = (["--disposition", "answered", "--text", "an answer"])
+    r = subprocess.run([sys.executable, dp, "answer", "--id", q["id"], *args],
+                       capture_output=True, text=True)
+    recs.append(json.loads(r.stdout))
+json.dump(recs, open(f"{w}/answers.json", "w"))
+PY758
+python3 "$DP" journal --interview "$wpc/iv.json" --answers "$wpc/answers.json" \
+  --ws "$wpc" 2>/dev/null | grep -q payload_capture_warning \
+  && ok "#758: absent presented-payloads.jsonl -> named payload_capture_warning" \
+  || err "#758: capture loss not named"
+touch "$wpc/presented-payloads.jsonl"
+python3 "$DP" journal --interview "$wpc/iv.json" --answers "$wpc/answers.json" \
+  --ws "$wpc" 2>/dev/null | grep -q payload_capture_warning \
+  && err "#758: warning emitted although the payload log exists" \
+  || ok "#758: a present payload log journals silently"
+rm -rf "$wpc"
+
 if [ "$fail" -eq 0 ]; then
   printf '\nAll interview-journal checks passed.\n'; exit 0
 else

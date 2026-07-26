@@ -4156,6 +4156,20 @@ def cmd_journal(args):
                      f"({_bare_policy_reason(args.policy_note) or 'policy_source unset'})")
 
     out = {"stage": "interview", "journal": entries, "consulted": consulted}
+    # #758 (Story 19.13): a run that PRESENTED owner-facing gates but left no
+    # presented-payload log has lost its offered-alternatives record — name
+    # the loss (a warning, never a hard failure: degraded runs still journal).
+    ws_dir = getattr(args, "ws", None)
+    if ws_dir and entries:
+        asked_any = any(e.get("status") == "asked" for e in entries)
+        plog = os.path.join(ws_dir, "presented-payloads.jsonl")
+        if asked_any and not os.path.isfile(plog):
+            out["payload_capture_warning"] = (
+                "presented-payloads.jsonl is absent from the run workspace "
+                "although questions were asked — the offered-alternatives "
+                "record survives only in conversation (capture contract (f), "
+                "#234/#758); relay this once in the completion summary's "
+                "informational bucket")
     # Echo the pinned presentation order (Story 13.30, CAP-4) so a mis-ordered
     # run is attributable from the journal alone.
     if interview.get("presentation_order"):
@@ -6876,6 +6890,8 @@ def main(argv=None):
                          "candidate:<n>+edited | owner-authored (Story 18.28)")
     sp = sub.add_parser("journal")
     sp.add_argument("--interview", required=True, help="the `interview` output JSON (carries triage), or - for stdin")
+    sp.add_argument("--ws", help="run workspace — when given, an asked-questions journal with no "
+                                 "presented-payloads.jsonl gains a named payload_capture_warning (#758)")
     sp.add_argument("--answers", help="recorded answer records (JSON list), or - for stdin")
     sp.add_argument("--policy-note", help="why the run was not policy-seeded, for the consulted: line "
                                           "(e.g. 'policy_source unavailable: <reason>'; default: unset)")

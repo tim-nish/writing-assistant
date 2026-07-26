@@ -37,6 +37,24 @@ own entry precondition already redirects to "share engineering lessons", so
 recommend that. Draft the recommendation from repo state you can check
 (tags, docs, eval assets), never from guesswork.
 
+**Capture the intent gate like every other ask (Story 19.13, #758).** This is
+the run's first fork and was the one owner-facing ask the capture contract
+skipped: assemble the payload — the offered intent labels, the recommendation
+and its basis (the seed pointer in the **Why** when policy-informed) — and
+validate/capture it **before presenting**:
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/validate-proposal-payload.py \
+  --ws "$WS" --surface intent <payload>
+```
+
+then record the owner's selection against the returned `ask_id` with
+`--answer` (proposal contract (f)). The offered-alternatives record is what a
+later session (Revise, a plan-schema audit) reconstructs the angle decision
+from — a run whose gates leave no payload log has its loss NAMED by the
+journal (`payload_capture_warning`), never silent. The intent gate precedes
+`stage0`, so mint/resolve `$WS` first via `autostart` when capturing here.
+
 **Policy-informed recommendation (SPEC-policy-editorial-direction CAP-1,
 Story 13.37).** When the host repo declares a `policy_source`, the
 recommendation may additionally draw on the owner's recorded positions — read
