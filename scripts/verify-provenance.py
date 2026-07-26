@@ -53,6 +53,9 @@ import sys
 PROV_CLASSES = ("sourced", "derived", "narration", "verify")
 ATTEST_LINE = re.compile(r"^attestation:\s*draft-sha256=(?P<hash>[0-9a-fA-F]{64})\s*$")
 GRADED_LINE = re.compile(r"^graded:\s*(?P<positions>\S.*)$")
+CARRIED_LINE = re.compile(r"^carried:\s*(?P<positions>\S.*)$")
+# A prior hand-off entry: `POS [Lnn]: <payload>` (#738 delta basis).
+WORKLIST_ENTRY = re.compile(r"^(?P<pos>\S+) \[L\d+\]: (?P<payload>.*)$")
 # `POS ~ "<quoted>": reason` — the judge echoing the sentence it graded.
 JUDGE_ECHO = re.compile(r'^(?P<pos>[^~:]+)~\s*"(?P<quote>[^"]*)"\s*:\s*(?P<reason>.*)$')
 # Positions may carry a line anchor — `P1.S1[L7]` (#304). This parser stays
@@ -111,13 +114,16 @@ def draft_sha256(draft_text):
 
 
 def parse_attestation(text):
-    """Split the verdicts file into (draft_hash, graded_set, verdict_lines).
+    """Split the verdicts file into (draft_hash, graded_set, carried_set,
+    verdict_lines).
 
-    Returns (None, set(), lines) when no attestation header is present — the
-    caller fails closed on that. `graded:` lines are unioned so the judge can
-    echo the narration and derived listings' headers separately.
+    Returns (None, set(), set(), lines) when no attestation header is present —
+    the caller fails closed on that. `graded:` lines are unioned so the judge
+    can echo the narration and derived listings' headers separately. `carried:`
+    lines (#738 delta re-grade) name positions whose verdicts carry forward
+    from the attested prior cycle — echoed from the hand-off like `graded:`.
     """
-    draft_hash, graded, verdicts = None, set(), []
+    draft_hash, graded, carried, verdicts = None, set(), set(), []
     for raw in text.splitlines():
         ln = raw.strip()
         if not ln or ln.startswith("#"):
@@ -130,24 +136,33 @@ def parse_attestation(text):
         if m:
             graded.update(p.strip() for p in m.group("positions").split(",") if p.strip())
             continue
+        m = CARRIED_LINE.match(ln)
+        if m:
+            carried.update(p.strip() for p in m.group("positions").split(",") if p.strip())
+            continue
         verdicts.append(ln)
-    return draft_hash, graded, verdicts
+    return draft_hash, graded, carried, verdicts
 
 
-def check_attestation(draft_hash, graded, entries, draft_text):
-    """The fail-closed attestation checks (Story 13.67). Returns error strings."""
+def check_attestation(draft_hash, graded, entries, draft_text, carried=frozenset()):
+    """The fail-closed attestation checks (Story 13.67). Returns error strings.
+
+    `carried` positions (#738) count toward worklist coverage: a delta cycle
+    grades only changed sentences, and the hand-off's `carried:` header —
+    echoed by the judge — accounts for the rest.
+    """
     errors = []
     if draft_hash is None:
         return ["no judge attestation found (`attestation: draft-sha256=<hex>` header) "
                 "— absence of verdicts is never PASS; a comment-only or free-form file "
                 "does not demonstrate that a judge ran"]
     worklist = {pos for pos, cls, _, _ in entries if cls in ("narration", "derived")}
-    missing = sorted(worklist - graded)
+    missing = sorted(worklist - graded - set(carried))
     if missing:
         errors.append("attestation does not cover the expected worklist — ungraded "
                       f"position(s): {', '.join(missing)} (a partially-graded artifact "
                       "is not judged)")
-    unknown = sorted(graded - {pos for pos, _, _, _ in entries})
+    unknown = sorted((graded | set(carried)) - {pos for pos, _, _, _ in entries})
     if unknown:
         errors.append(f"attestation grades position(s) not in the map: {', '.join(unknown)}")
     if draft_text is None:
@@ -158,6 +173,44 @@ def check_attestation(draft_hash, graded, entries, draft_text):
                       "draft version — verdicts for a prior draft never validate the "
                       "current one")
     return errors
+
+
+def delta_basis(prior_worklist_text, prior_verdicts_text):
+    """The #738 delta re-grade basis: which sentence TEXTS passed the attested
+    prior cycle. Returns (passing_texts, prior_hash) or (None, reason) when the
+    basis does not resolve — the caller then falls back to a full re-grade with
+    a disclosed reason, never silently.
+    """
+    prior_hash = None
+    texts = {}
+    for raw in prior_worklist_text.splitlines():
+        ln = raw.strip()
+        m = ATTEST_LINE.match(ln)
+        if m:
+            prior_hash = m.group("hash").lower()
+            continue
+        m = WORKLIST_ENTRY.match(ln)
+        if m and not ln.startswith(("graded:", "carried:")):
+            payload = m.group("payload")
+            # derived/sourced entries print `ptrs | text`; narration prints text.
+            text = payload.split(" | ", 1)[1] if " | " in payload else payload
+            texts[m.group("pos")] = text.strip()
+    if prior_hash is None:
+        return None, "prior worklist carries no attestation header"
+    v_hash, graded, _carried, verdict_lines = parse_attestation(prior_verdicts_text)
+    if v_hash is None:
+        return None, "prior verdicts carry no attestation header"
+    if v_hash != prior_hash:
+        return None, ("prior verdicts attestation does not match the prior "
+                      "worklist (different draft version)")
+    failing = set()
+    for ln in verdict_lines:
+        m = JUDGE_ECHO.match(ln)
+        pos = m.group("pos").strip() if m else ln.partition(":")[0].strip()
+        failing.add(pos)
+    passing = {txt for pos, txt in texts.items()
+               if pos in graded and pos not in failing and txt}
+    return passing, prior_hash
 
 
 def _load_set(path):
@@ -181,6 +234,15 @@ def main(argv=None):
                         "STATED, including its actor/scope? A supported-topic-but-contradicted-"
                         "attribution span is a `contradicted-attribution` finding")
     p.add_argument("--draft", help="the draft the map describes; makes the judge hand-off carry each\nposition's anchored line verbatim, and lets an echoed judge quote be checked (#304)")
+    p.add_argument("--prior-worklist", dest="prior_worklist",
+                   help="the SAME listing class's hand-off from the attested prior cycle "
+                        "(#738 delta re-grade): sentences unchanged since it, whose "
+                        "positions the prior judge graded clean, are CARRIED instead of "
+                        "re-graded; requires --prior-verdicts and --draft")
+    p.add_argument("--prior-verdicts", dest="prior_verdicts",
+                   help="the judge verdicts returned for --prior-worklist; its attestation "
+                        "must match the prior worklist's, else the emission falls back to a "
+                        "full re-grade with a disclosed reason")
     args = p.parse_args(argv)
 
     try:
@@ -204,10 +266,31 @@ def main(argv=None):
         # verdicts file (Story 13.67): the draft hash binds the verdicts to
         # this draft version, the graded line to this worklist. Emitted only
         # with --draft — the hash does not exist without the draft.
+        # #738 delta re-grade: carry forward positions whose sentence text is
+        # unchanged since the attested prior cycle AND passed it. The judge
+        # never sees prior verdicts (NFR13) — only a smaller worklist plus the
+        # `carried:` header it echoes like `graded:`.
+        carried = []
+        if args.prior_worklist and args.prior_verdicts and args.draft:
+            passing, basis = delta_basis(_read(args.prior_worklist),
+                                         _read(args.prior_verdicts))
+            if passing is None:
+                sys.stderr.write(f"delta re-grade unavailable — full re-grade: {basis}\n")
+            else:
+                keep = []
+                for e in listed:
+                    text = anchored_text(e[3], draft_lines)
+                    (carried if text and text.strip() in passing else keep).append(e)
+                listed = keep
+                sys.stderr.write(
+                    f"delta re-grade: {len(carried)} carried, {len(listed)} "
+                    f"re-graded (basis draft-sha256={basis})\n")
         if args.draft:
             print(f"attestation: draft-sha256={draft_sha256(_read(args.draft))}")
             if listed:
                 print(f"graded: {','.join(pos for pos, _, _, _ in listed)}")
+            if carried:
+                print(f"carried: {','.join(pos for pos, _, _, _ in carried)}")
         for pos, cls, ptrs, anchor in listed:
             text = anchored_text(anchor, draft_lines)
             if cls_wanted == "narration":
@@ -224,8 +307,8 @@ def main(argv=None):
     verdict_lines = None
     if args.judge_findings:
         draft_text = _read(args.draft) if args.draft else None
-        att_hash, graded, verdict_lines = parse_attestation(_read(args.judge_findings))
-        att_errors = check_attestation(att_hash, graded, entries, draft_text)
+        att_hash, graded, carried, verdict_lines = parse_attestation(_read(args.judge_findings))
+        att_errors = check_attestation(att_hash, graded, entries, draft_text, carried)
         if att_errors:
             sys.stderr.write("verify-provenance: ATTESTATION FAILURE (not judged)\n")
             for e in att_errors:

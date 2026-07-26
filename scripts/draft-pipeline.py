@@ -875,6 +875,23 @@ def cmd_quality_gate(args):
     Emits a per-dimension verdict; a non-zero exit BLOCKS stage 4 (a
     precondition, not an advisory finding).
     """
+    # The shared two-cycle bound is ENFORCED here, not only documented (#738):
+    # rewrites, gate revisions, and repair hops all count against TWO_CYCLE_BOUND,
+    # and a third revision cycle is mechanically unreachable — past the bound the
+    # unresolved dimensions are a CAP-6 publish blocker, never another round.
+    if getattr(args, "cycle", 1) > TWO_CYCLE_BOUND:
+        print(json.dumps({
+            "gate": "quality",
+            "pass": False,
+            "action": "publish-blocker",
+            "publishable": False,
+            "reason": (f"two-cycle bound exhausted: cycle {args.cycle} requested, "
+                       f"bound is {TWO_CYCLE_BOUND} (rewrites, gate revisions, and "
+                       "repair hops share it) — the unresolved dimensions route to "
+                       "the completion summary's publish-blocker bucket, never a "
+                       "third revision cycle"),
+        }, indent=2))
+        return 1
     draft = sys.stdin.read() if args.draft == "-" else open(args.draft, encoding="utf-8").read()
     prov_entries = []
     if args.map:
