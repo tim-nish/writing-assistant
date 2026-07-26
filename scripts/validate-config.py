@@ -459,6 +459,47 @@ def validate_platform_profiles(args, findings, notices):
                 notices.append(line)
 
 
+def validate_pointer_block(args, findings):
+    """The pointer-block GATE must be renderable from the config (#752).
+
+    render-pointer-block.py refuses (GATE-unfilled exit) when the template
+    fails to consume a standing line — a defect that previously surfaced only
+    at Stage-3 fill/complete, the exact late failure CAP-5 exists to prevent.
+    Delegate to the renderer itself (one implementation, no rule copying): a
+    refusal here becomes a per-key stage-0 finding naming the template and the
+    dropped line. The pointer block is required on every article, so this is
+    unconditionally checkable up front.
+    """
+    script = os.path.join(HERE, "render-pointer-block.py")
+    passthrough = []
+    for flag, val in (("--root", args.root),
+                      ("--global-config", args.global_config),
+                      ("--repo-config", args.repo_config)):
+        if val:
+            passthrough.extend([flag, val])
+    seen = set()
+    for lang in ("en", "ja"):
+        res = subprocess.run(
+            [sys.executable, script, "--language", lang, *passthrough],
+            capture_output=True, text=True)
+        if res.returncode == 0:
+            continue
+        out = (res.stdout or "") + (res.stderr or "")
+        m = re.search(r"dropped standing line\(s\): ([^>\n]+?)\s*-->", out)
+        detail = (m.group(1).strip() if m
+                  else out.strip().splitlines()[-1] if out.strip() else
+                  f"renderer exit {res.returncode}")
+        if detail in seen:
+            continue
+        seen.add(detail)
+        findings.append((USER_FILE, "pointer_block.template",
+                         f"the pointer block cannot render ({lang}): template "
+                         f"does not consume standing line(s): {detail}. Fix: add "
+                         "the missing {placeholder} to pointer_block.template "
+                         "(e.g. *{newsletter_line}*) — an unrenderable pointer "
+                         "block is an unfilled GATE at Stage 3."))
+
+
 def main(argv=None):
     p = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -472,6 +513,7 @@ def main(argv=None):
     findings = []
     notices = []
     validate_user_config(args, findings)
+    validate_pointer_block(args, findings)
     if not args.skip_writing_sources:
         validate_writing_sources(args, findings)
         validate_journey(args, findings)
