@@ -4140,15 +4140,32 @@ def cmd_consume(args):
 
     needs_owner = []
     for e in vno.entries(no_lines):
-        parts = [p.strip() for p in e.rsplit(" / ", 2)]
+        # Pull the optional trailing `premise:` clause off FIRST (#736): the
+        # clause is sanctioned producer grammar (#526/#567, enforced in
+        # lockstep at validate-needs-owner.py), and parsing it as part of
+        # TOPIC rejected conformant harvest documents at the Stage-1 handoff.
+        # Same shared helper as the validator — one grammar, two call sites.
+        core, premise = vno.split_premise(e)
+        if premise is not None:
+            why = vno.validate_premise(premise)
+            if why:
+                sys.stderr.write(
+                    f"error: NEEDS-OWNER premise clause rejected ({why}): "
+                    f"`premise: {premise}` — sanctioned forms are `premise: "
+                    f"unverified` or `premise: path:line@sha`: {e}\n")
+                return 1
+        parts = [p.strip() for p in core.rsplit(" / ", 2)]
         if len(parts) != 3 or any(p == "" for p in parts):
-            sys.stderr.write(f"error: malformed NEEDS-OWNER entry (want `CANDIDATE / REASON / TOPIC`): {e}\n")
+            sys.stderr.write(f"error: malformed NEEDS-OWNER entry (want `CANDIDATE / REASON / TOPIC [/ premise: …]`): {e}\n")
             return 1
         candidate, reason, topic = parts
         if topic not in vno.TOPICS:
             sys.stderr.write(f"error: NEEDS-OWNER TOPIC {topic!r} outside the harvest contract: {e}\n")
             return 1
-        needs_owner.append({"candidate": candidate, "reason": reason, "topic": topic})
+        entry = {"candidate": candidate, "reason": reason, "topic": topic}
+        if premise is not None:
+            entry["premise"] = premise      # survives into pipeline state, never dropped
+        needs_owner.append(entry)
 
     state = {
         "stage": "consume",
