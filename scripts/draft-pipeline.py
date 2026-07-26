@@ -3958,6 +3958,28 @@ def cmd_staging_candidates(args):
                 f"Decision: {decision}",
             ]))
         if not blocks:
+            # Fail closed on a shape mismatch (#753): a NON-EMPTY findings list
+            # yielding zero blocks almost always means the file used adjacent
+            # vocabulary (`disposition`/`text`, the arbitration-events and
+            # answer-recorder keys) instead of this form's `outcome`/`decision`
+            # — and a silent empty file here loses the owner's position-moved
+            # proposal, the one artifact they are meant to hand-copy onward.
+            # A findings list that is genuinely empty, or whose entries carry
+            # the expected keys but no position-moved outcome, stays a clean
+            # no-op (no candidates -> no output).
+            recognized = any(
+                isinstance(f, dict) and ("outcome" in f or "decision" in f)
+                for f in findings)
+            if findings and not recognized:
+                sys.stderr.write(
+                    "error: --findings entries carry none of the expected keys "
+                    "(`outcome`, `decision`) — expected shape per finding: "
+                    '{"id", "outcome": "position-moved", "decision", "issue", '
+                    '"article": {"quote","pointer"}, "policy": '
+                    '{"quote","pointer"}}. Got keys: '
+                    f"{sorted(set().union(*(f.keys() for f in findings if isinstance(f, dict))))}. "
+                    "No blocks emitted.\n")
+                return 2
             return 0
         print("\n\n".join(blocks))
         return 0
