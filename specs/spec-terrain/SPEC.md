@@ -55,6 +55,38 @@ sources:
 > element (#671). This amendment strains the seam's ≤2-topic read bound, which
 > #670 deliberately does **not** widen — a separate decision (OQ, below).
 
+> **Corrected 2026-07-26 (triage, #733).** The amendment above describes the
+> join as matching **"the hub lesson's Evidence pointers"** against declared
+> sources. **The seam does not serve those pointers to this consumer**, so that
+> sentence describes a mechanism that cannot run here, and the correction is
+> recorded rather than the wording quietly softened.
+> **What is served:** one line per lesson, in the declared format
+> `- [one_liner](lessons/<slug>.md) — <status> | tags: <t1, t2> | YYYY-MM-DD` —
+> a one-liner, a slug, a status, tags, and a date. **No Evidence pointers.**
+> Those live in the lesson **body**, which the seam does not serve; this spec
+> already records that as OQ3, and the two facts were never read against each
+> other.
+> **What the verdict is therefore computed from:** the servable index line plus
+> the target repo's declared-source enumeration. Where a lesson's evidence
+> cannot be located because the pointers were never readable, the verdict is
+> **`cannot-determine`**, and that leg is **contracted as designed behavior**,
+> not an implementation shortfall — it is what an honest three-valued verdict
+> returns when the source was not consulted, and it must never be rendered as
+> "none". An absence is asserted only where it was established.
+> **The ratified three-valued distinction is untouched.** `matched` /
+> `episodic-unrecorded` / `no-episode` stay distinct because they route
+> differently — an unrecorded episode is a recording gap that a backfill can
+> discharge, and a no-episode lesson never can — and collapsing them would queue
+> work that can never complete (owner decision record — 2026-07-25,
+> three-valued join verdict ratified). This correction adds `cannot-determine`
+> as an honest fourth outcome of the *lookup*, never as a merge of the three
+> *verdicts*.
+> **Not decided here:** whether to ask the seam to widen so the original
+> mechanism becomes reachable. That is a hub-side ratification, contributions
+> across the seam are proposals, and this spec does not spend a trigger by
+> assuming the answer. Discovered by the per-paragraph join inspection (#725),
+> whose report renders this leg as cannot-determine for exactly this reason.
+
 > **Amended 2026-07-26 (triage, #726)** per /triage-gh. The mechanism is
 > **renamed Terrain**, and four owner-ratified design stances are recorded.
 > The rename is **owner-facing only**, by selection: see the machine-key clause
