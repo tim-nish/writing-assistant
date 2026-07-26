@@ -16,6 +16,8 @@ sources:
 > Canonical contract. Skills and scripts reference this spec and never restate
 > its wording.
 
+> **Amended 2026-07-26 (triage, #757)** per /triage-gh on a stale plan (run 20260726T165310: review arbitration narrowed the canonical's `audience:`; the plan kept the draft-time value and so stated a fact the reviewed canonical contradicts — demonstrated by the #727 cold-reconstruction test, which confidently rebuilt the *pre-review* article from the plan alone). **CAP-1's emission points are now two: run completion AND any post-arbitration review re-entry that applied ≥1 edit.** The re-entry emission is the same deterministic projection through the same fail-closed writer — projected from the reviewed canonical and the round's arbitration record, with **no new owner interaction** — so CAP-1's character (deterministic projection of artifacts the run already produced; forbidden fields untouched; no machine state in the articles repo) is unchanged; what changes is only *when* the projection re-runs. A plan is current with respect to the canonical it describes, or the run that made it stale re-emits it. The re-entry-side step is SPEC-article-review's amendment of the same date; enforced in lockstep.
+
 # Article Plan
 
 ## Why
