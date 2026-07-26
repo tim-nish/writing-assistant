@@ -1123,19 +1123,41 @@ def cmd_quality_gate(args):
                         "declared": sorted(types),
                         "allowed_kinds": sorted(allowed),
                         "found_kinds": sorted(found),
-                        "classification": "missing-input",
-                        # A ready-made `Upstream:` remediation in exactly the
-                        # shape `repair-hop` consumes — the bounded route, never
-                        # open-ended re-harvest.
-                        "upstream": (f"ask Section '{slot}' declares minimum evidence "
-                                     f"type {tlist} and the draft satisfies none: which "
-                                     f"concrete {tlist} from the sources should fill it? "
-                                     "Name its source."),
+                        # #750: a section the join never FOUND is a different
+                        # defect class than a found-but-hollow one — the first
+                        # is a draft-shape defect (renamed heading), repaired
+                        # by a heading fix; only the second is an evidence gap
+                        # whose remedy is the `ask` elicitation hop. Reporting
+                        # the first as "found nothing" routed a full revision
+                        # cycle into re-eliciting evidence that was present all
+                        # along (run 20260726T165310).
+                        "classification": ("section-not-found" if not sec
+                                           else "missing-input"),
+                        "upstream": (
+                            # A ready-made `Upstream:` remediation in exactly
+                            # the shape `repair-hop` consumes — the bounded
+                            # route, never open-ended re-harvest.
+                            (f"ask Section '{slot}' declares minimum evidence "
+                             f"type {tlist} and the draft satisfies none: which "
+                             f"concrete {tlist} from the sources should fill it? "
+                             "Name its source.") if sec else
+                            (f"rename the section heading: no draft section "
+                             f"normalizes to the slot key '{slot}' — actual "
+                             "headings: "
+                             + "; ".join(s[0] for s in sections if s[0])
+                             + ". Align the heading with the framework slot "
+                               "(a heading fix, never an ask elicitation — "
+                               "the evidence may be present under the wrong "
+                               "heading, #750)")),
                     })
             results["evidence"] = ("pass", "") if not evidence_missing else (
                 "fail", "; ".join(
+                    (f"{m['section']}: section not found (expected slot key "
+                     f"'{m['section']}'; heading mismatch — see upstream)")
+                    if m["classification"] == "section-not-found" else
                     f"{m['section']}: declared {'|'.join(m['declared'])}, found "
-                    f"{','.join(m['found_kinds']) or 'nothing'}" for m in evidence_missing))
+                    f"{','.join(m['found_kinds']) or 'nothing'}"
+                    for m in evidence_missing))
 
     failing = [d for d, (v, _) in results.items() if v == "fail"]
     out = {"gate": "quality", "pass": not failing,

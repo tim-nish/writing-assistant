@@ -34,11 +34,17 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py quality-gate \
   13.90, #416):** pass `--framework-file` (the run state's `framework_file`)
   and `--state` (the checkpoint carrying the fact sheet) so the gate verifies
   every slot carrying an authored `[EVIDENCE: …]` tag against the fact-sheet
-  KINDs anchored into that section. A section filled without its declared
-  type is a **missing-input finding** — the gate output's
-  `evidence_types.missing_input[]` carries a ready-made `upstream` line;
-  route it through `repair-hop` (below), **never** backfill the section with
-  unrelated factual material and never report success past it. An unrepaired
+  KINDs anchored into that section. **Two failure classes, routed differently
+  (Story 19.12, #750):** `classification: "section-not-found"` means the join
+  never located the section — a **draft-shape defect** (renamed heading) whose
+  `upstream` names the expected slot key and the actual headings; repair it
+  with the **heading fix**, never an `ask` elicitation — the evidence may be
+  present under the wrong heading, and re-eliciting it is the incident this
+  class exists to prevent. `classification: "missing-input"`
+  (`section_present: true`) is the genuine evidence gap — its ready-made
+  `upstream` line routes through `repair-hop` (below). In neither case
+  backfill the section with unrelated factual material, and never report
+  success past an unresolved finding. An unrepaired
   absence after the shared two-cycle bound surfaces as a publish blocker
   naming the section and the missing type. The gate **fails closed** (exit
   2) if the framework declares types but `--map`/`--state` are missing.

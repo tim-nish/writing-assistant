@@ -374,6 +374,36 @@ else
   err "#751: emptied state not refused as a substrate error (rc=$rc)"
 fi
 
+# --- #750 (Story 19.12): a renamed GATE heading is section-not-found, with a
+# heading-fix remedy — never the found-nothing/ask shape.
+cat > "$work/renamed.md" <<'RN'
+---
+slug: rn
+audience: x
+audience_id: x
+---
+
+## What it produced
+
+- proof lives here
+RN
+printf 'P1.S1[L9]: sourced <- x.md:1@8f3c2d1000000000000000000000000000000000\n' > "$work/rn-map.txt"
+printf '{"fact_sheet":[{"claim":"c","source":"x.md:1@8f3c2d1000000000000000000000000000000000","kind":"number"}]}' > "$work/rn-state.json"
+python3 "$DP" quality-gate --draft "$work/renamed.md" --map "$work/rn-map.txt" \
+  --judge "$work/judge-pass.txt" \
+  --framework-file "skills/draft-article/frameworks/F1-project-introduction.md" \
+  --state "$work/rn-state.json" > "$work/rn.out" 2>/dev/null || true
+python3 - "$work/rn.out" <<'PYEOF' \
+  && ok "#750: renamed heading -> section-not-found with a heading-fix remedy" \
+  || err "#750: renamed heading misreported (the found-nothing incident shape)"
+import json, sys
+d = json.load(open(sys.argv[1]))
+ev = [m for m in d["evidence_types"]["missing_input"] if m["section"] == "evidence"][0]
+assert ev["classification"] == "section-not-found", ev
+assert ev["upstream"].startswith("rename the section heading"), ev["upstream"]
+assert "ask " not in ev["upstream"][:20], ev["upstream"]
+PYEOF
+
 if [ "$fail" -eq 0 ]; then
   printf '\nAll quality-gate checks passed.\n'; exit 0
 else
