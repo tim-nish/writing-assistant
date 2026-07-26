@@ -66,7 +66,7 @@ where classifying would be premature.
   - *Destination-repo write surface (amended 2026-07-23, #611):* the
     `output.drafts` **destination** repository's permitted surface is the two
     GATED products plus **exactly two regenerated NON-GATING views** —
-    `INDEX.md` and the topic-map View (SPEC-topic-map CAP-3). A non-gating
+    `INDEX.md` and the Terrain View (SPEC-terrain CAP-3). A non-gating
     view qualifies only if it is fully regenerated per invocation, never read
     back as an input, and gates no decision; the surface is **enumerated
     exhaustively** in `scripts/check-footprint-invariant.sh`, so a write

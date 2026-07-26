@@ -30,7 +30,7 @@ source is **cannot-determine**, not "absent". Write it as an open question
 marked cannot-determine — never as a blocking premise, and never as a reason to
 decline scope.
 
-Why this exists: `SPEC-topic-map` OQ4 asserted that nothing readable here
+Why this exists: `SPEC-terrain` OQ4 (then `SPEC-topic-map`) asserted that nothing readable here
 records a reversal, a decision with its why, or thinking-at-the-time. It was
 written from this repo's family list without a consultation. One `policy_lookup`
 disproved all three — they were inside the existing whitelist — after a

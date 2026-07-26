@@ -480,9 +480,9 @@ assert "retry-storm" not in nr and "cache-warmth" in nr, nr
 PYEOF
 
 # The SKILL presents the verdicts and never silently filters to matched.
-grep -qi 'never silently' skills/topic-map/SKILL.md \
-  && grep -q 'needs_recording' skills/topic-map/SKILL.md \
-  && grep -qi 'no-episode' skills/topic-map/SKILL.md \
+grep -qi 'never silently' skills/terrain/SKILL.md \
+  && grep -q 'needs_recording' skills/terrain/SKILL.md \
+  && grep -qi 'no-episode' skills/terrain/SKILL.md \
   && ok "#669: topic-map SKILL presents verdicts + NEEDS-RECORDING, never silently filters" \
   || err "topic-map SKILL missing the usability-verdict presentation"
 

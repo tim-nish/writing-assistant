@@ -1,5 +1,5 @@
 # topic-depth-thresholds.yaml — the ONE place the map's depth estimate is
-# declared (Story 18.62, #588; SPEC-topic-map CAP-2).
+# declared (Story 18.62, #588; SPEC-terrain CAP-2).
 #
 # The estimate answers "what does this material support TODAY" — seed-only /
 # short note / full article / article series — and it is computed from the
