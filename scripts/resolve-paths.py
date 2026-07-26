@@ -187,9 +187,15 @@ def articles_repo_root(root):
 
 
 def topic_map_view(root):
-    """The topic-map View's FIXED path (SPEC-topic-map CAP-3, amended
+    """The Terrain View's FIXED path (SPEC-terrain CAP-3, amended
     2026-07-23): <destination-repo>/topic-map/<repo-key>/topic-map-view.md.
     None when no destination is declared.
+
+    The path keeps the `topic-map` spelling deliberately. It is an internal
+    machine key with no owner-facing reading, and it is a published-artifact
+    location with live files behind it and no discovery mechanism pointing at
+    any other name — so the 2026-07-26 rename (#726) stops at the surfaces a
+    reader reads. Any future change to this path must supply the migration.
 
     Fixed, not per-run: the View is written for the owner to open, and a
     per-run path moves every invocation, so nothing opened during a sitting can

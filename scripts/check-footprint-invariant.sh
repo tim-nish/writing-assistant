@@ -89,7 +89,7 @@ clean && ok "host tree clean after intermediates written to the workspace" || {
 #    files landed wherever the caller's shell pointed. A run-producing skill
 #    missing from this list is unguarded, so the list must grow with them.
 for f in skills/harvest/SKILL.md skills/draft-article/SKILL.md \
-         skills/review-article/SKILL.md skills/topic-map/SKILL.md; do
+         skills/review-article/SKILL.md skills/terrain/SKILL.md; do
   if grep -q 'resolve-paths.py' "$f" \
      && grep -qiE 'output\.drafts|host (working )?tree|host repo' "$f" \
      && grep -qi 'workspace' "$f"; then

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """topic-map-directions.py — the map's ONE screen and its brief hand-off
-(Story 18.63, #591; SPEC-topic-map CAP-3).
+(Story 18.63, #591; SPEC-terrain CAP-3).
 
 The map ends in a BRIEF, not in a second proposer. This script reads an
 assembled map (`topic-map.py assemble`) and composes exactly two things:
@@ -90,7 +90,7 @@ USAGE = 2
 MAX_SINGLE = 3
 MAX_COMBINATION = 2
 
-# THE SCREEN BUDGET (Story 18.66, #601; SPEC-topic-map CAP-3 size switch).
+# THE SCREEN BUDGET (Story 18.66, #601; SPEC-terrain CAP-3 size switch).
 # Past this many subtopics one screen stops showing what the map exists to
 # show, and the terrain moves into a View file the owner opens while the
 # screen becomes a summary.
@@ -430,7 +430,7 @@ def _coverage_direction(sub):
 
     `cover <subject> — <claim>`: still a coverage statement naming what to
     cover, never a thesis or an article shape (the no-second-proposer boundary,
-    `specs/spec-topic-map/SPEC.md:125`). The claim lives in the DERIVATION, not
+    `specs/spec-terrain/SPEC.md:125`). The claim lives in the DERIVATION, not
     in the rendering, because this wording becomes the owner's brief the moment
     they adopt it — the same reason #637's placeholder rule lives here. It is
     carried in FULL for the same reason: a length clip is a render-only concern
@@ -703,7 +703,7 @@ def _depth_line(sub):
     counts it was derived from, without the promotion arithmetic.
 
     The counts STAY — CAP-2's success clause promises the owner can ask "why
-    this depth?" and be answered from them (`specs/spec-topic-map/SPEC.md`).
+    this depth?" and be answered from them (`specs/spec-terrain/SPEC.md`).
     Only the unmet predicate leaves, and only from the RENDERING: `depth.why`
     in `map.json` is untouched, which is where `check-topic-map-depth.sh`
     asserts the predicate is named. Trimming in `estimate_depth` would break
@@ -791,9 +791,9 @@ def compose_view(map_data, cands):
     subs = _subtopics(map_data)
     pin = map_data.get("coverage", {}).get("pin")
     lines = [
-        "# Topic map — the terrain",
+        "# Terrain",
         "",
-        "<!-- Regenerated on every topic-map invocation. Never read back by any",
+        "<!-- Regenerated on every terrain invocation. Never read back by any",
         "     code path; deleting this file loses nothing. Do not edit or commit. -->",
         "",
         f"Pin: {pin}",

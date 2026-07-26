@@ -34,7 +34,7 @@ M="scripts/topic-map.py"
 D="scripts/topic-map-directions.py"
 DP="scripts/draft-pipeline.py"
 VP="scripts/validate-proposal-payload.py"
-SKILL="skills/topic-map/SKILL.md"
+SKILL="skills/terrain/SKILL.md"
 
 fail=0
 err() { printf 'FAIL: %s\n' "$1" >&2; fail=1; }

@@ -1,16 +1,16 @@
 ---
-name: topic-map
+name: terrain
 description: >
-  Show the terrain before choosing what to write. Invoke as "show the topic
-  map" (or "what could I write about") to assemble the derived, bounded map of
-  topics, subtopics and evidence depth, present ONE screen of candidate
-  directions plus free-form, and hand the owner's chosen direction to the
-  existing stage-0 --brief path as an ordinary brief-carrying run. The contract
-  it fronts is SPEC-topic-map CAP-1/CAP-2/CAP-3; this skill re-implements
-  nothing.
+  Show the terrain before choosing what to write. Invoke as "show the terrain"
+  (also accepted, unchanged: "show the topic map", "what could I write about")
+  to assemble the derived, bounded survey of the Gloss of hub Lessons —
+  subtopics and evidence depth — present ONE screen of candidate directions
+  plus free-form, and hand the owner's chosen direction to the existing stage-0
+  --brief path as an ordinary brief-carrying run. The contract it fronts is
+  SPEC-terrain CAP-1/CAP-2/CAP-3; this skill re-implements nothing.
 ---
 
-# Topic map
+# Terrain
 
 The article-creation entry point for **"what could I write about?"**. It ends in
 a **brief**, not in a second proposer: one screen showing the terrain plus
@@ -18,8 +18,12 @@ candidate directions the owner can accept, combine, or override in their own
 words, and then an ordinary drafting run.
 
 ```
-show the topic map [<host-repo>]
+show the terrain [<host-repo>]
 ```
+
+`show the topic map` and `what could I write about` remain accepted triggers —
+the rename is owner-facing vocabulary, not a change to what the owner may type
+(SPEC-terrain, 2026-07-26 amendment).
 
 **Name the target repository first (#309).** Before reading anything else,
 print the resolved target as the flow's first owner-visible line:
@@ -178,7 +182,7 @@ and choose from the fresh View. Free text still always wins; if the owner
 writes their own direction, that is the brief and no index is consulted.
 
 This is the one case where the map hands the owner **an artifact to open**
-(SPEC-topic-map CAP-3, amended 2026-07-23, superseding the earlier
+(SPEC-terrain CAP-3, amended 2026-07-23, superseding the earlier
 in-conversation-only reading for this branch only). The View is at the same
 status as a debug dump: a **fixed path**, **fully regenerated** on every
 invocation, and **never read back** by any code path. Deleting it loses

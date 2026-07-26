@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """topic-map.py — the topic map as a DERIVED, READ-ONLY view (Story 18.61, #585;
-SPEC-topic-map CAP-1 + CAP-4).
+SPEC-terrain CAP-1 + CAP-4).
 
 The topic map is an overview of what the owner *could* write about, assembled
 **at every invocation** from state that already exists. This script implements:
@@ -54,7 +54,7 @@ and every candidate surface carries the **source family** it came from
     (`read-policy-source.py read --only LESSONS.md`, the gateway's
     `lessons_index`). There is no second reader and no per-Lesson file read:
     the seam's scope is code-bounded and lesson BODIES are out of reach
-    (SPEC-topic-map OQ3). An unresolvable or degraded policy source makes the
+    (SPEC-terrain OQ3). An unresolvable or degraded policy source makes the
     family **declared-but-not-enumerated with the reason** — the same disclosed
     refusal shape `consumption_view` uses — never a silent empty family.
   * `host-sources` — the host repo's **declared writing sources** (Story
