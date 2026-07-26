@@ -6056,6 +6056,117 @@ def _derived_ancestry_evidence(draft_text):
             "resolution_check": "reported, not run — see required_checks"}, []
 
 
+def _reproject_plan(slug, root, canonical_text, ws):
+    """Re-project plans/<slug>.md from the reviewed canonical (Story 19.17,
+    #757). A review round that applies edits can change exactly the facts the
+    plan exists to carry — the observed incident: an owner-directed audience
+    narrowing left `plans/<slug>.md` stating an audience the reviewed
+    canonical contradicts, so a cold Revise session would confidently
+    reconstruct the pre-review article.
+
+    Deterministic projection, no new owner interaction (SPEC-article-plan
+    CAP-1 as amended 2026-07-26):
+      * frontmatter `audience:` mirrors the reviewed canonical's;
+      * frontmatter `sections:` re-derives from the edited draft's `##`
+        headings — a heading matching an existing entry (normalized) keeps
+        its elements; a renamed heading inherits by position, or the sole
+        consumed element when there is exactly one;
+      * everything else (claim, consumed, pins, body) is plan-owned and
+        carried unchanged.
+    Returns a result dict; raises _CanonicalWriteError-style failure via
+    (False, reason) — the caller refuses the checkpoint on it. A slug with no
+    plan (hand-adopted canonical, derived canonical) skips with a note.
+    """
+    wap = _load("write-article-plan.py")
+    try:
+        plan_path, _conf, _repo = wap.resolve_dest(
+            _load("resolve-paths.py").host_root(root), slug)
+    except Exception as e:
+        return {"reprojected": False, "note": f"plan destination unresolvable: {e}"}
+    if not os.path.isfile(plan_path):
+        return {"reprojected": False,
+                "note": f"no plan at {plan_path} — nothing to re-project "
+                        "(hand-adopted or derived canonical)"}
+    plan_text = open(plan_path, encoding="utf-8").read()
+    fields, body, errs = wap.split_frontmatter(plan_text)
+    if errs:
+        return {"reprojected": False,
+                "note": f"existing plan unparseable ({errs[0][1]}) — left untouched"}
+
+    cfields, _cbody = _read_frontmatter(canonical_text)
+    changed = []
+
+    # audience mirrors the canonical
+    new_audience = (cfields or {}).get("audience")
+    if new_audience and fields.get("audience") != new_audience:
+        changed.append(("audience", fields.get("audience"), new_audience))
+
+    # sections re-derive from the edited draft's headings
+    old_sections = wap.parse_sections(fields.get("sections", "")) or []
+    consumed = wap.parse_id_list(fields.get("consumed", ""))
+    def norm(h):
+        return re.sub(r"[^a-z0-9]+", " ", h.lower()).strip()
+    old_by_title = {norm(s.get("title", "")): s.get("elements", [])
+                    for s in old_sections}
+    headings = [ln.lstrip("#").strip() for ln in canonical_text.splitlines()
+                if ln.startswith("## ") and "{Pointer block}" not in ln]
+    if not headings:
+        # A draft with no `##` headings gives the derivation nothing to work
+        # from — keep the plan's recorded sections rather than erasing them.
+        headings = None
+    new_sections = []
+    for i, h in enumerate(headings or []):
+        els = old_by_title.get(norm(h))
+        if els is None:
+            if len(consumed) == 1:
+                els = list(consumed)
+            elif i < len(old_sections):
+                els = old_sections[i].get("elements", [])
+            else:
+                els = []
+        new_sections.append({"title": h, "elements": els})
+    old_render = json.dumps(old_sections, sort_keys=True)
+    new_render = json.dumps(new_sections, sort_keys=True)
+    if headings is not None and old_render != new_render:
+        changed.append(("sections", f"{len(old_sections)} entries",
+                        f"{len(new_sections)} entries re-derived"))
+
+    if not changed:
+        return {"reprojected": False, "note": "plan already mirrors the "
+                "reviewed canonical — nothing to re-emit"}
+
+    # rewrite only the changed frontmatter lines; body carried unchanged
+    lines = plan_text.splitlines(keepends=True)
+    close = next(i for i, ln in enumerate(lines[1:], 1) if ln.strip() == "---")
+    fm = lines[1:close]
+    def set_key(key, value):
+        nonlocal fm
+        rendered = f"{key}: {value}\n"
+        for i, ln in enumerate(fm):
+            if ln.split(":", 1)[0].strip() == key:
+                fm[i] = rendered
+                return
+        fm.append(rendered)
+    for key, _old, _new in changed:
+        if key == "audience":
+            set_key("audience", new_audience)
+        if key == "sections":
+            set_key("sections", json.dumps(new_sections, ensure_ascii=False))
+    new_plan = lines[0] + "".join(fm) + "".join(lines[close:])
+
+    defects = list(wap.validate_plan(new_plan,
+                                     os.path.join("plans", f"{slug}.md")))
+    if defects:
+        return {"reprojected": False, "failed": True,
+                "note": "re-projected plan failed the writer's validation: "
+                        + "; ".join(f"{k}: {v}" for k, v in defects[:3])}
+    with open(plan_path, "w", encoding="utf-8") as fh:
+        fh.write(new_plan)
+    return {"reprojected": True, "path": plan_path,
+            "changed": [{"field": k, "from": str(a)[:60], "to": str(b)[:60]}
+                        for k, a, b in changed]}
+
+
 def cmd_review_reentry(args):
     """Post-arbitration re-entry into the gate regime (Story 13.70). Invoked by
     the review SKILL after an arbitration round that applied >=1 accepted
@@ -6297,6 +6408,27 @@ def cmd_review_reentry(args):
     stale_variants = [v for v in staleness["variants"]
                       if v["status"] != "fresh"]
 
+    # (d2) Re-project the article plan (Story 19.17, #757): a round with >=1
+    # applied edit re-emits plans/<slug>.md as a deterministic projection of
+    # the reviewed canonical — audience mirrored, sections re-derived from the
+    # edited draft's headings — through the plan writer's own validation. A
+    # projection that FAILS validation refuses the checkpoint (fail-closed);
+    # a slug with no plan, or a derived canonical, skips with a note. Zero
+    # applied edits never reach this command (the SKILL's zero-edit path
+    # hand-writes the checkpoint), so the trigger is simply being here.
+    plan_result = None
+    if evidence_class == "provenance-map":
+        plan_result = _reproject_plan(args.slug, args.root,
+                                      open(canonical_path, encoding="utf-8").read(),
+                                      args.ws)
+        if plan_result.get("failed"):
+            sys.stderr.write(
+                "error: review-reentry: plan re-projection failed the writer's "
+                f"validation — {plan_result['note']}. The reviewed canonical is "
+                "persisted, but done/reviewed is refused over a plan the run "
+                "knows is stale (Story 19.17, #757). No checkpoint written.\n")
+            return 1
+
     # (e) STOP — nothing is emitted. Write the done/reviewed checkpoint (this
     # command is its only sanctioned writer for a round with applied edits).
     checkpoint_path = _checkpoint_path(args.ws)
@@ -6334,6 +6466,9 @@ def cmd_review_reentry(args):
         "emitted_variants": [],
         "re_emission": f"variants --slug {args.slug} "
                        "(owner publish decision; skills/draft-article/variants.md)",
+        # Story 19.17 (#757): what re-projection did to plans/<slug>.md —
+        # relay `changed`/`note` in the completion summary.
+        **({"plan_reprojection": plan_result} if plan_result is not None else {}),
         "checkpoint": checkpoint_path,
     }
     # The versioned re-entry verdict record the run persisted (Story 18.21) —

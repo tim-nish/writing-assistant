@@ -806,6 +806,13 @@ records which evidence class the run used.
    same write path and emission-trailer convention as the draft flow's
    `complete` gate), structurally validates the rebuilt map against the edited
    draft, reports the required scoped checks, marks existing variants stale,
+   **re-projects the article plan** (Story 19.17, #757 — an authored
+   canonical's `plans/<slug>.md` is re-emitted as a deterministic projection
+   of the reviewed canonical: `audience` mirrored, `sections` re-derived from
+   the edited draft's headings, everything plan-owned carried unchanged; a
+   projection failing the plan writer's validation refuses the checkpoint, and
+   the JSON's `plan_reprojection` is relayed in the completion summary; a
+   derived canonical or a plan-less slug skips with a note),
    and writes the `done/reviewed` checkpoint — **refusing (non-zero, no
    checkpoint) when the map is invalid, or when `--rubric-applied` but the
    versioned `rubric-verdicts-v2.txt` from step 3 is missing or partial** (a
