@@ -31,7 +31,7 @@ sources:
 > attribution, and any `journey:` entry carrying the lesson's slug (#671) matched
 > against the fact sheet / `resolve-writing-sources.py files` enumeration — with a
 > **three-valued verdict** (deliberately the hub's own three-valued-absence
-> lesson applied to itself, served: `consulted: product-lab@4799d96d
+> lesson applied to itself, served: `consulted: hub@<private-pin>
 > topics/knowledge-architecture.md:53` — present / absent-with-evidence /
 > cannot-determine, collapsing to two-valued is the defect): **matched** (≥1
 > evidence pointer resolves into declared sources → offer as draft-ready, evidence
@@ -241,7 +241,7 @@ flows into the existing brief/structures path unchanged.**
   - **elements — a second projection, not a replacement (added 2026-07-23,
     #631/OQ4).** Beside the subtopic clusters, the map projects **typed
     elements** from the recall surface: `decision` (a dated `topics/*.md` line
-    with its reasoning and `q_a/` pointer) and `reversal` (a Declined or
+    with its reasoning and `the hub decision archive` pointer) and `reversal` (a Declined or
     struck-through topic line, or a `LESSONS.md` index line whose lesson
     records one). Each element carries a one-line summary, the situation it
     was recorded in (its date and source line), a consumed mark, and its
@@ -581,19 +581,19 @@ flows into the existing brief/structures path unchanged.**
   **CORRECTED AND CLOSED 2026-07-23 — the blocking claim above was false.**
   It was written from the consumer's family list without consulting the served
   surface. A consultation the same day
-  (`product-lab@6b9a4882`) shows all three "missing" types are recorded, and
+  (`hub@<private-pin>`) shows all three "missing" types are recorded, and
   **inside the existing whitelist** — no grant is required:
   - **Decisions with their why** are the topic lines themselves: every
-    `topics/*.md` entry is dated, states its reasoning, and carries a `q_a/`
+    `topics/*.md` entry is dated, states its reasoning, and carries a hub-decision-archive
     provenance pointer (e.g. `topics/knowledge-architecture.md:9,21,39`).
   - **Reversals** are recorded natively — "topic Declined lines and
     struck-through superseded decision lines (**the recall surface's native
-    reversal records**)" (`topics/articles.md:30@6b9a4882`), alongside the
+    reversal records**)" (`topics/articles.md:30@<private-pin>`), alongside the
     reversal-capture lesson at `LESSONS.md:23`.
   - **Thinking-at-the-time** has a typed producer: distill-checklist item `N`
     (narrative candidate), payload "original framing verbatim → the actual
     question it became → what moved it"
-    (`topics/knowledge-architecture.md:67@6b9a4882`).
+    (`topics/knowledge-architecture.md:67@<private-pin>`).
 
   What is genuinely unreachable is only the **`## Journey` body**, which lives
   in `lessons/*.md` — unservable, and already tracked as **OQ3**. The

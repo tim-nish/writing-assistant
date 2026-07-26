@@ -88,7 +88,7 @@ mechanisms with the model confined to per-source judgment. The result is a
 
 - **Per-source budgeted extraction.** The model extracts **one source file at a
   time**, each under an explicit **relative per-file entry budget** (the
-  product-lab corpus-intake relative scheme — a budget derived from the source's
+  the hub corpus-intake relative scheme — a budget derived from the source's
   own size, not a corpus-wide attention pool). Corpus growth therefore scales
   extraction cost; it never silently shrinks per-file coverage. The budget is an
   **explicit contract** — floors and caps live in code or config, **not** in a

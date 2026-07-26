@@ -161,7 +161,7 @@ FAMILY_HUB_ELEMENTS = "hub-elements"
 ELEMENT_TOPIC_BOUND = 2
 
 # What a topic line looks like on the served surface: `- <date> — <text>`,
-# verified against product-lab@6b9a4882 rather than inferred.
+# verified against product-lab@<private-pin> rather than inferred.
 ELEMENT_LINE = re.compile(r"^-\s+(\d{4}-\d{2}-\d{2})\s+—\s+(.*)$")
 
 # The heading whose lines are rejections rather than decisions. Membership of
@@ -171,7 +171,7 @@ ELEMENT_LINE = re.compile(r"^-\s+(\d{4}-\d{2}-\d{2})\s+—\s+(.*)$")
 DECLINED_HEADING = "declined"
 
 # The other native reversal record: a struck-through clause inside a dated line
-# marks the superseded position (topics/articles.md:17@6b9a4882 is one).
+# marks the superseded position (topics/articles.md:17@<private-pin> is one).
 STRUCK = "~~"
 
 ELEMENT_SUMMARY_CHARS = 200
@@ -686,7 +686,7 @@ def parse_topic_elements(topic, served, commit):
 
     `served` is the seam's `N: text` lines for the file, in order. Two element
     kinds are recognised, and BOTH markers were verified against the served
-    surface (product-lab@6b9a4882) rather than inferred from the spec prose:
+    surface (product-lab@<private-pin>) rather than inferred from the spec prose:
 
     * `reversal` — a dated line under the `## Declined` heading (things
       considered and rejected), or a dated line carrying a struck-through

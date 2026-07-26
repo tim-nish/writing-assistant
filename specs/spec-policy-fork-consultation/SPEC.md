@@ -28,7 +28,7 @@ sources:
 > *occurred* but cannot observe its disposition (tsurezure-gateway spec §6), so
 > covered-fork auto-resolutions were mechanically uncountable; this one field
 > makes them countable, enabling the ratified **impact-statistics view**
-> (product-lab `q_a/2026-07-21-tsurezure-impact-stats-and-tanuki-consumer` D1:
+> (the hub an owner decision record — 2026-07-21 (tsurezure impact stats and tanuki consumer) D1:
 > counts assembled **on demand** from access log + receipts + tracker emissions,
 > **never a stored second ledger**). `auto-resolved-FYI` = a covered fork demoted
 > to an FYI (CAP-2); `escalated` = an uncovered fork presented as a gate (CAP-3)
@@ -131,7 +131,7 @@ intake as a **proposal only**.
     served surface as implementation makes the development state concrete.
     Re-consult triggers are **precision-first** — under-trigger over noise,
     mirroring the hub's ambient-trigger rule (`consulted:
-    product-lab@90877fa4e77e1353b527a76607ed2ea06daf2b27
+    hub@<private-pin>
     topics/knowledge-architecture.md:80`). Each iteration carries its own
     `consulted:` receipt line naming the served lines it applied. Freshness is
     unchanged: the gateway serves committed hub state, so a re-consult sees new
@@ -145,7 +145,7 @@ intake as a **proposal only**.
     writes hub Policy: *"a completing action stops at the ratification boundary
     — the consumer's gate completes by emitting the proposal, the hub's gate
     completes by promoting it"* (`consulted:
-    product-lab@90877fa4e77e1353b527a76607ed2ea06daf2b27
+    hub@<private-pin>
     topics/knowledge-architecture.md:73`). The gateway write prohibition is
     unchanged; "synchronize" means propose, never place.
   - **success:** A run's receipts show a consult at task-start, per in-scope

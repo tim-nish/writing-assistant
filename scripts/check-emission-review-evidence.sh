@@ -12,13 +12,13 @@
 #   1. It NEVER refuses. Emission exits 0 and writes the variant; the missing
 #      evidence is a publish blocker, because "a promotion threshold gates what
 #      surfaces by default, not what the human may act on"
-#      (consulted: product-lab@34a6119 LESSONS.md:68).
+#      (consulted: product-lab@<private-pin> LESSONS.md:68).
 #   2. A PARENT'S review record does NOT satisfy its derivation. This is the
 #      one that would silently reintroduce the defect: slugs nest
 #      (`<slug>.<language>`), so a bare prefix test would accept the EN panel
 #      record as the JA canonical's evidence, when "a JA canonical earns its own
 #      review pass because it is a canonical, not a variant"
-#      (consulted: product-lab@34a6119 topics/articles.md:56).
+#      (consulted: product-lab@<private-pin> topics/articles.md:56).
 #
 # Also pinned: the wording is three-valued (cannot-determine, never
 # "unreviewed"), and the run-workspace checkpoint's `review_evidence_class`

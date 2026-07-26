@@ -1833,7 +1833,7 @@ def _variant_layout_subdir(profile):
 # then every delivery is rejected on sync. A projection dir is "an externally
 # imposed delivery target of the sync contract" and a profile is "a conformance
 # record of [the platform's] sync contract"
-# (`consulted: product-lab@34a6119666896f232e1aa00789c3f916bc2b6dad
+# (`consulted: product-lab@<private-pin>
 # topics/articles.md:13,86`), so the rule is declared THERE and never here: no
 # platform is named in this module (Profiles carry the platform, code carries
 # none — asserted by scripts/check-stage5-variants.sh).
@@ -1895,7 +1895,7 @@ def _identity_from_basename(profile):
     profile declares a `layout.dir`, but a directory is only sometimes an
     externally imposed delivery target: some are our own organizational choice
     and constrain no name at all (the hub draws exactly that distinction,
-    `consulted: product-lab@34a6119666896f232e1aa00789c3f916bc2b6dad
+    `consulted: product-lab@<private-pin>
     topics/articles.md:13`). Keying on the directory would report every profile
     that merely files its output somewhere. So the profile states the fact and
     the code branches on no platform — the rule is declared THERE, as with
@@ -1994,7 +1994,7 @@ def _delivered_variant_paths(slug, out_dir, root):
     discovery property requires — "any future change separating variants from
     their canonical must supply a replacement discovery mechanism instead of
     silently breaking one" (`consulted:
-    product-lab@34a6119666896f232e1aa00789c3f916bc2b6dad topics/articles.md:14`).
+    product-lab@<private-pin> topics/articles.md:14`).
     A mapped basename is unparseable back to `(slug, platform)`, so callers
     UNION this with the slug-prefix scan rather than replacing it: profiles
     with no declared mapping keep being found exactly as before.
@@ -2025,7 +2025,7 @@ def _delivered_variant_paths(slug, out_dir, root):
 def _dest_repo_root(out_dir):
     """The destination repo root a profile's `packaging.layout.dir` resolves
     against — the `output.drafts` repo root (the lint's `--dest-repo`;
-    hub-ratified layout `consulted: product-lab@4f36029e topics/articles.md:76`:
+    hub-ratified layout `consulted: product-lab@<private-pin> topics/articles.md:76`:
     the canonical `drafts/` and the regenerated per-platform projection dirs are
     all SIBLINGS at the destination repo root, so a projection dir is a sibling
     of the drafts dir, never nested inside it).
@@ -2092,7 +2092,7 @@ def _variant_scan_dirs(out_dir, root):
 # its JA derivation — precisely the defect #716 exists to catch, since "full
 # rubric review runs once per claims-bearing artifact, not once per article — a
 # JA canonical earns its own review pass because it is a canonical, not a
-# variant" (`consulted: product-lab@34a6119666896f232e1aa00789c3f916bc2b6dad
+# variant" (`consulted: product-lab@<private-pin>
 # topics/articles.md:56`). Requiring `-panel-` keeps them disjoint because `.`
 # is not `-`: `tanuki-honest-automation.ja-panel-…` does not start with
 # `tanuki-honest-automation-panel-`, and vice versa.
@@ -2444,7 +2444,7 @@ def cmd_variants(args):
     # mechanism (#534). It is asserted here as a DISCLOSURE and never a
     # refusal — the owner may legitimately emit ahead of review, and "a
     # promotion threshold gates what surfaces by default, not what the human
-    # may act on" (`consulted: product-lab@34a6119666896f232e1aa00789c3f916bc2b6dad
+    # may act on" (`consulted: product-lab@<private-pin>
     # LESSONS.md:68`).
     #
     # DELIBERATELY NOT READ: the review re-entry's `review_evidence_class`
@@ -5298,7 +5298,7 @@ def _read_brief(raw):
 # consumption/overlap exclusion gates what the selector surfaces BY DEFAULT,
 # never what the owner may pick. An entry naming an element a prior article
 # already consumed is HONOURED — disclosed as consumed, never refused.
-# `consulted: product-lab@f58defe4 topics/articles.md:10,13, LESSONS.md:42`
+# `consulted: product-lab@<private-pin> topics/articles.md:10,13, LESSONS.md:42`
 # (`threshold-gates-surfacing-not-permission`).
 
 def _entry_request(element=None, brief=None):

@@ -40,12 +40,12 @@ sources:
 > that shortcuts are not available here: *"SPEC-article-restructure itself stays
 > deferred behind its own mechanical tripwire (≥3 whole-section post-review edit
 > runs), **which is not declared fired by analogy**"* (`consulted:
-> product-lab@249a4eb3fe1d71e69694a20d209ae238f8282bdd topics/articles.md:79`).
+> hub@<private-pin> topics/articles.md:79`).
 > So the count is **superseded** instead, on the precedent the same surface
 > supplies for exactly this move: the browsable-candidate-list trigger count was
 > *"**SUPERSEDED 2026-07-23** by direct owner demand after one sitting"*, with
 > *"the trigger's **substance** — the need observed, not assumed"* surviving
-> unstruck (`topics/articles.md:70@249a4eb3`). Applied here, the substance is
+> unstruck (`topics/articles.md:70@<private-pin>`). Applied here, the substance is
 > satisfied: the owner reports the three cases below as **recurring in real
 > use**, not as anticipated kinds.
 > **What this costs, stated rather than hidden:** a tripwire superseded on

@@ -504,7 +504,7 @@ always-present NEEDS-OWNER list:
 # Fact sheet: {subject}
 
 ## Coverage
-pin: a1b2c3d
+pin: abc1234
 matched: 3
 read: bench/results.md (4)
 read: README.md (1)
