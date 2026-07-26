@@ -16,7 +16,7 @@ root=$(git rev-parse --show-toplevel 2>/dev/null) || {
 cd "$root"
 
 V="$root/scripts/validate-visual-set.py"
-SKILL="skills/draft-article/SKILL.md"
+SKILL="skills/draft-article/stages/stage3.md"
 SPEC="specs/spec-article-visuals/SPEC.md"
 fail=0
 err() { printf 'FAIL: %s\n' "$1" >&2; fail=1; }

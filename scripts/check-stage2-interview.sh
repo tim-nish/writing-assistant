@@ -8,9 +8,12 @@ root=$(git rev-parse --show-toplevel 2>/dev/null) || {
   printf 'FAIL: not inside a git repository\n' >&2; exit 1;
 }
 cd "$root"
+__DA_ALL="${TMPDIR:-/tmp}/da-skill-all.$$.md"
+cat skills/draft-article/SKILL.md skills/draft-article/stages/stage0.md skills/draft-article/stages/stage1.md skills/draft-article/stages/stage2.md skills/draft-article/stages/stage3.md skills/draft-article/stages/gate.md skills/draft-article/stages/stage4.md skills/draft-article/stages/complete.md > "$__DA_ALL"
+
 
 DP="$root/scripts/draft-pipeline.py"
-SKILL="skills/draft-article/SKILL.md"
+SKILL="$__DA_ALL"
 fail=0
 err() { printf 'FAIL: %s\n' "$1" >&2; fail=1; }
 ok()  { printf 'ok:   %s\n' "$1"; }

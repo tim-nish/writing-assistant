@@ -15,7 +15,7 @@ cd "$root"
 
 CONV="skills/completion-summary.md"
 RT="scripts/reading-time.py"
-DRAFT="skills/draft-article/SKILL.md"
+DRAFT="skills/draft-article/stages/complete.md"
 REVIEW="skills/review-article/SKILL.md"
 HARVEST="skills/harvest/SKILL.md"
 fail=0

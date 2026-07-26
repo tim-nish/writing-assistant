@@ -54,8 +54,8 @@ has "NEEDS-OWNER" "open/deferred findings route to NEEDS-OWNER"
 has "github-issues source skipped" "unreachable API degrades with one logged line"
 has "Degrade, never fail" "degrade is never a failure"
 # The stage-2 triage side of the rule lives in the draft skill (not inference).
-grep -qF "13.50" "skills/draft-article/SKILL.md" \
-  && grep -qF "eligible grounding for" "skills/draft-article/SKILL.md" \
+grep -qF "13.50" "skills/draft-article/stages/stage2.md" \
+  && grep -qF "eligible grounding for" "skills/draft-article/stages/stage2.md" \
   && ok "stage-2 triage states the issue-fact grounding rule" \
   || err "draft-article triage missing the issue-fact rule"
 
@@ -78,8 +78,8 @@ grep -qF 'den:' "scripts/validate-fact-sheet.py" \
   && ok "validate-fact-sheet accepts the den pointer form" \
   || err "validator missing the den pointer form"
 # The Den triage rule reaches the draft skill too (same rules as 13.50).
-grep -qF "13.51" "skills/draft-article/SKILL.md" \
-  && grep -qF "recurrence count is data" "skills/draft-article/SKILL.md" \
+grep -qF "13.51" "skills/draft-article/stages/stage2.md" \
+  && grep -qF "recurrence count is data" "skills/draft-article/stages/stage2.md" \
   && ok "stage-2 triage states the Den-fact rule (recurrence never amplified)" \
   || err "draft-article triage missing the Den-fact rule"
 

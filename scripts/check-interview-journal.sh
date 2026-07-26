@@ -17,7 +17,7 @@ root=$(git rev-parse --show-toplevel 2>/dev/null) || {
 cd "$root"
 
 DP="$root/scripts/draft-pipeline.py"
-SKILL="skills/draft-article/SKILL.md"
+SKILL="skills/draft-article/stages/stage2.md"
 fail=0
 err() { printf 'FAIL: %s\n' "$1" >&2; fail=1; }
 ok()  { printf 'ok:   %s\n' "$1"; }
@@ -232,7 +232,7 @@ assert d.get('editorial_anchor_rejected') == 'editorial-anchor-empty', d
 # --- Offered-candidate provenance (Story 18.28, #515) ------------------------
 # The answer record + journal entry carry which candidates were offered and
 # which the owner took, and --events emits the calibration stream.
-SKILL2="skills/draft-article/SKILL.md"
+SKILL2="skills/draft-article/stages/stage2.md"
 # a) answer record carries candidates + selection; selection grammar validated.
 python3 "$DP" answer --id q1 --disposition approved --text "confirmed" \
   --pointer README.md:88@abc1234 \
