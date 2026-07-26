@@ -2352,8 +2352,13 @@ def cmd_variants(args):
                     "route": f"adapt canonical {fields.get('slug')} for {name}",
                     # Within the proposal contract's 140-char effect budget, so
                     # a screen composed from this entry is presentable as-is.
-                    "effect": (f"derives a {prof_lang} canonical from this one; that "
-                               f"canonical emits to {name} with no retarget step. "
+                    # The owner's register, not the pipeline's (#790): no
+                    # `canonical`, `projection` or `retarget` — an owner reads
+                    # this at the moment of choosing and has nowhere to look
+                    # those up. check-cross-language-offer.sh asserts the
+                    # PROPERTIES of this string, deliberately not its wording.
+                    "effect": (f"creates a separate {prof_lang} article from this one; "
+                               f"{name} publishes that instead. "
                                "Nothing is emitted until you approve its plan.")})
             else:
                 direct.append(name)
