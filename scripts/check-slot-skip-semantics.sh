@@ -16,7 +16,7 @@ cd "$root"
 
 FDIR="skills/draft-article/frameworks"
 CONV="$FDIR/CONVENTIONS.md"
-SKILL="skills/draft-article/SKILL.md"
+SKILL="skills/draft-article/stages/stage3.md"
 fail=0
 err() { printf 'FAIL: %s\n' "$1" >&2; fail=1; }
 ok()  { printf 'ok:   %s\n' "$1"; }

@@ -15,6 +15,9 @@ root=$(git rev-parse --show-toplevel 2>/dev/null) || {
   printf 'FAIL: not inside a git repository\n' >&2; exit 1;
 }
 cd "$root"
+__DA_ALL="${TMPDIR:-/tmp}/da-skill-all.$$.md"
+cat skills/draft-article/SKILL.md skills/draft-article/stages/stage0.md skills/draft-article/stages/stage1.md skills/draft-article/stages/stage2.md skills/draft-article/stages/stage3.md skills/draft-article/stages/gate.md skills/draft-article/stages/stage4.md skills/draft-article/stages/complete.md > "$__DA_ALL"
+
 
 W="$root/scripts/write-article-plan.py"
 SPEC="specs/spec-article-plan/SPEC.md"
@@ -186,7 +189,7 @@ printf '%s' "$out" | grep -q "$work/state" \
 grep -q 'article-plan' "$SPEC" && ok "spec names the artifact 'article plan'" || err "spec vocabulary"
 grep -rqi 'skeleton' "$W" && err "'skeleton' appears in the writer" \
   || ok "vocabulary: 'skeleton' appears nowhere in the writer"
-DSKILL="skills/draft-article/SKILL.md"
+DSKILL="$__DA_ALL"
 grep -q 'write-article-plan.py' "$DSKILL" \
   && ok "draft-article skill emits the article plan at completion" \
   || err "draft-article skill does not wire in the plan writer"

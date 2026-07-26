@@ -14,8 +14,11 @@ root=$(git rev-parse --show-toplevel 2>/dev/null) || {
   printf 'FAIL: not inside a git repository\n' >&2; exit 1;
 }
 cd "$root"
+__DA_ALL="${TMPDIR:-/tmp}/da-skill-all.$$.md"
+cat skills/draft-article/SKILL.md skills/draft-article/stages/stage0.md skills/draft-article/stages/stage1.md skills/draft-article/stages/stage2.md skills/draft-article/stages/stage3.md skills/draft-article/stages/gate.md skills/draft-article/stages/stage4.md skills/draft-article/stages/complete.md > "$__DA_ALL"
 
-DRAFT="skills/draft-article/SKILL.md"
+
+DRAFT="$__DA_ALL"
 HARVEST="skills/harvest/SKILL.md"
 fail=0
 err() { printf 'FAIL: %s\n' "$1" >&2; fail=1; }

@@ -18,7 +18,7 @@ cd "$root"
 
 DP="scripts/draft-pipeline.py"
 RUBRIC="skills/draft-article/quality-rubric.md"
-SKILL="skills/draft-article/SKILL.md"
+SKILL="skills/draft-article/stages/gate.md"
 fail=0
 err() { printf 'FAIL: %s\n' "$1" >&2; fail=1; }
 ok()  { printf 'ok:   %s\n' "$1"; }

@@ -12,7 +12,7 @@ root=$(git rev-parse --show-toplevel 2>/dev/null) || {
 cd "$root"
 
 CONV="skills/policy-influence-report.md"
-DRAFT="skills/draft-article/SKILL.md"
+DRAFT="skills/draft-article/stages/stage2.md"
 fail=0
 err() { printf 'FAIL: %s\n' "$1" >&2; fail=1; }
 ok()  { printf 'ok:   %s\n' "$1"; }

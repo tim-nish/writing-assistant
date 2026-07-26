@@ -26,8 +26,7 @@ cd "$root"
 
 PIPE="scripts/draft-pipeline.py"
 FIX="scripts/fixtures/policy-classification"
-SKILL="skills/draft-article/SKILL.md"
-
+SKILL="skills/draft-article/stages/stage2.md"
 fail=0
 err() { printf 'FAIL: %s\n' "$1" >&2; fail=1; }
 ok()  { printf 'ok:   %s\n' "$1"; }

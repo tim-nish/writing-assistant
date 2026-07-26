@@ -65,6 +65,19 @@ for s in draft-article review-article harvest; do
   fi
 done
 
+# Dispatcher + stage-file split (Story 19.3, #744/#740): the draft-article
+# SKILL.md is a dispatcher and its operating detail ships in declared stage
+# companions — the split is packaging-preserving, so the guard asserts the
+# declared stage files are present and non-empty rather than treating the
+# slimmer SKILL.md as a regression.
+for f in stage0 stage1 stage2 stage3 gate stage4 complete; do
+  if [ -s "skills/draft-article/stages/$f.md" ]; then
+    ok "stage companion stages/$f.md present and non-empty"
+  else
+    err "declared stage companion stages/$f.md missing or empty"
+  fi
+done
+
 if [ "$fail" -eq 0 ]; then
   printf '\nAll plugin-manifest checks passed.\n'; exit 0
 else
