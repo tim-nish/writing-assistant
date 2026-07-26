@@ -32,9 +32,34 @@ COMPARABLE_SUBJECTS = (
         # The 2026-07-18 regression subject: a served records-only line for the
         # owner's Website vs `syndication.policy.en.mode: canonical`.
         "policy_line": re.compile(r"[Ww]ebsite stays independent|reference records.*only"),
+        # A served line whose match is a SCOPING/permission of the restriction —
+        # not the restriction itself — is no conflict (#739, hub-ratified
+        # 2026-07-26: the 2026-07-18 full-body-publication line QUOTES the
+        # records-only phrase while scoping it to mode:external articles, and
+        # the classifier read the quotation as the rule; the truthful verdict
+        # was "no conflict — both records stand"). A line matching this
+        # exclusion is skipped by detect_conflicts.
+        "policy_line_excludes": re.compile(
+            r"SCOPES|scopes\s+the|full-body publication adopted|mode:external"),
         "policy_implies": "records-only",
         "config_key": "syndication.policy.en.mode",
         "conflicting_value": "canonical",
+        # The machine's PARSE, rendered at the gate BEFORE the options (#739):
+        # which rule is being applied, by what predicate, how the machine reads
+        # it, and whom it binds — so a misparse is catchable while it is cheap.
+        "parse": {
+            "rule": "what the owner's Website may carry for EN articles "
+                    "(records-only restriction vs full-body permission)",
+            "predicate": "config `syndication.policy.en.mode` == `canonical` "
+                         "AND a served line matches the records-only pattern "
+                         "(scoping/permission lines excluded)",
+            "reading": "indeterminate from the pattern alone — whether the "
+                       "served line is a mandate, a permission, or a scoping "
+                       "of an earlier line is not machine-decidable; verify "
+                       "against the line's own scoping clauses",
+            "binds": "the Website surface only — never how the canonical is "
+                     "authored in the articles repo",
+        },
         # The records-only line rules a canonical EN topology OUT as an answer;
         # it does not determine which of the remaining topologies to use, so a
         # question on this subject stays asked with `canonical` shown-excluded.
@@ -87,7 +112,14 @@ def detect_conflicts(surface_lines, cfg, config_version):
         if value != subject["conflicting_value"]:
             continue
         for sl in surface_lines:
-            if subject["policy_line"].search(sl["text"]):
+            if not subject["policy_line"].search(sl["text"]):
+                continue
+            excl = subject.get("policy_line_excludes")
+            if excl is not None and excl.search(sl["text"]):
+                # The match sits inside a scoping/permission line — the served
+                # surface itself resolves the apparent conflict (#739).
+                continue
+            if True:
                 conflicts.append({
                     "subject": subject,
                     "policy": {

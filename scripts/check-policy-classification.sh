@@ -40,6 +40,36 @@ work=$(mktemp -d); trap 'rm -rf "$work"' EXIT
 python3 -c "import py_compile; py_compile.compile('$root/$PIPE', doraise=True)" 2>/dev/null \
   && ok "pipeline compiles" || { err "pipeline syntax error"; printf '\nFAILED.\n' >&2; exit 1; }
 
+# --- 0b. #739 regression: the SCOPING line is NO conflict -----------------------
+# The incident's exact case: a served line that QUOTES the records-only phrase
+# while scoping it to mode:external articles (the 2026-07-18 full-body
+# publication adoption). Expected: no conflict; config unchanged; no
+# policy-change proposal — the false conflict must not be manufactured.
+cp "$FIX/surface.txt" "$work/surface-scoping.txt"
+cat >> "$work/surface-scoping.txt" <<'SCOPE'
+20: Website full-body publication adopted (option 2) — this SCOPES the "Website stays independent — reference records only" line to externally-published (mode:external) articles.
+SCOPE
+python3 - "$work" <<'PYEOF'
+import re, sys
+w = sys.argv[1]
+txt = open(f"{w}/surface-scoping.txt").read()
+# drop the bare records-only line so ONLY the scoping line remains
+txt = txt.replace("17: Website stays independent — reference records only.\n", "")
+open(f"{w}/surface-scoping.txt", "w").write(txt)
+PYEOF
+printf '[]' > "$work/empty-items.json"
+python3 "$PIPE" classify-policy --surface "$work/surface-scoping.txt" \
+  --config-json "$FIX/config.json" --items "$work/empty-items.json" \
+  --config-version cfgv1 > "$work/classified-scoping.json" 2>/dev/null \
+  || err "#739: classify-policy failed on the scoping fixture"
+python3 - "$work/classified-scoping.json" <<'PYEOF' \
+  && ok "#739: a scoping/permission line manufactures NO conflict" \
+  || err "#739: the scoping line was read as a conflict (the incident replayed)"
+import json, sys
+d = json.load(open(sys.argv[1]))
+assert d["reconciliation_items"] == [], d["reconciliation_items"]
+PYEOF
+
 # --- 1. The 2026-07-18 EN-topology replay ---------------------------------------
 # Fixture surface serves the records-only line at a pinned cite; fixture config
 # declares syndication.policy.en.mode: canonical; the candidate items carry the
@@ -63,6 +93,13 @@ assert auth["policy"]["pointer"].startswith("topics/articles.md:17@"), auth["pol
 assert "reference records only" in auth["policy"]["quote"], auth["policy"]
 assert auth["config"]["pointer"] == "syndication.policy.en.mode@cfgv1", auth["config"]
 assert "canonical" in auth["config"]["quote"], auth["config"]
+# #739: the machine's parse rides the item (rule/predicate/reading/binds), and
+# "no conflict — both records stand" is a STRUCTURED option, first in the list.
+parse = rc["parse"]
+assert all(k in parse for k in ("rule", "predicate", "reading", "binds")), parse
+opts = {o["id"]: o for o in rc["options"]}
+assert "no-conflict" in opts and rc["options"][0]["id"] == "no-conflict", rc["options"]
+assert "neither config nor policy" in opts["no-conflict"]["effect"], opts["no-conflict"]
 PYEOF
 python3 - "$work/classified.json" <<'PYEOF' \
   && ok "EN replay: original tension superseded; no ordinary candidate carries the records-only position" \
