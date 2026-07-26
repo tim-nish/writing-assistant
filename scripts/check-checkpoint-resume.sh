@@ -282,6 +282,35 @@ grep -q 'PAUSED (elective)' "$SKILL" \
   && ok "SKILL leads with the PAUSED banner and requires a selection" \
   || err "SKILL missing the leading pause banner / selection requirement"
 
+# --- skill-contract pin (Story 19.9, #743) ------------------------------------
+# The checkpoint records what skill contract the run started under; a mid-run
+# edit to the skill surface is DISCLOSED on resume and on the stop-side line —
+# recording + disclosure only, resumability unchanged.
+wpin=$(mktemp -d)
+printf '{"next_stage":"interview","stage":"consume"}' > "$wpin/s.json"
+python3 "$DP" checkpoint --ws "$wpin" "$wpin/s.json" >/dev/null 2>&1
+python3 - "$wpin/checkpoint.json" <<'PYEOF' \
+  && ok "#743: checkpoint records the skill-contract pin" \
+  || err "#743: no skill_contract_pin in the checkpoint"
+import json, sys
+pin = json.load(open(sys.argv[1])).get("skill_contract_pin", "")
+assert "+" in pin and len(pin.rsplit("+", 1)[-1]) == 12, pin
+PYEOF
+python3 "$DP" resume --ws "$wpin" 2>/dev/null | grep -q skill_contract_mismatch \
+  && err "#743: mismatch reported on an unchanged tree" \
+  || ok "#743: unchanged tree resumes silently (disclosure only on mismatch)"
+touched="skills/draft-article/stages/stage4.md"
+printf '\n' >> "$touched"
+python3 "$DP" resume --ws "$wpin" 2>/dev/null | grep -q skill_contract_mismatch \
+  && ok "#743: mid-run skill edit is disclosed on resume" \
+  || err "#743: skill edit NOT disclosed on resume"
+python3 "$DP" stop-disclosure --ws "$wpin" --repo /x 2>/dev/null \
+  | grep -q "skill contract changed mid-run" \
+  && ok "#743: stop-side line carries the mismatch note with both pins" \
+  || err "#743: stop-side line missing the mismatch note"
+git checkout -q -- "$touched"
+rm -rf "$wpin"
+
 if [ "$fail" -eq 0 ]; then
   printf '\nAll checkpoint/resume checks passed.\n'; exit 0
 else
