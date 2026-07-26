@@ -143,6 +143,37 @@ python3 "$DP" quality-gate --draft "$ws/edited.md" --map "$ws/map.txt" \
 for d in 'dim1:' 'dim2:' 'dim3:' 'dim4:'; do
   grep -q "^$d" "$ws/rubric-verdicts-v2.txt" || err "v2 record missing $d"
 done
+
+# --- Story 19.15 (#751): the v2 record is SHA-BOUND, and freshness is refused
+# alongside completeness — a complete-but-stale record never authorizes
+# done/reviewed, and a pre-19.15 record (no attestation) is partial forever.
+grep -q '^attestation: draft-sha256=' "$ws/rubric-verdicts-v2.txt" \
+  && ok "#751: the gate stamps the v2 record with the draft sha" \
+  || err "#751: v2 record carries no attestation line"
+cp "$ws/rubric-verdicts-v2.txt" "$work/v2-good.txt"
+printf 'stale-edit\n' >> "$ws/edited.md"
+if python3 "$DP" review-reentry --draft "$ws/edited.md" --map "$ws/map.txt" \
+     --slug "$slug" --root "$h" --ws "$ws" --applied 2 --rubric-applied \
+     >/dev/null 2>"$work/e_v2stale"; then
+  err "#751: re-entry accepted a v2 record computed from an older draft"
+else
+  grep -q 'DIFFERENT draft version' "$work/e_v2stale" \
+    && ok "#751: a stale v2 record is refused naming both shas" \
+    || err "#751: stale-v2 refusal message wrong: $(cat "$work/e_v2stale")"
+fi
+grep -v '^attestation:' "$work/v2-good.txt" > "$ws/rubric-verdicts-v2.txt"
+if python3 "$DP" review-reentry --draft "$ws/edited.md" --map "$ws/map.txt" \
+     --slug "$slug" --root "$h" --ws "$ws" --applied 2 --rubric-applied \
+     >/dev/null 2>"$work/e_v2noatt"; then
+  err "#751: re-entry accepted an attestation-less (pre-19.15) v2 record"
+else
+  grep -q 'no .attestation' "$work/e_v2noatt" \
+    && ok "#751: an attestation-less v2 record is partial, never grandfathered" \
+    || err "#751: no-attestation refusal message wrong: $(cat "$work/e_v2noatt")"
+fi
+# restore the good record + draft for the steps below
+python3 "$DP" quality-gate --draft "$ws/edited.md" --map "$ws/map.txt" \
+  --verdicts-out "$ws/rubric-verdicts-v2.txt" >/dev/null 2>&1 || true
 grep -q '^dim3:.*dim3_inventory:' "$ws/rubric-verdicts-v2.txt" \
   && ok "v2 record is complete (four dims + dim3 inventory stamp)" \
   || err "v2 record missing its dim3 inventory stamp"

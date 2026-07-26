@@ -746,17 +746,27 @@ def _rubric_dimension_count(path=None):
         return len(_RUBRIC_DIM_RE.findall(fh.read()))
 
 
-def _render_verdict_record(results, vocab_stamp, dim4_measures):
+def _render_verdict_record(results, vocab_stamp, dim4_measures, draft_text=None):
     """Serialize the complete four-dimension verdict record. dim3 carries its
     `dim3_inventory` stamp (version + counts); dim4 carries the measured
     mechanics. Verdict tokens (pass/fail/waived) come straight from the gate's
-    own `results`, so the record cannot diverge from the gate that wrote it."""
+    own `results`, so the record cannot diverge from the gate that wrote it.
+
+    Sha-bound (Story 19.15, #751): with `draft_text`, the record opens with
+    `attestation: draft-sha256=<hex>` — the same convention the provenance
+    verdicts carry — so a record is bound to the draft version it graded and
+    re-entry can refuse a stale one (completeness alone proved acceptable
+    while stale)."""
     def verdict(dim):
         return results.get(dim, ("missing", ""))[0]
     lines = ["# Stage 3->4 quality-gate verdict record — all four dimensions "
-             "(dim3 inventory + dim4 measures stamped, Story 18.18).",
+             "(dim3 inventory + dim4 measures stamped, Story 18.18; sha-bound, "
+             "Story 19.15).",
              f"dim1: {verdict('dim1')}",
              f"dim2: {verdict('dim2')}"]
+    if draft_text is not None:
+        lines.insert(1, "attestation: draft-sha256="
+                     + hashlib.sha256(draft_text.encode("utf-8")).hexdigest())
     stamp = ""
     if vocab_stamp:
         stamp = ("  [dim3_inventory: "
@@ -782,6 +792,16 @@ def _verdict_record_gaps(text):
     if "dim3" in dims and "dim3_inventory" not in dims["dim3"]:
         gaps.append("dim3_inventory")
     return gaps
+
+
+def _verdict_record_sha(text):
+    """The record's `attestation: draft-sha256=<hex>` value, or None for a
+    pre-19.15 record (which re-entry treats as PARTIAL — never grandfathered)."""
+    for ln in text.splitlines():
+        m = re.match(r"attestation:\s*draft-sha256=([0-9a-fA-F]{64})\s*$", ln.strip())
+        if m:
+            return m.group(1).lower()
+    return None
 
 
 def _loc_set(s):
@@ -1161,7 +1181,8 @@ def cmd_quality_gate(args):
     # that let review compensate for an unrun gate (#492). This is the file the
     # completion gate blocks on when partial.
     if getattr(args, "verdicts_out", None):
-        record = _render_verdict_record(results, vocab_stamp, dim4_measures)
+        record = _render_verdict_record(results, vocab_stamp, dim4_measures,
+                                        draft_text=draft)
         try:
             with open(args.verdicts_out, "w", encoding="utf-8") as fh:
                 fh.write(record)
@@ -6046,6 +6067,30 @@ def cmd_review_reentry(args):
                 "stamp, dim4 with measured values) to rubric-verdicts-v2.txt "
                 "before re-entry may report done/reviewed. No checkpoint "
                 "written.\n")
+            return 1
+        # Freshness (Story 19.15, #751): completeness alone proved acceptable
+        # while STALE — re-entry once checkpointed done over a record computed
+        # from an older draft version while the newest gate run had failed.
+        # The record's attestation must match the edited draft; a record with
+        # no attestation (pre-19.15) is treated as partial, never grandfathered.
+        v2_sha = _verdict_record_sha(_read_text(verdicts_v2_path))
+        draft_text_for_sha = _read_text(args.draft)
+        cur_sha = hashlib.sha256(draft_text_for_sha.encode("utf-8")).hexdigest()
+        if v2_sha is None:
+            sys.stderr.write(
+                "error: review-reentry: the re-entry verdict record carries no "
+                "`attestation: draft-sha256=` line (pre-19.15 format) — treated "
+                "as partial, never grandfathered; re-run the gate "
+                "(`quality-gate --draft <edited> --map <rebuilt> --verdicts-out "
+                f"{verdicts_v2_path}`). No checkpoint written.\n")
+            return 1
+        if v2_sha != cur_sha:
+            sys.stderr.write(
+                "error: review-reentry: the re-entry verdict record was computed "
+                f"from a DIFFERENT draft version (record {v2_sha[:12]}…, edited "
+                f"draft {cur_sha[:12]}…) — a stale record never authorizes "
+                "done/reviewed; re-run the gate on the edited draft. No "
+                "checkpoint written.\n")
             return 1
 
     # Read the edited draft first: its own frontmatter decides which evidence
