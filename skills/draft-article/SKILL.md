@@ -1874,6 +1874,28 @@ verdicts file. A clean map passes
 with no findings; any finding blocks stage progression. (These judge spawns cost
 turns against the pipeline budget — see #118's durability/resume constraint.)
 
+**A revision cycle re-grades only what changed (#738 delta re-grade).** On a
+revision cycle, build each listing with the prior cycle's hand-off and verdicts
+as the attested basis:
+
+```
+python3 /home/tomoya/work/writing-assistant/scripts/verify-provenance.py --map <map> --draft <edited> \
+  --list-narration --prior-worklist "$WS/judge-narration.txt" \
+  --prior-verdicts "$WS/provenance-verdicts.txt"
+```
+
+Sentences unchanged since the attested basis whose positions graded clean carry
+forward on a `carried:` header line — the judge echoes it with `attestation:`
+and `graded:`, grades **only** the re-graded entries, and the checker counts
+carried positions toward worklist coverage. The emission discloses the split on
+stderr (`delta re-grade: N carried, M re-graded`) — the run-workspace record
+of what each round cost. A basis that does not resolve (missing or mismatched
+attestation) falls back to a full re-grade **with the disclosed reason**, never
+silently. Isolation is unchanged: the judge receives the smaller worklist,
+never prior verdicts. The **two-cycle bound is mechanically enforced**: the
+gate refuses `--cycle` past the shared bound with a publish-blocker payload —
+a third revision round is unreachable, never merely discouraged.
+
 **Grade `sourced` spans for ATTRIBUTION entailment, not only pointer resolution
 (Story 18.97, #672).** A sourced pointer resolving into the fact sheet proves the
 *topic* is grounded — it does **not** prove the sentence's **attribution** (which
