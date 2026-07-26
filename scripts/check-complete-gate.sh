@@ -257,7 +257,7 @@ sed 's|^generated_by:.*|generated_by: not-a-birth-record|' "$ws/draft.md" > "$ws
 python3 "$DP" complete --draft "$wsb/draft-bad.md" --slug birth-probe2 --root "$h" --ws "$wsb" \
   >/dev/null 2>"$work/e_birth2" \
   && err "#709: a malformed birth record was persisted" \
-  || grep -q 'is not' "$work/e_birth2" \
+  || grep -q 'is neither' "$work/e_birth2" \
      && ok "#709: a malformed birth record refuses the write" \
      || err "#709: wrong malformed-record refusal: $(cat "$work/e_birth2")"
 # The renderer's real shape — value plus a trailing comment — still passes. This

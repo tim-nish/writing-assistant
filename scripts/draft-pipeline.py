@@ -5163,6 +5163,12 @@ def _record_canonical_ownership(ws, slug, sha):
 # `_GENERATED_BY_RE` — one shape, checked in two places for two purposes: the
 # lint REPORTS it on any draft, this asserts it before a canonical is persisted.
 _BIRTH_RECORD_RE = re.compile(r"^[\w.-]+@[\w.\-+]+\+\S+$")
+# The owner-confirmed ADOPTION record (#745, SPEC-canonical-adaptation
+# 2026-07-26): the truthful birth record for a canonical born outside the
+# pipeline — hand authorship plus the adoption date, never a fabricated run
+# pointer. Minted at most once by `adapt-canonical.py adopt`; immutable like
+# the pipeline form.
+_ADOPTED_RECORD_RE = re.compile(r"^owner-authored, adopted \d{4}-\d{2}-\d{2}$")
 
 
 def _assert_birth_record(text, canonical_path):
@@ -5194,14 +5200,20 @@ def _assert_birth_record(text, canonical_path):
             "it cannot be added later without recording something untrue. A "
             "canonical reaching the write without it is a generation defect: the "
             "frontmatter renderer must emit `<tool>@<version>+<commit>`. Nothing "
-            "was persisted")
-    if not _BIRTH_RECORD_RE.match(val.strip()):
+            "was persisted. For a canonical born OUTSIDE the pipeline "
+            "(hand-authored), the sanctioned creation act is the owner-confirmed "
+            "adoption step (#745): `adapt-canonical.py adopt --slug <slug>` "
+            "proposes `generated_by: owner-authored, adopted <date>` and writes "
+            "it only on your confirmation")
+    if not (_BIRTH_RECORD_RE.match(val.strip())
+            or _ADOPTED_RECORD_RE.match(val.strip())):
         raise _CanonicalWriteError(
             canonical_path,
-            f"the `generated_by` birth record {val.strip()!r} is not "
-            "`<tool>@<version>+<commit>` — the join key must resolve to a real "
-            "run artifact, and a malformed one resolves to nothing. Nothing was "
-            "persisted")
+            f"the `generated_by` birth record {val.strip()!r} is neither "
+            "`<tool>@<version>+<commit>` nor the adoption form "
+            "(`owner-authored, adopted <YYYY-MM-DD>`, #745) — the join key must "
+            "resolve to a real run artifact or a truthful adoption act, and a "
+            "malformed one resolves to nothing. Nothing was persisted")
 
 
 def _persist_canonical(text, slug, root, create_out=False, ws=None,

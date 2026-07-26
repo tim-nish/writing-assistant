@@ -249,7 +249,12 @@ grep -q '"kind": "answer"' "$work/ws/presented-payloads.jsonl" \
   || err "no answer record in the run workspace"
 
 # --- CAP-1: no draft-flow stage and no emission path invokes adaptation -------
-if grep -rn "adapt-canonical\|adapt_canonical" scripts/draft-pipeline.py \
+# The guard targets the ADAPTATION entry points (plan/payload/write) — the acts
+# that derive a canonical. It deliberately does NOT match `adopt`: the #745
+# amendment REQUIRES the birth-record refusal in draft-pipeline.py to name the
+# adoption step as its remedy, and naming a remedy is not invoking adaptation.
+if grep -rEn "adapt-canonical(\.py)? +(plan|payload|write)|adapt_canonical" \
+     scripts/draft-pipeline.py \
      skills/draft-article/ skills/emit-variants/ >/dev/null 2>&1; then
   err "a draft-flow stage or emission path invokes adaptation (CAP-1 forbids it)"
 else
@@ -331,6 +336,39 @@ fi
 python3 "$AC" plan --slug same-reader --target zenn $ARGS >/dev/null 2>"$work/e-diffreader" \
   && ok "#713: a different-reader target still returns a plan" \
   || err "#713: the precondition now blocks a legitimate adaptation: $(cat "$work/e-diffreader")"
+
+# --- adoption of a hand-authored canonical (Story 19.5, #745) ----------------
+# A canonical born outside the pipeline (no generated_by) is adoptable exactly
+# once: propose writes nothing; --confirm mints the truthful record through
+# the one canonical write path; any existing record refuses (immutability);
+# and the adopted canonical then proceeds through the normal plan gate.
+cat > "$work/drafts/hand-piece.md" <<'HAND'
+---
+slug: hand-piece
+title: "A hand-written piece states its claim"
+date: 2026-07-20
+mode: canonical
+language: en
+audience: en-practitioner
+audience_id: en-practitioner
+summary: >
+  Hand-authored, born outside the pipeline.
+topics: [x]
+related: { projects: [], publications: [], products: [] }
+---
+
+## The point
+
+Hand-authored prose with a checkable claim.
+HAND
+$A adopt --slug hand-piece --root "$work/host" > "$work/adopt-prop.json" 2>&1   && python3 -c "
+import json;d=json.load(open('$work/adopt-prop.json'))
+assert d['written'] is False and 'owner-authored' in d['record'], d
+" && ok "adopt proposes without writing" || err "adopt proposal wrote or malformed"
+grep -q generated_by "$work/drafts/hand-piece.md"   && err "proposal mutated the canonical" || ok "proposal left the canonical untouched"
+$A adopt --slug hand-piece --root "$work/host" --confirm --date 2026-07-26 >/dev/null 2>&1   && grep -q '^generated_by: owner-authored, adopted 2026-07-26' "$work/drafts/hand-piece.md"   && ok "confirmed adoption mints the truthful record" || err "adoption write failed"
+$A adopt --slug hand-piece --root "$work/host" --confirm --date 2026-07-27 >/dev/null 2>&1   && err "second adoption did not refuse (immutability)"   || ok "second adoption refuses — the record is immutable"
+$A plan --slug hand-piece --target zenn $ARGS >/dev/null 2>&1   && ok "adopted canonical proceeds through the normal plan gate"   || err "adopted canonical refused at plan"
 
 # --- lockstep: the SKILL prose describes exactly the mechanics checked above --
 [ -f "$SKILL" ] && ok "the adapt-canonical skill exists" || err "$SKILL missing"
