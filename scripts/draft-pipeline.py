@@ -5130,13 +5130,47 @@ def cmd_stop_disclosure(args):
 DONE_STAGE = "done"
 
 
-def _autostart(root):
+def _resume_disclosure_line(run_id, ws, state):
+    """One line naming what a resumed run IS (Story 19.10, #746): id, age, and
+    subject from checkpointed state — so a topic mismatch (tanuki F86: a
+    tutorial invocation adopting a q_a-gateway run) is visible at turn one."""
+    import datetime
+    age = ""
+    try:
+        ts = datetime.datetime.strptime(run_id.split("-")[0], "%Y%m%dT%H%M%S")
+        mins = int((datetime.datetime.now() - ts).total_seconds() // 60)
+        age = f", started {mins // 60}h{mins % 60:02d}m ago" if mins >= 60 else f", started {mins}m ago"
+    except (ValueError, IndexError):
+        pass
+    rs = state.get("run_state") or state
+    bits = []
+    if rs.get("framework"):
+        bits.append(f"framework {rs['framework']}")
+    ent = (rs.get("entry") or {}).get("request") or rs.get("element")
+    if ent:
+        bits.append(f"entry {str(ent)[:60]!r}")
+    srcs = rs.get("sources_raw") or [s.get("value") for s in rs.get("sources", []) if isinstance(s, dict)]
+    if srcs:
+        bits.append(f"sources {', '.join(map(str, srcs))[:60]}")
+    subject = "; ".join(bits) or "subject unrecorded in checkpoint"
+    return (f"resuming run {run_id}{age} — {subject}; stage {state.get('next_stage')}. "
+            f"Not your topic? re-run with --fresh (this run stays untouched).")
+
+
+def _autostart(root, fresh=False):
     """Core of automatic resume (Story 13.12): return the workspace to use and
     where to start — resuming the newest in-progress run (checkpoint next_stage
     != done), or minting a fresh run when none is in progress. Shared by the
-    `autostart` and `stage0` commands."""
+    `autostart` and `stage0` commands.
+
+    `fresh=True` (Story 19.10, #746) mints a new workspace REGARDLESS of
+    resumable state — the explicit opt-out of automatic resumption. The prior
+    in-progress run is left untouched and its id reported (`fresh_skipped`),
+    never deleted; the ratified default (#142) is unchanged when fresh is not
+    asked for."""
     rp = _load("resolve-paths.py")
     base = rp.runs_dir(root)
+    skipped = None
     if os.path.isdir(base):
         # Run ids are timestamp-based, so reverse-lexicographic == newest-first.
         for run_id in sorted(os.listdir(base), reverse=True):
@@ -5151,12 +5185,21 @@ def _autostart(root):
             except (OSError, json.JSONDecodeError):
                 continue
             if state.get("next_stage") and state["next_stage"] != DONE_STAGE:
+                if fresh:
+                    skipped = run_id      # left untouched, reported, never deleted
+                    break
                 out = {"resumed": True, "ws": os.path.join(base, run_id), "run_id": run_id}
                 out.update(state)
+                out["resume_disclosure"] = _resume_disclosure_line(run_id, out["ws"], state)
                 return out
     # No in-progress run — start fresh (this is the AC4 no-false-resume path).
     ws = rp.new_run(root)
-    return {"resumed": False, "ws": ws, "run_id": os.path.basename(ws), "next_stage": "harvest"}
+    out = {"resumed": False, "ws": ws, "run_id": os.path.basename(ws), "next_stage": "harvest"}
+    if skipped:
+        out["fresh_skipped"] = skipped
+        out["fresh_note"] = (f"--fresh: minted a new run; in-progress run {skipped} "
+                             "left untouched (resumable later; nothing deleted)")
+    return out
 
 
 def cmd_autostart(args):
@@ -5169,7 +5212,8 @@ def cmd_autostart(args):
       {"resumed": false, "ws": …, "run_id": …, "next_stage": "harvest"}  # new run
     A large draft completing across several invocations is the normal model."""
     rp = _load("resolve-paths.py")
-    print(json.dumps(_autostart(rp.host_root(args.root)), indent=2))
+    print(json.dumps(_autostart(rp.host_root(args.root),
+                                fresh=getattr(args, "fresh", False)), indent=2))
     return 0
 
 
@@ -6458,7 +6502,7 @@ def cmd_stage0(args):
     # owner-visible line can name the repository it is about to operate on —
     # before scope is read, a workspace is minted, or a token is spent (#309).
     out = {"config_ok": True, "target": root, "run_state": run_state}
-    out.update(_autostart(root))
+    out.update(_autostart(root, fresh=getattr(args, "fresh", False)))
     # Informational (Story 18.19, #494): a declared syndication variant with no
     # resolvable platform profile is surfaced at draft start — NOT a hard fail,
     # so `config_ok`/`next_stage` are unchanged and the run proceeds.
@@ -6581,8 +6625,14 @@ def main(argv=None):
                          "the quality gate's mechanical dimensions")
     sp = sub.add_parser("autostart", help="auto-resume the newest in-progress run, else mint a fresh one (Story 13.12)")
     sp.add_argument("--root", help="host-repo root (default: git top-level of cwd; errors outside a git repo)")
+    sp.add_argument("--fresh", action="store_true",
+                    help="mint a new workspace even when a resumable run exists (#746): "
+                         "the in-progress run is left untouched and its id reported")
     sp = sub.add_parser("stage0", help="fold Stage 0 into one call: config validation + framework + autostart (Story 13.13)")
     sp.add_argument("framework")
+    sp.add_argument("--fresh", action="store_true",
+                    help="opt out of automatic resumption for THIS invocation (#746): "
+                         "mint a new workspace; the in-progress run stays resumable")
     sp.add_argument("sources", nargs="*")
     sp.add_argument("--depth", help="optional depth/scope directive (deep-dive|standard|note, or an explicit scope statement) — CAP-8, #432")
     sp.add_argument("--element", help="pin the run to one named story element (\"write about <element>\"): "
