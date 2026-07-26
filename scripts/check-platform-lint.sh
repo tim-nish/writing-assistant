@@ -70,6 +70,14 @@ fi
 [ -f "$work/platform-lint.devto.json" ] \
   && ok "lint output lands in \$WS" || err "no lint output in \$WS"
 
+# 1c. A PASS is reported, not silent (#789). The skill contract is "report each
+#     variant's result — pass or the findings"; a silent success is
+#     indistinguishable from a silently-failed invocation.
+passout=$(python3 "$LINT" "$work/o/devto/retry-storms.devto.md" --root "$work/host" 2>/dev/null)
+printf '%s' "$passout" | grep -q 'passed lint' \
+  && ok "a passing lint reports its pass on stdout" \
+  || err "a passing lint printed nothing — the owner cannot tell pass from silent failure"
+
 # 2. Seeded defect: tags over the profile cap → reported with file/line.
 sed 's/^tags:.*/tags: a, b, c, d, e/' "$work/o/devto/retry-storms.devto.md" > "$work/toomany.devto.md"
 out=$(python3 "$LINT" "$work/toomany.devto.md" --root "$work/host" 2>&1 || true)

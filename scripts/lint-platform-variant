@@ -297,6 +297,15 @@ def main(argv=None):
 
     for ln, msg in findings:
         sys.stderr.write(f"{args.variant}:{ln}: {msg}\n")
+    if not findings:
+        # A silent pass is indistinguishable from a silently-failed invocation,
+        # and the skill contract is "report each variant's result — pass or the
+        # findings" (skills/emit-variants/SKILL.md). Findings go to stderr; the
+        # pass line is informational, so it goes to stdout in the `ok:` shape
+        # the sibling check-*.sh scripts already use. The machine contract —
+        # exit code and the --ws JSON — is unchanged.
+        sys.stdout.write(f"ok:   {args.variant}: {platform} variant passed lint "
+                         "(0 findings)\n")
     return 1 if findings else 0
 
 
