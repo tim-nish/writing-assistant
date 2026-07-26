@@ -241,8 +241,21 @@ its own.
 **The sidecar provenance map.** Stage 3 maintains a **sidecar provenance map**
 in the run workspace, appended per section as the fill progresses (Story
 13.84 above; never inline — the draft body stays clean for variants and
-review), one line per sentence keyed by paragraph/sentence position; when
-Stage 3 completes, the full map is validated as below:
+review), one line per sentence keyed by paragraph/sentence position.
+**Positions come from the tool, never from hand-counting (Story 19.16,
+#755):** the segmentation that defines `P{n}.S{m}` is mechanical — emit the
+skeleton and author the map against it, filling in classifications only:
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py provenance-segment --draft <draft>
+```
+
+After any draft edit, re-run it and re-emit the map's positions/anchors from
+the new skeleton — a hand-renumbered map fails the structural validation's
+skeleton-conformance check. The judge worklists print each position's **full
+reconstructed sentence** from this same segmentation, and the echo check
+compares the judge's quote against it byte-for-byte. When Stage 3 completes,
+the full map is validated as below:
 
 ```
 P4.S2[L31]: derived <- fs-12, fs-14

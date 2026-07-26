@@ -319,6 +319,19 @@ def _provenance_problems(entries, draft_lines=None):
     return tally, problems
 
 
+def cmd_provenance_segment(args):
+    """Emit the position skeleton — `{pos, anchor, sentence}` per sentence —
+    the map is authored AGAINST (Story 19.16, #755). Classifications are
+    filled in; positions and anchors are never hand-derived, which is what
+    dissolves both judge mislocation and hand-renumbering after an edit."""
+    vp = _load("verify-provenance.py")
+    draft = _read_text(args.draft)
+    rows = [{"pos": p, "anchor": a, "sentence": s} for p, a, s in vp.segment_draft(draft)]
+    print(json.dumps({"stage": "provenance-segment", "positions": rows,
+                      "count": len(rows)}, indent=2))
+    return 0
+
+
 def cmd_provenance(args):
     """Stage 3: parse and structurally validate the sidecar provenance map
     (Story 11.1). Enforces the per-class pointer contract:
@@ -350,6 +363,31 @@ def cmd_provenance(args):
         draft_lines = _read_text(args.draft).splitlines()
 
     tally, problems = _provenance_problems(entries, draft_lines)
+
+    # Skeleton conformance (Story 19.16, #755): with --draft, every P<n>.S<m>
+    # position must exist in the deterministic segmentation and carry ITS
+    # anchor — hand-derived numbering that drifts from the one segmentation
+    # authority is exactly what mislocated judges, and a re-anchor after an
+    # edit is now a tool re-run (`provenance-segment`), never hand-counting.
+    # Bare paragraph-level P<n> spans (owner-attributed prose) are exempt —
+    # the skeleton carries sentences only.
+    if draft_lines is not None:
+        vp = _load("verify-provenance.py")
+        skeleton = {pos: anchor for pos, anchor, _s in
+                    vp.segment_draft("\n".join(draft_lines))}
+        for pos, _cls, _ptrs, anchor in entries:
+            if "." not in pos:
+                continue
+            if pos not in skeleton:
+                problems.append(
+                    f"{pos}: not in the draft's segmentation skeleton — re-run "
+                    "`provenance-segment --draft <draft>` and author against "
+                    "its positions (#755)")
+            elif anchor is not None and skeleton[pos] != anchor:
+                problems.append(
+                    f"{pos}: anchor L{anchor} disagrees with the segmentation "
+                    f"skeleton (L{skeleton[pos]}) — re-anchor from "
+                    "`provenance-segment`, never by hand (#755)")
 
     if args.count:
         print(json.dumps(tally))
@@ -6905,6 +6943,12 @@ def main(argv=None):
     sp.add_argument("--file", action="append", help="checked whitelist file (repeatable); no-finding files close as (no conflict)")
     sp.add_argument("--policy-note", nargs="?", const="", default=None,
                     help="skipped mode: reason for consulted: none (empty = unset)")
+    sp = sub.add_parser("provenance-segment",
+                        help="emit the deterministic {pos, anchor, sentence} skeleton the "
+                             "provenance map is authored against (Story 19.16, #755) — the "
+                             "single segmentation authority for P{n}.S{m}")
+    sp.add_argument("--draft", required=True)
+
     sp = sub.add_parser("provenance")
     sp.add_argument("--map", default="-", help="the sidecar provenance map, or - for stdin")
     sp.add_argument("--count", action="store_true", help="print per-class tallies as JSON")
@@ -7088,6 +7132,7 @@ def main(argv=None):
         "review-checkpoint-proposal": cmd_review_checkpoint_proposal,
         "review-diff": cmd_review_diff,
         "answer": cmd_answer, "journal": cmd_journal, "provenance": cmd_provenance,
+        "provenance-segment": cmd_provenance_segment,
         "staging-candidates": cmd_staging_candidates,
         "review-consulted": cmd_review_consulted,
         "quality-gate": cmd_quality_gate,
