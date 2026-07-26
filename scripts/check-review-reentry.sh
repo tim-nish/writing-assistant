@@ -440,6 +440,73 @@ else
     || err "#704: wrong authored-class refusal: $(cat "$d/e3")"
 fi
 
+# --- Story 19.17 (#757): re-entry re-projects the plan --------------------------
+# The fixture's articles repo gets a plan whose audience contradicts the edited
+# canonical; re-entry must mirror it and report the change.
+plansdir=$(dirname "$(dirname "$ws")")
+adir="$work/articles"
+mkdir -p "$adir/plans"
+# the schema markers resolve_dest requires (drafts/ + INDEX.md-or-backlog/)
+touch "$adir/INDEX.md"
+python3 - "$ws/edited.md" <<'PY757'
+import sys
+p = sys.argv[1]; t = open(p).read()
+if "audience:" not in t:
+    t = t.replace("generated_by:", "audience: the NEW audience\ngenerated_by:", 1)
+if "## " not in t:
+    t = t.replace("The retry storm tripled load",
+                  "## Old heading\n\nThe retry storm tripled load", 1)
+open(p, "w").write(t)
+PY757
+# the edit moved lines, so re-derive the map from the segmentation skeleton —
+# the exact workflow 19.16 prescribes after any draft edit (#755)
+python3 "$DP" provenance-segment --draft "$ws/edited.md" > "$ws/skeleton.json"
+python3 - "$ws/skeleton.json" "$ws/map.txt" <<'PY757B'
+import json, sys
+rows = json.load(open(sys.argv[1]))["positions"]
+classes = ["sourced <- docs/retries.md:12", "narration"]
+with open(sys.argv[2], "w") as fh:
+    for i, r in enumerate(rows):
+        cls = classes[i] if i < len(classes) else "narration"
+        fh.write(f"{r['pos']}[L{r['anchor']}]: {cls}\n")
+PY757B
+cat > "$adir/plans/$slug.md" <<'PLAN757'
+---
+kind: article-plan
+slug: SLUG757
+intent: share engineering lessons
+claim: "A claim."
+status: drafted
+run_id: r1
+pin: host@8f3c2d1000000000000000000000000000000000
+audience: the OLD audience
+consumed: [el-one]
+sections: [{"title": "Old heading", "elements": ["el-one"]}]
+---
+
+# Plan body carried unchanged.
+PLAN757
+sed -i "s/SLUG757/$slug/" "$adir/plans/$slug.md"
+python3 "$DP" quality-gate --draft "$ws/edited.md" --map "$ws/map.txt" \
+  --verdicts-out "$ws/rubric-verdicts-v2.txt" >/dev/null 2>&1 || true
+python3 "$DP" review-reentry --draft "$ws/edited.md" --map "$ws/map.txt" \
+  --slug "$slug" --root "$h" --ws "$ws" --applied 1 --rubric-applied \
+  > "$work/re757.json" 2>/dev/null || true
+python3 - "$work/re757.json" "$adir/plans/$slug.md" "$ws/edited.md" <<'PYEOF' \
+  && ok "#757: re-entry re-projected the plan (audience mirrored, change reported)" \
+  || err "#757: plan re-projection missing or wrong: $(python3 -c "import json;print(json.load(open('$work/re757.json')).get('plan_reprojection'))" 2>&1)"
+import json, sys, re
+d = json.load(open(sys.argv[1]))
+pr = d.get("plan_reprojection") or {}
+assert pr.get("reprojected") is True, pr
+plan = open(sys.argv[2]).read()
+draft = open(sys.argv[3]).read()
+m = re.search(r"^audience: (.+)$", plan, re.M)
+dm = re.search(r"^audience: ([^#\n]+)", draft, re.M)
+assert m and dm and m.group(1).strip() == dm.group(1).strip(), (m, dm)
+assert "# Plan body carried unchanged." in plan
+PYEOF
+
 if [ "$fail" -eq 0 ]; then
   printf '\nAll review-reentry checks passed.\n'; exit 0
 else
