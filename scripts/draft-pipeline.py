@@ -3739,8 +3739,12 @@ def cmd_journal(args):
         parsed = _load_json_state(args.answers, "answers batch")
         for a in (parsed if isinstance(parsed, list) else [parsed]):
             answers[a.get("id")] = a.get("disposition")
-            if a.get("text"):
-                answer_text[a.get("id")] = a["text"]
+            # Accept both the answer-SPEC shape (`text`, the `answer --batch`
+            # input) and the recorder's OUTPUT shape (`answer`, what
+            # `answer --batch` emits) — passing the recorder's own output used
+            # to parse cleanly with every owner text silently empty (#749).
+            if a.get("text") or a.get("answer"):
+                answer_text[a.get("id")] = a.get("text") or a["answer"]
             if a.get("selection") is not None:
                 answer_choice[a.get("id")] = {
                     "candidates": a.get("candidates", []),
