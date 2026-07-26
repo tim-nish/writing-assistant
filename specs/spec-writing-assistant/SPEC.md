@@ -85,7 +85,7 @@ An opportunity to capture plus a vision to realize: the article specs already pr
 
 Written 2026-07-10 (prior dogfooding round) so the build decisions are pre-made; each fires mechanically when its frontmatter `build-trigger` is met, with `docs/dogfood-findings.md` as the tripwire. They are deliberately **not** companions: companions are the current build contract.
 
-- [`../spec-article-restructure/SPEC.md`](../spec-article-restructure/SPEC.md) — intent-changing re-outline + fact-preserving re-fill. Trigger: ≥3 logged runs with whole-section post-review manual edits.
+- [`../spec-article-revise/SPEC.md`](../spec-article-revise/SPEC.md) — **Revise** (`revise-article`): intent-changing re-outline + fact-preserving re-fill, in a full and a light tier. Accepted 2026-07-26 (#728); the original ≥3-logged-runs trigger was **superseded** by direct owner demand, not met.
 - [`../spec-article-index/SPEC.md`](../spec-article-index/SPEC.md) — machine-global metadata index (pointers + one-line claims, never bodies). Trigger: 5 published pipeline articles, or first observed self-repetition.
 
 ## Open Questions
