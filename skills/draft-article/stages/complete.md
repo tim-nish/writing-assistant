@@ -127,7 +127,11 @@ absent journal reads as "unknown", never as zero cost):
 python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py cost-block --ws "$WS"
 ```
 
-Relay its `lines` verbatim. The run-level `budget-check` (same data) fires the
+Relay its `lines` verbatim. When `resume`/`autostart` reported a
+`skill_contract_mismatch` (Story 19.9, #743 — the skill surface changed while
+the run was in flight), relay its `disclosure` line **once** here too: the
+run proceeded per the ratified automatic-resumption contract, and this note is
+the record that it did so under a changed contract. The run-level `budget-check` (same data) fires the
 existing budget-triage choice at a stage boundary when the configured
 `run_budget` thresholds (config; shipped defaults 120 min / 12 judge rounds)
 are crossed — an over-budget run is a decision, never archaeology.

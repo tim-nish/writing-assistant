@@ -4779,6 +4779,55 @@ def cmd_start(args):
 
 CHECKPOINT_FILE = "checkpoint.json"
 
+# --- Skill-contract pin (Story 19.9, #743) ---------------------------------
+# A run records which skill contract it STARTED under, so a mid-run contract
+# change (a concurrent session editing skill files while a run is in flight)
+# is visible instead of silent. Recording + disclosure ONLY: the ratified
+# automatic-resumption contract (#142 — resume "without the agent choosing")
+# is untouched; a refuse/ask gate on mismatch is a future spec decision, for
+# which these disclosures are the evidence base.
+
+def _skill_contract_pin():
+    """`<git-sha|nogit>+<content12>` over the draft-article skill surface
+    (SKILL.md, stages/, frameworks/, companions). The CONTENT half is the
+    comparator — it sees uncommitted edits, which the incident's concurrent
+    session made; the git half is informational context."""
+    plugin_root = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+    skill_dir = os.path.join(plugin_root, "skills", "draft-article")
+    h = hashlib.sha256()
+    for base, _dirs, files in sorted(os.walk(skill_dir)):
+        for fn in sorted(files):
+            fp = os.path.join(base, fn)
+            h.update(os.path.relpath(fp, skill_dir).encode())
+            h.update(b"\0")
+            try:
+                with open(fp, "rb") as fh:
+                    h.update(fh.read())
+            except OSError:
+                h.update(b"<unreadable>")
+            h.update(b"\0")
+    content = h.hexdigest()[:12]
+    try:
+        out = subprocess.run(["git", "-C", plugin_root, "rev-parse", "--short", "HEAD"],
+                             capture_output=True, text=True, timeout=10)
+        git_half = out.stdout.strip() if out.returncode == 0 else "nogit"
+    except Exception:
+        git_half = "nogit"
+    return f"{git_half}+{content}"
+
+
+def _skill_contract_mismatch(state):
+    """(recorded, current) when the run's recorded pin no longer matches the
+    current tree's CONTENT half — else None. Disclosure-only consumer."""
+    rec = state.get("skill_contract_pin")
+    if not rec:
+        return None
+    cur = _skill_contract_pin()
+    if rec.rsplit("+", 1)[-1] != cur.rsplit("+", 1)[-1]:
+        return (rec, cur)
+    return None
+
+
 
 def _checkpoint_path(ws):
     return os.path.join(ws, CHECKPOINT_FILE)
@@ -4807,6 +4856,17 @@ def cmd_checkpoint(args):
             "state (start/consume/interview/...), which records where to resume\n")
         return 1
     path = _checkpoint_path(args.ws)
+    # Skill-contract pin (#743): minted at the FIRST checkpoint write, carried
+    # immutably by every later one — it records what the run STARTED under.
+    prior_pin = None
+    if os.path.isfile(path):
+        try:
+            with open(path, encoding="utf-8") as f:
+                prior_pin = (json.load(f) or {}).get("skill_contract_pin")
+        except (OSError, json.JSONDecodeError):
+            prior_pin = None
+    state["skill_contract_pin"] = prior_pin or state.get("skill_contract_pin") \
+        or _skill_contract_pin()
     tmp = path + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(state, f, indent=2)
@@ -4893,6 +4953,15 @@ def cmd_resume(args):
         state = json.load(f)
     out = {"resumed": True}
     out.update(state)
+    mm = _skill_contract_mismatch(state)
+    if mm:
+        out["skill_contract_mismatch"] = {
+            "recorded": mm[0], "current": mm[1],
+            "disclosure": ("skill contract changed mid-run — recorded "
+                           f"{mm[0]}, tree now {mm[1]}; proceeding per the "
+                           "automatic-resumption contract (#743); relay this "
+                           "once in the completion summary's informational "
+                           "bucket")}
     print(json.dumps(out, indent=2))
     return 0
 
@@ -5036,14 +5105,23 @@ def cmd_stop_disclosure(args):
         sys.stderr.write(f"error: checkpoint unreadable: {e}\n")
         return 1
     nxt = st.get("next_stage")
+    # #743: a skill-contract change since the run started is DISCLOSED on the
+    # stop-side line — one clause naming both pins; the run's resumability is
+    # unchanged (recording+disclosure only, per the ratified auto-resume
+    # contract).
+    mm = _skill_contract_mismatch(st)
+    note = (f" note: skill contract changed mid-run — recorded {mm[0]}, tree "
+            f"now {mm[1]}; proceeding per the automatic-resumption contract."
+            if mm else "")
     if nxt == DONE_STAGE:
         # Completion is the `complete` gate's contract (Story 13.68) — defer to
         # its persisted-path relay rather than restating or contradicting it.
         print(f"run-status: workspace {wsid}; complete (next_stage=done) — "
-              f"canonical persisted via the complete gate.")
+              f"canonical persisted via the complete gate.{note}")
         return 0
     print(f"run-status: workspace {wsid}; stopped at stage {nxt}; "
-          f"no draft persisted yet — re-invoking `{invocation}` resumes at {nxt}.")
+          f"no draft persisted yet — re-invoking `{invocation}` resumes at {nxt}."
+          f"{note}")
     return 0
 
 
