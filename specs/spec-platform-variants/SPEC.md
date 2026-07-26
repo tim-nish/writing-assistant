@@ -92,6 +92,23 @@ per publish decision.**
     `language-mismatch` publish blocker (CAP-4 lint, added 2026-07-22 per #574)
     remains the backstop that keeps the outcome visible rather than silent.
     Same-language targets are offered exactly as before.
+    **Amended 2026-07-26 (triage, #790) — the adapt-first entry speaks the
+    owner's register.** The entry's `effect` states what the owner ends up
+    with, using no term whose meaning comes from the pipeline's own vocabulary
+    (`canonical`, `projection`, `retarget`). The shipped text said "derives a
+    ja canonical from this one", which a first-time owner has no way to decode
+    at the moment of choosing — observed in a driven run as the option being
+    unreadable on its own terms. This binds the **presentation only**, never
+    the route: the target is still offered as "adapt first" and still routes
+    through SPEC-canonical-adaptation to a derived same-language canonical.
+    The conformance check asserts the entry's **properties** — that it names
+    the target language, that it says a separate article is produced, that it
+    states nothing is emitted before approval, and that it fits the
+    140-character budget — and no longer pins a literal phrase, because a
+    check that owns owner-facing prose freezes the defect it exists to catch.
+    This is the presentation-side rule that
+    `skills/owner-facing-proposal-contract.md:92-96` already names as the
+    sibling of the internal-vocabulary rule, applied at this boundary.
   - **success:** A run whose owner publishes only on dev.to this week leaves no
     Zenn file anywhere; the choice and its outcome appear in the completion
     summary; a review run that edits the canonical leaves the variant files
