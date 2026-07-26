@@ -790,6 +790,15 @@ records which evidence class the run used.
      --verdicts-out "$WS/rubric-verdicts-v2.txt"
    ```
 
+   When the framework declares evidence types, pass `--framework-file` and a
+   **fact-sheet-carrying** `--state` — the consume output or a pre-completion
+   checkpoint, **never the terminal `done` checkpoint**, which drops
+   `fact_sheet`: the gate refuses an emptied substrate with a named error
+   rather than reporting a false evidence gap (Story 19.14, #751).
+
+   ```
+   ```
+
    The mechanical dims (3-4) are re-scanned; the dim1-2 judge verdicts are not
    re-bought. Any failure from step 2 or 3 surfaces as a **publish blocker**,
    never silently.

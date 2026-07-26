@@ -1058,6 +1058,23 @@ def cmd_quality_gate(args):
                     "constraint)\n")
                 return 2
             state = _load_json_state(args.state, "--state")
+            # Substrate assertion (Story 19.14, #751): a state with no fact
+            # sheet cannot resolve any KIND, and "computed over nothing" must
+            # never present as "computed and found nothing" — the terminal
+            # `done` checkpoint drops `fact_sheet`, so the documented re-entry
+            # invocation used to false-fail here as `found_kinds: []`,
+            # indistinguishable from a real evidence gap. Same fail-closed
+            # posture as the missing --map/--state branch above.
+            if not state.get("fact_sheet"):
+                sys.stderr.write(
+                    "error: --state carries no fact sheet (empty or absent "
+                    "`fact_sheet` key) — the evidence-type check cannot resolve "
+                    "KINDs over nothing, and refuses rather than reporting a "
+                    "false evidence gap. Pass a pre-completion state (the "
+                    "consume output, or a checkpoint written before the "
+                    "terminal `done`); the run's fact sheet itself is unchanged "
+                    "at $WS/fact-sheet.md (Story 19.14, #751)\n")
+                return 2
             kinds_by_source = {e.get("source"): e.get("kind")
                                for e in state.get("fact_sheet", [])}
             lines = draft.splitlines()
