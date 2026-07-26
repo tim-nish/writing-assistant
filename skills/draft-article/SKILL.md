@@ -308,8 +308,7 @@ allowed to ask for. An entry that **explicitly names** an element a prior articl
 already consumed is **honoured** — the run states that it was consumed and by
 which plan, and proceeds. Refusing it, or re-asking for confirmation, is the
 failure this clause exists to prevent
-(`threshold-gates-surfacing-not-permission`;
-`consulted: product-lab@f58defe4 topics/articles.md:10, LESSONS.md:42`). Resolve
+(`threshold-gates-surfacing-not-permission`). Resolve
 it mechanically rather than by judgement:
 
 ```

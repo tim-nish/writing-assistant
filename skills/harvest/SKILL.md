@@ -214,7 +214,7 @@ run-to-run variance CAP-10 exists to remove. Instead, walk the enumerated source
   # → one `budget: <file> <n>` line per source, in enumeration order (plus total-budget)
   ```
 
-  The budget is **relative to the source's own size** (the product-lab
+  The budget is **relative to the source's own size** (the owner hub's
   corpus-intake scheme) — a soft extraction target for that one file, not a hard
   cap the validator enforces. Extract that file's facts up to its budget.
 - **If a source's genuine facts exceed its budget, do not silently drop them —

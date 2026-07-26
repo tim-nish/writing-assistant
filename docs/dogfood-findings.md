@@ -10,6 +10,102 @@ Each run is a dated section. Newest at the top. Issues carry a rough severity
 
 ---
 
+## 2026-07-26 — Plan-schema sufficiency: cold-session reconstruction from the plan alone (#727)
+
+Issue #727. Investigation only — the amendments at the end are proposal-only
+and none is applied here. Subject: `plans/tanuki-automate-the-user.md`, the plan
+emitted by run `20260726T165310-009046` (produced normally, no instrumentation).
+Method per the issue: a fresh session was given ONLY the plan file — no
+canonical, no run workspace, no conversation history — and answered the fixed
+seven-question rubric, citing plan lines for every "answered" claim. No question
+was scored from memory of the writing session.
+
+### Rubric verdicts (cold session's, with its plan-line citations)
+
+| Q | Question | Verdict | Citations / gap |
+|---|---|---|---|
+| R1 | Claim + audience + why that audience | **partial** | claim L5, thesis L24-26, audience L9 — *why this audience* is nowhere in the plan |
+| R2 | Why this angle; alternatives dispositioned | **partial** | absence statements only (L33-35 no structure choice presented; L52-54/L124-125 no competing tool in sources) — no record of the intent-selection fork or any rejected angle |
+| R3 | Evidence clusters + role of each | **answered** | per-section obligation + pointer set, L44-109 |
+| R4 | Visual decisions and why | **partial** | the decision L112-114 and pins L115-120; "nothing was padded" L113 — *why one visual, why this one* absent |
+| R5 | Open/unresolved at completion | **answered** | L122-129 (three items, incl. the displaced t2 tension) |
+| R6 | Lifecycle position | **answered** | `relates: new` L12 |
+| R7 | Constraints/policy stances | **answered** | `policy_seeded` L10, `seed` L11, `pin` L8, `policy_pin` L15, `policy_config_version` L16, `policy_conformance` L17; boundary noted — q2/q3/q4/t1/t2 outcomes are carried by tag, their content is not |
+
+Four of seven answered. The schema's mechanical spine (pins, conformance,
+lifecycle, unresolved items, evidence-per-section) reconstructs cleanly; every
+gap is a **why** — the plan records outcomes, not the decisions behind them.
+
+### Gap traces (each gap → the run artifact that already carries it)
+
+- **R1 (why this audience)** → the q5 interview answer (`$WS/answers.json`,
+  disposition `modified`; echoed in the interview journal). The owner's answer
+  states the why in full ("not only Claude Code plugin authors… argues the
+  method before the tool…"). Carrier exists; the plan just never projects it.
+- **R2 (why this angle / alternatives)** → the intent-selection gate at run
+  start offered four intent labels with a repo-grounded + policy-seeded
+  recommendation, and the owner picked one. The **designed** carrier is the
+  presented-payload log (`$WS/presented-payloads.jsonl`, proposal-contract (f));
+  this run **never wrote it** — the intent gate went through the harness ask
+  directly, so the alternatives-considered record survives only in conversation.
+  Two-layer gap: schema (plan doesn't project it) *and* process (the artifact
+  that should hold it wasn't populated). The journal's `consulted:` line does
+  carry the policy half (`topics/articles.md:86 → article-type`). `papercut`
+  on the schema, `friction` on the capture miss.
+- **R4 (why these visuals)** → `$WS/visual-set-plan.json` carries each member's
+  `role` (the communicative why) and per-element evidence; the set-size
+  rationale and the owner's ratification lived in the proposal payload (same
+  missing presented-payloads carrier as R2). Partially artifact-held.
+- **R7 boundary (tag content)** → `$WS/interview.json` + `answers.json` +
+  `interview-journal.json` hold the full question text, dispositions, and seeds
+  the plan references only as `q2`/`q3`/`t1`. Carrier exists — but note it is
+  workspace-lifetime, exactly what the plan exists to outlive.
+
+### A finding the rubric didn't ask for, and the sharpest one
+
+- **The plan went stale at review re-entry, and now states a wrong fact** —
+  `blocker` for the Revise entry point this test exists to serve. Review
+  arbitration narrowed the canonical's audience to "engineers who have shipped
+  a Claude Code plugin" (owner call, closing the surviving cold-read Q2
+  blocker); the canonical's frontmatter says so, but `plans/<slug>.md:9` still
+  records "anyone building agent-driven developer tooling", and the plan's
+  `claim:`/section obligations predate 11 applied review edits.
+  `review-reentry` re-persists the canonical and re-checkpoints, but nothing
+  re-projects the plan. A cold Revise session reading the plan would
+  reconstruct the *pre-review* article — confidently and with citations. A
+  sufficiency test of the schema is moot if the instance is not kept current:
+  freshness is a precondition of sufficiency.
+
+### What worked
+
+- The cold session scored every answered question with line citations and
+  refused to fill gaps from plausibility — the rubric-with-citations method is
+  itself reusable.
+- `Unresolved` earned its place: the displaced t2 tension item survived the
+  workspace only because the plan carries it (R5 answered).
+- The CAP-4 conformance trio + dual pins made R7 fully reconstructible —
+  policy provenance is the schema's strongest area.
+
+### Proposed schema amendments (proposal-only; all CAP-1-compatible — each is a
+deterministic projection of an artifact the run already produced, no new owner
+interaction, forbidden fields untouched)
+
+1. Project the audience answer's **owner text** (the q5 disposition record)
+   alongside the `audience:` value — the why, from an existing artifact.
+2. Project an **intent-selection record** (chosen label + offered alternatives
+   + recommendation basis) from the presented-payload log; prerequisite: the
+   draft flow must actually capture the intent gate to
+   `presented-payloads.jsonl` (the existing (f) contract, currently skippable).
+3. Project each visual member's `role` line from `visual-set-plan.json` into
+   the plan's Visual decisions section.
+4. **Re-projection duty at review re-entry**: a round that applies edits
+   updates `plans/<slug>.md` from the reviewed canonical + arbitration record
+   (same writer, same fail-closed validation), so the plan tracks the artifact
+   it describes. This is the highest-leverage one — it fixes a wrongness, not
+   a thinness.
+
+---
+
 ## 2026-07-26 — Gloss↔article join, per-paragraph inspection of the finished corpus
 
 Story 18.118 / #725. Investigation only — the findings below propose spec
