@@ -24,6 +24,24 @@ HARD_LINES=600   # over this: FAIL — split per the packaging invariant
 # this list — the wall binds everything born after it.
 GRANDFATHERED="skills/review-article/SKILL.md"   # 904 lines at adoption, 2026-07-26
 
+# --- Script-surface family (Story 20.1, #759) --------------------------------
+# Same cost-typed class, second family: scripts/*.py. Thresholds sized from
+# the 2026-07-26 distribution (next-largest after the outlier: topic-map.py
+# 1,612; the long tail <= ~1,300) so only genuine outliers trip.
+PY_WARN_LINES=1400
+PY_HARD_LINES=2000
+# The outlier is RATCHETED, not warn-forever grandfathered (deliberately NOT
+# the skill list's shape above): its entry records the line count at adoption
+# plus 1% slack, and the check FAILS when the file GROWS past it — a 7,297-line
+# monolith that keeps growing under a warning is the #740/#744 incident again.
+# Shrinkage: when the file drops below the recorded count, update the entry
+# (ratchet down). The remedy for a trip is the sanctioned split shape —
+# per-stage command modules — which is a SPEC decision, not this check's:
+# the check points, it never restructures.
+# Format: "<path>:<lines-at-adoption>", space-separated.
+RATCHETED="scripts/draft-pipeline.py:7297"   # adopted 2026-07-26
+RATCHET_SLACK_PCT=1
+
 root=$(git rev-parse --show-toplevel 2>/dev/null) || {
   printf 'FAIL: not inside a git repository\n' >&2; exit 1;
 }
@@ -53,6 +71,37 @@ for f in skills/*/SKILL.md; do
   fi
 done
 [ "$found" -eq 1 ] || err "no skills/*/SKILL.md found — wrong root?"
+
+# --- scripts/*.py family (Story 20.1, #759) ----------------------------------
+pyfound=0
+for f in scripts/*.py; do
+  [ -f "$f" ] || continue
+  pyfound=1
+  n=$(wc -l < "$f")
+  ratchet=""
+  for entry in $RATCHETED; do
+    case "$entry" in
+      "$f":*) ratchet="${entry##*:}" ;;
+    esac
+  done
+  if [ -n "$ratchet" ]; then
+    limit=$(( ratchet + ratchet * RATCHET_SLACK_PCT / 100 ))
+    if [ "$n" -gt "$limit" ]; then
+      err "$f is $n lines — GREW past its ratchet ($ratchet at adoption, +${RATCHET_SLACK_PCT}% slack = $limit). The sanctioned remedy is the per-stage command-module split (a spec decision — see #759); shrink the file or take that decision, never raise the ratchet to absorb growth"
+    elif [ "$n" -lt "$ratchet" ]; then
+      warn "$f is $n lines (below its $ratchet ratchet) — ratchet DOWN: update the RATCHETED entry to $n so the gain is locked in"
+    else
+      ok "$f is $n lines (ratcheted outlier: <= $limit; split shape is a spec decision, #759)"
+    fi
+  elif [ "$n" -gt "$PY_HARD_LINES" ]; then
+    err "$f is $n lines (> hard ceiling $PY_HARD_LINES for scripts/*.py) — split it, or take a spec decision if the split alters packaging (Story 20.1, #759)"
+  elif [ "$n" -gt "$PY_WARN_LINES" ]; then
+    warn "$f is $n lines (> warning line $PY_WARN_LINES, ceiling $PY_HARD_LINES) — consider splitting before the ceiling forces it"
+  else
+    ok "$f is $n lines (within budget)"
+  fi
+done
+[ "$pyfound" -eq 1 ] || err "no scripts/*.py found — wrong root?"
 
 if [ "$fail" -eq 0 ]; then
   printf '\nAll skill-budget checks passed.\n'; exit 0
