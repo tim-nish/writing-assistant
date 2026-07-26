@@ -10,6 +10,93 @@ Each run is a dated section. Newest at the top. Issues carry a rough severity
 
 ---
 
+## 2026-07-26 — Gloss↔article join, per-paragraph inspection of the finished corpus
+
+Story 18.118 / #725. Investigation only — the findings below propose spec
+amendments and apply none. The view is `scripts/inspect-article-join.py`; the
+join it renders is documented in `docs/evidence-gloss-consumption-join.md`.
+
+**Corpus inspected** (every finished Tanuki-related article):
+`tanuki-engineering-lessons` (17 ¶), `tanuki-honest-automation` (12 ¶),
+`tool-proposes-human-decides` (11 ¶) — 40 paragraphs, 11 consumption claims.
+
+### What worked
+
+- **Every one of the 11 `consumed:` claims is paragraph-attributable.** Not one
+  element was consumed without prose carrying one of its declared pointers.
+  Within an article, the consumption record is honest — the design-vs-practice
+  gap this investigation went looking for is *not* over-claiming at the article
+  level.
+- **The paragraph-level join needs no schema change.** The provenance map's
+  `[L<line>]` anchor plus the draft's own headings derive paragraph→section at
+  render time. The expected blocker was not there.
+- **33 of 40 paragraphs (82%) carry at least one evidence pointer.** The
+  ungrounded 7 are narration and section framing, which is what narration is for.
+
+### Usability issues
+
+- **`consumed:` and the hub Lesson pool are disjoint namespaces** — `blocker`
+  for any claim about lesson coverage. A story-element id is a pure function of
+  the *cluster's declared membership anchor* in the fact sheet
+  (`scripts/write-article-plan.py:155-178`), so it is minted from the **host
+  repo's declared sources** and is never a hub Lesson slug. The corpus's 11
+  `el-*` ids correspond to no lesson slug in the served index.
+  **This is the divergence that produced the motivating symptom.** A run
+  reporting "every core lesson has been consumed" is quantifying over the
+  elements it minted; the owner's "under 10% of the lessons learned building
+  Tanuki" quantifies over hub Lessons. Both were true. Nothing converts between
+  them, so no surface could show that they were answering different questions.
+  *Strains:* the derived-consumption design's implicit assumption that
+  "consumed" is meaningful as a coverage statement.
+  *Proposed (not applied):* either a declared element→Lesson mapping, or a
+  scope qualifier on every consumption claim naming the population it covers.
+  The second is cheap and honest; the first is the one that would let a
+  coverage question be asked at all.
+
+- **Leg (b) of the intended join is not computable from the consumer side** —
+  `blocker` for the view as originally specified. The served lessons index
+  carries `one_liner | slug | status | tags | date` (`LESSONS.md:9`, consulted
+  2026-07-26 at `product-lab@807a12f5`) and **no Evidence pointers**; those live
+  in the lesson body, which the seam does not serve (`SPEC-terrain` OQ3).
+  The view therefore reports leg (b) as **cannot-determine** throughout rather
+  than as "none" — an absence was never established, and printing one would
+  assert what was never read.
+  *Strains:* `SPEC-terrain`'s #669 amendment, which describes matching "the hub
+  lesson's Evidence pointers" against declared sources. That mechanism is
+  specified against a surface the seam does not expose to this consumer.
+  *Proposed (not applied):* either widen the served surface to carry index-line
+  Evidence pointers, or amend the spec to say which side performs the match.
+  Not decided here — it is a seam question, and the seam is hub-side.
+
+- **The element→evidence mapping lives in editorial prose, not a declared
+  field** — `papercut`. `consumed:` gives ids; the pointers backing each id are
+  written in the plan's `# Editorial decisions` body as free text, so the view
+  parses prose. A plan phrasing it differently yields `not-attributable` for
+  reasons of format rather than substance.
+  *Strains:* the same property `persist-what-the-review-rule-reads` names — a
+  join the design relies on, carried in a place nothing can rely on.
+  *Proposed (not applied):* an `evidence:` sub-field per element, mirroring what
+  `sections:` did for the section→element map.
+
+- **The claim-level join depends on run-workspace state the plan only points
+  at** — `friction`. The provenance map is not persisted in the articles repo
+  (correctly — footprint invariant); the view locates it through the plan's
+  `run_id`. All three corpus runs still had their workspaces, so the join was
+  computable *this time*. Nothing guarantees that: prune the run workspace and
+  the article's claim-level grounding becomes unrecoverable while the plan
+  continues to assert `consumed:` as if it were checkable.
+  *Strains:* the durability assumption behind treating provenance as auditable.
+  *Proposed (not applied):* either state run-workspace retention as a contract,
+  or persist the map's paragraph→pointer projection into the plan.
+
+- **10 of 33 grounded paragraphs carry evidence belonging to no selected
+  element** — `friction`, and probably healthy. Concentrated in Context and
+  closing sections, where the draft grounds framing rather than a lesson. Noted
+  because it is the shape a real problem would also take, so the baseline is
+  worth having on record: ~30% is what a healthy article looks like today.
+
+---
+
 ## 2026-07-11 — design tension: quality gating vs. provenance-first drafting
 
 **Scope:** cross-cutting — the interaction between the mandatory article-quality
