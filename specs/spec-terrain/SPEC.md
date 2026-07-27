@@ -347,7 +347,39 @@ sources:
 > Recorded: `owner decision record — 2026-07-27 (terrain axis suspended;
 > combinations re-based)`.
 >
-> **2. Cross-topic combinations are re-based, not retired.** Removing the
+> **CORRECTED 2026-07-27 (later the same day, #809) — clause 2 below rested on
+> a FALSE PREMISE, and the combination move is DEFERRED behind OQ3 rather than
+> re-based.** The clause states that "Strands carry an `evidence` cite list, so
+> the rule transfers to a different field", marked verified in code. What was
+> verified is that the FIELD exists; what it CONTAINS was not checked. A
+> Strand's evidence is its own index-line cite — `lesson_item` says so outright,
+> "Its own index line is its evidence pointer" — so pairing on shared sources
+> makes every cross-topic pair share `LESSONS.md`. Measured on three unrelated
+> lessons in three distinct topics: **two combinations proposed, both with axis
+> `LESSONS.md`**, growing quadratically. That is the same junk class the cluster
+> removal exists to delete.
+> **What is decided:** the CAP-3 promise STANDS and the implementation does
+> not. A Strand carries no subject-matter evidence because **lesson bodies are
+> unservable — OQ3**, and the Evidence pointers that would name a shared
+> subject never reach this consumer. So the move is deferred behind that
+> already-recorded, observable condition rather than retired on a temporary
+> limitation. **Reopen trigger:** Strands carry evidence pointers naming
+> something other than the surface they were read from — i.e. OQ3 closes, or
+> the seam begins serving per-Lesson Evidence. Until then no combination is
+> derived, and CAP-3's promise is explicitly undelivered rather than quietly
+> broken. Pairing on tags or shard membership instead was offered and declined:
+> a shared tag is not a shared subject (`workflow` alone has 53 members), and
+> CAP-3's own rule is that "a combination with nothing shared is a hunch, and a
+> hunch is the owner's to voice at the free-form entry, not the machine's to
+> propose."
+> *(Method note: the error was certifying a claim as code-verified after reading
+> a field's existence rather than its contents. "Verified in code" means the
+> value was read.)*
+>
+> **2. Cross-topic combinations are re-based, not retired.** *(SUPERSEDED by
+> the correction immediately above — retained unstruck because its reasoning
+> about WHY the move should survive the cluster removal is confirmed, not
+> reversed; only the mechanism was wrong.)* Removing the
 > subtopic unit would have deleted the combination move as a side effect —
 > `candidates()` derives combinations *only* from subtopic pairs — and CAP-3
 > calls that move "the 'connect these topics along this axis' move that is the
