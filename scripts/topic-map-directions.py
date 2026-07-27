@@ -951,8 +951,33 @@ def cmd_member(args):
     out = {"kind": "terrain-member", "member": ms["member"],
            "count": ms["count"],
            "sections": [{"title": s["title"],
-                         "strands": [e.get("slug") for e in s["strands"]]}
+                         "strands": [e.get("slug") for e in s["strands"]],
+                         "note": s.get("note")}
                         for s in ms["sections"]],
+           # Section-background composition inputs (Story 20.24, #853;
+           # CAP-2 as amended 2026-07-27, #850). The SCRIPT owns the
+           # sections — their membership is fixed before any prose exists —
+           # and the presenting agent composes ONLY the background prose,
+           # from these served claims, bound by the rules below. That split
+           # is what keeps a model in the loop from becoming a gate: a
+           # composer that receives sections as fixed input cannot omit,
+           # merge, or rank a Strand, only narrate what is already there.
+           "background": {
+               "authoring": "machine-composed at render time, marked",
+               "inputs": [{"title": s["title"],
+                           "claims": [str(e.get("gloss") or e.get("title")
+                                          or e.get("slug") or "")
+                                      for e in s["strands"]]}
+                          for s in ms["sections"]],
+               "rules": [
+                   "background only — never a substitute for a Strand's "
+                   "served rendering or its disclosure",
+                   "every Strand stays exactly once and selectable — "
+                   "composition never omits, merges, ranks, or gates",
+                   "mark each background line as machine-composed",
+                   "gateway unavailable or composition skipped: say so and "
+                   "relay the deterministic titles — never silent",
+               ]},
            "listing": listing}
     json.dump(out, sys.stdout, indent=2)
     sys.stdout.write("\n")

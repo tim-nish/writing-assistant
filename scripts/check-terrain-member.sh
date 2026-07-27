@@ -148,6 +148,21 @@ check(any("origin not recorded" in c for c in ctx),
 check(all("·" in c for c in ctx),
       "context lines carry all three fields on the one line")
 
+# --- background composition: script owns sections, composer owns prose ------
+# (Story 20.24, #853; CAP-2 as amended 2026-07-27 #850.)
+bg = d.get("background") or {}
+check(bg.get("authoring") == "machine-composed at render time, marked",
+      "the background block declares its authoring class")
+check(len(bg.get("inputs") or []) == len(d["sections"]),
+      "composition inputs cover every section — none omitted")
+check(all(len(i["claims"]) == len(s["strands"])
+          for i, s in zip(bg["inputs"], d["sections"])),
+      "every Strand's claim is a composition input (count-in == count-in)")
+rules = " ".join(bg.get("rules") or [])
+for phrase in ("never omits, merges, ranks, or gates",
+               "machine-composed", "never silent"):
+    check(phrase in rules, f"the binding rules state: {phrase!r}")
+
 # --- determinism + selection contract --------------------------------------
 check(out.stdout == run("workflow").stdout, "byte-identical across invocations")
 check(re.search(r"^- \*\*L\d+\*\* — ", d["listing"], re.M),
