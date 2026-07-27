@@ -1575,7 +1575,7 @@ def lesson_elements(topics, gloss_info, consumption):
 
 def journey_elements(gloss_info, consumption):
     """Every served `journey_gloss:` rendering as its own ELEMENT beside the
-    lesson's: a Journey (how a position changed) is a distinct article idea
+    lesson's: a Journey (how a position changed) is a distinct Strand
     from the rule the lesson states. Projected ONLY from what the hub serves
     as a journey rendering — never synthesized from a lesson headline."""
     consumed_index = (consumption or {}).get("consumed_index") or {}

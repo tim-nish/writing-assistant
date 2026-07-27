@@ -4,7 +4,7 @@ description: >
   Show the terrain before choosing what to write. Invoke as "show the terrain"
   (also accepted, unchanged: "show the topic map", "what could I write about")
   to assemble the derived, bounded ELEMENT SURVEY of the hub — every Lesson
-  and Journey an individually selectable article idea, quoting its served
+  and Journey an individually selectable Strand, quoting its served
   Gloss rendering and carrying its visible writability verdict — present ONE
   screen of candidate directions plus free-form, and hand the owner's chosen
   direction to the existing stage-0 --brief path as an ordinary brief-carrying
