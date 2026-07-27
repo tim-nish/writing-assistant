@@ -24,6 +24,18 @@ HARD_LINES=600   # over this: FAIL — split per the packaging invariant
 # split landed (story 20.13, #818), the last entry retired with it.
 GRANDFATHERED=""
 
+# --- Companion family (Story 20.14, #820) ------------------------------------
+# Same class of prompt payload as the dispatcher, loaded on entry to its
+# phase/stage: every skills/**/*.md except the SKILL.md dispatchers. The
+# dispatcher split relocates operating detail here, so an uncapped companion
+# is where the #740/#744 regrowth pressure goes next. Same axes as SKILL.md.
+COMP_WARN_LINES=400
+COMP_HARD_LINES=600
+# First offenders at adoption (2026-07-27), RATCHETED like the py outlier —
+# growth past adoption+slack FAILS; shrinkage ratchets the entry down.
+# Format: "<path>:<lines-at-adoption>", space-separated.
+COMP_RATCHETED="skills/draft-article/stages/stage0.md:731 skills/draft-article/stages/stage2.md:705 skills/draft-article/stages/stage3.md:603"
+
 # --- Script-surface family (Story 20.1, #759) --------------------------------
 # Same cost-typed class, second family: scripts/*.py. Thresholds sized from
 # the 2026-07-26 distribution (next-largest after the outlier: topic-map.py
@@ -71,6 +83,38 @@ for f in skills/*/SKILL.md; do
   fi
 done
 [ "$found" -eq 1 ] || err "no skills/*/SKILL.md found — wrong root?"
+
+# --- companion family loop (Story 20.14, #820) -------------------------------
+compfound=0
+for f in $(find skills -name '*.md' ! -name 'SKILL.md' | sort); do
+  [ -f "$f" ] || continue
+  compfound=1
+  n=$(wc -l < "$f")
+  ratchet=""
+  for entry in $COMP_RATCHETED; do
+    case "$entry" in
+      "$f":*) ratchet="${entry##*:}" ;;
+    esac
+  done
+  if [ -n "$ratchet" ]; then
+    limit=$(( ratchet + ratchet * RATCHET_SLACK_PCT / 100 ))
+    if [ "$n" -gt "$limit" ]; then
+      err "$f is $n lines — GREW past its ratchet ($ratchet at adoption, +${RATCHET_SLACK_PCT}% slack = $limit) — move detail down or split the companion; never raise the ratchet to absorb growth (Story 20.14, #820)"
+    elif [ "$n" -lt "$ratchet" ]; then
+      warn "$f is $n lines (below its $ratchet ratchet) — ratchet DOWN: update the COMP_RATCHETED entry to $n so the gain is locked in"
+    else
+      ok "$f is $n lines (ratcheted companion outlier: <= $limit)"
+    fi
+  elif [ "$n" -gt "$COMP_HARD_LINES" ]; then
+    err "$f is $n lines (> hard ceiling $COMP_HARD_LINES for skill companions) — split it or move detail to a spec (Story 20.14, #820)"
+  elif [ "$n" -gt "$COMP_WARN_LINES" ]; then
+    warn "$f is $n lines (> warning line $COMP_WARN_LINES, ceiling $COMP_HARD_LINES) — consider splitting before the ceiling forces it"
+  else
+    ok "$f is $n lines (within budget)"
+  fi
+done
+[ "$compfound" -eq 1 ] || err "no skill companion .md found — wrong root?"
+
 
 # --- scripts/*.py family (Story 20.1, #759) ----------------------------------
 pyfound=0
