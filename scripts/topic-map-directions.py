@@ -88,7 +88,9 @@ USAGE = 2
 # screen budget. A screen is a screen: the map's job is to make the terrain
 # legible, not to enumerate it.
 MAX_SINGLE = 3
-MAX_COMBINATION = 2
+# MAX_COMBINATION went with the deferred combination move (Story 20.7, #809):
+# a cap on a list nothing produces is the kind of residue the removal exists
+# to stop. It returns with the move, not before.
 
 # THE SCREEN BUDGET (Story 18.66, #601; SPEC-terrain CAP-3 size switch).
 # Past this many subtopics one screen stops showing what the map exists to
@@ -201,34 +203,6 @@ def _element_direction(el):
     return f"cover the {kind} — {summary}"
 
 
-def _pointer_stems(unit):
-    """The source files a unit's evidence names, as bare stems.
-
-    One extractor for both carriers, because the pairing rule is the same and
-    only the field moved (Story 20.7, #809): a SUBTOPIC carried its pointers
-    under `density.pointers`; a STRAND carries its own `evidence` cite list
-    (`topics/x.md:3@sha`). Reading both keeps the rule identical across the
-    unit change instead of forking it.
-    """
-    out = set()
-    pointers = list(unit.get("evidence") or [])
-    pointers += list((unit.get("density") or {}).get("pointers") or [])
-    for p in pointers:
-        head = str(p).split("#")[0].split(":")[0].strip()
-        stem = head.rsplit("/", 1)[-1]
-        if stem:
-            out.add(stem)
-    return out
-
-
-def _shared_pointer_subjects(a, b):
-    """What two units visibly have in common: evidence naming the same source.
-    This is the only evidence a combination is ever proposed on — a combination
-    with nothing shared is a hunch, and a hunch is the owner's to voice at the
-    free-form entry, not the machine's to propose."""
-    return sorted(_pointer_stems(a) & _pointer_stems(b))
-
-
 def is_large(map_data):
     """Does this map exceed the screen budget? The ONE predicate the size
     switch turns on (CAP-3 as amended 2026-07-23). Since the pivot (#799) the
@@ -273,65 +247,30 @@ def candidates(map_data):
             "evidence_pointers": len(el.get("evidence") or []),
         })
 
-    # CROSS-TOPIC COMBINATIONS — "the move that is the reason the map exists"
-    # (CAP-3). Re-based onto strands: only pairs from DIFFERENT topics that
-    # share an evidence source qualify, so the axis is named from something
-    # real rather than asserted. The rule is byte-identical to the pre-removal
-    # one; only the unit it reads changed.
+    # CROSS-TOPIC COMBINATIONS — DEFERRED, not derived (Story 20.7, #809;
+    # SPEC-terrain corrected 2026-07-27).
     #
-    # A strand with NO topic is excluded rather than paired. Journey strands
-    # carry `topic: ""` today (`scripts/topic-map.py`, journey projection), so
-    # "different topics" cannot be established for them — and a pair whose
-    # provenance cannot be distinguished is not demonstrably cross-topic. This
-    # is a DISCLOSED gap, not a silent one: it closes when journeys become
-    # addressable (story 20.10), and until then no combination is invented on
-    # an empty topic.
+    # CAP-3 still promises the move — "at least one cross-topic combination
+    # when the evidence supports one" — and the promise stands. What does not
+    # exist is evidence that could support one. The rule requires two units
+    # that share an evidence SOURCE, and a Strand's only pointer is the
+    # surface it was read from: `lesson_item` states it outright, "Its own
+    # index line is its evidence pointer". So pairing on shared sources makes
+    # every cross-topic pair share `LESSONS.md`. Measured before this code was
+    # removed: three unrelated lessons in three distinct topics produced two
+    # combinations, both with axis `LESSONS.md`, growing quadratically — the
+    # same junk class the cluster removal exists to delete.
     #
-    # NOT AN AXIS. This reads each strand's own pre-existing `topic`
-    # attribute, which the assembler already records; it does not decide what
-    # Screen 1 navigates by. That question is suspended under OQ8 and is
-    # deliberately untouched here.
-    combos = []
-    for i, a in enumerate(strands):
-        for b in strands[i + 1:]:
-            ta, tb = (a.get("topic") or "").strip(), (b.get("topic") or "").strip()
-            if not ta or not tb or ta == tb:
-                continue
-            shared = _shared_pointer_subjects(a, b)
-            if not shared:
-                continue
-            name_a = a.get("title") or a.get("slug") or a["id"]
-            name_b = b.get("title") or b.get("slug") or b["id"]
-            combos.append({
-                "kind": "combination",
-                "id": f"{a['id']}+{b['id']}",
-                "direction": (f"connect {name_a} and {name_b} along {shared[0]}"),
-                "topics": sorted({ta, tb}),
-                "subtopics": [],
-                "axis": shared[0],
-                "shared_evidence": shared,
-                "why": (f"{name_a} ({ta}) and {name_b} ({tb}) "
-                        f"both cite {', '.join(shared)}"),
-                "evidence_pointers": (len(a.get("evidence") or [])
-                                      + len(b.get("evidence") or [])),
-            })
-
-    combos.sort(key=lambda c: (-len(c["shared_evidence"]), -c["evidence_pointers"],
-                               c["direction"]))
-    if is_large(map_data):
-        # Bounded by the terrain, not by a screen constant: the strongest
-        # combination per distinct axis. Every axis the evidence supports is
-        # offered exactly once, so the View lists connections without listing
-        # the same one N times.
-        seen, kept = set(), []
-        for c in combos:
-            if c["axis"] in seen:
-                continue
-            seen.add(c["axis"])
-            kept.append(c)
-        out.extend(kept)
-    else:
-        out.extend(combos[:MAX_COMBINATION])
+    # The blocker is OQ3: lesson bodies are unservable, so the Evidence
+    # pointers that would name a shared SUBJECT never reach this consumer.
+    # REOPEN when a Strand carries an evidence pointer naming something other
+    # than the surface it was read from.
+    #
+    # Pairing on tags or shard membership instead was offered and DECLINED: a
+    # shared tag is not a shared subject (`workflow` alone has 53 members),
+    # and CAP-3's own rule is that "a combination with nothing shared is a
+    # hunch, and a hunch is the owner's to voice at the free-form entry, not
+    # the machine's to propose".
     return out
 
 
@@ -340,28 +279,14 @@ def _clip(text, budget=BUDGETS["effect"]):
     return text if len(text) <= budget else text[:budget - 1].rstrip() + "."
 
 
-UNNAMED = "(unnamed)"
-
-# The placeholder states the ASSEMBLER records when nothing named a thing
-# (`scripts/topic-map.py:825`, `:866`). They are legitimate map values — the
-# spec is deliberate that an undeclared cluster falls to the derived path
-# family and that the fallback is NAMED, never silently smoothed. What is a
-# defect is presenting the bare enum in a headline position, where a machine
-# state reads as if it were the owner's own vocabulary. The View renders the
-# same state as prose that says what to do about it; `map.json` keeps the enum.
-PLACEHOLDER_PROSE = {
-    "(unclustered)": ("not yet clustered — declare `subtopic:` in the item's "
-                      "backlog frontmatter to name it"),
-    "(untracked)": ("not yet mapped to a topic — declare the track's topic in "
-                    "the articles repo to name it"),
-    UNNAMED: ("nothing named this yet — declare `subtopic:` in the item's "
-              "backlog frontmatter to name it"),
-}
 
 
-def as_prose(name):
-    """A placeholder state, rendered for a person. Any other name is its own."""
-    return PLACEHOLDER_PROSE.get(str(name).strip(), name)
+# No View line is longer than this. The View is a human surface, so its lines
+# are budgeted the way the screen payload's fields already are — a list renders
+# one item per line, clipped, capped, with the remainder disclosed. Asserted in
+# `scripts/check-topic-map-screen.sh`, so the 818-line regression cannot recur
+# unnoticed.
+VIEW_LINE_CHARS = 200
 
 
 def _clip_line(line):
@@ -507,6 +432,31 @@ def _gloss_disclosure_line(map_data):
     reason = gloss.get("reason") or "not enumerated"
     return (f"Renderings not served — lesson lines carry names, not "
             f"renderings: {reason}")
+
+
+# The map's OWN internal lexicon, enumerated (Story 18.82, #646). CAP-3's
+# owner-readable clause is only lintable because this list is finite: cluster
+# and track states, the depth ladder's enum keys, the density counter names,
+# and the source-family ids. Every one of them is a legitimate value in
+# `map.json` — the defect is presenting it on the surface the owner reads.
+#
+# A term added to the assembler and not registered here would silently stop
+# being gated, which is why `check-topic-map-screen.sh` derives the depth keys
+# and family names from the map itself and fails on a term this list misses.
+INTERNAL_VOCAB = (
+    "(unclustered)", "(untracked)", "(unnamed)",
+    "seed-only", "short-note", "full-article", "article-series",
+    "hub-lessons", "host-sources", "articles-items",
+    "unclustered", "subtopic:", "cluster:", "frontmatter",
+    " ptr,", " ptr)", "unconsumed", "live item", "density",
+    # Retired vocabulary is NOT banned here — see check-retired-vocabulary.sh.
+    # This lint runs over composed lines that QUOTE THE MATERIAL'S OWN WORDS
+    # (CAP-3 substance-led rendering), so it cannot tell the tool's vocabulary
+    # from the owner's content on the same line. Banning a common word here
+    # fires on content: "seed" flagged a fixture subtopic named "seed-heavy".
+    # The retired-vocabulary rule belongs at the layer where the TOOL's words
+    # are written, which is the source text.
+)
 
 
 def lint_owner_lines(lines):

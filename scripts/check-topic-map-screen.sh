@@ -115,8 +115,33 @@ evidence:
 ---
 EOF
 
-python3 "$M" assemble --root "$h" > "$work/map.json" 2>"$work/m.err" \
+python3 "$M" assemble --root "$h" > "$work/raw-map.json" 2>"$work/m.err" \
   || { err "map assembly failed: $(cat "$work/m.err")"; printf '\nFAILED.\n' >&2; exit 1; }
+# STRANDS ARE THE ONLY UNIT since the cluster removal (Story 20.7, #809), so
+# the small fixture must carry some. The backlog items above no longer produce
+# candidates on their own — clustering was their only path to one — which is a
+# real consequence of the removal, not a fixture quirk: `articles-items` are
+# tracking data, and article MATERIAL is Lessons and Journeys.
+python3 - "$work/raw-map.json" > "$work/map.json" <<'PYEOF'
+import json, sys
+d = json.load(open(sys.argv[1]))
+d["elements"] = [
+    {"kind": "lesson", "slug": "retry-storm", "title": "The retry storm",
+     "topic": "engineering", "date": "2026-07-20",
+     "gloss": "Retries without a budget turn one slow dependency into an outage",
+     "situation": "LESSONS.md:3@abc1234",
+     "evidence": ["LESSONS.md:3@abc1234"], "consumed": False},
+    {"kind": "lesson", "slug": "team-shape", "title": "Team shape",
+     "topic": "people", "date": "2026-07-19",
+     "gloss": "A rota that nobody owns is a rota that silently stops",
+     "situation": "LESSONS.md:4@abc1234",
+     "evidence": ["LESSONS.md:4@abc1234"], "consumed": False},
+]
+d["coverage"] = dict(d.get("coverage", {}),
+                     element_topics_read=["engineering", "people"],
+                     element_topics_skipped=[])
+print(json.dumps(d))
+PYEOF
 ok "fixture: the map assembles"
 
 # --- candidate directions -----------------------------------------------------
@@ -130,19 +155,21 @@ def check(cond, msg):
     if not cond: fail.append(msg)
 
 check(c, "the map proposes candidate directions")
+# CROSS-TOPIC COMBINATIONS ARE DEFERRED (Story 20.7, #809) — asserted absent
+# WITH ITS REASON, never deleted silently. CAP-3 still promises the move; what
+# does not exist is evidence that could support one, because a Strand's only
+# pointer is the surface it was read from ("Its own index line is its evidence
+# pointer", scripts/topic-map.py lesson_item). Pairing on that made every
+# cross-topic pair share `LESSONS.md`.
 combos = [x for x in c if x["kind"] == "combination"]
-check(combos, "at least one candidate is a CROSS-TOPIC combination")
-if combos:
-    k = combos[0]
-    check(sorted(k["topics"]) == ["engineering", "people"],
-          "the combination spans two different topics")
-    check(k["axis"] == "retro.md" and "retro.md" in k["shared_evidence"],
-          "the combination's axis is named from evidence both subtopics cite")
-    check("retro.md" in k["why"],
-          "the combination explains itself from the shared evidence")
-# No combination is proposed on nothing shared.
-check(all("staffing" not in x["subtopics"] for x in combos),
-      "a subtopic sharing no evidence is never combined on a hunch")
+check(not combos,
+      f"no combination is derived while the move is deferred behind OQ3 ({combos[:1]})")
+# The DEFERRAL IS RECORDED IN THE CODE, so a future reader meets the reason
+# rather than an unexplained gap — this is what distinguishes a deferral from
+# a silent retirement.
+src = open("scripts/topic-map-directions.py", encoding="utf-8").read()
+check("DEFERRED, not derived" in src and "OQ3" in src,
+      "the deferral and its reopen trigger are stated where the move used to be")
 # Every candidate names WHAT to cover, never HOW to tell it.
 for x in c:
     check(set(x) & {"structure", "sections", "outline", "arc"} == set(),
@@ -170,8 +197,12 @@ labels = [c["label"] for c in item["choices"]]
 check(any("name your own" in l for l in labels),
       "a free-form response is offered")
 check(labels[-1] == "stop here", "stopping is offered and stays first-class")
-check(any("connect" in l for l in labels),
-      "the combination candidate reaches the screen")
+# The combination candidate is DEFERRED (Story 20.7, #809), so no "connect …"
+# label reaches the screen. Asserted absent rather than dropped: a screen that
+# silently stopped offering the move would be indistinguishable from one where
+# the evidence simply did not support one that run.
+check(not any(l.startswith("connect ") for l in labels),
+      f"no combination candidate is offered while the move is deferred ({labels[:2]})")
 check("signal for your judgment, never a gate" in item["why"],
       "the screen states that depth is a signal, never a gate")
 check("selectable" in item["where"],
@@ -215,76 +246,38 @@ grep -q 'View' "$work/payload.json" \
 
 # A map ABOVE the budget: the terrain moves to the View, the screen summarises.
 python3 - "$work/map.json" > "$work/big-map.json" <<'PYEOF'
-import copy, json, sys
+import json, sys
 d = json.load(open(sys.argv[1]))
-topic = d["topics"][0]
-base = topic["subtopics"][0]
+# An OVER-BUDGET terrain, built from STRANDS (Story 20.7, #809). It used to be
+# built by cloning subtopics; subtopics no longer exist, and a Strand is now
+# the only thing that counts toward the screen budget.
+strands = list(d.get("elements") or [])
 for n in range(12):                       # comfortably past the screen budget
-    s = copy.deepcopy(base)
-    s["subtopic"] = f"widened-{n:02d}"
-    s["density"] = dict(s["density"], evidence_pointers=n,
-                        pointers=[f"host/w{n}.md:{n + 1}@abc1234"])
-    s["consumed"] = (n == 0)
-    s["items"] = [{"slug": f"seed-{n}", "title": f"Lesson {n}",
-                   "family": "hub-lessons"}]
-    topic["subtopics"].append(s)
-# A POINTERLESS entry, and an UNNAMED one — the two opaque shapes #616 found in
-# a real View. Without these the no-opaque-entries assertions pass vacuously.
-# A subtopic citing ONE file many times — the shape #615 found (24 pointers into
-# a single SPEC, six consecutive lines of one tool). Without it the per-file
-# aggregation assertion passes vacuously.
-dense = copy.deepcopy(base)
-dense["subtopic"] = "dense-citations"
-dense["density"] = dict(dense["density"], evidence_pointers=9,
-                        pointers=[f"specs/spec-loop/SPEC.md:{n}@abc1234"
-                                  for n in range(10, 17)]
-                                 + [f"tools/ledger:{n}@abc1234" for n in (1403, 1404)])
-topic["subtopics"].append(dense)
-# A subtopic carrying MANY lesson seeds, one of them very long — the shape #634
-# found (65 complete lesson texts joined onto one ~10,000-character line).
-# Without it the seed cap, the clip and the remainder disclosure pass vacuously.
-seedy = copy.deepcopy(base)
-seedy["subtopic"] = "seed-heavy"
-seedy["density"] = dict(seedy["density"], evidence_pointers=1,
-                        pointers=["host/seeds.md:1@abc1234"])
-seedy["items"] = [{"slug": f"seed-heavy-{n}",
-                   "title": (f"Lesson {n} " + "x" * 400 if n == 0
-                             else f"Seeded lesson number {n:02d}"),
-                   "family": "hub-lessons"} for n in range(20)]
-topic["subtopics"].append(seedy)
-blank = copy.deepcopy(base)
-blank["subtopic"] = ""
-blank["clustered_by"] = "evidence-subject"
-blank["density"] = dict(blank["density"], evidence_pointers=0, pointers=[])
-blank["items"] = [{"slug": "nameless-member", "title": "Nameless",
-                   "status": "seed", "family": "articles-items"}]
-topic["subtopics"].append(blank)
-# The SECOND PROJECTION (Story 18.80, #641): typed elements beside the
-# clusters, plus the bound disclosure that must reach the owner surface.
-d["elements"] = [
-    {"kind": "decision", "summary": "Ship behind a flag; rollback is the feature",
-     "topic": "delivery", "date": "2026-07-20",
-     "situation": "topics/delivery.md:3@abc1234",
-     "evidence": ["topics/delivery.md:3@abc1234"], "consumed": False},
-    {"kind": "reversal", "summary": "Weekly release train, superseded by continuous deploy",
-     "topic": "delivery", "date": "2026-07-19",
-     "situation": "topics/delivery.md:4@abc1234",
-     "evidence": ["topics/delivery.md:4@abc1234"], "consumed": True},
-    {"kind": "decision", "summary": "One repo doubles as the publishing repo",
-     "topic": "nowhere", "date": "2026-07-18",
-     "situation": "topics/nowhere.md:2@abc1234",
-     "evidence": ["topics/nowhere.md:2@abc1234"], "consumed": False},
-]
+    strands.append({
+        "kind": "lesson", "slug": f"widened-{n:02d}",
+        "title": f"Lesson {n}",
+        # Two topics, so topic-spanning rendering is still exercised.
+        "topic": "engineering" if n % 2 else "people",
+        "date": f"2026-07-{(n % 28) + 1:02d}",
+        "gloss": f"A claim the material itself makes, number {n}",
+        "situation": f"LESSONS.md:{n + 10}@abc1234",
+        "evidence": [f"LESSONS.md:{n + 10}@abc1234"],
+        "consumed": (n == 0),
+    })
+# A strand whose rendering was NOT served: it must still appear, with the
+# reason disclosed, never dropped and never quoting the one-liner as a gloss.
+strands.append({
+    "kind": "lesson", "slug": "no-rendering", "title": "Unrendered lesson",
+    "topic": "people", "date": "2026-07-02",
+    "gloss": None,
+    "gloss_unavailable": "the served gloss index carries no rendering for this lesson",
+    "situation": "LESSONS.md:40@abc1234",
+    "evidence": ["LESSONS.md:40@abc1234"], "consumed": False,
+})
+d["elements"] = strands
 d["coverage"] = dict(d.get("coverage", {}),
-                     element_topics_read=["delivery", "nowhere"],
+                     element_topics_read=["delivery", "engineering", "people", "nowhere"],
                      element_topics_skipped=["zeta"])
-lonely = copy.deepcopy(base)
-lonely["subtopic"] = "(unclustered)"
-lonely["clustered_by"] = "unclustered"
-lonely["density"] = dict(lonely["density"], evidence_pointers=0, pointers=[])
-lonely["items"] = [{"slug": "hidden-live-item", "title": "Hidden",
-                    "status": "shaping", "family": "articles-items"}]
-topic["subtopics"].append(lonely)
 print(json.dumps(d))
 PYEOF
 python3 "$D" payload --map "$work/big-map.json" --view "$work/view.md" \
@@ -379,8 +372,8 @@ python3 "$D" candidates --map "$work/big-map.json" > "$work/big-cands.json"
 python3 -c "
 import json
 c=json.load(open('$work/big-cands.json'))['candidates']
-singles=[x for x in c if x['kind']=='single']
-assert len(singles) > 3, len(singles)
+strands=[x for x in c if x['kind']=='element']
+assert len(strands) > 3, len(strands)
 " && ok "size switch: above the budget the fixed candidate caps no longer apply" \
   || err "the over-budget branch is still capped at the screen constants"
 
@@ -420,14 +413,11 @@ check(len(directional) > 7, f"the fixture derives an over-budget candidate set (
 rows = re.findall(r"^- \*\*(\S+)\*\* — (.+)$", block, re.M)
 elem_ids = {c["id"] for c in cands if c["kind"] == "element"}
 combo_ids = {c["id"] for c in cands if c["kind"] == "combination"}
-check(combo_ids, "the fixture derives at least one cross-topic combination")
-check(elem_ids, "the fixture carries elements to open the list")
+check(not combo_ids, "no combination reaches the View while the move is deferred")
+check(elem_ids, "the fixture carries Strands to fill the list")
 epos = [i for i, (rid, _) in enumerate(rows) if rid in elem_ids]
 check(epos and max(epos) < len(elem_ids),
-      "the elements — the primary units — open the candidate list (#799)")
-positions = [i for i, (rid, _) in enumerate(rows) if rid in combo_ids]
-check(positions and max(positions) < len(elem_ids) + len(combo_ids),
-      "combinations are listed before the single-subtopic directions")
+      "the Strands — the only units since the cluster removal — fill the candidate list")
 
 # Roughly ten pickable candidates in the first screenful — the whole point of
 # the section. Counted over the first 40 lines, header included.
@@ -472,11 +462,12 @@ def check(cond, msg):
     print(("ok:   " if cond else "FAIL: ") + msg, file=sys.stdout if cond else sys.stderr)
     if not cond: fail.append(msg)
 
+# The #637 rule survives the cluster removal in the half that still applies:
+# no candidate direction and no composed brief may carry an internal
+# placeholder enum. GONE is the cluster-NAMING half — placeholders were the
+# assembler's enums for "nothing named this cluster", and there are no
+# clusters (Story 20.7, #809). A Strand is named by the material itself.
 PLACEHOLDERS = ("(unclustered)", "(untracked)", "(unnamed)")
-subs = [s for t in d["topics"] for s in t["subtopics"]]
-check(any(s["subtopic"] in PLACEHOLDERS or not str(s["subtopic"]).strip()
-          for s in subs),
-      "the fixture contains an unnamed / not-yet-clustered subtopic")
 
 bad = [c["direction"] for c in cands
        if any(p in c["direction"] for p in PLACEHOLDERS)]
@@ -497,15 +488,6 @@ check(not badb, f"no composed brief carries a placeholder enum ({badb[:2]})")
 check(all(b.endswith("— an angle") for b in briefs),
       "the owner's note is still carried verbatim onto every composed brief")
 
-# A NAMED cluster's wording is untouched: the articles repo still owns names.
-# Stable IDs are assigned by the composer, not carried in the map, so the
-# id-annotated view is what pairs a subtopic with its candidate.
-named = [s for s in mod._subtopics(d)
-         if str(s["subtopic"]).strip() and s["subtopic"] not in PLACEHOLDERS]
-byid = {c["id"]: c for c in cands if c["kind"] == "single"}
-check(all(byid[s["id"]]["direction"] == f"cover {s['subtopic']}"
-          for s in named if s["id"] in byid),
-      "a declared or derived name still produces exactly `cover <name>`")
 sys.exit(1 if fail else 0)
 PYEOF
 [ $? -eq 0 ] || fail=1
@@ -520,24 +502,26 @@ def check(cond, msg):
     print(("ok:   " if cond else "FAIL: ") + msg, file=sys.stdout if cond else sys.stderr)
     if not cond: fail.append(msg)
 
-# A claim-bearing subtopic whose Lesson line runs well past the old 120-char
-# derivation clip and ends on a whole word.
+# A claim-bearing Strand whose Lesson rendering runs well past the old 120-char
+# derivation clip and ends on a whole word. (Re-based from the subtopic path,
+# which is gone — Story 20.7, #809. The rule itself is unchanged: clipping is
+# RENDER-only, and the derivation carries the material's full claim.)
 claim = ("Absence-based verification is three valued not two because "
          "absent with evidence requires both the run count and the corroborating "
          "signal before the regression may be recorded as genuinely resolved")
 assert len(claim) > 120 and len(claim.split()) >= 5
-sub = {"subtopic": "verification", "id": "T9.1",
-       "items": [{"family": "hub-lessons", "title": claim, "slug": "verification"}],
-       "density": {"evidence_pointers": 3}}
-direction = mod._coverage_direction(sub)
+strand = {"kind": "lesson", "slug": "verification", "title": claim,
+          "gloss": claim, "topic": "engineering", "date": "2026-07-23",
+          "evidence": ["LESSONS.md:9@abc1234"]}
+direction = mod._element_direction(strand)
 check(claim in direction,
       "the full claim is carried into the DERIVATION, not clipped at 120 chars")
 
 # The brief composed from the index carries the whole claim, ending on the
 # source's own last word before the owner's note — never a mid-word cut.
-cands = [dict(sub, direction=direction, kind="single")]
+cands = [dict(strand, id="L9", direction=direction, kind="element")]
 brief = mod.brief_from_answer(
-    {"index": "T9.1", "note": "my angle", "pin": "p@1"}, cands, "p@1")["brief"]
+    {"index": "L9", "note": "my angle", "pin": "p@1"}, cands, "p@1")["brief"]
 check(claim in brief and brief.endswith("resolved — my angle"),
       "the composed brief carries the full claim and ends on a source word, never mid-word")
 
@@ -565,7 +549,8 @@ check(len(els) == len(d["elements"]), f"every element reaches the candidate list
 # Own namespace, no collision with the subtopic scheme.
 eids = [c["id"] for c in els]
 tids = [c["id"] for c in cands if c.get("kind") != "element"]
-check(all(re.fullmatch(r"E\d+\.\d+", i) for i in eids), f"element ids are E<topic>.<n> ({eids})")
+check(all(re.fullmatch(r"(?:E\d+\.\d+|L\d+|J\d+)", i) for i in eids),
+      f"Strand ids use the declared namespaces L<n>/J<n>/E<topic>.<n> ({eids})")
 check(not (set(eids) & set(tids)), "element ids never collide with subtopic ids")
 check(len(set(eids)) == len(eids), "element ids are unique")
 
@@ -578,7 +563,8 @@ check("What you decided" not in heads,
 block = view.split("## Subtopic clusters — a derived, secondary grouping")[0]
 check(all(f"**{i}**" in block for i in eids),
       "every element appears among the candidate directions, with its index")
-check("reversal" in block and "decision" in block, "each element's kind is shown")
+check(any(k in block for k in ("lesson", "journey", "decision", "reversal")),
+      "each Strand's kind is shown")
 check("already consumed" in block, "a consumed element is MARKED, not hidden")
 # The bound is never silent: the projection's coverage disclosure survives the
 # section's removal — a bounded projection read as the whole record is what it
@@ -631,43 +617,27 @@ assert any("name your own" in l for l in labels) and labels[-1] == "stop here", 
 PYEOF
 [ $? -eq 0 ] || fail=1
 
-# --- the View shows the ESTIMATE, not the estimator's rule (18.77, #633) ----
-python3 - "$work/big-map.json" "$work/view.md" "$D" <<'PYEOF' || fail=1
-import importlib.util, json, re, sys
-d = json.load(open(sys.argv[1]))
-view = open(sys.argv[2], encoding="utf-8").read()
+# --- the depth ESTIMATOR is GONE (Story 20.7, #809) -------------------------
+# This block asserted that the View showed the estimate but not the
+# estimator's promotion rule. There is no estimator: it was derived per
+# subtopic and retired with the unit. What survives is the stronger claim —
+# nothing depth-shaped reaches the owner surface at all — plus the absence of
+# the machinery, so a reader meets the removal rather than a silent gap.
+python3 - "$work/view.md" "$D" <<'PYEOF' || fail=1
+import re, sys
+view = open(sys.argv[1], encoding="utf-8").read()
+src = open(sys.argv[2], encoding="utf-8").read()
 fail = []
 def check(cond, msg):
     print(("ok:   " if cond else "FAIL: ") + msg, file=sys.stdout if cond else sys.stderr)
     if not cond: fail.append(msg)
 
-subs = [s for t in d["topics"] for s in t["subtopics"]]
-withpred = [s for s in subs if "the next level needs" in s.get("depth", {}).get("why", "")]
-check(withpred, "the fixture contains a subtopic with an UNMET promotion predicate")
-# The predicate stays on the record: this is a rendering rule, not a data change.
-check(all("the next level needs" in s["depth"]["why"] for s in withpred),
-      "map.json still carries the promotion predicate (the depth harness reads it)")
-# ...and never reaches the owner surface.
-check("the next level needs" not in view,
-      "the View does not carry the promotion predicate")
-check(not re.search(r"^- depth: .*\d+ < \d+", view, re.M),
-      "no threshold arithmetic appears on a depth line")
-# Story 20.5 (#802): depth lines no longer reach the View at all — the block
-# that rendered them is deleted. The ban above is therefore satisfied by
-# construction, and CAP-2's "why this depth?" is answered from the header's
-# terrain-size line instead (SPEC-terrain, amended 2026-07-27). `_depth_line`
-# itself survives with its unit test below; story 20.7 retires the estimator.
 check(not re.search(r"^- depth: ", view, re.M),
       "no depth line reaches the View (the estimate is not an owner surface)")
-
-# A trim must never swallow a DISCLOSURE: a `why` with no predicate is passed
-# through whole, including "no depth-threshold declaration is readable".
-spec = importlib.util.spec_from_file_location("d", sys.argv[3])
-mod = importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)
-disclosure = ("no depth-threshold declaration is readable, so no estimate "
-              "is offered (nothing declared)")
-check(mod._depth_line({"depth": {"why": disclosure}}) == disclosure,
-      "a why carrying no predicate passes through unchanged (disclosure preserved)")
+check("the next level needs" not in view,
+      "the estimator's promotion rule appears nowhere on the owner surface")
+for gone in ("_depth_line", "DEPTH_PREDICATE_MARKER"):
+    check(gone not in src, f"{gone} is deleted, not merely unreferenced")
 sys.exit(1 if fail else 0)
 PYEOF
 [ $? -eq 0 ] || fail=1
@@ -761,7 +731,7 @@ python3 "$D" brief --answer "$work/answer-stop.json" --map "$work/map.json" \
 bigpin=$(python3 -c "import json;print(json.load(open('$work/big-map.json'))['coverage']['pin'])")
 idx=$(python3 -c "
 import json
-c=[x for x in json.load(open('$work/big-cands.json'))['candidates'] if x['kind']=='single']
+c=[x for x in json.load(open('$work/big-cands.json'))['candidates'] if x['kind']=='element']
 print(c[0]['id'])")
 python3 -c "
 import json,sys
@@ -865,10 +835,12 @@ import json, re, sys
 # Story 20.5 (#802): the per-subtopic detail headings are gone, so the View's
 # identifiers are read where they now live — the candidate direction rows,
 # which is the surface the owner actually answers from.
-view_ids = set(re.findall(r"^- \*\*(T\d+\.\d+)\*\* — ",
+# Story 20.7 (#809): the identifiers are Strand ids now (L<n>/J<n>/E<t>.<n>),
+# subtopic T-ids having gone with the cluster unit.
+view_ids = set(re.findall(r"^- \*\*((?:L|J)\d+|E\d+\.\d+)\*\* — ",
                           open(sys.argv[1], encoding="utf-8").read(), re.M))
 cand_ids = {c["id"] for c in json.load(open(sys.argv[2]))["candidates"]
-            if c["kind"] == "single"}
+            if c["kind"] == "element"}
 assert cand_ids <= view_ids, cand_ids - view_ids
 PYEOF
 
@@ -997,8 +969,8 @@ check("declare `subtopic:`" not in reading,
 check("[#" not in reading,
       "no depth bar reaches the owner surface")
 # IDs stay — they are the ratified selection mechanism.
-check(re.search(r"^- \*\*T\d+\.\d+\*\* — ", reading, re.M),
-      "terrain lines still carry their index for selection")
+check(re.search(r"^- \*\*((?:L|J)\d+|E\d+\.\d+)\*\* — ", reading, re.M),
+      "terrain lines still carry their Strand index for selection")
 sys.exit(1 if fail else 0)
 PYEOF
 [ $? -eq 0 ] || fail=1
