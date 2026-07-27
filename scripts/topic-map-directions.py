@@ -592,6 +592,95 @@ def _fit_with_path(prefix, path, budget):
     return prefix + tail
 
 
+def axis_members(map_data):
+    """Screen 1's axis: the SERVED TAG VOCABULARY, derived from the tags the
+    elements already carry (Story 20.8, #810; SPEC-terrain as resolved
+    2026-07-27).
+
+    Deterministic by construction — no model decides what appears: every tag
+    on any Strand is a member, members sort alphabetically, and the count is
+    plain arithmetic. The count is a screen affordance for choosing where to
+    look (legitimate presentation under the no-selection-authority wording),
+    never a gate: every member is offered whatever its size, and a large
+    member is served WHOLE downstream — no within-axis cap.
+
+    Strands carrying NO tag (a lesson whose rendering was not served has an
+    empty tag list) would be reachable through no member, so their count is
+    returned as a DISCLOSURE the screen must carry as a line — the
+    named-denominator rule (CAP-4): they are named as outside the axis, never
+    hidden, and free-form still reaches them.
+    """
+    members, untagged = {}, 0
+    for el in map_data.get("elements", []) or []:
+        tags = [str(t).strip() for t in (el.get("tags") or []) if str(t).strip()]
+        if not tags:
+            untagged += 1
+            continue
+        for t in tags:
+            members[t] = members.get(t, 0) + 1
+    listing = [{"member": name, "strands": n}
+               for name, n in sorted(members.items())]
+    return {"members": listing, "untagged_strands": untagged}
+
+
+def compose_axis_payload(map_data):
+    """Screen 1 as ONE owner-facing proposal payload (Story 20.8, #810).
+
+    The same contract every other screen honours: machine-proposed selectable
+    options, free-form every time, stop last, plain text, validated before
+    presentation. The member word is the TAG'S OWN NAME — the UI word "Topic"
+    is retired for the axis (upstream ruling, 2026-07-27) and never appears
+    in the composed copy.
+    """
+    axis = axis_members(map_data)
+    pin = map_data.get("coverage", {}).get("pin")
+    choices = []
+    for m in axis["members"]:
+        n = m["strands"]
+        plural = "s" if n != 1 else ""
+        choices.append({
+            "label": f"{m['member']} ({n} Strand{plural})",
+            "effect": _clip(f"shows all {n} of this tag's Strands, whole — "
+                            f"nothing capped, nothing ranked; you pick the "
+                            f"material there"),
+        })
+    choices.append({
+        "label": "name your own direction or combination axis",
+        "effect": _clip("skips the listing and starts the run with your "
+                        "wording as the brief"),
+    })
+    choices.append({
+        "label": "stop here",
+        "effect": _clip("nothing is drafted and no brief is recorded; the "
+                        "axis is recomputed fresh next time"),
+    })
+    where = (f"Terrain at {pin}: {len(axis['members'])} tag(s) from the "
+             f"served vocabulary, each individually selectable.")
+    if axis["untagged_strands"]:
+        # The disclosure is a LINE, never a section (CAP-4): strands outside
+        # the axis are named, not hidden, and free-form still reaches them.
+        where += (f" {axis['untagged_strands']} Strand(s) carry no served "
+                  f"tag and sit outside this axis — name one at free-form "
+                  f"to reach it.")
+    return {"items": [{
+        "where": _clip(where, BUDGETS["where"]),
+        "why": _clip("Pick where to look first. The count is a signal for "
+                     "your judgment, never a gate: every tag is offered "
+                     "whatever its size, and its material is shown whole.",
+                     BUDGETS["why"]),
+        "choices": choices,
+    }]}
+
+
+def cmd_axis(args):
+    m = load_map(args.map)
+    out = {"kind": "terrain-axis", "axis": axis_members(m),
+           "payload": compose_axis_payload(m)}
+    json.dump(out, sys.stdout, indent=2)
+    sys.stdout.write("\n")
+    return 0
+
+
 def compose_payload(map_data, cands, view_path=None):
     """The ONE screen.
 
@@ -892,6 +981,9 @@ def main(argv=None):
     p = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = p.add_subparsers(dest="cmd", required=True)
+    ax = sub.add_parser("axis", help="Screen 1: the served-tag axis listing "
+                        "with per-member Strand counts, as JSON + payload")
+    ax.add_argument("--map", required=True)
     c = sub.add_parser("candidates", help="candidate directions as JSON")
     c.add_argument("--map", required=True, help="assembled map JSON, or - for stdin")
     pa = sub.add_parser("payload", help="the one screen, as a proposal payload")
@@ -913,7 +1005,8 @@ def main(argv=None):
     b.add_argument("--map", help="the same map, so an adopted candidate resolves")
     args = p.parse_args(argv)
     return {"candidates": cmd_candidates, "payload": cmd_payload,
-            "view": cmd_view, "brief": cmd_brief}[args.cmd](args)
+            "view": cmd_view, "brief": cmd_brief,
+            "axis": cmd_axis}[args.cmd](args)
 
 
 if __name__ == "__main__":

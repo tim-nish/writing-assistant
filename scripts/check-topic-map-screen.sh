@@ -994,5 +994,64 @@ for token in 'topic-map.py assemble' 'topic-map-directions.py payload' \
     || err "SKILL is missing contract text: $token"
 done
 
+
+# --- SCREEN 1: the served-tag axis (Story 20.8, #810) ------------------------
+# The axis is decided (upstream, 2026-07-27): members are the served tags,
+# derived from the tags the Strands already carry; deterministic; no cap; the
+# UI word "Topic" retired for the axis; strands outside the axis disclosed as
+# a line. Asserted on a fixture that exercises every clause, including a
+# 53-entry member so serve-whole is tested at the measured worst case.
+python3 - "$D" <<'PYEOF' || fail=1
+import json, subprocess, sys, tempfile
+D = sys.argv[1]
+fail = []
+def check(cond, msg):
+    print(("ok:   " if cond else "FAIL: ") + msg, file=sys.stdout if cond else sys.stderr)
+    if not cond: fail.append(msg)
+
+els = []
+for n in range(53):                    # the measured largest member is 40-53
+    els.append({"kind": "lesson", "slug": f"w{n}", "title": f"W{n}",
+                "tags": ["workflow"], "evidence": [], "consumed": False})
+els.append({"kind": "lesson", "slug": "a1", "title": "A1",
+            "tags": ["agents", "workflow"], "evidence": [], "consumed": False})
+els.append({"kind": "journey", "slug": "j1", "title": "J1",
+            "tags": ["agents"], "evidence": [], "consumed": True})
+els.append({"kind": "lesson", "slug": "untagged", "title": "U",
+            "tags": [], "evidence": [], "consumed": False})
+m = {"kind": "topic-map", "topics": [], "coverage": {"pin": "h@abc1234"},
+     "elements": els}
+f = tempfile.NamedTemporaryFile("w", suffix=".json", delete=False)
+json.dump(m, f); f.close()
+run = lambda: subprocess.run(
+    ["python3", D, "axis", "--map", f.name], capture_output=True, text=True)
+out = run()
+check(out.returncode == 0, f"axis composes (rc={out.returncode})")
+d = json.loads(out.stdout)
+members = {x["member"]: x["strands"] for x in d["axis"]["members"]}
+check(members == {"workflow": 54, "agents": 2},
+      f"members are exactly the element tags with correct counts ({members})")
+check(d["axis"]["untagged_strands"] == 1,
+      "a Strand with no served tag is counted outside the axis")
+item = d["payload"]["items"][0]
+labels = [c["label"] for c in item["choices"]]
+check(labels[0] == "agents (2 Strands)" and labels[1] == "workflow (54 Strands)",
+      f"every member is offered with its count — 54 entries included, no cap ({labels[:2]})")
+check(labels[-2:] == ["name your own direction or combination axis", "stop here"],
+      "free-form is offered and stop stays last")
+check("no served tag" in item["where"],
+      "the outside-the-axis disclosure is a line on the screen")
+surface = json.dumps(d["payload"])
+check("Topic" not in surface and "topic" not in surface.replace("topic-map", ""),
+      "the UI word Topic never appears in the axis screen copy")
+check(out.stdout == run().stdout, "the axis listing is byte-identical across invocations")
+v = subprocess.run(["python3", "scripts/validate-proposal-payload.py",
+                    "--surface", "topic-map", "/dev/stdin"],
+                   input=json.dumps(d["payload"]), capture_output=True, text=True)
+check(v.returncode == 0, f"the axis screen passes the proposal validator ({v.stderr.strip()[:80]})")
+sys.exit(1 if fail else 0)
+PYEOF
+[ $? -eq 0 ] || fail=1
+
 [ "$fail" -eq 0 ] && printf '\nAll topic-map screen checks passed.\n' \
   || { printf '\nFAILED.\n' >&2; exit 1; }
