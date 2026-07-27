@@ -105,9 +105,40 @@ intake as a **proposal only**.
     candidate that most reframes the remaining forks first). Candidate
     drafting is sanctioned; candidate *finality* is not: no default is
     pre-selected, and the gate never times out into a choice.
+  - **the gate carries the machine's own comparison (amended 2026-07-27,
+    #808).** Candidates ordered and individually grounded is **not enough**:
+    the hardest input at a fork is the *comparison*, and a panel of
+    per-option advocacy leaves every option plausible in isolation while
+    nothing weighs them against each other. So an uncovered fork additionally
+    carries:
+    - **a ranked recommendation with its reasoning** — the machine states
+      which candidate it judges best and why;
+    - **the evidence bearing on each option**, attached to the option it bears
+      on, never left in prose above the gate. A measurement the sitting
+      already holds and does not attach is withheld, not absent;
+    - **the evidence that would OVERTURN the recommendation**, stated with it.
+    - **Where options share a machine-computed premise, the premise is
+      rendered explicitly and a candidate negating it is carried** — otherwise
+      every available answer records something false.
+    **This is not a default, and the discriminator is falsifiability.** A
+    recommendation carrying the evidence that would overturn it is agent-fed
+    input the owner can cheaply check; one without it is a default wearing a
+    suggestion's clothes. Nothing is pre-selected, rank is not pre-selection,
+    and the gate still never times out into a choice — the CAP-3 intent above
+    is unchanged in every other respect.
+    *Provenance: ratified upstream 2026-07-27 as a gate-contract clause; this
+    is the consumer rendering half. The observed incident is this repo's own
+    #803 sitting, where per-shard entry counts were in hand, withheld from the
+    fork panel, and recomputed by a second agent at double cost — and where
+    two of three fork panels shared a premise their own withheld evidence
+    falsified. `owner decision record — 2026-07-27 (fork gates owe a ranked
+    recommendation)`.*
   - **success:** An uncovered fixture fork presents ≤3 ordered candidates
     with their grounding, no pre-selected default; the run cannot proceed
-    past the gate without an owner choice.
+    past the gate without an owner choice. **Every option carries the evidence
+    bearing on it, the panel carries a ranked recommendation, and the
+    recommendation names what would overturn it**; a shared machine-computed
+    premise is rendered with a candidate that negates it.
 - **CAP-4** — miss feedback into the upstream intake (proposal-only)
   - **intent:** Every uncovered in-scope fork is a consult **miss**: recorded
     as a distill-bug signal in the run receipts, and — at the owner's gate

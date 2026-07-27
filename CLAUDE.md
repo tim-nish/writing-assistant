@@ -11,6 +11,34 @@ no position on X") — every escalation doubles as a distill-bug signal. Record
 the returned `consulted:` line, and which served lines you applied, in your
 run output.
 
+## Fork gates owe a ranked recommendation (#808)
+
+**Any gate that presents options — a fork panel, a classification batch, an
+alternatives selection — carries the machine's own comparison.** Ordered,
+individually grounded options are not enough: the hardest input at a fork is
+the *comparison*, and per-option advocacy leaves every option plausible alone
+while nothing weighs them together.
+
+Each option carries **the evidence bearing on it**, attached to that option and
+not left in prose above the gate. The panel carries a **ranked recommendation
+with its reasoning**, and states **what would overturn it**. Where options
+share a machine-computed premise, render the premise and carry an option that
+negates it — otherwise every available answer records something false.
+
+**This is not a default.** The discriminator is falsifiability: a
+recommendation carrying its own overturning evidence is agent-fed input the
+owner can check cheaply; one without it is a default wearing a suggestion's
+clothes. Nothing is pre-selected, and rank is not pre-selection.
+
+Why this is here and not only in the fork-gate skill: **a skill binds only the
+sittings that invoke it.** The incident that produced this rule
+(`specs/spec-policy-fork-consultation/SPEC.md` CAP-3, amended 2026-07-27)
+happened in a sitting that rendered fork panels without invoking that skill —
+and a grep confirms nothing in this repo invokes it today. The rule is broken
+at the moment an agent draws a panel, in any sitting, so it is ambient here;
+the skill carries the procedure, and a check carries the visible-absence
+signal.
+
 ## Claims about the served surface (#642)
 
 The rule above governs *gates*. This one governs *authored text*, because a
