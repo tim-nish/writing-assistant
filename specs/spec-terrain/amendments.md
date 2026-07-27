@@ -404,3 +404,42 @@ the blocks.
 > two-way name collision. #803's body and the story text derived from it say
 > "Seeds"; that wording is superseded. This spec uses **Strand** for the
 > selectable unit from here.
+
+> **Amended 2026-07-27 (spec sitting, #844) — Screen 2 Strands gain
+> deterministic context fields; section background prose is pre-ratified or
+> absent.** The owner's cold-read of a member listing found adjacent Strands
+> with "no visible relationship, or any relationship that exists is enclosed
+> in machine-side reasoning so completely that the user cannot perceive it",
+> and proposed section-level shared-background prose with render-time LLM
+> composition explicitly on the table (cost grounds set aside). The fork was
+> half-covered: the served surface had already superseded consumer render-time
+> re-expression of a *single* element ("an UNRATIFIED machine paraphrase of
+> ratified policy") and declined interpretation-at-consult because a live
+> output cannot be pinned — but carried no position on *cross-Strand*
+> background narrative (owner decision record — 2026-07-27 (triage #844:
+> consumer render-time re-expression superseded; interpretation-at-consult
+> declined); the full pin is in the private provenance store). The owner
+> resolved the uncovered half at this sitting's single pause:
+>
+> **1. Per-Strand context fields, deterministic, now.** Each Strand line on
+> Screen 2 carries the Topics it belongs to beyond the member's own tag, its
+> origin, and whether it holds both a claim and its reasoning — all read from
+> served artifacts or the map. This is presentation within CAP-3's
+> owner-readable rule; sectioning stays a permutation and sections still gate
+> nothing.
+>
+> **2. Section background prose only as a served, pre-ratified rendering —
+> held, not refused.** The section key is stable (member tag + co-tag), so a
+> background rendering *is* ratifiable in advance, which is the served
+> surface's adopted pattern for exactly this competence class. Until the hub
+> serves such an artifact class (its counterpart proposal is staged in the
+> hub's own intake), sections remain title-only. The clause activates when
+> the artifact class is served; it is not re-decided then. **Reopen trigger
+> for the rejected arm:** if the pre-ratified form proves untrue of the
+> Strands that land in a section — the co-tag key too crude for one written
+> background to hold — that is the served surface's own reopen condition (a
+> question class no pre-ratifiable artifact answers), and render-time
+> composition returns as a live alternative rather than a settled refusal.
+>
+> The no-LLM clause is untouched: it governed selection before and after;
+> narration stays out of the render loop by construction, not by that clause.

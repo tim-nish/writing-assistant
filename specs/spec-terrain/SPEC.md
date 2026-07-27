@@ -99,7 +99,24 @@ flows into the existing brief/structures path unchanged.**
       direction line and never a gate;
     - **Screen 2 is that member's complete material** — all its Lessons and
       Journeys, arranged into **presentation-only sections** whose first line
-      is a derived group title;
+      is a derived group title. Each Strand's line carries its **deterministic
+      context fields** (amended 2026-07-27, #844): the Topics (tags) it
+      belongs to beyond the member's own, where it originated, and whether it
+      carries both a claim and its reasoning — every field **read** from the
+      served artifacts or the map, never composed at render time;
+    - **section background prose is pre-ratified or absent (amended
+      2026-07-27, #844 — a condition-bound hold, not a refusal):** prose under
+      a section title is admissible **only** as a served, hub-ratified
+      rendering keyed by the section's stable tag key (the member tag plus the
+      co-tag that names the section). No such served artifact class exists
+      today, so sections remain title-only until it does; the counterpart
+      proposal is staged in the hub's own intake, and this clause **activates**
+      — it is not re-decided — when that artifact class is served. Render-time
+      composition never substitutes for it (owner decision record — 2026-07-27
+      (triage #844: consumer render-time re-expression superseded;
+      interpretation-at-consult declined)). The two-screen no-LLM clause below
+      is unchanged in scope: it governs selection; this clause keeps narration
+      out of the render loop by construction;
     - **sectioning is a permutation**: every element of the member appears
       **exactly once**, `count in == count out`, asserted by a check script.
       Completeness is structural, so a wrong grouping is a cosmetic defect and
