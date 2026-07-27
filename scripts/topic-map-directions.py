@@ -368,7 +368,11 @@ def _verdict_phrase(cand):
                 "gap, never blocks the draft")
     if verdict == "no-episode":
         return "no-episode — offerable as your own framing, stated as such"
-    return "evidence lookup: cannot-determine"
+    # The lookup's honest fourth outcome, said in the owner's register (#842;
+    # the fix belongs in the derivation, #637): the lookup did not look, so
+    # neither presence nor absence is asserted.
+    return ("whether this can be evidenced was not checked — "
+            "still selectable")
 
 
 def _short_path(path):
@@ -414,7 +418,12 @@ def _direction_lines(cands):
             # the claim gives way to it below, never the other way round.
             facts.append(verdict)
         if _is_substance_led(c):
-            facts.append(f"{c.get('evidence_pointers', 0)} evidence pointer(s)")
+            # Declared, not checked (#842): this counts the source references
+            # the material declares; whether they resolve is the verdict's to
+            # say, so the two never share one phrase.
+            n = c.get("evidence_pointers", 0)
+            facts.append(f"{n} source reference{'' if n == 1 else 's'} "
+                         "declared")
         if c.get("consumed"):
             facts.append("already consumed — still selectable")
         trailer = f" ({', '.join(facts)})" if facts else ""
@@ -497,6 +506,10 @@ INTERNAL_VOCAB = (
     "hub-lessons", "host-sources", "articles-items",
     "unclustered", "subtopic:", "cluster:", "frontmatter",
     " ptr,", " ptr)", "unconsumed", "live item", "density",
+    # The 2026-07-27 owner-flagged spellings (#842): the verdict-fallback
+    # enum and the pointer-count trailer. Registered so a regression FAILS
+    # the render-boundary check instead of passing as unlisted.
+    "evidence lookup: cannot-determine", " evidence pointer",
     # Retired vocabulary is NOT banned here — see check-retired-vocabulary.sh.
     # This lint runs over composed lines that QUOTE THE MATERIAL'S OWN WORDS
     # (CAP-3 substance-led rendering), so it cannot tell the tool's vocabulary
@@ -917,10 +930,11 @@ def compose_payload(map_data, cands, view_path=None):
     choices = []
     for c in cands:
         verdict = _verdict_phrase(c)
+        n = c["evidence_pointers"]
         effect = (f"starts a normal drafting run with this as your coverage "
                   f"brief; {verdict}" if verdict else
                   f"starts a normal drafting run with this as your coverage "
-                  f"brief; {c['evidence_pointers']} evidence pointer(s) "
+                  f"brief; {n} source reference{'' if n == 1 else 's'} "
                   f"behind it")
         choices.append({"label": c["direction"], "effect": _fit(effect)})
     # Free-form is offered EVERY time, not only on rejection.
