@@ -443,3 +443,47 @@ the blocks.
 >
 > The no-LLM clause is untouched: it governed selection before and after;
 > narration stays out of the render loop by construction, not by that clause.
+
+> **Amended 2026-07-27 (triage, #850, coupled with #844) — the hub's
+> cold-reader verdicts land: the join is the defect, identifiers are
+> kind-qualified, the composition reopen is taken up, and two owner rulings
+> enter CAP-2.** The hub ratified four verdicts over the same cold-reader
+> review that produced #841–#844 (owner decision record — 2026-07-27 (#850
+> D1–D4); the full pin is in the private provenance store; the issue quotes
+> them verbatim under the ratified-rendering rule).
+>
+> **1. D1 — the raw-prose defect is a consumer JOIN failure.** The ratified
+> renderings exist (111/111 lessons, 102/104 journey-bearing, and served
+> decision shards); `topic-map.py` simply has no code path reading the
+> decisions shards, and the Journey renderings were shadowed by a basename
+> collision fixed upstream. Story 20.22 wires the join. The #848 disclosure
+> shape remains the fallback surface — a surface that falls back to source
+> must say so at the point of substitution.
+>
+> **2. D2 — kind-qualified identifiers: already discharged.** The obligation
+> (every identifier kind-qualified; the surface declares its kinds) shipped
+> in Story 20.20/#848 — `L`/`J`/`E` prefixes plus the row-kind legend on both
+> reading surfaces. No story is decomposed; recorded so the verdict meets its
+> evidence rather than an unexplained gap.
+>
+> **3. D3 — the pre-ratified-or-absent hold is SUPERSEDED, not activated.**
+> The earlier same-day clause held sections title-only until the hub served a
+> pre-ratified background artifact class. The hub answered differently: it
+> recorded that the reopen's ground (cost) was withdrawn by the owner and the
+> render-time composition is admissible — a writing-assistant decision, which
+> this amendment makes: composed section background is adopted under the
+> hub-hardened invariants (permutation extends to composed sections;
+> background never substitutes for a Strand's served text; machine-composed
+> marking). Story 20.24 (umbrella #844) delivers it — #844's twice-stated
+> ask, so that umbrella closes on delivery, not on this text.
+> **Carried question (cannot-determine, pending at the hub):** whether
+> "sections-by-Topic" means the served tag vocabulary or a `topics/*.md`
+> join — staged hub-side; Story 20.24 carries it as a story question and
+> composes against the served tag key until answered.
+>
+> **4. D4 — two owner rulings enter CAP-2 verbatim-scoped:** a missing Gloss
+> rendering is an abnormal condition to fix immediately (Story 20.22's
+> disclosure shape), and no direct parent section holds more than 20% of the
+> member's Strands (Story 20.23 implements the subdivision; the existing
+> co-tag grouping rule stays free to change — the contract is the bound, not
+> the grouping).

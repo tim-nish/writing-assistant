@@ -104,19 +104,32 @@ flows into the existing brief/structures path unchanged.**
       belongs to beyond the member's own, where it originated, and whether it
       carries both a claim and its reasoning — every field **read** from the
       served artifacts or the map, never composed at render time;
-    - **section background prose is pre-ratified or absent (amended
-      2026-07-27, #844 — a condition-bound hold, not a refusal):** prose under
-      a section title is admissible **only** as a served, hub-ratified
-      rendering keyed by the section's stable tag key (the member tag plus the
-      co-tag that names the section). No such served artifact class exists
-      today, so sections remain title-only until it does; the counterpart
-      proposal is staged in the hub's own intake, and this clause **activates**
-      — it is not re-decided — when that artifact class is served. Render-time
-      composition never substitutes for it (owner decision record — 2026-07-27
-      (triage #844: consumer render-time re-expression superseded;
-      interpretation-at-consult declined)). The two-screen no-LLM clause below
-      is unchanged in scope: it governs selection; this clause keeps narration
-      out of the render loop by construction;
+    - **section background prose may be machine-composed at render time
+      (amended 2026-07-27, #850 — supersedes the same-day pre-ratified-or-
+      absent hold, whose activation condition the hub answered differently):**
+      the render-time composition reopen is admissible — its ground was cost,
+      and the owner withdrew it (owner decision record — 2026-07-27 (#850 D3:
+      composition reopen admissible; invariants bind harder)). The clause
+      binds the composer, not just the renderer:
+      - composed prose is **background only** and is **marked as
+        machine-composed** on the surface; a Strand's own text still quotes
+        **only** its served rendering or the not-served disclosure — a
+        composer's paraphrase never substitutes for either (the
+        no-silent-fallback rule, #850 D1);
+      - **the permutation and no-selection-authority invariants extend to
+        composed sections and bind harder with a model in the loop**: every
+        Strand appears exactly once (`count in == count out`, asserted by the
+        check script), and a composer able to omit or merge a Strand is the
+        grouping-upstream-of-selection defect arriving again, wearing prose;
+      - the two-screen no-LLM clause below is unchanged in scope: it governs
+        **selection**; composition narrates what is already selected and
+        withholds nothing;
+    - **sectioning contract (owner ruling, 2026-07-27, #850 D4):** no direct
+      parent section may hold more than 20% of the member's Strands —
+      subdivide until every direct parent is under the threshold; and **a
+      missing served rendering is an abnormal condition to fix immediately**,
+      rendered as a loud disclosure at the point of substitution, never a
+      tolerated gap;
     - **sectioning is a permutation**: every element of the member appears
       **exactly once**, `count in == count out`, asserted by a check script.
       Completeness is structural, so a wrong grouping is a cosmetic defect and
