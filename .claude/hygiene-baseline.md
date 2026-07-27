@@ -1,7 +1,9 @@
 # Hygiene baseline — /hygiene-sweep
 
-First sweep: 2026-07-27, repo @ 9792819. Consulted:
-`consulted: product-lab@c564689e4762492ddd09178f1b772913bb1746bc topics/knowledge-architecture.md:14,18,31,38,49,97,106,133,164,219-220,225,228,249,304,327,335-336, GLOSSARY.md:85, topics/articles.md:26,83`
+First sweep: 2026-07-27, repo @ 9792819. Consulted the served policy surface;
+the pin and cite set are recorded machine-locally per the publication boundary:
+`owner decision record — 2026-07-27 (hygiene-sweep baseline consult)`
+(resolve with `python3 scripts/provenance-pin.py resolve`).
 
 ## Findings ledger
 
