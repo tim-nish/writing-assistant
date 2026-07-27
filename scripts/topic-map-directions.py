@@ -1069,12 +1069,40 @@ def cmd_view(args):
     return 0
 
 
+def _answer_from_payloads(path, ask_id=None):
+    """Select the recorded answer row from a presented-payloads.jsonl capture
+    (#831): the row `validate-proposal-payload.py --answer` appended, so the
+    skill hands over the capture file itself and nothing is hand-extracted.
+    With --ask-id, the row for that ask; otherwise the latest answer row."""
+    rows = []
+    with open(path, encoding="utf-8") as fh:
+        for line in fh:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                row = json.loads(line)
+            except ValueError:
+                continue
+            if row.get("kind") == "answer" and \
+                    (ask_id is None or str(row.get("ask_id")) == str(ask_id)):
+                rows.append(row)
+    if not rows:
+        which = f"ask {ask_id}" if ask_id is not None else "any ask"
+        raise ValueError(f"no recorded answer row for {which} in {path}")
+    return rows[-1]
+
+
 def cmd_brief(args):
     try:
-        answer = json.load(open(args.answer, encoding="utf-8")) if args.answer != "-" \
-            else json.load(sys.stdin)
+        if getattr(args, "payloads", None):
+            answer = _answer_from_payloads(args.payloads, args.ask_id)
+        else:
+            answer = json.load(open(args.answer, encoding="utf-8")) if args.answer != "-" \
+                else json.load(sys.stdin)
     except (OSError, ValueError) as exc:
-        return _err(f"unreadable answer at {args.answer}: {exc}")
+        src = getattr(args, "payloads", None) or args.answer
+        return _err(f"unreadable answer at {src}: {exc}")
     if answer.get("kind") == "answer":            # a presented-payloads.jsonl row
         answer = answer.get("answer") or {}
     map_data = load_map(args.map) if args.map else None
@@ -1123,8 +1151,15 @@ def main(argv=None):
     v.add_argument("--out", required=True, metavar="PATH",
                    help=f"where to write it (the run workspace's {VIEW_FILENAME})")
     b = sub.add_parser("brief", help="the owner's outcome as the stage-0 brief")
-    b.add_argument("--answer", required=True,
-                   help="the recorded answer JSON, or - for stdin")
+    src = b.add_mutually_exclusive_group(required=True)
+    src.add_argument("--answer",
+                     help="the recorded answer JSON, or - for stdin")
+    src.add_argument("--payloads",
+                     help="the run's presented-payloads.jsonl; the answer row "
+                          "is selected here, never hand-extracted (#831)")
+    b.add_argument("--ask-id",
+                   help="with --payloads: select this ask's answer row "
+                        "(default: the latest answer row)")
     b.add_argument("--map", help="the same map, so an adopted candidate resolves")
     args = p.parse_args(argv)
     return {"candidates": cmd_candidates, "payload": cmd_payload,
