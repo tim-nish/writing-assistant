@@ -363,15 +363,6 @@ def _clip(text, budget=BUDGETS["effect"]):
     return text if len(text) <= budget else text[:budget - 1].rstrip() + "."
 
 
-def _lesson_seed_names(sub):
-    """The lesson seeds under a subtopic, by name. They are what makes a
-    widened corpus legible: 'why this depth?' is answered partly by which hub
-    Lessons sit behind the subtopic."""
-    return sorted({i.get("title") or i.get("slug")
-                   for i in sub.get("items", [])
-                   if i.get("family") == "hub-lessons"} - {None, ""})
-
-
 UNNAMED = "(unnamed)"
 
 # The placeholder states the ASSEMBLER records when nothing named a thing
@@ -486,23 +477,6 @@ def _coverage_direction(sub):
     return f"cover {subject} — {claim}"
 
 
-def _id_order(sub):
-    """Sort key for a stable ID (`T3.2`) by its NUMERIC components (#612).
-
-    Sorting the ID as a string renders T3.1, T3.10, T3.11 … T3.19, T3.2 —
-    which scatters the ranking that assigned the IDs in the first place, so an
-    85-pointer article series lands below nineteen four-pointer short notes.
-    For a file whose whole purpose is owner observation, the ordering IS the
-    signal.
-
-    By construction the numeric order equals the shipped rank order (`_rank`),
-    so this restores "richest terrain first" without re-deriving it. Handles
-    topic numbers past 9 too, which a string sort would break next.
-    """
-    parts = re.findall(r"\d+", str(sub.get("id", "")))
-    return tuple(int(p) for p in parts) or (0,)
-
-
 def _subtopic_name(sub):
     """A heading the owner can steer by (Story 18.70, #616). An empty name
     renders as a dangling dash and names nothing, so fall back to a member's
@@ -546,69 +520,6 @@ def _clip_line(line):
         return line
     indent = line[:len(line) - len(line.lstrip())]
     return indent + _clip(line.strip(), VIEW_LINE_CHARS - len(indent))
-
-
-def _seed_lines(seeds):
-    """Lesson seeds, ONE PER LINE, clipped and capped — the convention
-    `_pointer_lines` already applies to evidence (#615), applied to the field
-    that was still unbounded (#634)."""
-    if not seeds:
-        return ["none"]
-    shown = [_clip(s, VIEW_SEED_CHARS) for s in seeds[:VIEW_SEED_ITEMS]]
-    rest = len(seeds) - len(shown)
-    if rest:
-        shown.append(f"… and {rest} more seed(s)")
-    return shown
-
-
-def _pointer_lines(pointers):
-    """Evidence pointers AGGREGATED PER SOURCE FILE, `path ×N` (#615).
-
-    The View listed every pointer on its own line: one subtopic ran to 121
-    lines, another 85, and runs like `tools/tanuki-ledger:1403` through `:1408`
-    took six lines to say one thing. Over half a 1781-line View was pointer
-    dump. Line-granular pointers are machine provenance; the View's job is to
-    let the owner distinguish 20+ directions and answer "why this depth?" from
-    the counts — and burying that under provenance is the exact failure the
-    size switch exists to fix.
-
-    The total is unchanged and still printed beside this list, so the depth
-    estimate stays explainable from the same numbers it was derived from. Past
-    the cap the remainder is disclosed as `… and N more files`, the same
-    disclosure convention CAP-4 uses for an over-bound enumeration — a silent
-    truncation would read as "that was everything".
-    """
-    if not pointers:
-        return ["none"]
-    counts = {}
-    for p in pointers:
-        path = str(p).split("#")[0].rsplit(":", 1)[0].strip() or str(p)
-        counts[path] = counts.get(path, 0) + 1
-    # Most-cited first, ties broken by path so a run is reproducible.
-    ranked = sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))
-    shown = [f"{path} ×{n}" if n > 1 else path for path, n in ranked[:VIEW_POINTER_FILES]]
-    rest = len(ranked) - len(shown)
-    if rest:
-        shown.append(f"… and {rest} more file(s)")
-    return shown
-
-
-def _member_lines(sub):
-    """The subtopic's members, by name, with status — what an entry carrying
-    only counts never told the owner. Consumed members are MARKED, never
-    hidden: the owner may still pick them."""
-    out = []
-    for item in sub.get("items", []):
-        label = str(item.get("slug") or item.get("title") or "").strip() or UNNAMED
-        facts = [str(f) for f in (item.get("status"), item.get("family")) if f]
-        mark = " — consumed" if item.get("consumed") else ""
-        out.append(label + (f" ({', '.join(facts)})" if facts else "") + mark)
-    return out or ["none"]
-
-
-# How much of a subtopic's glance the at-a-glance summary carries. The full
-# text stays one line further down, in the subtopic's own block.
-VIEW_SUMMARY_GLANCE = 70
 
 
 def _verdict_phrase(cand):
@@ -731,70 +642,19 @@ def _gloss_disclosure_line(map_data):
         return (f"Renderings served: {gloss.get('lesson_renderings', 0)} "
                 f"lesson(s), {gloss.get('journey_renderings', 0)} "
                 f"journey arc(s).")
-    # The reason is a remedy statement (it names configuration), so it lives
-    # in the maintenance section — the reading path states only the fact.
-    return ("The plain-language renderings are not being served, so lesson "
-            "lines carry their names, not their renderings — the reason is "
-            "under maintenance below.")
-
-
-def _summary_lines(subs):
-    """The terrain, one line per subtopic — the at-a-glance map (#632). Index,
-    name, glance, consumed mark: enough to choose from, with the per-subtopic
-    block below carrying the rest.
-
-    The DEPTH WORD is on the line inside the glance, not beside it: `_glance`
-    renders `[bar] <level> - <counts>` (`scripts/topic-map.py:1092`), so
-    printing the level separately rendered "short note · [##..] short note -
-    3 ptr" — the same word twice on a line whose whole job is to be scannable.
-    """
-    out = []
-    for sub in sorted(subs, key=_id_order):
-        mark = " · consumed" if sub.get("consumed") else ""
-        claim = _subtopic_claim(sub)
-        if claim:
-            # SUBSTANCE-LED (Story 18.81, #647): the line IS what the material
-            # says, and the count trails it. `glance` renders `[bar] level -
-            # N ptr, …` — a description of the corpus, which is what this
-            # section stopped carrying: it stays in the block below.
-            n = sub.get("density", {}).get("evidence_pointers", 0)
-            out.append(f"- **{sub['id']}** — {_clip(claim, VIEW_SUMMARY_GLANCE)} "
-                       f"({n} evidence pointer(s)){mark}")
-        else:
-            # Nothing claim-bearing to quote, so the line names the subject and
-            # stops. Never a fabricated claim, and never subject-plus-counts.
-            # The SUBJECT is the coverage description (Story 18.82, #646): a
-            # remediation prompt ("declare `subtopic:` …") is an instruction to
-            # repo upkeep, not something the owner reads a terrain by, so it
-            # lives in the maintenance section instead of on this line.
-            out.append(f"- **{sub['id']}** — {_coverage_subject(sub)}{mark}")
-    return out or ["- none"]
-
-
-def _maintenance_lines(subs, map_data):
-    """What the repo must declare for the map to name things properly — OUT of
-    the reading path (Story 18.82, #646).
-
-    These prompts are real and stay on the surface: an undeclared cluster is a
-    configuration gap only the owner can close. But they are addressed to repo
-    upkeep, not to someone choosing what to write, and inside a terrain line
-    they read as if the map were the thing needing attention.
-    """
-    out = []
-    for sub in sorted(subs, key=_id_order):
-        name = str(_subtopic_name(sub)).strip()
-        if name in PLACEHOLDER_PROSE:
-            out.append(f"- **{sub['id']}** — {PLACEHOLDER_PROSE[name]}")
-    for topic in sorted({str(s.get("topic") or "").strip() for s in subs}):
-        if topic in PLACEHOLDER_PROSE:
-            out.append(f"- topic — {PLACEHOLDER_PROSE[topic]}")
-    for defect in map_data.get("subtopic_defects") or []:
-        out.append(f"- declaration defect — {defect}")
-    gloss = map_data.get("gloss", {}) or {}
-    if not gloss.get("served"):
-        out.append(f"- gloss surface — not served: "
-                   f"{gloss.get('reason') or 'not enumerated'}")
-    return out or ["- none: every cluster and track is declared"]
+    # The reason used to be deferred to the maintenance section; Story 20.5
+    # (#802) deleted that section, so the pointer would dangle. The fact and
+    # its reason now travel together on the one line — which is what CAP-4's
+    # disclosure-is-a-LINE rule asks for anyway: name the denominator, do not
+    # expand it into a section.
+    #
+    # The boilerplate is kept SHORT on purpose: the reason is the actionable
+    # half, and `_clip_line` bounds the whole line at VIEW_LINE_CHARS — so
+    # verbose framing here is paid for by truncating the remedy mid-word. The
+    # check asserts the composed line fits without clipping.
+    reason = gloss.get("reason") or "not enumerated"
+    return (f"Renderings not served — lesson lines carry names, not "
+            f"renderings: {reason}")
 
 
 # The estimator's promotion rule, appended to the depth explanation by
@@ -926,58 +786,24 @@ def compose_view(map_data, cands):
     # the disclosure guards against, so it moves here rather than lapsing.
     lines += ["", _element_coverage_line(map_data)]
     lines += ["", _gloss_disclosure_line(map_data)]
-    # DEMOTED (the stance-3 pivot, #799): the subtopic clusters are a derived,
-    # secondary grouping — they follow the elements and never gate selection.
-    lines += ["", "## Subtopic clusters — a derived, secondary grouping", "",
-              "Clusters group the same material another way. They never gate",
-              "what is selectable: every element above is individually",
-              "selectable on its own.", ""]
-    lines += _summary_lines(subs)
-    lines.append("")
-    # END OF THE READING PATH (Story 18.82, #646). Everything below is upkeep
-    # and machine detail, labeled as such: the owner chooses from what is
-    # above, and the counters that used to sit inside those lines are two
-    # headings down where they read as data rather than as the terrain.
-    reading_path = list(lines)
-    lines += ["## Maintenance — repo upkeep, not part of choosing", ""]
-    lines += _maintenance_lines(subs, map_data)
-    lines += ["", "## Diagnostics — how the map measured this terrain", ""]
-    by_topic = {}
-    for sub in subs:
-        by_topic.setdefault(sub["topic"], []).append(sub)
-    for topic in sorted(by_topic):
-        lines += [f"### {_topic_heading(topic)}", ""]
-        for sub in sorted(by_topic[topic], key=_id_order):
-            d = sub.get("density", {})
-            lines.append(f"#### {sub['id']} — {_coverage_subject(sub)}")
-            lines.append("")
-            lines.append(f"- glance: {sub.get('glance', '')}")
-            lines.append(f"- depth: {_depth_line(sub)}")
-            lines.append(f"- consumed: {'yes' if sub.get('consumed') else 'no'}"
-                         f" ({sub.get('consumed_items', 0)} of "
-                         f"{d.get('items', 0)} item(s))")
-            seeds = _lesson_seed_names(sub)
-            lines.append(f"- lesson seeds ({len(seeds)}):")
-            for line in _seed_lines(seeds):
-                lines.append(f"    - {line}")
-            pointers = d.get("pointers") or []
-            lines.append(f"- evidence pointers ({len(pointers)}):")
-            for line in _pointer_lines(pointers):
-                lines.append(f"    - {line}")
-            # An entry with no pointers has shown the owner counts and nothing
-            # else — and the unclustered bucket is exactly the material nothing
-            # else surfaces, so it always names its members (Story 18.70,
-            # #616). The data is already on the record; this is a rendering.
-            if not pointers or sub.get("clustered_by") == "unclustered":
-                lines.append(f"- items ({d.get('items', 0)}):")
-                for member in _member_lines(sub):
-                    lines.append(f"    - {member}")
-            lines.append("")
-    # The render-boundary check (Story 18.82, #646): an internal term reaching
-    # the reading path is REPORTED, never laundered. Rewriting the line here
-    # would hide the derivation defect that produced it, and the surface would
-    # go on looking clean while the adopted brief still carried the term.
-    for line, term in lint_owner_lines(reading_path):
+    # THE VIEW ENDS HERE (Story 20.5, #802). What used to follow — "Subtopic
+    # clusters", "Maintenance", "Diagnostics" — was ~2,300 of a 2,511-line
+    # view serving no function the owner could identify, so the sections AND
+    # their emitters are gone: a section deleted at render time is still paid
+    # for at assembly time, which was the whole cost.
+    #
+    # `reading_path` is COLLAPSED DELIBERATELY, not dropped. It existed to
+    # mark where the owner-facing surface stopped and upkeep began; with
+    # nothing below the boundary, every line is the reading path, so the lint
+    # below runs over `lines` itself. Reintroducing a non-owner-facing tail
+    # would mean reintroducing the distinction, not just the section.
+    #
+    # The render-boundary check (Story 18.82, #646) is unchanged in kind: an
+    # internal term reaching the owner surface is REPORTED, never laundered.
+    # Rewriting the line here would hide the derivation defect that produced
+    # it, and the surface would go on looking clean while the adopted brief
+    # still carried the term.
+    for line, term in lint_owner_lines(lines):
         sys.stderr.write(f"warning: internal vocabulary on the owner surface: "
                          f"{term!r} in {line!r}\n")
     # The budget applies to the composed surface, not to each call site: a
@@ -986,16 +812,6 @@ def compose_view(map_data, cands):
     # and its remainder disclosed — this bounds a single long VALUE, it never
     # silently drops an item.
     return "\n".join(_clip_line(x) for x in lines).rstrip() + "\n"
-
-
-def _topic_heading(topic):
-    """A topic as a heading the owner can read. The placeholder track states
-    say what the bucket CONTAINS; the declaration that would name it is a
-    maintenance instruction and lives in that section (Story 18.82, #646)."""
-    name = str(topic).strip()
-    if name == "(untracked)" or name in PLACEHOLDER_PROSE:
-        return "items not yet mapped to a topic"
-    return name
 
 
 def write_view(path, text):
