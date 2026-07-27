@@ -58,11 +58,29 @@ else
 fi
 
 # 3. Clean config + framework -> one JSON with config_ok, run_state, and a workspace.
+# Fresh state home: since #830 every successful stage0 leaves a resumable
+# checkpoint, so case 2b's runs would otherwise be resumed here — this case
+# asserts the no-prior-run mint path and needs a genuinely empty slate.
+export XDG_STATE_HOME="$work/state-fold"
 out=$(python3 "$DP" stage0 F2 specs/ --root "$host")
 echo "$out" | jget 'd["config_ok"]' | grep -q True && ok "stage0 reports config_ok on a clean config" || err "config_ok missing/false"
 echo "$out" | jget 'd["run_state"]["framework"]' | grep -q F2 && ok "stage0 carries the run_state (framework F2)" || err "run_state missing"
 echo "$out" | jget 'd["resumed"]' | grep -q False && ok "stage0 mints a fresh run when none is in progress" || err "stage0 false-resumed"
 ws=$(echo "$out" | jget 'd["ws"]'); [ -d "$ws" ] && ok "stage0 returns a real workspace dir" || err "stage0 workspace missing"
+
+# 3b. Durability by construction (#830): the fresh mint persists the state it
+#     just composed — a checkpoint-less run dir is invisible to the resume scan,
+#     which is how a terrain-adopted brief evaporated at the designed pause.
+[ -f "$ws/checkpoint.json" ] \
+  && ok "a freshly minted stage0 run has its checkpoint in the same invocation (#830)" \
+  || err "stage0 minted a workspace with no checkpoint.json — the run is unresumable (#830)"
+python3 -c "
+import json,sys
+s=json.load(open('$ws/checkpoint.json'))
+assert s.get('next_stage')=='harvest', s
+assert s.get('framework')=='F2', s
+" && ok "the persisted checkpoint carries stage0's own run_state (next_stage=harvest)" \
+  || err "stage0's checkpoint does not match its run_state"
 
 # 4. Fold is real: on a second invocation with an in-progress checkpoint, stage0
 #    resumes it rather than minting a new run.

@@ -119,6 +119,14 @@ VIEW_FILENAME = "topic-map-view.md"
 # composer stays inside them rather than discovering them at presentation time.
 BUDGETS = {"where": 240, "why": 200, "effect": 140}
 
+# The screen's shared `why` line — ONE authored copy for both branches, written
+# to fit BUDGETS["why"] by construction and measured by
+# `check-topic-map-screen.sh` (#832): static template text is never clipped,
+# because there is nothing to clip — it is authored inside its budget.
+WHY_TEXT = ("Every element is its own selectable idea. Verdicts and depth are "
+            "a signal for your judgment, never a gate: gaps are disclosed and "
+            "drafted anyway. Your choice becomes the brief, in your words.")
+
 
 def _err(msg):
     sys.stderr.write(f"error: {msg}\n")
@@ -178,7 +186,7 @@ def _element_direction(el):
     carries no internal marker (#637's rule, unchanged for the new kind). The
     summary is carried in FULL: clipping is a render-only concern (#651), so
     the string the brief is composed from ends where the source did, never
-    mid-word — the View bounds the displayed line itself (`_clip_line`)."""
+    mid-word — the View bounds the displayed line itself (`_clip_line`, visible elision)."""
     kind = el.get("kind")
     if kind in ("lesson", "journey"):
         # The slot QUOTES the served `gloss:` / `journey_gloss:` rendering —
@@ -274,9 +282,30 @@ def candidates(map_data):
     return out
 
 
-def _clip(text, budget=BUDGETS["effect"]):
+def _fit(text, budget=BUDGETS["effect"]):
+    """A payload field is AUTHORED within its budget, never truncated (#832;
+    SPEC-writing-assistant owner-facing proposal contract, clause (e)). This
+    collapses whitespace only: an over-budget value flows to
+    `validate-proposal-payload.py`, which blocks presentation naming the field
+    — the sanctioned failure — instead of a mid-word slice wearing a period
+    ("Too many to f.") reaching the owner as if it were a sentence. `budget`
+    is kept in the signature as the author-time declaration of which budget
+    the text was written against."""
+    del budget  # authorship contract, not a truncation input
+    return " ".join(str(text).split())
+
+
+def _elide(text, room):
+    """Bound a VIEW line's value — a rendered file line, not a payload field.
+    The cut is visible ('…') and lands on a word boundary, never a fake
+    sentence end (#832)."""
     text = " ".join(str(text).split())
-    return text if len(text) <= budget else text[:budget - 1].rstrip() + "."
+    if len(text) <= room:
+        return text
+    cut = text[:max(0, room - 1)]
+    if " " in cut:
+        cut = cut[:cut.rfind(" ")]
+    return cut.rstrip() + "…"
 
 
 
@@ -291,12 +320,12 @@ VIEW_LINE_CHARS = 200
 
 def _clip_line(line):
     """Bound one View line, preserving its indentation and leaving blank lines
-    blank. `_clip` collapses whitespace, which would flatten the list indents
+    blank. `_elide` collapses whitespace, which would flatten the list indents
     the View's structure is made of, so it is applied to the value only."""
     if len(line) <= VIEW_LINE_CHARS:
         return line
     indent = line[:len(line) - len(line.lstrip())]
-    return indent + _clip(line.strip(), VIEW_LINE_CHARS - len(indent))
+    return indent + _elide(line.strip(), VIEW_LINE_CHARS - len(indent))
 
 
 def _verdict_phrase(cand):
@@ -374,7 +403,7 @@ def _direction_lines(cands):
         room = VIEW_LINE_CHARS - len(head) - len(trailer)
         direction = c["direction"]
         if len(direction) > room > 0:
-            direction = _clip(direction, room)
+            direction = _elide(direction, room)
         out.append(f"{head}{direction}{trailer}")
     return out or ["- none: this map proposes no directions"]
 
@@ -610,16 +639,23 @@ def write_view(path, text):
         fh.write(text)
 
 
-def _fit_with_path(prefix, path, budget):
-    """`prefix` then `path`, inside `budget` — shortening the PREFIX, never the
+def _fit_with_path(prefixes, path, budget):
+    """Prefix then `path`, inside `budget` — shortening the PREFIX, never the
     path. A clipped path is an unopenable View, which would make the whole
-    >budget branch useless; the summary around it is the part that can give."""
+    >budget branch useless. The prefix gives by AUTHORSHIP (#832): `prefixes`
+    is a longest-first list of authored wordings and the first that fits is
+    used — never a mid-word slice wearing a period. If even the tersest form
+    cannot fit beside the path, the full form is returned over budget and the
+    validator blocks presentation naming the field (clause (e)) — a named
+    failure, not garbled boilerplate on the owner's screen."""
     tail = f" Open the View: {path}"
     room = budget - len(tail)
-    prefix = " ".join(str(prefix).split())
-    if len(prefix) > room:
-        prefix = prefix[:max(0, room - 1)].rstrip() + "."
-    return prefix + tail
+    cands = [prefixes] if isinstance(prefixes, str) else list(prefixes)
+    cands = [" ".join(str(p).split()) for p in cands]
+    for p in cands:
+        if len(p) <= room:
+            return p + tail
+    return cands[0] + tail
 
 
 def axis_members(map_data):
@@ -670,18 +706,18 @@ def compose_axis_payload(map_data):
         plural = "s" if n != 1 else ""
         choices.append({
             "label": f"{m['member']} ({n} Strand{plural})",
-            "effect": _clip(f"shows all {n} of this tag's Strands, whole — "
+            "effect": _fit(f"shows all {n} of this tag's Strands, whole — "
                             f"nothing capped, nothing ranked; you pick the "
                             f"material there"),
         })
     choices.append({
         "label": "name your own direction or combination axis",
-        "effect": _clip("skips the listing and starts the run with your "
+        "effect": _fit("skips the listing and starts the run with your "
                         "wording as the brief"),
     })
     choices.append({
         "label": "stop here",
-        "effect": _clip("nothing is drafted and no brief is recorded; the "
+        "effect": _fit("nothing is drafted and no brief is recorded; the "
                         "axis is recomputed fresh next time"),
     })
     where = (f"Terrain at {pin}: {len(axis['members'])} tag(s) from the "
@@ -696,8 +732,8 @@ def compose_axis_payload(map_data):
                   f"tag and sit outside this axis — name one at free-form "
                   f"to reach it.")
     return {"items": [{
-        "where": _clip(where, BUDGETS["where"]),
-        "why": _clip("Pick where to look first. The count is a signal for "
+        "where": _fit(where, BUDGETS["where"]),
+        "why": _fit("Pick where to look first. The count is a signal for "
                      "your judgment, never a gate: every tag is offered "
                      "whatever its size, and its material is shown whole.",
                      BUDGETS["why"]),
@@ -833,31 +869,27 @@ def compose_payload(map_data, cands, view_path=None):
                   f"starts a normal drafting run with this as your coverage "
                   f"brief; {c['evidence_pointers']} evidence pointer(s) "
                   f"behind it")
-        choices.append({"label": c["direction"], "effect": _clip(effect)})
+        choices.append({"label": c["direction"], "effect": _fit(effect)})
     # Free-form is offered EVERY time, not only on rejection.
     choices.append({
         "label": "name your own direction or combination axis",
-        "effect": _clip("starts the same run with your wording as the brief; "
+        "effect": _fit("starts the same run with your wording as the brief; "
                         "nothing above is adopted unless you say so"),
     })
     choices.append({
         "label": "stop here",
-        "effect": _clip("nothing is drafted and no brief is recorded; the map is "
+        "effect": _fit("nothing is drafted and no brief is recorded; the map is "
                         "recomputed fresh next time"),
     })
 
     els = map_data.get("elements", [])
     item = {
-        "where": _clip(
+        "where": _fit(
             f"Terrain at {map_data.get('coverage', {}).get('pin')}: "
             f"{len(els)} element(s) — each its own Strand — and "
             f"{len(topics)} topic(s), {terrain}; "
             f"{consumed} already consumed and still selectable.", BUDGETS["where"]),
-        "why": _clip(
-            "Every element is its own selectable idea. Verdicts and depth "
-            "are a signal for your judgment, never a gate: a gap is "
-            "disclosed, recorded, and drafted anyway. Your choice becomes "
-            "the brief, in your words.", BUDGETS["why"]),
+        "why": _fit(WHY_TEXT, BUDGETS["why"]),
         "choices": choices,
     }
     return {"items": [item]}
@@ -874,30 +906,31 @@ def _compose_summary_payload(map_data, view_path):
 
     choices = [
         {"label": "choose a direction by its index from the View",
-         "effect": _clip("answer with the index (for example L3 or T1.2) and "
+         "effect": _fit("answer with the index (for example L3 or T1.2) and "
                          "a short note about the angle you want; your note is "
                          "carried into the brief word for word")},
         # Free-form is offered EVERY time, not only on rejection.
         {"label": "name your own direction or combination axis",
-         "effect": _clip("starts the same run with your wording as the brief; "
+         "effect": _fit("starts the same run with your wording as the brief; "
                          "nothing in the View is adopted unless you say so")},
         {"label": "stop here",
-         "effect": _clip("nothing is drafted and no brief is recorded; the map "
+         "effect": _fit("nothing is drafted and no brief is recorded; the map "
                          "and the View are regenerated fresh next time")},
     ]
     els = map_data.get("elements", [])
+    pin = map_data.get("coverage", {}).get("pin")
     item = {
-        "where": _fit_with_path(
-            f"Terrain at {map_data.get('coverage', {}).get('pin')}: "
-            f"{len(els)} element(s) — each its own Strand — and "
-            f"{len(topics)} topic(s), {terrain}; "
-            f"{consumed} already consumed and still selectable. Too many to "
-            f"fit on one screen.", view_path, BUDGETS["where"]),
-        "why": _clip(
-            "Every element is its own selectable idea. Verdicts and depth "
-            "are a signal for your judgment, never a gate: a gap is "
-            "disclosed, recorded, and drafted anyway. Your choice becomes "
-            "the brief, in your words.", BUDGETS["why"]),
+        "where": _fit_with_path([
+            # Longest-first authored variants (#832); the View path already
+            # says the screen overflowed, so no "too many to fit" sentence.
+            f"Terrain at {pin}: {len(els)} element(s) — each its own Strand "
+            f"— and {len(topics)} topic(s), {terrain}; "
+            f"{consumed} already consumed and still selectable.",
+            f"Terrain at {pin}: {len(els)} Strands, {len(topics)} topic(s); "
+            f"{consumed} consumed, still selectable.",
+            f"Terrain: {len(els)} Strands.",
+        ], view_path, BUDGETS["where"]),
+        "why": _fit(WHY_TEXT, BUDGETS["why"]),
         "choices": choices,
     }
     return {"items": [item]}
@@ -1069,12 +1102,40 @@ def cmd_view(args):
     return 0
 
 
+def _answer_from_payloads(path, ask_id=None):
+    """Select the recorded answer row from a presented-payloads.jsonl capture
+    (#831): the row `validate-proposal-payload.py --answer` appended, so the
+    skill hands over the capture file itself and nothing is hand-extracted.
+    With --ask-id, the row for that ask; otherwise the latest answer row."""
+    rows = []
+    with open(path, encoding="utf-8") as fh:
+        for line in fh:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                row = json.loads(line)
+            except ValueError:
+                continue
+            if row.get("kind") == "answer" and \
+                    (ask_id is None or str(row.get("ask_id")) == str(ask_id)):
+                rows.append(row)
+    if not rows:
+        which = f"ask {ask_id}" if ask_id is not None else "any ask"
+        raise ValueError(f"no recorded answer row for {which} in {path}")
+    return rows[-1]
+
+
 def cmd_brief(args):
     try:
-        answer = json.load(open(args.answer, encoding="utf-8")) if args.answer != "-" \
-            else json.load(sys.stdin)
+        if getattr(args, "payloads", None):
+            answer = _answer_from_payloads(args.payloads, args.ask_id)
+        else:
+            answer = json.load(open(args.answer, encoding="utf-8")) if args.answer != "-" \
+                else json.load(sys.stdin)
     except (OSError, ValueError) as exc:
-        return _err(f"unreadable answer at {args.answer}: {exc}")
+        src = getattr(args, "payloads", None) or args.answer
+        return _err(f"unreadable answer at {src}: {exc}")
     if answer.get("kind") == "answer":            # a presented-payloads.jsonl row
         answer = answer.get("answer") or {}
     map_data = load_map(args.map) if args.map else None
@@ -1123,8 +1184,15 @@ def main(argv=None):
     v.add_argument("--out", required=True, metavar="PATH",
                    help=f"where to write it (the run workspace's {VIEW_FILENAME})")
     b = sub.add_parser("brief", help="the owner's outcome as the stage-0 brief")
-    b.add_argument("--answer", required=True,
-                   help="the recorded answer JSON, or - for stdin")
+    src = b.add_mutually_exclusive_group(required=True)
+    src.add_argument("--answer",
+                     help="the recorded answer JSON, or - for stdin")
+    src.add_argument("--payloads",
+                     help="the run's presented-payloads.jsonl; the answer row "
+                          "is selected here, never hand-extracted (#831)")
+    b.add_argument("--ask-id",
+                   help="with --payloads: select this ask's answer row "
+                        "(default: the latest answer row)")
     b.add_argument("--map", help="the same map, so an adopted candidate resolves")
     args = p.parse_args(argv)
     return {"candidates": cmd_candidates, "payload": cmd_payload,

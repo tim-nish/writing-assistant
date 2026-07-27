@@ -63,20 +63,26 @@ sout=$(python3 "$DP" start F9 README.md 2>/dev/null); src=$?
 set -e
 [ "$rc" -ne 0 ] && ok "invalid framework exits non-zero" || err "invalid framework exited 0"
 printf '%s' "$out" | grep -q '"introduce the project" (F1)' && printf '%s' "$out" | grep -q '(F4)' \
-  && ok "rejection reports the valid intent labels (with F1-F4 aliases)" || err "valid set not reported"
+  && printf '%s' "$out" | grep -q '(F5)' \
+  && ok "rejection reports the valid intent labels (with F1-F5 aliases)" || err "valid set not reported"
 [ -z "$sout" ] && ok "invalid framework emits NO run state (no partial run)" || err "run state leaked on invalid framework"
 
-# 5. Framework allowlist is closed + case-insensitive.
+# 5. Framework allowlist is closed + case-insensitive. F5 (working-note,
+# story 13.89) is a member of the ratified set, not an invalid name (#835).
 python3 "$DP" start f3 >/dev/null 2>&1 && ok "framework name is case-insensitive (f3)" || err "case-insensitive check failed"
-for bad in F0 F5 project-introduction ''; do
+python3 "$DP" start F5 >/dev/null 2>&1 && ok "F5 (working-note) is in the valid set" || err "F5 rejected"
+for bad in F0 F6 project-introduction ''; do
   set +e; python3 "$DP" start "$bad" >/dev/null 2>&1; rc=$?; set -e
   [ "$rc" -ne 0 ] || { err "accepted invalid framework: '$bad'"; }
 done
-ok "allowlist rejects F0/F5/slug/empty"
+ok "allowlist rejects F0/F6/slug/empty"
 
-# 6. Scope reconciliation is documented (selection intersects declared scope; no widening).
-grep -q 'intersect' "$SKILL" && ok "documents that sources intersect declared scope (no widening)" || err "scope-intersection not documented"
-grep -q 'resolve-writing-sources.py files' "$SKILL" && ok "defers read scope to the declared files boundary" || err "does not defer to files boundary"
+# 6. Scope reconciliation is documented (selection intersects declared scope; no
+# widening). The text moved from the dispatcher SKILL.md to the stage-1
+# companion in the dispatcher split; the check follows the text (#835).
+STAGE1="skills/draft-article/stages/stage1.md"
+grep -q 'intersect' "$STAGE1" && ok "documents that sources intersect declared scope (no widening)" || err "scope-intersection not documented"
+grep -q 'resolve-writing-sources.py files' "$STAGE1" && ok "defers read scope to the declared files boundary" || err "does not defer to files boundary"
 
 if [ "$fail" -eq 0 ]; then
   printf '\nAll draft-scaffold checks passed.\n'; exit 0

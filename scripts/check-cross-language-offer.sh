@@ -247,8 +247,14 @@ assert 'stop here' in labels, labels
   || err "the composed screen still offers a direct cross-language projection"
 
 # --- CAP-1 stays true: emission never invokes adaptation ---------------------
+# Matching is invocation-shaped (#834, same class as #827): naming the route in
+# a comment, help string, or skill prose is sanctioned — the #745 adoption step
+# is *pointed to* from the emission path — while importing, executing, or
+# spelling a runnable adapt-canonical command inside it crosses the boundary.
 if grep -rn "adapt-canonical\|adapt_canonical" scripts/draft-pipeline.py \
-     skills/draft-article/ skills/emit-variants/ >/dev/null 2>&1; then
+     skills/draft-article/ skills/emit-variants/ 2>/dev/null \
+   | grep -E "subprocess|Popen|os\.system|check_(call|output)|spawn|import |python3? [^ ]*adapt-canonical" \
+   >/dev/null; then
   err "the emission path invokes adaptation (CAP-1 forbids it)"
 else
   ok "the emission path names the route but never invokes adaptation"
