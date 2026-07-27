@@ -605,6 +605,124 @@ def gloss_surfaces(root):
             for rel, parsed in by_file], None
 
 
+# A topic decision line's trailing provenance pointer and a decisions-shard
+# entry heading carry the same key: `q_a/<batch> D<n>` (Story 20.22, #851;
+# shard shape read from the served surface, not inferred). Rally suffixes and
+# the heading's `· <date>` tail are outside the captured key on both sides.
+DECISION_POINTER = re.compile(r"\(q_a/([^\s)]+)\s+D(\d+)[^)]*\)\s*$")
+DECISION_SHARD_HEAD = re.compile(r"^##\s*\(q_a/([^\s)]+)\s+D(\d+)[^)]*\)\s*$")
+
+
+def parse_decision_shard(stdout_text):
+    """Entries of one served `decisions/<topic>` shard, keyed by provenance
+    pointer (`q_a/<batch> D<n>`).
+
+    The shard is the reader's `gloss --tag decisions/<topic>` output: `=== path
+    @ sha` then `N: text` lines, entry headings `## (q_a/<batch> D<n> ·
+    <date>)`, entry bodies the ratified plain-register rendering, whole. The
+    rendering is quoted verbatim downstream — a consumer never re-expresses it.
+    Measured at the pin this join was built against: shard entries carry NO
+    per-entry tags, so `tags` is empty until the hub serves them — which is
+    why a joined decision Strand still lands in the untagged-disclosure line
+    rather than under an axis member.
+    """
+    entries, key, headline_no, body = {}, None, None, []
+    path = sha = None
+
+    def flush():
+        if key and body:
+            entries[key] = {
+                "gloss": " ".join(" ".join(body).split()),
+                "cite": f"{path}:{headline_no}@{sha}",
+                "tags": [],
+            }
+
+    for line in stdout_text.splitlines():
+        if line.startswith("miss: "):
+            return {}
+        if line.startswith("=== "):
+            head = line[4:]
+            p, _sep, c = head.rpartition(" @ ")
+            path, sha = p.strip(), c.strip()
+            continue
+        number, _sep, text = line.partition(": ")
+        if not number.strip().isdigit():
+            continue
+        t = text.strip()
+        m = DECISION_SHARD_HEAD.match(t)
+        if m:
+            flush()
+            key = f"q_a/{m.group(1)} D{m.group(2)}"
+            headline_no, body = number.strip(), []
+            continue
+        if key and t and not t.startswith("#") and t != "---":
+            body.append(t)
+    flush()
+    return entries
+
+
+def decision_gloss_read(root, topics):
+    """The served decision-line renderings: one tier-2 `decisions/<topic>`
+    shard per topic in the ALREADY-BOUNDED element-topic set — the run never
+    widens its own scope to reach more (CAP-4's rule, applied to the shard
+    reads the same way `read_topic_elements` applies it to the topic reads).
+
+    Returns `(by_topic, misses)`. A miss names its reason per topic; it is
+    NEVER folded into an empty dict, because downstream the absence must be
+    disclosed as the abnormal condition it is (owner ruling, #850 D4)."""
+    out, misses = {}, {}
+    for topic in topics:
+        cmd = [sys.executable, POLICY_READER]
+        if root:
+            cmd += ["--root", root]
+        cmd += ["gloss", "--tag", f"decisions/{topic}"]
+        r = subprocess.run(cmd, capture_output=True, text=True)
+        if r.returncode != 0:
+            misses[topic] = (r.stderr.strip().split("\n")[-1] if r.stderr.strip()
+                             else f"the policy reader exited {r.returncode}")
+            continue
+        entries = parse_decision_shard(r.stdout)
+        if entries:
+            out[topic] = entries
+        else:
+            misses[topic] = ("the served surface lists no decision renderings "
+                             "for this record")
+    return out, misses
+
+
+def join_decision_gloss(elements, shards, misses):
+    """Attach each decision/reversal Strand's served rendering (Story 20.22,
+    #851 — the join #850 D1 found missing).
+
+    A joined Strand carries `gloss`/`gloss_cite`/`tags` exactly as
+    lesson/journey Strands do, so the renderer's served branch fires with no
+    renderer change. A Strand whose rendering is absent carries the
+    ABNORMAL-CONDITION disclosure (owner ruling, #850 D4): a fault to fix now,
+    stated at the point of substitution — never a tolerated gap, and never the
+    raw topic line dressed as a rendering."""
+    for el in elements:
+        if el.get("kind") not in ("decision", "reversal"):
+            continue
+        key = el.get("decision_pointer")
+        entry = (shards.get(el.get("topic") or "") or {}).get(key) if key else None
+        if entry:
+            el["gloss"] = entry["gloss"]
+            el["gloss_cite"] = entry["cite"]
+            el["tags"] = list(entry["tags"])
+            el["gloss_unavailable"] = None
+            continue
+        el["gloss"] = None
+        el["gloss_cite"] = None
+        el.setdefault("tags", [])
+        reason = misses.get(el.get("topic") or "")
+        el["gloss_unavailable"] = (
+            (f"the decision renderings for this record are not being served "
+             f"({reason}) — an abnormal condition to fix now, not a gap to "
+             f"tolerate") if reason else
+            ("no rendering is served for this decision line — an abnormal "
+             "condition to fix now, not a gap to tolerate"))
+
+
 def _element_summary(text):
     """One line of a topic decision, as a person reads it.
 
@@ -652,8 +770,16 @@ def parse_topic_elements(topic, served, commit):
         declined = heading.startswith(DECLINED_HEADING)
         kind = "reversal" if (declined or STRUCK in body) else "decision"
         cite = f"topics/{topic}.md:{number}@{commit}"
+        # The line's trailing provenance pointer, captured BEFORE the summary
+        # strips it (Story 20.22, #851): it is the JOIN KEY into the served
+        # `decisions/<topic>` shard, whose entries are headed by the same
+        # `(q_a/<batch> D<n> · <date>)` pointer. A line with no D-numbered
+        # pointer has no served rendering to join and stays pointerless.
+        pm = DECISION_POINTER.search(body)
+        pointer = f"q_a/{pm.group(1)} D{pm.group(2)}" if pm else None
         elements.append({
             "kind": kind,
+            "decision_pointer": pointer,
             "summary": _element_summary(body),
             "topic": topic,
             # The situation it was recorded in: when, and exactly where.
@@ -1261,6 +1387,16 @@ def build_map(args):
     # Lesson and every served Journey rendering is its own element beside the
     # decision/reversal projection. Built before the join so every element
     # carries its usability verdict.
+    # The decisions-shard join (Story 20.22, #851 — the join #850 D1 found
+    # missing): fetch the served renderings for exactly the topics that
+    # produced decision/reversal Strands, then attach them. A missing
+    # rendering is disclosed as the abnormal condition it is, in the join.
+    decision_topics = sorted({e.get("topic") or "" for e in elements
+                              if e.get("kind") in ("decision", "reversal")})
+    decision_topics = [t for t in decision_topics if t]
+    decision_gloss, decision_gloss_misses = decision_gloss_read(
+        root, decision_topics)
+    join_decision_gloss(elements, decision_gloss, decision_gloss_misses)
     elements = (elements
                 + lesson_elements(topics, gloss_info, consumption)
                 + journey_elements(gloss_info, consumption))
@@ -1307,7 +1443,14 @@ def build_map(args):
         "gloss": {"served": gloss_info["served"],
                   "reason": gloss_info["reason"],
                   "lesson_renderings": len(gloss_info["lessons"]),
-                  "journey_renderings": len(gloss_info["journeys"])},
+                  "journey_renderings": len(gloss_info["journeys"]),
+                  # The decisions-shard join's own disclosure (Story 20.22,
+                  # #851): how many renderings joined, and per-topic misses
+                  # with their reasons — an absence is named, never folded
+                  # into a zero.
+                  "decision_renderings": sum(
+                      len(v) for v in decision_gloss.values()),
+                  "decision_misses": decision_gloss_misses},
         "coverage": coverage,
         "consumption": consumption,
         # The PRIMARY selection units (stance-3 pivot, 2026-07-27, #799):
