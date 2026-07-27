@@ -426,9 +426,12 @@ assert 'lint-ancestry' in checks, o
 assert 'verify-provenance' not in checks, o
 " && ok "#704: the ancestry RESOLUTION check is reported in the worklist, not run" \
   || err "#704: the worklist does not carry lint-ancestry for a derived draft"
-# And the pipeline never names the adaptation module — CAP-1's boundary, which
-# is why the resolution check is reported rather than executed here.
-[ "$(grep -c 'adapt-canonical' "$DP" || true)" -eq 0 ] \
+# And the pipeline never INVOKES the adaptation module — CAP-1's boundary,
+# which is why the resolution check is reported rather than executed here.
+# Matching is invocation-shaped (#827): naming the sanctioned adoption step in
+# a comment or an owner-facing diagnostic is mandated by the #745 adoption-act
+# amendment and does not cross the boundary; importing or executing it does.
+[ "$(grep -E 'adapt[-_]canonical' "$DP" | grep -cE 'subprocess|Popen|os\.system|check_(call|output)|spawn|import' || true)" -eq 0 ] \
   && ok "#704: the pipeline still never references the adaptation invocation" \
   || err "#704: the pipeline now references adaptation — CAP-1's boundary broken"
 
