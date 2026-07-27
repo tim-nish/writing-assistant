@@ -17,7 +17,12 @@ root=$(git rev-parse --show-toplevel 2>/dev/null) || {
 cd "$root"
 
 DP="$root/scripts/draft-pipeline.py"
-SKILL="skills/review-article/SKILL.md"
+SKILL=$(mktemp)
+cat skills/review-article/SKILL.md skills/review-article/phases/entry.md \
+    skills/review-article/phases/passes.md skills/review-article/phases/arbitration.md \
+    skills/review-article/phases/reentry.md > "$SKILL"
+# ^ story 20.13 (#818): the skill is now a dispatcher + phase companions; checks
+#   assert over the concatenation, whose order matches the pre-split file.
 fail=0
 err() { printf 'FAIL: %s\n' "$1" >&2; fail=1; }
 ok()  { printf 'ok:   %s\n' "$1"; }

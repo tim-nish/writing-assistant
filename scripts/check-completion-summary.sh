@@ -16,7 +16,12 @@ cd "$root"
 CONV="skills/completion-summary.md"
 RT="scripts/reading-time.py"
 DRAFT="skills/draft-article/stages/complete.md"
-REVIEW="skills/review-article/SKILL.md"
+REVIEW=$(mktemp)
+cat skills/review-article/SKILL.md skills/review-article/phases/entry.md \
+    skills/review-article/phases/passes.md skills/review-article/phases/arbitration.md \
+    skills/review-article/phases/reentry.md > "$REVIEW"
+# ^ story 20.13 (#818): the skill is now a dispatcher + phase companions; checks
+#   assert over the concatenation, whose order matches the pre-split file.
 HARVEST="skills/harvest/SKILL.md"
 fail=0
 err() { printf 'FAIL: %s\n' "$1" >&2; fail=1; }

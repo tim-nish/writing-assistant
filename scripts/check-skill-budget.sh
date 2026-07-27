@@ -18,11 +18,11 @@ HARD_LINES=600   # over this: FAIL — split per the packaging invariant
 
 # Grandfathered debt — DECLARED, dated, and shrinking, never silent: files
 # over the hard ceiling at the moment the wall was built, whose split is the
-# recorded follow-up (story 19.3's story-question: harvest/review-article
-# follow after the ceiling lands). A grandfathered file WARNS instead of
-# failing; remove its entry when its split lands. New skills never enter
-# this list — the wall binds everything born after it.
-GRANDFATHERED="skills/review-article/SKILL.md"   # 904 lines at adoption, 2026-07-26
+# recorded follow-up. A grandfathered file WARNS instead of failing; remove
+# its entry when its split lands. New skills never enter this list — the wall
+# binds everything born after it. Empty since 2026-07-27: review-article's
+# split landed (story 20.13, #818), the last entry retired with it.
+GRANDFATHERED=""
 
 # --- Script-surface family (Story 20.1, #759) --------------------------------
 # Same cost-typed class, second family: scripts/*.py. Thresholds sized from
