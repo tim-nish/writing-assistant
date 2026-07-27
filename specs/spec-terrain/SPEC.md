@@ -267,6 +267,60 @@ sources:
 > tokens on every invocation until then and die under every candidate outcome
 > of that session.
 
+> **Amended 2026-07-27 (spec sitting, #803) — clustering is removed; Terrain
+> navigates in two screens over the SERVED GLOSS TAG.** The second dogfood run
+> spent its whole budget to produce one usable line while the host-sources
+> family emitted ~190 junk directions, so the subtopic cluster is **abandoned,
+> not tuned**. The replacement navigates and never filters: **Screen 1** is a
+> deterministic listing of the axis members with an element count each;
+> **Screen 2** is ALL of the selected member's Lessons and Journeys arranged
+> into presentation-only sections. Two mechanically checkable invariants
+> replace the tuning: **sectioning is a permutation** (every element appears
+> exactly once; count in == count out asserted by a check script, so
+> information loss is structurally impossible and the worst case is a badly
+> grouped but complete list), and **sections are presentation-only** (a title
+> and nothing else — they gate nothing, so a wrong grouping costs zero).
+>
+> **The axis is the served gloss tag, NOT the hub Topic — the proposal's
+> premise was disproved at this sitting.** #803 asserted that "Topics are the
+> pre-existing, human-maintained structure with deterministic membership; the
+> served gloss index is already per-tag, so this screen is a cheap
+> deterministic listing." Consulting the surface refutes it: the hub carries
+> **9 topic files** and **14 gloss shard tags**, and **only 3 names occur in
+> both**; 6 of the 9 topics have no lessons gloss shard at all, and the
+> decisions shards cover 2 of 9. **No served surface maps a Lesson to a
+> Topic.** Deterministic membership therefore holds for the *tag* and not for
+> the *Topic*, and the two are different views of the corpus rather than one
+> renamed. Recorded so the premise is not reconstructed:
+> `owner decision record — 2026-07-27 (terrain axis, sections, depth)`.
+>
+> **Topic-as-axis stays open, and is an UPSTREAM ask.** A consumer-side
+> tag→Topic mapping is **not** the fallback: consumer-side re-expression of
+> ratified hub lines is Declined upstream, and CAP-4 already states that
+> widening the served scope "is a hub-side ratification, never a map-side
+> workaround". So Topic navigation waits on a served Lesson→Topic membership
+> surface; see OQ8.
+>
+> **Depth demotes to a count (Fork B).** The depth estimate and the
+> evidence-density signal were derived *per subtopic*, and the subtopic unit is
+> gone — so they retire with it, along with their thresholds. What survives is
+> a bare **element count per axis member on Screen 1**, a screen-1 affordance
+> for choosing where to look, never a direction line and never a gate.
+>
+> **The View survives, re-based (Fork C).** CAP-3's size switch is retained but
+> its budget is measured **per axis member** rather than over the whole
+> terrain: two-screen navigation shrinks the overload condition without
+> removing it, since one tag can still hold many elements. The #802 amendment
+> above therefore stands and its story remains in scope.
+>
+> **Host sources leave the candidate set entirely** — article material is
+> Lessons and Journeys. **Journeys degrade with a named disclosure** until the
+> hub's Journey-addressability issue lands (upstream, open at this sitting):
+> journey shard tags are shadowed by same-named lesson shards, so a run that
+> cannot address them says so on the screen rather than silently omitting them.
+> Free-form answer, element-level selection, and the hand-off to the existing
+> stage-0 `--brief` path are all unchanged — there is still no second proposer.
+
 # Terrain
 
 ## Why
@@ -303,7 +357,13 @@ flows into the existing brief/structures path unchanged.**
       per-Lesson files are out of scope here — see OQ3.*
     - **host-sources** — the host repo's **declared writing sources**, from the
       single enumerator (`resolve-writing-sources.py files`), read at
-      frontmatter/heading level only.
+      frontmatter/heading level only. **Removed from the candidate set
+      2026-07-27 (#803):** article material is Lessons and Journeys, and this
+      family emitted ~190 junk directions in the second dogfood ("cover
+      check-topic-map" — repo check scripts are evidence, not article
+      material). The family is no longer enumerated for candidate derivation;
+      dropping it is the removal of the *emitting* path, not a filter over its
+      output.
 
     Plus the track↔topic mapping in per-repo config (articles repo owns track
     names, hub owns topic names, mapping is consumer config under declared
@@ -317,8 +377,27 @@ flows into the existing brief/structures path unchanged.**
     the repo changed; deleting the run workspace loses nothing; no new stored
     index exists anywhere.
 
-- **CAP-2 (map content — depth signals, not just names)**
-  - **intent:** Per topic, the map shows: its subtopic clusters (grouped from
+- **CAP-2 (map content — two screens over the served gloss tag)**
+  - **superseded in its unit and its depth signal (2026-07-27, #803).** The
+    subtopic cluster below is **removed**, and with it the evidence-density
+    signal, the depth estimate and their thresholds — all three were derived
+    per subtopic and have no carrier once the unit is gone. Read the clause
+    that follows as the historical design; the binding content is:
+    - **the axis is the served gloss tag** (Screen 1), listed
+      deterministically with **an element count per member** — the only
+      surviving depth affordance, a cue for choosing where to look, never a
+      direction line and never a gate;
+    - **Screen 2 is that member's complete material** — all its Lessons and
+      Journeys, arranged into **presentation-only sections** whose first line
+      is a derived group title;
+    - **sectioning is a permutation**: every element of the member appears
+      **exactly once**, `count in == count out`, asserted by a check script.
+      Completeness is structural, so a wrong grouping is a cosmetic defect and
+      never information loss;
+    - **elements remain the selectable unit** (`E<tag>.<n>` in the tag's
+      namespace), and selection still composes an ordinary brief.
+  - **intent (historical — subtopic clustering, removed 2026-07-27):** Per
+    topic, the map shows: its subtopic clusters (grouped from
     backlog items, unconsumed Lessons, and evidence pointers sharing a
     subject — under OQ1's declared precedence as closed 2026-07-23: a
     declared `subtopic:` key in the articles repo names the cluster, and a
@@ -352,9 +431,17 @@ flows into the existing brief/structures path unchanged.**
       ordinary brief out.
     - Elements are **derived per invocation and stored nowhere**, exactly as
       CAP-1 requires of everything else on this map.
-  - **success:** For any subtopic shown, the owner can ask "why this depth?"
-    and the map answers with its pointer counts; a subtopic with rich material
-    and one with a lone seed are visibly different at a glance.
+  - **success (rewritten 2026-07-27, #803 — the depth question is retired, not
+    re-pointed):** Screen 1 lists every served gloss tag with its element
+    count, so a rich member and a thin one are visibly different at a glance.
+    For any member selected, Screen 2 shows **all** of its elements: the
+    permutation check passes (`count in == count out`), every element appears
+    exactly once, and grepping the section machinery finds no gate — sections
+    carry a title and nothing else. *(The former success clause promised the
+    owner could ask "why this depth?" and be answered from pointer counts. The
+    #802 amendment re-pointed that answer at the header's size line; this
+    amendment retires the question itself, because the estimator that raised
+    it is gone.)*
 
 - **CAP-3 (presentation and the combination move)**
   - **intent:** The map is presented **in-conversation** under the owner-facing
@@ -367,9 +454,21 @@ flows into the existing brief/structures path unchanged.**
     stage-0 `--brief` path. **No second proposer:** the map never composes
     narrative structures — structure candidates remain the shipped proposer's
     job downstream.
-  - **size switch (amended 2026-07-23).** One screen does not scale: past a
-    **screen budget** (~7 candidates) a large terrain collapses into a handful
-    of options and the map stops showing what it exists to show.
+  - **presentation is two screens (amended 2026-07-27, #803).** The map is
+    presented as **Screen 1** (the deterministic axis listing — served gloss
+    tags with element counts) and **Screen 2** (the selected member's complete,
+    sectioned material). Free-form is offered on both, and the outcome is the
+    same brief handed to the same stage-0 `--brief` path. Navigation replaces
+    filtering: no LLM decides what appears on Screen 1, and nothing is withheld
+    on Screen 2.
+  - **size switch (amended 2026-07-23; re-based per axis member 2026-07-27,
+    #803).** One screen does not scale: past a **screen budget** (~7
+    candidates) a large terrain collapses into a handful of options and the map
+    stops showing what it exists to show. **The budget is now measured over one
+    axis member's Screen 2, not over the whole terrain** — two-screen
+    navigation shrinks the overload condition without removing it, because a
+    single tag can still hold many elements. The branches below are otherwise
+    unchanged, and the #802 scoping of what the View contains stands.
     - **At or under the budget:** the flow above, unchanged. This branch is
       the shipped behaviour and must not regress.
     - **Above the budget:** the screen becomes a short **summary** plus the
@@ -495,12 +594,14 @@ flows into the existing brief/structures path unchanged.**
     - **Counts demote.** Evidence-pointer counts, unconsumed/live tallies and
       depth arithmetic are map *metadata*: they may appear as a trailing
       annotation at most, and never as the content of a direction or terrain
-      line. CAP-2's "why this depth?" is still answerable — **from the
-      header's terrain-size line** (amended 2026-07-27, #802; previously "from
-      the per-subtopic detail", which no longer exists on the view). The
-      counts that answer it are the topic/subtopic/element totals the size
-      line already carries; depth answerability is therefore a **property of
-      the header**, not a reason to retain a section.
+      line. CAP-2's "why this depth?" was re-pointed at **the header's
+      terrain-size line** (amended 2026-07-27, #802; previously "from the
+      per-subtopic detail", which no longer exists on the view) and is
+      **retired outright** by the later #803 amendment the same day, which
+      removes the estimator that raised the question. The one count that
+      survives is the **per-member element count on Screen 1** — an affordance
+      for choosing where to look, which this clause's ban on count-only lines
+      does not reach, because it is not a direction.
     - **Elements are directions.** The element projection (CAP-2, Story 18.80)
       reaches the **same** candidate list the subtopics do and is presented
       **inside** the candidate directions, not in a section of its own. Two
@@ -572,6 +673,18 @@ flows into the existing brief/structures path unchanged.**
     family. Widening that scope is a **hub-side ratification**, never a
     map-side workaround; a run may not issue extra reads to synthesize whole
     coverage, and no element is invented for a topic that was not read.
+  - **the axis is served whole, and Journeys degrade loudly (amended
+    2026-07-27, #803).** Under the gloss-tag axis, Screen 1's denominator is
+    **the served shard-tag listing itself**, which the seam returns in one
+    bounded enumeration — so the axis listing is complete by construction and
+    the `≤2 topics/*.md per read` bound above stops being load-bearing for it
+    (it still binds the `decision`/`reversal` element projection, unchanged).
+    **Journeys are the disclosed gap:** journey shard tags are shadowed by
+    same-named lesson shards upstream, so until the hub's addressability issue
+    lands a run **names the shortfall on the screen** — which journeys it could
+    not address, as a line, per the disclosure-is-a-line rule above — and never
+    omits them silently. An undisclosed omission here is the exact defect
+    CAP-4's named-denominator rule exists to prevent.
   - **success:** Map assembly cost scales with index size, not corpus body
     size; an over-bound invocation's output names what it skipped; the closed
     accounting (`read + skipped == matched`) holds **per family**; a reader of
@@ -718,3 +831,26 @@ flows into the existing brief/structures path unchanged.**
   *(Method note: the false claim survived a whole sitting because the spec
   lane grounded in the consumer's code and not in the served surface. Grounding
   a claim about an upstream surface means consulting that surface.)*
+
+- **OQ8 — can the hub Topic ever be the navigation axis?** *(Raised 2026-07-27
+  by the #803 sitting, which disproved the premise that it already could be.)*
+  Screen 1 navigates by **served gloss tag** because that is the axis whose
+  membership the seam actually serves. The hub Topic is the structure the owner
+  actually maintains by hand, and it remains the more meaningful axis — but
+  there is **no served Lesson→Topic membership**, the two vocabularies overlap
+  in only 3 names, and 6 of 9 topics carry no lessons shard at all. Two
+  non-answers, both already ruled out rather than merely unattractive:
+  - a **consumer-side tag→Topic mapping** is Declined upstream as
+    consumer-side re-expression of ratified lines — N consumers would make N
+    unratified restatements of the hub's own structure;
+  - a **map-side workaround** issuing extra reads to synthesize membership is
+    forbidden by CAP-4's own clause ("a hub-side ratification, never a map-side
+    workaround").
+  So this closes only if the hub ratifies a served membership surface. **The
+  ask belongs upstream and is not this repo's to make** — until then the axis
+  is the tag, the spec says so plainly, and no code approximates the mapping.
+  *(Method note: the same one as OQ4 above, one sitting later — the premise
+  that the gloss index was per-Topic was written from consumer-side reasoning
+  and survived into an accepted issue body. One `surface_names` call refuted
+  it. Grounding a claim about an upstream surface means consulting that
+  surface.)*
