@@ -134,29 +134,6 @@ def load_map(path):
     return data
 
 
-def _subtopics(map_data):
-    """Every subtopic in the map, each carrying its topic and its STABLE ID —
-    flat, in a deterministic order, with nothing filtered out. Consumed
-    subtopics are included: they are MARKED, never hidden, and the owner may
-    still pick one.
-
-    The ID is `T<topic>.<subtopic>`, both 1-based, from a deterministic
-    ordering: topics in the map's own sorted order, subtopics by the shipped
-    `_rank`. The same repo state at the same pin therefore yields the same IDs,
-    which is what lets a large View be answered by index. It is computed here
-    per invocation and stored nowhere — a recorded index vocabulary is exactly
-    the stored state CAP-1 exists to prevent.
-    """
-    rows = []
-    for t_i, topic in enumerate(map_data.get("topics", []), start=1):
-        ranked = sorted(topic.get("subtopics", []), key=_rank)
-        order = {s["subtopic"]: i for i, s in enumerate(ranked, start=1)}
-        for sub in topic.get("subtopics", []):
-            rows.append(dict(sub, topic=topic["topic"],
-                             id=f"T{t_i}.{order[sub['subtopic']]}"))
-    return rows
-
-
 def _elements(map_data):
     """Every element in the map, each carrying its STABLE ID (Story 18.80,
     #641).
@@ -224,98 +201,55 @@ def _element_direction(el):
     return f"cover the {kind} — {summary}"
 
 
-def _rank(sub):
-    """Richest first, ties broken by name so a run is reproducible."""
-    d = sub.get("density", {})
-    return (-d.get("evidence_pointers", 0), -d.get("unconsumed_lessons", 0),
-            -d.get("live_items", 0), sub["subtopic"])
+def _pointer_stems(unit):
+    """The source files a unit's evidence names, as bare stems.
+
+    One extractor for both carriers, because the pairing rule is the same and
+    only the field moved (Story 20.7, #809): a SUBTOPIC carried its pointers
+    under `density.pointers`; a STRAND carries its own `evidence` cite list
+    (`topics/x.md:3@sha`). Reading both keeps the rule identical across the
+    unit change instead of forking it.
+    """
+    out = set()
+    pointers = list(unit.get("evidence") or [])
+    pointers += list((unit.get("density") or {}).get("pointers") or [])
+    for p in pointers:
+        head = str(p).split("#")[0].split(":")[0].strip()
+        stem = head.rsplit("/", 1)[-1]
+        if stem:
+            out.add(stem)
+    return out
 
 
 def _shared_pointer_subjects(a, b):
-    """What two subtopics visibly have in common: evidence pointers naming the
-    same source. This is the only evidence a combination is ever proposed on —
-    a combination with nothing shared is a hunch, and a hunch is the owner's to
-    voice at the free-form entry, not the machine's to propose."""
-    def subjects(sub):
-        out = set()
-        for p in sub.get("density", {}).get("pointers", []):
-            head = str(p).split("#")[0].split(":")[0].strip()
-            stem = head.rsplit("/", 1)[-1]
-            if stem:
-                out.add(stem)
-        return out
-    return sorted(subjects(a) & subjects(b))
+    """What two units visibly have in common: evidence naming the same source.
+    This is the only evidence a combination is ever proposed on — a combination
+    with nothing shared is a hunch, and a hunch is the owner's to voice at the
+    free-form entry, not the machine's to propose."""
+    return sorted(_pointer_stems(a) & _pointer_stems(b))
 
 
 def is_large(map_data):
     """Does this map exceed the screen budget? The ONE predicate the size
     switch turns on (CAP-3 as amended 2026-07-23). Since the pivot (#799) the
-    elements are the primary units, so they count toward the budget too — a
-    100-lesson terrain with two subtopics is a large terrain."""
-    return (len(_subtopics(map_data))
-            + len(map_data.get("elements", []))) > SCREEN_BUDGET
+    Strands are the only units since the cluster removal (Story 20.7, #809),
+    so the budget counts them alone."""
+    return len(map_data.get("elements", [])) > SCREEN_BUDGET
 
 
 def candidates(map_data):
-    """Machine-proposed candidate DIRECTIONS, derived from the map's own depth
-    signals. Never a narrative shape — what to cover, not how to tell it.
+    """Machine-proposed candidate DIRECTIONS. Never a narrative shape — what to
+    cover, not how to tell it.
 
-    At or under the screen budget the fixed caps apply, unchanged. ABOVE it the
-    caps stop being fixed constants: the terrain goes to a View file, so every
-    subtopic is a candidate and combinations are bounded by the terrain itself
-    (one per distinct axis) rather than by a number chosen for a screen.
+    Since the cluster removal (Story 20.7, #809) the STRAND — one Lesson or
+    Journey — is the only unit. Subtopic clusters, their ranking and their
+    depth estimate are gone; what survives is the strand list plus the
+    CROSS-TOPIC COMBINATION move, re-based onto strands rather than deleted
+    with the clusters it happened to be built from (re-triage of #809).
     """
-    subs = sorted(_subtopics(map_data), key=_rank)
-    large = len(subs) > SCREEN_BUDGET
     out = []
-    for sub in (subs if large else subs[:MAX_SINGLE]):
-        d = sub.get("density", {})
-        depth = sub.get("depth", {})
-        claim = _subtopic_claim(sub)
-        out.append({
-            "kind": "single",
-            "id": sub["id"],
-            "direction": _coverage_direction(sub),
-            "claim": claim,
-            "topics": [sub["topic"]],
-            "subtopics": [sub["subtopic"]],
-            "depth": depth.get("level"),
-            "why": depth.get("why"),
-            "consumed": sub.get("consumed", False),
-            "evidence_pointers": d.get("evidence_pointers", 0),
-        })
-
-    # Cross-topic combinations: the move the map exists for. Only pairs from
-    # DIFFERENT topics that share evidence qualify, so the axis is named from
-    # something real rather than asserted.
-    combos = []
-    for i, a in enumerate(subs):
-        for b in subs[i + 1:]:
-            if a["topic"] == b["topic"]:
-                continue
-            shared = _shared_pointer_subjects(a, b)
-            if not shared:
-                continue
-            combos.append({
-                "kind": "combination",
-                "id": f"{a['id']}+{b['id']}",
-                "direction": (f"connect {_coverage_subject(a)} and "
-                              f"{_coverage_subject(b)} along {shared[0]}"),
-                "topics": sorted({a["topic"], b["topic"]}),
-                "subtopics": [a["subtopic"], b["subtopic"]],
-                "axis": shared[0],
-                "shared_evidence": shared,
-                "why": (f"{a['subtopic']} ({a['topic']}) and {b['subtopic']} "
-                        f"({b['topic']}) both cite {', '.join(shared)}"),
-                "evidence_pointers": (a.get("density", {}).get("evidence_pointers", 0)
-                                      + b.get("density", {}).get("evidence_pointers", 0)),
-            })
-    # Elements (Story 18.80): the second projection reaches the SAME candidate
-    # list, so index selection, the screen and the View all resolve against one
-    # derivation. Unbounded like the singles above — the terrain bounds them,
-    # not a screen constant, and the seam already bounded which topics they
-    # came from.
-    for el in _elements(map_data):
+    strands = _elements(map_data)
+    for el in strands:
         out.append({
             "kind": "element",
             "element_kind": el.get("kind"),
@@ -328,20 +262,63 @@ def candidates(map_data):
             "situation": el.get("situation"),
             "depth": None,
             # The claim the slot leads with: the served rendering for a
-            # lesson/journey element, the topic-line summary otherwise.
+            # lesson/journey strand, the topic-line summary otherwise.
             "why": el.get("gloss") or el.get("summary"),
             "gloss": el.get("gloss"),
             "gloss_unavailable": el.get("gloss_unavailable"),
-            # The three-valued writability verdict, VISIBLE on every element
+            # The three-valued writability verdict, VISIBLE on every strand
             # (#799): it surfaces at selection and never filters what appears.
             "usability": el.get("usability"),
             "consumed": bool(el.get("consumed")),
             "evidence_pointers": len(el.get("evidence") or []),
         })
 
+    # CROSS-TOPIC COMBINATIONS — "the move that is the reason the map exists"
+    # (CAP-3). Re-based onto strands: only pairs from DIFFERENT topics that
+    # share an evidence source qualify, so the axis is named from something
+    # real rather than asserted. The rule is byte-identical to the pre-removal
+    # one; only the unit it reads changed.
+    #
+    # A strand with NO topic is excluded rather than paired. Journey strands
+    # carry `topic: ""` today (`scripts/topic-map.py`, journey projection), so
+    # "different topics" cannot be established for them — and a pair whose
+    # provenance cannot be distinguished is not demonstrably cross-topic. This
+    # is a DISCLOSED gap, not a silent one: it closes when journeys become
+    # addressable (story 20.10), and until then no combination is invented on
+    # an empty topic.
+    #
+    # NOT AN AXIS. This reads each strand's own pre-existing `topic`
+    # attribute, which the assembler already records; it does not decide what
+    # Screen 1 navigates by. That question is suspended under OQ8 and is
+    # deliberately untouched here.
+    combos = []
+    for i, a in enumerate(strands):
+        for b in strands[i + 1:]:
+            ta, tb = (a.get("topic") or "").strip(), (b.get("topic") or "").strip()
+            if not ta or not tb or ta == tb:
+                continue
+            shared = _shared_pointer_subjects(a, b)
+            if not shared:
+                continue
+            name_a = a.get("title") or a.get("slug") or a["id"]
+            name_b = b.get("title") or b.get("slug") or b["id"]
+            combos.append({
+                "kind": "combination",
+                "id": f"{a['id']}+{b['id']}",
+                "direction": (f"connect {name_a} and {name_b} along {shared[0]}"),
+                "topics": sorted({ta, tb}),
+                "subtopics": [],
+                "axis": shared[0],
+                "shared_evidence": shared,
+                "why": (f"{name_a} ({ta}) and {name_b} ({tb}) "
+                        f"both cite {', '.join(shared)}"),
+                "evidence_pointers": (len(a.get("evidence") or [])
+                                      + len(b.get("evidence") or [])),
+            })
+
     combos.sort(key=lambda c: (-len(c["shared_evidence"]), -c["evidence_pointers"],
                                c["direction"]))
-    if large:
+    if is_large(map_data):
         # Bounded by the terrain, not by a screen constant: the strongest
         # combination per distinct axis. Every axis the evidence supports is
         # offered exactly once, so the View lists connections without listing
@@ -385,131 +362,6 @@ PLACEHOLDER_PROSE = {
 def as_prose(name):
     """A placeholder state, rendered for a person. Any other name is its own."""
     return PLACEHOLDER_PROSE.get(str(name).strip(), name)
-
-
-def _coverage_subject(sub):
-    """What a direction says it covers — OWNER-READABLE BY CONSTRUCTION (#637).
-
-    A candidate's wording becomes the owner's brief the moment they adopt it
-    (`_brief_from_index`), so an internal placeholder must never reach it: a
-    brief reading `cover (unclustered)` hands the tool's own enum back to the
-    owner as their words. Fixing that only where the View prints would leave
-    the adopted brief carrying the enum — so the constraint lives here, in the
-    derivation both branches share.
-
-    A declared or successfully derived name is returned untouched: the articles
-    repo owns subject NAMES (OQ1), and this only governs the wording composed
-    when the repo named nothing. In that case the subject DESCRIBES the
-    cluster's contents rather than inventing a name for it.
-    """
-    name = _subtopic_name(sub)
-    if str(name).strip() not in PLACEHOLDER_PROSE:
-        return name
-    count = sub.get("density", {}).get("items") or len(sub.get("items", []))
-    topic = str(sub.get("topic") or "").strip()
-    where = f" under {topic}" if topic and topic not in PLACEHOLDER_PROSE else ""
-    return f"the not-yet-clustered items{where} ({count} item(s))"
-
-
-# A claim is a sentence a source actually made. A path family's items carry
-# their own filename as a title (`docs/stories`, `!/usr/bin/env python3`),
-# which names a subject but claims nothing — so a title only qualifies when it
-# differs from its slug AND reads as a sentence. Set deliberately conservative:
-# the cost of rejecting a real claim is a coverage-worded line, while the cost
-# of accepting a filename is a line that pretends a source said something.
-CLAIM_MIN_WORDS = 5
-
-# The one family whose lines are claims by construction: a hub Lesson IS a
-# sentence the owner already committed to. CAP-3's clause names exactly this
-# source — "an element's own summary or why, and for a subtopic a claim drawn
-# from its strongest element or Lesson line".
-CLAIM_FAMILY = "hub-lessons"
-
-
-def _subtopic_claim(sub):
-    """The claim a subtopic's own material makes, or None (Story 18.81, #647).
-
-    CAP-3's substance-led clause: a ranked slot is filled by the material's own
-    words. This QUOTES the strongest claim-bearing member — never composes one
-    about it — so a subtopic with nothing claim-bearing returns None and its
-    caller falls back to coverage wording explicitly. The tool never invents a
-    claim a source did not make.
-
-    Strongest = unconsumed before consumed (unconsumed material is what an
-    article would be written from), hub Lessons before other families (a Lesson
-    line IS a claim by construction), then assembler order, which is
-    deterministic within a pin.
-    """
-    def rank(pair):
-        i, item = pair
-        return (bool(item.get("consumed")), i)
-
-    for _, item in sorted(enumerate(sub.get("items", [])), key=rank):
-        # Only a Lesson line qualifies. A declared-source or backlog title
-        # NAMES its subject ("Spec: /tanuki-loop — …"); quoting it beside a
-        # subtopic would read as if that one member characterised the whole
-        # cluster, which is a claim the map would be making, not the material.
-        if item.get("family") != CLAIM_FAMILY:
-            continue
-        title = str(item.get("title") or "").strip()
-        slug = str(item.get("slug") or "").strip()
-        if title and title != slug and len(title.split()) >= CLAIM_MIN_WORDS:
-            return title
-    return None
-
-
-def _coverage_direction(sub):
-    """A subtopic's direction — SUBSTANCE-LED where the material allows it.
-
-    `cover <subject> — <claim>`: still a coverage statement naming what to
-    cover, never a thesis or an article shape (the no-second-proposer boundary,
-    `specs/spec-terrain/SPEC.md:125`). The claim lives in the DERIVATION, not
-    in the rendering, because this wording becomes the owner's brief the moment
-    they adopt it — the same reason #637's placeholder rule lives here. It is
-    carried in FULL for the same reason: a length clip is a render-only concern
-    (#651), so the brief ends at a boundary the source wrote, never mid-word;
-    the View bounds the displayed line itself (`_clip_line`).
-    """
-    subject = _coverage_subject(sub)
-    claim = _subtopic_claim(sub)
-    if not claim:
-        return f"cover {subject}"
-    return f"cover {subject} — {claim}"
-
-
-def _subtopic_name(sub):
-    """A heading the owner can steer by (Story 18.70, #616). An empty name
-    renders as a dangling dash and names nothing, so fall back to a member's
-    slug and then to an explicit placeholder — never to blank."""
-    name = str(sub.get("subtopic") or "").strip()
-    if name:
-        return name
-    for item in sub.get("items", []):
-        alt = str(item.get("slug") or item.get("title") or "").strip()
-        if alt:
-            return alt
-    return UNNAMED
-
-
-# How many source files one subtopic lists before the rest are disclosed as a
-# count. Declared here alone: it is an estimate of a readable block, not a
-# measurement. The remainder is always DISCLOSED, never silently truncated.
-VIEW_POINTER_FILES = 12
-
-# The same convention, for lesson seeds (#634). One subtopic rendered 65
-# complete lesson texts joined onto ONE physical line — ~10,000 characters —
-# while every other subtopic showed `lesson seeds: none`, so the single
-# subtopic where seeds existed was the one where they could not be read. A seed
-# is a NAME here; its full text is reachable through the evidence pointers.
-VIEW_SEED_ITEMS = 8
-VIEW_SEED_CHARS = 110
-
-# No View line is longer than this. The View is a human surface, so its lines
-# are budgeted the way the screen payload's fields already are — a list renders
-# one item per line, clipped, capped, with the remainder disclosed. Asserted in
-# `scripts/check-topic-map-screen.sh`, so the 818-line regression cannot recur
-# unnoticed.
-VIEW_LINE_CHARS = 200
 
 
 def _clip_line(line):
@@ -606,7 +458,7 @@ def _is_substance_led(cand):
     """Does this candidate's wording carry the material's own claim?
 
     True for an element (its summary IS the claim) and for a subtopic whose
-    material yielded one; False where `_subtopic_claim` found nothing and the
+    material yielded one; False where no claim was found and the
     wording fell back to coverage. Combinations name an axis derived from
     shared evidence and are ordered first regardless, so they never reach here.
     """
@@ -657,58 +509,6 @@ def _gloss_disclosure_line(map_data):
             f"renderings: {reason}")
 
 
-# The estimator's promotion rule, appended to the depth explanation by
-# `scripts/topic-map.py:1045` as "; the next level needs evidence_pointers
-# 24 < 25". It answers "what would the NEXT level require?" — the estimator's
-# question, not the question of an owner choosing what to write.
-DEPTH_PREDICATE_MARKER = "; the next level needs "
-
-
-def _depth_line(sub):
-    """The depth estimate as the View shows it (#633): the level plus the
-    counts it was derived from, without the promotion arithmetic.
-
-    The counts STAY — CAP-2's success clause promises the owner can ask "why
-    this depth?" and be answered from them (`specs/spec-terrain/SPEC.md`).
-    Only the unmet predicate leaves, and only from the RENDERING: `depth.why`
-    in `map.json` is untouched, which is where `check-topic-map-depth.sh`
-    asserts the predicate is named. Trimming in `estimate_depth` would break
-    that; trimming here cannot.
-
-    A `why` carrying no predicate — notably the "no depth-threshold declaration
-    is readable" DISCLOSURE (`scripts/topic-map.py:1027`) — passes through
-    unchanged. A trim must never swallow a disclosure.
-    """
-    why = str(sub.get("depth", {}).get("why", ""))
-    return why.split(DEPTH_PREDICATE_MARKER)[0].rstrip()
-
-
-# The map's OWN internal lexicon, enumerated (Story 18.82, #646). CAP-3's
-# owner-readable clause is only lintable because this list is finite: cluster
-# and track states, the depth ladder's enum keys, the density counter names,
-# and the source-family ids. Every one of them is a legitimate value in
-# `map.json` — the defect is presenting it on the surface the owner reads.
-#
-# A term added to the assembler and not registered here would silently stop
-# being gated, which is why `check-topic-map-screen.sh` derives the depth keys
-# and family names from the map itself and fails on a term this list misses.
-INTERNAL_VOCAB = (
-    "(unclustered)", "(untracked)", "(unnamed)",
-    "seed-only", "short-note", "full-article", "article-series",
-    "hub-lessons", "host-sources", "articles-items",
-    "unclustered", "subtopic:", "cluster:", "frontmatter",
-    " ptr,", " ptr)", "unconsumed", "live item", "density",
-    # Retired vocabulary is NOT banned here — see check-retired-vocabulary.sh.
-    # This lint runs over composed lines that QUOTE THE MATERIAL'S OWN WORDS
-    # (CAP-3 substance-led rendering), so it cannot tell the tool's vocabulary
-    # from the owner's content on the same line. Banning a common word here
-    # fires on content: "seed" flagged a fixture subtopic named "seed-heavy".
-    # The retired-vocabulary rule belongs at the layer where the TOOL's words
-    # are written, which is the source text.
-)
-
-
-
 def lint_owner_lines(lines):
     """Internal vocabulary found on the owner's reading path — the render-time
     check CAP-3's owner-readable clause implies (Story 18.82, #646).
@@ -728,24 +528,25 @@ def lint_owner_lines(lines):
     return found
 
 
-def _terrain_size_line(topics, subs, elements=0):
+def _terrain_size_line(topics, strands):
     """How big this terrain is, in one unambiguous line (#645).
 
-    `Subtopics: 25 across 4 topic(s)` reads as a FRACTION — "four topics out of
-    twenty-five" — to anyone who does not already know that topics contain
-    subtopics. It was the first line of the artifact, so the map failed the
-    owner-readable bar before the owner reached anything selectable.
+    `Subtopics: 25 across 4 topic(s)` read as a FRACTION — "four topics out of
+    twenty-five" — to anyone who did not already know that topics contained
+    subtopics, and it was the first line of the artifact, so the map failed the
+    owner-readable bar before the owner reached anything selectable. Leading
+    with the containing unit fixed that.
 
-    Leading with topics puts the containing unit first, which is the order the
-    relationship actually runs in, and `containing` names the relationship
-    instead of leaving `across` to imply it.
+    Subtopics are gone (Story 20.7, #809), so the line now carries the two
+    counts that remain: strands, and the topics they came from. The count is a
+    screen affordance for choosing where to look — never a gate, and never the
+    content of a direction line (CAP-3 counts-demote).
     """
     def plural(n, word):
         return f"{n} {word}" if n == 1 else f"{n} {word}s"
 
-    return (f"{plural(elements, 'element')} — each its own Strand — "
-            f"and {plural(topics, 'topic')} containing "
-            f"{plural(subs, 'subtopic')}")
+    return (f"{plural(strands, 'Strand')} — each individually selectable — "
+            f"from {plural(topics, 'topic')}")
 
 
 def compose_view(map_data, cands):
@@ -764,7 +565,6 @@ def compose_view(map_data, cands):
     regenerated every invocation and NEVER read back by any code path. Deleting
     it loses nothing — the map is recomputed, and this is recomposed from it.
     """
-    subs = _subtopics(map_data)
     pin = map_data.get("coverage", {}).get("pin")
     lines = [
         "# Terrain",
@@ -773,7 +573,7 @@ def compose_view(map_data, cands):
         "     code path; deleting this file loses nothing. Do not edit or commit. -->",
         "",
         f"Pin: {pin}",
-        _terrain_size_line(len(map_data.get("topics", [])), len(subs),
+        _terrain_size_line(len(map_data.get("topics", [])),
                            len(map_data.get("elements", []))),
         "",
         "Answer with an element's index (for example L3) or a subtopic's",
@@ -859,13 +659,13 @@ def compose_payload(map_data, cands, view_path=None):
     if view_path and is_large(map_data):
         return _compose_summary_payload(map_data, view_path)
     topics = map_data.get("topics", [])
-    subs = _subtopics(map_data)
-    by_depth = {}
-    for sub in subs:
-        by_depth.setdefault(sub.get("depth", {}).get("level") or "no estimate", 0)
-        by_depth[sub.get("depth", {}).get("level") or "no estimate"] += 1
-    terrain = ", ".join(f"{n} {level}" for level, n in sorted(by_depth.items()))
-    consumed = sum(1 for s in subs if s.get("consumed"))
+    # The terrain line was a histogram of depth ESTIMATES per subtopic. Both
+    # are gone (Story 20.7, #809), so it states what the terrain now holds:
+    # how many strands, and how many are already written from. A count is a
+    # screen affordance for choosing where to look, never a gate.
+    strands = map_data.get("elements", []) or []
+    terrain = f"{len(strands)} strand(s)"
+    consumed = sum(1 for e in strands if e.get("consumed"))
 
     choices = []
     for c in cands:
@@ -893,7 +693,7 @@ def compose_payload(map_data, cands, view_path=None):
         "where": _clip(
             f"Terrain at {map_data.get('coverage', {}).get('pin')}: "
             f"{len(els)} element(s) — each its own Strand — and "
-            f"{len(topics)} topic(s), {len(subs)} subtopic(s) ({terrain}); "
+            f"{len(topics)} topic(s), {terrain}; "
             f"{consumed} already consumed and still selectable.", BUDGETS["where"]),
         "why": _clip(
             "Every element is its own selectable idea. Verdicts and depth "
@@ -910,13 +710,9 @@ def _compose_summary_payload(map_data, view_path):
     free-form every time, still `stop here` last — the size switch changes what
     the screen SHOWS, never the shape of the contract it is presented under."""
     topics = map_data.get("topics", [])
-    subs = _subtopics(map_data)
-    by_depth = {}
-    for sub in subs:
-        level = sub.get("depth", {}).get("level") or "no estimate"
-        by_depth[level] = by_depth.get(level, 0) + 1
-    terrain = ", ".join(f"{n} {level}" for level, n in sorted(by_depth.items()))
-    consumed = sum(1 for s in subs if s.get("consumed"))
+    strands = map_data.get("elements", []) or []
+    terrain = f"{len(strands)} strand(s)"
+    consumed = sum(1 for e in strands if e.get("consumed"))
 
     choices = [
         {"label": "choose a direction by its index from the View",
@@ -936,7 +732,7 @@ def _compose_summary_payload(map_data, view_path):
         "where": _fit_with_path(
             f"Terrain at {map_data.get('coverage', {}).get('pin')}: "
             f"{len(els)} element(s) — each its own Strand — and "
-            f"{len(topics)} topic(s), {len(subs)} subtopic(s) ({terrain}); "
+            f"{len(topics)} topic(s), {terrain}; "
             f"{consumed} already consumed and still selectable. Too many to "
             f"fit on one screen.", view_path, BUDGETS["where"]),
         "why": _clip(

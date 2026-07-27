@@ -622,119 +622,46 @@ assert fams["hub-gloss"]["enumerated"] is False and fams["hub-gloss"]["reason"],
     fams["hub-gloss"]
 PYEOF
 
-# --- declared precedence + the malformed-declaration lint (18.74, #614) ------
-# The articles repo owns subtopic names; the derivation is the fallback. A
-# declaration the map cannot honour is a CONFIG DEFECT NAMED, never a silent
-# degradation into a derived cluster — which is what a wrong-typed value used
-# to produce, indistinguishable from no declaration at all.
-# End to end: a malformed declaration in a real backlog item reaches the map's
-# disclosure by name. Without this the lint could be correct in isolation and
-# never actually wired into an assembled map.
-cat > "$a/backlog/bad-decl.md" <<'EOF'
----
-slug: bad-decl
-title: An item whose subtopic declaration is unusable
-status: seed
-track: engineering
-subtopic:
-  - one
-  - two
-evidence:
-  - host/notes.md:3@abc1234
----
-EOF
-MAP > "$work/decl.json" 2>/dev/null
-python3 - "$work/decl.json" <<'PYEOF' && ok "a malformed declared subtopic is disclosed on the map, naming the item and the reason" || err "malformed subtopic declaration not disclosed"
+# --- the depth estimator is GONE (Story 20.7, #809) -------------------------
+# It was derived PER SUBTOPIC and has no carrier once the unit is gone. The
+# threshold declaration goes with it — a declaration nothing reads is exactly
+# the assembly cost this removal exists to stop.
+python3 - "$root/scripts/topic-map.py" <<'PYEOF' && ok "no depth estimator, no threshold plumbing, no --thresholds flag" || err "depth estimator survives"
+import sys
+src = open(sys.argv[1], encoding="utf-8").read()
+for gone in ("estimate_depth", "load_thresholds", "--thresholds", "depth_thresholds"):
+    assert gone not in src, f"{gone} survives"
+PYEOF
+[ ! -f "$root/config/topic-depth-thresholds.yaml" ] \
+  && ok "the shipped threshold declaration is removed" \
+  || err "config/topic-depth-thresholds.yaml survives its only consumer"
+
+# --- clustering is GONE (Story 20.7, #809) ----------------------------------
+# The path-family derivation, the declared-subtopic precedence and the
+# malformed-declaration lint all existed to NAME a cluster. The cluster unit is
+# abandoned, so they are asserted absent rather than re-pointed: a lint on a
+# key nothing reads reports a defect with no consequence.
+python3 - "$root/scripts/topic-map.py" <<'PYEOF' && ok "clustering, its naming and its declaration lint are deleted, not merely unreferenced" || err "cluster machinery survives"
+import sys
+src = open(sys.argv[1], encoding="utf-8").read()
+for gone in ("def cluster_subtopics(", "def subtopic_key(", "def subtopic_defect(",
+             "def estimate_depth(", "def load_thresholds(", "def thresholds_path(",
+             "def _glance(", "SUBTOPIC_KEYS", "THRESHOLDS_FILE", "UNCLUSTERED"):
+    assert gone not in src, f"{gone} survives the cluster removal"
+PYEOF
+
+python3 - "$work/lessons.json" <<'PYEOF' && ok "hub-lessons: every served Lesson becomes its own Strand (the unit since the cluster removal)" || err "lesson strands wrong"
 import json, sys
 d = json.load(open(sys.argv[1]))
-defects = {x["item"]: x for x in d["subtopic_defects"]}
-assert "bad-decl" in defects, d["subtopic_defects"]
-bad = defects["bad-decl"]
-assert bad["key"] == "subtopic" and "ONE subtopic" in bad["reason"], bad
-assert bad["surface"] == "backlog/bad-decl.md", bad
-# well-formed items contribute NO defect — the disclosure is not noise
-assert "retry-storm" not in defects and "cache-warmth" not in defects, defects
-PYEOF
-rm "$a/backlog/bad-decl.md"
-
-python3 - "$root/scripts/topic-map.py" <<'PYEOF' && ok "declared subtopic outranks the derivation, and a malformed declaration is NAMED (#614)" || err "declared precedence or the subtopic lint is wrong"
-import importlib.util, sys
-s = importlib.util.spec_from_file_location("tm", sys.argv[1])
-m = importlib.util.module_from_spec(s); s.loader.exec_module(m)
-# 1. Declared beats the path family, and records that basis.
-assert m.subtopic_key({"subtopic": "owner-named",
-                       "evidence": ["docs/stories/a.md:1@x"]}) == ("owner-named", "declared")
-assert m.subtopic_key({"cluster": " spaced "})[0] == "spaced"
-# 2. A well-formed declaration is not a defect.
-assert m.subtopic_defect({"subtopic": "fine"}) is None
-assert m.subtopic_defect({"evidence": ["docs/stories/a.md:1@x"]}) is None  # absent != defective
-# 3. Every unusable shape is reported WITH A REASON, and still clusters
-#    (the map degrades, but never silently).
-for item, needle in (({"subtopic": ["a", "b"]}, "ONE subtopic"),
-                     ({"subtopic": []},         "empty list"),
-                     ({"subtopic": 42},         "type int"),
-                     ({"subtopic": "   "},      "empty name")):
-    found = m.subtopic_defect(item)
-    assert found and needle in found[1], (item, found)
-    assert found[0] == "subtopic", found
-PYEOF
-
-# --- the path-family derivation itself (Story 18.73, #614) -------------------
-# The rule the clustering rests on, pinned directly: cluster by the pointer's
-# parent directory when it is at least two segments deep, else the file stem —
-# and never adopt free-text prose as a subject. The old file-stem-only rule made
-# "cluster" a synonym for "file" at corpus scale (147 subtopics, ~no grouping).
-python3 - "$root/scripts/topic-map.py" <<'PYEOF' && ok "clustering derives PATH FAMILIES, and refuses prose as a subject (#614)" || err "path-family derivation wrong"
-import importlib.util, sys
-s = importlib.util.spec_from_file_location("tm", sys.argv[1])
-m = importlib.util.module_from_spec(s); s.loader.exec_module(m)
-cases = {
-    # a deep directory of siblings collapses into ONE family...
-    "docs/stories/18-54-x.md:3@a": "docs/stories",
-    "docs/stories/18-70-y.md:9@a": "docs/stories",
-    "specs/spec-tanuki-loop/SPEC.md:178@a": "specs/spec-tanuki-loop",
-    # ...while a top-level directory stays per-item (per tool, as before)
-    "tools/tanuki-ledger:1403@a": "tanuki-ledger",
-    "tools/tanuki-ledger:1408@a": "tanuki-ledger",
-    "README.md:1@a": "README",
-    # free-text prose with an embedded path names NO subject (#616)
-    "writing-assistant specs/spec-policy-source-seam/ (first shipped, Epic 14)": None,
-}
-for pointer, want in cases.items():
-    got = m._pointer_subject(pointer)
-    assert got == want, (pointer, got, want)
-# two files in one deep directory are ONE cluster, not two
-a = m.subtopic_key({"evidence": ["docs/stories/a.md:1@x"]})
-b = m.subtopic_key({"evidence": ["docs/stories/b.md:2@x"]})
-assert a == b == ("docs/stories", "evidence-subject"), (a, b)
-# a declared key still outranks the derivation (OQ1 precedence)
-assert m.subtopic_key({"subtopic": "owner-named",
-                       "evidence": ["docs/stories/a.md:1@x"]}) == ("owner-named", "declared")
-# an item whose only evidence is prose falls through, it does not invent a name
-assert m.subtopic_key({"evidence": ["some prose about specs/x/ (note)"]})[1] == "unclustered"
-PYEOF
-
-python3 - "$work/lessons.json" <<'PYEOF' && ok "hub-lessons: seeds cluster alongside items and count toward the subtopic's density signal (CAP-2)" || err "lesson seeds do not participate in clustering"
-import json, sys
-d = json.load(open(sys.argv[1]))
-topics = {t["topic"]: t for t in d["topics"]}
-# the family enters the topic derivation through the shipped track->topic path
-assert "hub-lessons" in topics, topics.keys()
-assert "hub-lessons" in d["unmapped_tracks"], d["unmapped_tracks"]
-subs = {s["subtopic"]: s for s in topics["hub-lessons"]["subtopics"]}
-# Story 18.73 (#614): seeds no longer carry a TOOL-DECLARED per-seed subtopic.
-# They fall to the path-family derivation, all cite the same index surface, and
-# so land in ONE cluster whose members the View lists as lesson-seed names —
-# instead of 65 full subtopic blocks at corpus scale. What must survive is the
-# CAP-2 properties, asserted here rather than the old one-seed-one-cluster shape.
-assert len(subs) == 1, subs.keys()
-s = next(iter(subs.values()))
-assert s["clustered_by"] == "evidence-subject", s["clustered_by"]
-assert {i["slug"] for i in s["items"]} == {"retry-storm", "cache-warmth", "team-shape"}, s["items"]
-assert s["density"]["evidence_pointers"] == 3, s["density"]
-assert s["density"]["unconsumed_lessons"] == 3, s["density"]
-assert s["depth"]["level"], s["depth"]          # a depth estimate, like any subtopic
-assert s["selectable"] is True, s               # thresholds gate surfacing, never picking
+strands = [e for e in d["elements"] if e.get("kind") == "lesson"]
+assert strands, "no lesson strands projected"
+# Each strand is individually selectable and carries its own evidence.
+for e in strands:
+    assert e.get("slug"), e
+    assert "evidence" in e, e
+# And no clustering happened: subtopics are empty everywhere.
+for t in d["topics"]:
+    assert t["subtopics"] == [], f"{t['topic']} still has subtopics: {t['subtopics']}"
 PYEOF
 
 python3 - "$work/lessons.json" <<'PYEOF' && ok "CAP-4: the manifest names BOTH enumerated families and the per-family accounting closes" || err "per-family manifest wrong"
@@ -784,21 +711,17 @@ consumed: [team-shape]
 - the team-shape lesson / host/notes.md:9@a1b2c3d4e5f6a7b8
 EOF
 MAP > "$work/lconsumed.json" 2>/dev/null
-python3 - "$work/lconsumed.json" <<'PYEOF' && ok "hub-lessons: a consumed seed is MARKED consumed and still surfaced (never hidden, still selectable)" || err "consumed lesson seed handling wrong"
+python3 - "$work/lconsumed.json" <<'PYEOF' && ok "hub-lessons: a consumed Strand is MARKED consumed and still surfaced (never hidden, still selectable)" || err "consumed strand handling wrong"
 import json, sys
 d = json.load(open(sys.argv[1]))
-topics = {t["topic"]: t for t in d["topics"]}
-subs = {s["subtopic"]: s for s in topics["hub-lessons"]["subtopics"]}
-# With seeds in one cluster (Story 18.73), "marked, never hidden" is asserted at
-# ITEM granularity — which is where it now matters, and a stronger claim than
-# the old per-seed-subtopic form: the consumed seed must still be PRESENT.
-s = next(iter(subs.values()))
-consumed = {i["slug"]: i["consumed"] for i in s["items"]}
-assert consumed.get("team-shape") is True, consumed
-assert consumed.get("retry-storm") is False, consumed
-assert s["consumed_items"] == 1 and len(s["items"]) == 3, s
-assert s["selectable"] is True, s               # consumed material stays pickable
-assert s["density"]["unconsumed_lessons"] == 2, s["density"]
+# Since the cluster removal (Story 20.7, #809) a Lesson is a STRAND, not a
+# member of a subtopic — so the consumed mark is asserted where it now lives.
+strands = [e for e in d["elements"] if e.get("kind") == "lesson"]
+assert strands, "the fixture must project lesson strands"
+consumed = [e for e in strands if e.get("consumed")]
+assert consumed, "the consumed fixture lesson is not marked consumed"
+# Marked, never hidden: it is still in the projection.
+assert len(strands) >= len(consumed), (len(strands), len(consumed))
 PYEOF
 rm "$a/plans/team-shape.md"
 
@@ -810,139 +733,32 @@ MAP > "$work/degraded.json" 2>/dev/null \
   && ok "hub-lessons: an unreachable gateway still yields a map (exit 0)" \
   || err "a degraded policy source broke the map instead of being disclosed"
 WRITING_ASSISTANT_GATEWAY_CMD="$saved_gw"
-
-# --- 7c. the host-sources family: declared writing sources enter the map -----
-# A host repo whose material lives in its README, docs and specs still has
-# terrain. The fixture sources carry a SENTINEL in their PROSE, so "read at
-# frontmatter/heading level, never as prose" is asserted rather than assumed.
-mkdir -p "$h/docs" "$h/specs"
-cat > "$h/README.md" <<'EOF'
-# The retry storm
-
-SENTINEL-PROSE-README — this paragraph is body text and must never be projected.
-
-## Why it happens
-
-More prose. SENTINEL-PROSE-README-TWO.
-
-```
-# not a heading — inside a fence
-```
-
-## What we changed
-EOF
-cat > "$h/docs/cache-warmth.md" <<'EOF'
----
-title: Cache warmth, measured
-track: engineering
----
-
-SENTINEL-PROSE-DOC — body text.
-
-## The measurement
-EOF
-printf '# Thin note\n' > "$h/specs/thin.md"
-printf '[{"path": "README.md"}, {"path": "docs"}, {"path": "specs"}]' | \
-  python3 "$root/scripts/resolve-writing-sources.py" --root "$h" \
-    set-sources >/dev/null 2>&1
-git -C "$h" add -A >/dev/null 2>&1
-git -C "$h" -c user.email=t@e -c user.name=t commit -qm sources >/dev/null 2>&1 || true
-
-MAP > "$work/hostsrc.json" 2>"$work/hostsrc.err" \
-  && ok "host-sources: the map assembles with declared sources enumerated" \
-  || err "assemble failed with declared sources: $(cat "$work/hostsrc.err")"
-
-python3 - "$work/hostsrc.json" <<'PYEOF' && ok "host-sources: declared sources become family-tagged surfaces, titled from frontmatter or the first H1" || err "host-sources projection wrong"
+# --- 7c. host-sources is DECLARED BUT NOT ENUMERATED (Story 20.7, #809) ------
+# The family emitted ~190 junk directions in the second dogfood ("cover
+# check-topic-map" — repo check scripts are evidence, not article material), so
+# its emitting path is gone. It stays DECLARED: CAP-4's denominator must still
+# name a family that is deliberately out of scope, or "complete" silently means
+# "complete over whatever we felt like reading".
+MAP > "$work/nohost.json" 2>/dev/null
+python3 - "$work/nohost.json" <<'PYEOF' && ok "host-sources: declared, NOT enumerated, and the reason names the decision" || err "host-sources disclosure wrong after the removal"
 import json, sys
 d = json.load(open(sys.argv[1]))
-srcs = {i["surface"]: i for t in d["topics"] for i in t["items"]
-        if i.get("family") == "host-sources"}
-assert {"README.md", "docs/cache-warmth.md", "specs/thin.md"} <= set(srcs), sorted(srcs)
-# a README has no frontmatter: its first level-1 heading is the nearest thing
-assert srcs["README.md"]["title"] == "The retry storm", srcs["README.md"]
-# frontmatter still wins where a source declares one, track included
-doc = srcs["docs/cache-warmth.md"]
-assert doc["title"] == "Cache warmth, measured", doc
-assert doc["track"] == "engineering", doc
-# an undeclared track falls to the family name, mappable like any other track
-assert srcs["README.md"]["track"] == "host-sources", srcs["README.md"]
-# one resolvable file:line@pin cite per heading, at the heading's TRUE line
-assert srcs["README.md"]["evidence"][0].startswith("README.md:1@"), srcs["README.md"]
-lines = [int(e.split(":")[1].split("@")[0]) for e in srcs["README.md"]["evidence"]]
-assert lines == [1, 5, 13], lines          # the fenced `# not a heading` is not one
-# the shipped size proxy is carried as a signal
-assert srcs["README.md"]["source_lines"] > srcs["specs/thin.md"]["source_lines"], srcs
+fams = {f["family"]: f for f in d["coverage"]["families"]}
+hs = fams["host-sources"]
+assert hs["declared"] is True, hs
+assert hs["enumerated"] is False, hs
+assert hs["reason"], "a not-enumerated family must carry its reason"
+assert "20.7" in hs["reason"] or "not article material" in hs["reason"], hs["reason"]
+# and it contributes nothing to the read set
+surfaces = [s for s in d["coverage"].get("read", []) if s.get("family") == "host-sources"]
+assert not surfaces, f"host-sources still contributed read surfaces: {surfaces}"
 PYEOF
 
-grep -q 'SENTINEL-PROSE' "$work/hostsrc.json" \
-  && err "source prose reached the map — the read widened past heading level" \
-  || ok "CAP-4: no source prose reaches the map (declared sources are read at heading level only)"
-
-python3 - "$work/hostsrc.json" <<'PYEOF' && ok "CAP-4: the manifest names host-sources as enumerated and its accounting closes" || err "host-sources manifest wrong"
-import json, sys
-d = json.load(open(sys.argv[1]))
-cov = d["coverage"]
-assert "host-sources" in cov["families_enumerated"], cov["families_enumerated"]
-fams = {f["family"]: f for f in cov["families"]}
-assert fams["host-sources"]["matched"] >= 3, fams["host-sources"]
-for f in fams.values():
-    assert f["accounting_closes"] is True, f
-assert sum(f["matched"] for f in fams.values()) == cov["matched"], cov
-# depth is still a SIGNAL: every subtopic stays selectable whatever its size
-subs = [s for t in d["topics"] for s in t["subtopics"]]
-assert subs and all(s["selectable"] is True for s in subs), subs
-assert all("source_lines" in s["density"] for s in subs), subs[0]["density"]
-PYEOF
-
-# Assembly cost stays index-scale: a 20k-line body changes nothing but the
-# size proxy — no heading, no pointer, no subtopic moves.
-cp "$h/README.md" "$work/readme-small.md"
-python3 - "$h/README.md" <<'PYEOF'
-import sys
-open(sys.argv[1], "a", encoding="utf-8").write("\nfiller prose line\n" * 20000)
-PYEOF
-MAP > "$work/hostbig.json" 2>/dev/null
-python3 - "$work/hostsrc.json" "$work/hostbig.json" <<'PYEOF' && ok "CAP-4: a 20k-line source body adds no pointers and moves no subtopic (cost stays index-scale)" || err "source body growth changed the map's structure"
-import json, sys
-a = json.load(open(sys.argv[1])); b = json.load(open(sys.argv[2]))
-def ptrs(d):
-    return {i["surface"]: i["evidence"] for t in d["topics"] for i in t["items"]}
-assert ptrs(a) == ptrs(b), "evidence pointers changed with body size"
-def subs(d):
-    return {(t["topic"], s["subtopic"]) for t in d["topics"] for s in t["subtopics"]}
-assert subs(a) == subs(b), "clusters changed with body size"
-PYEOF
-cp "$work/readme-small.md" "$h/README.md"
-
-# An undeclared source configuration is a DISCLOSED family, not a silent empty
-# one — and the map still produces a result.
-h3="$work/host3"; mkdir -p "$h3"; git -C "$h3" init -q
-python3 "$root/scripts/resolve-writing-sources.py" --root "$h3" \
-  set-draft-location "$a/drafts/" >/dev/null 2>&1
-python3 "$M" assemble --root "$h3" > "$work/nosrc.json" 2>/dev/null \
-  && ok "host-sources: an undeclared source configuration still yields a map (exit 0)" \
-  || err "an undeclared source configuration broke the map instead of being disclosed"
-python3 - "$work/nosrc.json" <<'PYEOF' && ok "host-sources: an undeclared source configuration is disclosed as declared-but-not-enumerated WITH THE REASON" || err "undeclared sources not disclosed"
-import json, sys
-cov = json.load(open(sys.argv[1]))["coverage"]
-hs = {f["family"]: f for f in cov["families"]}["host-sources"]
-assert hs["declared"] is True and hs["enumerated"] is False, hs
-assert hs["reason"], hs
-assert "host-sources" in [f["family"] for f in cov["families_not_enumerated"]], cov
-assert "articles-items" in cov["families_enumerated"], cov
-PYEOF
-
-# The enumeration is the SINGLE enumerator's, order included — never a second
-# walk of the tree.
-python3 "$root/scripts/resolve-writing-sources.py" --root "$h" files 2>/dev/null \
-  > "$work/enum.txt"
-python3 - "$work/hostsrc.json" "$work/enum.txt" "$h" <<'PYEOF' && ok "host-sources: the family is exactly resolve-writing-sources.py files, in its order (one enumerator)" || err "host-sources does not match the single enumerator"
-import json, os, sys
-d = json.load(open(sys.argv[1]))
-declared = [os.path.relpath(p.strip(), sys.argv[3])
-            for p in open(sys.argv[2]) if p.strip()]
-read = [r["surface"] for r in d["coverage"]["read"] if r["family"] == "host-sources"]
-assert read == declared, (read, declared)
+python3 - "$M" <<'PYEOF' && ok "host-sources: the item-emitting path is DELETED, not merely unreferenced" || err "a host-sources item builder survives"
+import re, sys
+src = open(sys.argv[1], encoding="utf-8").read()
+for gone in ("def source_item(", "def source_surfaces(", "SOURCE_TRACK", "SOURCE_SECTION"):
+    assert gone not in src, f"{gone} survives — an emitter kept 'in case' is the assembly cost"
 PYEOF
 python3 - "$work/degraded.json" <<'PYEOF' && ok "hub-lessons: a degraded policy source is disclosed as declared-but-not-enumerated WITH THE REASON" || err "degraded policy source not disclosed"
 import json, sys
@@ -1023,13 +839,15 @@ allowed = {
 extra = sorted(named - allowed)
 assert not extra, f"unreviewed sibling scripts: {extra}"
 PYEOF
-# harvest-budget.py is on the list for ONE measure. Reaching for its budget
-# machinery (or running it as a pass) is the corpus-scale cost CAP-4 forbids.
-python3 - "$M" <<'PYEOF' && ok "CAP-4: harvest-budget.py is used for its size proxy only — no budgeted extraction pass" || err "topic-map.py reaches past harvestable_lines into harvest's budgeting"
+# harvest-budget.py was reached for ONE measure, by the host-sources item
+# builder. That builder went with the family (Story 20.7, #809), so the
+# strongest form of CAP-4's cost promise now holds: the map does not reach for
+# harvest's budgeting AT ALL.
+python3 - "$M" <<'PYEOF' && ok "CAP-4: the map no longer reaches for harvest's budgeting at all (the host-sources item builder went with the family)" || err "topic-map.py still reaches into harvest's budgeting"
 import re, sys
 src = open(sys.argv[1], encoding="utf-8").read()
 used = set(re.findall(r'_budget\(\)\.(\w+)', src))
-assert used == {"harvestable_lines"}, f"harvest-budget attributes used: {sorted(used)}"
+assert not used, f"harvest-budget attributes still used: {sorted(used)}"
 PYEOF
 # The hub-lessons family goes through the SHIPPED seam — never a second reader.
 grep -q 'POLICY_READER' "$M" \

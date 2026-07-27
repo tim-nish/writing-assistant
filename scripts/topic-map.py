@@ -14,29 +14,28 @@ is **not** implemented here — it belongs to a sibling story. This script print
 JSON; it composes no owner-facing screen and no narrative structures (18.45's
 single-proposer invariant).
 
-CAP-2 — depth signals
----------------------
-Each topic's items are grouped into SUBTOPICS and annotated with an
-evidence-density signal (distinct evidence pointers, unconsumed cited story
-elements, backlog items with their status, live item count) and a DEPTH
-ESTIMATE naming what the material supports today. The estimate is computed from
-that density by minimums declared in ONE place
-(`config/topic-depth-thresholds.yaml`, overridable per repo) — never by taste —
-and every estimate carries the counts it was derived from, so "why this depth?"
-is answered from the same numbers rather than an opaque score.
+CAP-2 — the STRAND is the unit
+------------------------------
+Every hub Lesson and every served Journey rendering is its own STRAND: an
+individually selectable piece of article material, carrying its served
+plain-register rendering, its date, its consumed mark and its three-valued
+writability verdict.
 
-Two invariants hold here regardless of the numbers:
+Subtopic CLUSTERING and the DEPTH ESTIMATE were removed 2026-07-27 (Story 20.7,
+#809) — abandoned, not tuned: one dogfood run spent its whole budget to produce
+a single usable line. Both the emitters and the threshold declaration are gone,
+so the assembly cost went with the output; a section deleted at render time is
+still paid for. What survived the removal, deliberately, is the CROSS-TOPIC
+COMBINATION move, re-based onto strands (see topic-map-directions.py) rather
+than deleted with the clusters it happened to be built from.
 
-  * a threshold gates what is **surfaced**, never what the owner may pick —
-    every subtopic is emitted `selectable: true`, whatever level it lands in;
+Two invariants hold regardless:
+
+  * a signal gates what is **surfaced**, never what the owner may pick;
   * already-consumed material is **marked consumed, not hidden**, so the owner
     can still name it at the free-form entry (SPEC-article-draft-pipeline CAP-9,
     Story 18.47). Consumption is READ from the shipped derived view, never
     re-implemented and never stored.
-
-The shipped thresholds are PROPOSED, not ratified: the spec does not choose the
-boundaries, so the declaration carries `ratified: false` and the map reports it
-alongside every estimate.
 
 CAP-1 — derived, never stored, enumerated PER SOURCE FAMILY
 -----------------------------------------------------------
@@ -57,15 +56,13 @@ and every candidate surface carries the **source family** it came from
     (SPEC-terrain OQ3). An unresolvable or degraded policy source makes the
     family **declared-but-not-enumerated with the reason** — the same disclosed
     refusal shape `consumption_view` uses — never a silent empty family.
-  * `host-sources` — the host repo's **declared writing sources** (Story
-    18.65, #605), enumerated through the SINGLE enumerator
-    (`resolve-writing-sources.py files`) that already owns the read boundary
-    and its order — the same one harvest's budgeting delegates to. Read at
-    **frontmatter/heading level only**: the leading `---` block and the ATX
-    heading lines, never the prose between them. Undeclared or unresolvable
-    sources make the family declared-but-not-enumerated with the reason, as
-    above.
-
+  * `host-sources` — **DECLARED BUT NO LONGER ENUMERATED** (Story 20.7,
+    #809). The host repo's writing sources are not article material: this
+    family emitted ~190 junk directions in the second dogfood ("cover
+    check-topic-map" — repo check scripts are evidence, not material). The
+    family stays declared so CAP-4's denominator still NAMES it — a family
+    deliberately out of scope must say so rather than vanish — but its
+    surfaces are not walked, so the assembly cost went with the emitter.
   * `hub-gloss` — the served **plain-register Gloss overview index** (the
     gateway's two-tier `gloss_index`, tsurezure-gateway#64), one bounded
     tier-1 read: the ratified `gloss:` / `journey_gloss:` renderings the
@@ -206,37 +203,6 @@ LESSON_SECTION = FAMILY_HUB_LESSONS
 # A declared writing source enters the topic derivation the same way, for the
 # same reason: its own `track:` when it happens to declare one, else the family
 # name as a track the owner may map like any other.
-SOURCE_TRACK = FAMILY_HOST_SOURCES
-SOURCE_SECTION = FAMILY_HOST_SOURCES
-
-
-def _load(mod_filename):
-    """Load a sibling script as a module (the resolve-*.py idiom)."""
-    here = os.path.dirname(os.path.realpath(__file__))
-    name = mod_filename.replace(".py", "").replace("-", "_")
-    spec = importlib.util.spec_from_file_location(
-        name, os.path.join(here, mod_filename))
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    return mod
-
-
-SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
-SRC_RES = os.path.join(SCRIPT_DIR, "resolve-writing-sources.py")
-PLAN_WRITER = os.path.join(SCRIPT_DIR, "write-article-plan.py")
-POLICY_READER = os.path.join(SCRIPT_DIR, "read-policy-source.py")
-
-_BUDGET = []
-
-
-def _budget():
-    """harvest-budget.py, loaded once, for its `harvestable_lines` measure
-    ALONE (Story 18.65). This is the shipped non-blank-line size proxy, reused
-    so the map and harvest measure a source the same way — NOT harvest's
-    extraction pass, which the map never invokes (CAP-4's cost promise)."""
-    if not _BUDGET:
-        _BUDGET.append(_load("harvest-budget.py"))
-    return _BUDGET[0]
 
 
 def host_root(arg_root):
@@ -256,6 +222,11 @@ def host_root(arg_root):
 # --------------------------------------------------------------------------
 # Resolution — every location comes from a resolver, never composed here.
 
+
+SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
+SRC_RES = os.path.join(SCRIPT_DIR, "resolve-writing-sources.py")
+PLAN_WRITER = os.path.join(SCRIPT_DIR, "write-article-plan.py")
+POLICY_READER = os.path.join(SCRIPT_DIR, "read-policy-source.py")
 
 def articles_repo(root, repo_override=None):
     """The articles repo root: an explicit --repo (tests / non-default
@@ -410,142 +381,6 @@ def lesson_seeds(root):
         return [], (f"the served LESSONS.md index at {pin or 'an undisclosed pin'} "
                     "lists no index lines")
     return seeds, None
-
-
-def declared_sources(root):
-    """The `host-sources` family's read boundary, from the SINGLE enumerator.
-
-    `resolve-writing-sources.py files` is the one source of truth for which
-    files are in scope and in what order — the same enumeration harvest's
-    budgeting delegates to, so the map and harvest can never disagree about
-    what "the declared sources" means. Returns `(paths, reason)`; a `reason`
-    is the family's declared-but-not-enumerated disclosure.
-    """
-    cmd = [sys.executable, SRC_RES]
-    if root:
-        cmd += ["--root", root]
-    cmd += ["files"]
-    r = subprocess.run(cmd, capture_output=True, text=True)
-    if r.returncode != 0:
-        detail = (r.stderr.strip().split("\n")[-1] if r.stderr.strip()
-                  else f"the enumerator exited {r.returncode}")
-        return [], f"{detail} (resolve-writing-sources.py exit {r.returncode})"
-    paths = [ln for ln in r.stdout.splitlines() if ln.strip()]
-    if not paths:
-        return [], ("no writing sources are declared for this repo "
-                    "(resolve-writing-sources.py files enumerated none)")
-    return paths, None
-
-
-def read_headings(path):
-    """A declared source at **frontmatter/heading level**, in ONE pass.
-
-    **This is CAP-4's bound for the host-sources family**, the counterpart of
-    `read_frontmatter` for files that have no frontmatter at all. It returns
-    `(frontmatter, headings)` where `headings` is `[(level, text, line_no)]`
-    for ATX heading lines only.
-
-    The prose between headings is skipped over and discarded: it is never
-    projected into the map, which is the difference between reading a document
-    at outline level and consuming it as prose. Fenced code blocks are tracked
-    so a `# comment` inside one is not mistaken for a heading.
-    """
-    fm, headings = {}, []
-    try:
-        with open(path, encoding="utf-8", errors="strict") as fh:
-            raw = fh.read().splitlines()
-    except (OSError, UnicodeDecodeError):
-        return fm, headings
-    start = 0
-    if raw and raw[0].strip() == "---":
-        for i in range(1, len(raw)):
-            if raw[i].strip() == "---":
-                start = i + 1
-                break
-    if start:
-        fm = read_frontmatter(path)
-    fence = False
-    for n, line in enumerate(raw[start:], start=start + 1):
-        if line.lstrip().startswith("```") or line.lstrip().startswith("~~~"):
-            fence = not fence
-            continue
-        if fence or not line.startswith("#"):
-            continue
-        level = len(line) - len(line.lstrip("#"))
-        text = line[level:].strip()
-        if text and level <= 6:
-            headings.append((level, text, n))
-    return fm, headings
-
-
-def source_surfaces(root):
-    """The `host-sources` family as surfaces, in the enumerator's own order.
-
-    Returns `(surfaces, reason)`. The payload is the absolute path; the
-    surface name is the path relative to the host root, so the manifest names
-    a source the way the repo does.
-    """
-    paths, reason = declared_sources(root)
-    if reason:
-        return [], reason
-    out = []
-    for path in paths:
-        try:
-            rel = os.path.relpath(path, root)
-        except ValueError:                       # pragma: no cover - defensive
-            rel = path
-        out.append((FAMILY_HOST_SOURCES, SOURCE_SECTION, rel, path))
-    return out, None
-
-
-def source_item(rel, path, pin):
-    """A declared source as an item, projected from its OUTLINE alone.
-
-    The projection — the story's open design point, proposed here for review:
-
-      * **title** — the frontmatter `title:`, else the first level-1 heading,
-        else the path stem. A README has no frontmatter; its `# Title` is the
-        nearest thing it has to one.
-      * **evidence** — one `file:line@pin` pointer per heading, at the
-        heading's true line. These are real, resolvable cites, and a document
-        with a rich outline honestly carries more of them than a stub.
-      * **size** — `harvest-budget.py`'s `harvestable_lines`, the SHIPPED
-        non-blank-line proxy, called rather than reimplemented so the map and
-        harvest measure a source the same way.
-      * **subtopic** — NOT set here. The shipped clustering rule already
-        resolves a source to its own path stem via the evidence-pointer
-        subject, so nothing needs inventing; a source that declares
-        `subtopic:`/`cluster:` keeps winning as it does for any item.
-      * **body text** — never projected. `read_headings` counts it and drops
-        it; CAP-4 forbids widening to prose, and no heading's following
-        paragraph reaches the map.
-    """
-    fm, headings = read_headings(path)
-    title = fm.get("title") or fm.get("one_liner") or ""
-    if not title:
-        h1 = next((h for h in headings if h[0] == 1), None)
-        title = h1[1] if h1 else os.path.splitext(os.path.basename(rel))[0]
-    item = {
-        "slug": os.path.splitext(os.path.basename(rel))[0],
-        "title": title if isinstance(title, str) else str(title),
-        "family": FAMILY_HOST_SOURCES,
-        "section": SOURCE_SECTION,
-        "surface": rel,
-        "status": fm.get("status") or "",
-        "track": fm.get("track") or SOURCE_TRACK,
-        "date": fm.get("date") or "",
-        "evidence": ([f"{rel}:{n}@{pin}" for _lvl, _t, n in headings]
-                     or [f"{rel}:1@{pin}"]),
-        "live": False,
-        # The shipped cheap size proxy, carried as a SIGNAL. It informs the
-        # density readout and nothing else: no declared depth level takes a
-        # minimum over it, so CAP-2's "signal, never a gate" is untouched.
-        "source_lines": _budget().harvestable_lines(path),
-    }
-    for key in SUBTOPIC_KEYS:
-        if key in fm and fm[key]:
-            item[key] = fm[key]
-    return item
 
 
 def repo_pin(repo):
@@ -929,10 +764,15 @@ def all_surfaces(repo, root, mapping=None):
     if reason:
         families[FAMILY_HUB_LESSONS].update(enumerated=False, reason=reason)
     matched += lessons
-    sources, reason = source_surfaces(root)
-    if reason:
-        families[FAMILY_HOST_SOURCES].update(enumerated=False, reason=reason)
-    matched += sources
+    # NOT ENUMERATED (Story 20.7, #809). The family stays DECLARED so CAP-4's
+    # denominator still names it — "complete over a named denominator" means a
+    # family that is deliberately out of scope must say so, not vanish — but
+    # its surfaces are no longer walked. Enumerating and then discarding would
+    # keep paying the assembly cost this removal exists to stop.
+    families[FAMILY_HOST_SOURCES].update(
+        enumerated=False,
+        reason=("host source files are not article material (Story 20.7, "
+                "#809): Strands are Lessons and Journeys"))
     # The element family's surfaces are the DECLARED topic files. An
     # undeclared mapping yields none, which is not an error: a repo that maps
     # no topics simply has no elements to project, and the family reports that
@@ -1022,8 +862,8 @@ def assemble(repo, mapping, max_surfaces, root=None):
         families[FAMILY_HUB_ELEMENTS].update(enumerated=False,
                                              reason=element_reason)
         # A family that could not be enumerated AT ALL is declared-but-not-
-        # enumerated with its reason and contributes no denominator — exactly
-        # how `host-sources` behaves when nothing is declared. Counting its
+        # enumerated with its reason and contributes no denominator — the same
+        # shape `host-sources` now reports permanently. Counting its
         # surfaces as read-with-zero-entries would instead report a successful
         # empty projection, the "silently empty family" shape CAP-4 forbids.
         # This is distinct from the bounded case below: reading 2 of 9 topics
@@ -1052,9 +892,9 @@ def assemble(repo, mapping, max_surfaces, root=None):
                                     "entries": len(payload)})
             continue
         if family == FAMILY_HUB_ELEMENTS:
-            # Elements are a SECOND PROJECTION, not items: they never enter
-            # the clustering that produces subtopics (CAP-2 — the cluster
-            # stays the primary unit and elements sit beside it).
+            # Strands are the PRIMARY units since the cluster removal
+            # (Story 20.7, #809); they were always a separate projection from
+            # items, and now they are the only one that reaches candidates.
             found = elements_by_topic.get(payload) or []
             elements.extend(found)
             read_disclosure.append({"family": family, "surface": rel,
@@ -1065,12 +905,7 @@ def assemble(repo, mapping, max_surfaces, root=None):
             read_disclosure.append({"family": family, "surface": rel,
                                     "entries": 1})
             continue
-        if family == FAMILY_HOST_SOURCES:
-            item = source_item(rel, payload, host_pin)
-            items.append(item)
-            read_disclosure.append({"family": family, "surface": rel,
-                                    "entries": len(item["evidence"])})
-            continue
+
         path = payload
         if section == "index":
             read_disclosure.append({"family": family, "surface": rel,
@@ -1095,12 +930,14 @@ def assemble(repo, mapping, max_surfaces, root=None):
             "evidence": [e for e in evidence if isinstance(e, str)],
             "live": section in LIVE_SECTIONS,
         }
-        # Optional cluster/citation keys, projected only when an item happens to
-        # declare one (Story 18.62). Reading a key that may be absent imposes no
-        # schema obligation, and no clustering depends on any of them existing.
-        for key in SUBTOPIC_KEYS + ELEMENT_KEYS:
+        # Optional citation keys, projected only when an item declares one
+        # (Story 18.62). The cluster keys are no longer read at all: clustering
+        # is gone (Story 20.7, #809), and reading a key nothing consumes is the
+        # assembly cost that removal exists to stop. The articles repo may keep
+        # declaring them; they are simply unread here.
+        for key in ELEMENT_KEYS:
             if key in fm:
-                item[key] = fm[key] if key in SUBTOPIC_KEYS else _as_list(fm[key])
+                item[key] = _as_list(fm[key])
         items.append(item)
         read_disclosure.append({"family": family, "surface": rel,
                                 "entries": len(fm)})
@@ -1222,308 +1059,11 @@ def assemble(repo, mapping, max_surfaces, root=None):
 # MARKED consumed rather than hidden — the owner may still name it at the
 # free-form entry (SPEC-article-draft-pipeline CAP-9, Story 18.47).
 
-THRESHOLDS_FILE = "topic-depth-thresholds.yaml"
 
 # Optional item keys, read only when an item happens to declare them. None is
 # required, so the articles repo gains no schema obligation from this story.
-SUBTOPIC_KEYS = ("subtopic", "cluster")
 ELEMENT_KEYS = ("elements", "lessons")
 
-UNCLUSTERED = "(unclustered)"
-
-
-def thresholds_path(root, override):
-    """The depth-threshold declaration: an explicit override, else a per-repo
-    file beneath the RESOLVED repo-config directory, else the shipped default.
-    One place, so the boundaries can move without touching stage code."""
-    if override:
-        return os.path.realpath(override)
-    rp = _load("resolve-paths.py")
-    repo_local = os.path.join(rp.repo_config_dir(root), THRESHOLDS_FILE)
-    if os.path.isfile(repo_local):
-        return repo_local
-    return os.path.realpath(os.path.join(SCRIPT_DIR, "..", "config", THRESHOLDS_FILE))
-
-
-def load_thresholds(root, override=None):
-    """Read the declared levels. A missing or unreadable declaration is
-    DISCLOSED, never silently replaced by numbers invented here."""
-    path = thresholds_path(root, override)
-    uc = _load("resolve-user-config.py")
-    try:
-        data = uc.load_yaml(open(path, encoding="utf-8").read())
-    except (OSError, uc.YamlSubsetError) as exc:
-        return {"available": False, "source": path, "reason": str(exc), "levels": []}
-    declared = (data or {}).get("levels") or {}
-    order = (data or {}).get("order") or sorted(declared)
-    levels = []
-    for key in order:
-        entry = declared.get(key)
-        if not isinstance(entry, dict):
-            continue
-        levels.append({
-            "key": key,
-            "name": str(entry.get("name") or key),
-            "description": str(entry.get("description") or ""),
-            "min_evidence_pointers": int(entry.get("min_evidence_pointers") or 0),
-            "min_unconsumed_lessons": int(entry.get("min_unconsumed_lessons") or 0),
-            "min_live_items": int(entry.get("min_live_items") or 0),
-        })
-    if not levels:
-        return {"available": False, "source": path,
-                "reason": "the declaration names no levels", "levels": []}
-    return {"available": True, "source": path,
-            # Proposed values are visibly proposed: a run can never mistake an
-            # unratified calibration input for a settled rule.
-            "ratified": bool((data or {}).get("ratified")),
-            "levels": levels}
-
-
-def _pointer_subject(pointer):
-    """The subject a bare evidence pointer names, at PATH-FAMILY granularity
-    (Story 18.73, #614). Two items citing the same *family* of sources are
-    talking about the same thing.
-
-    The rule, and why it is shaped this way: use the pointer's **parent
-    directory** when that directory is at least two segments deep, else the
-    file stem.
-
-        docs/stories/18-54-x.md:3   -> docs/stories      (one cluster, not ~60)
-        specs/spec-tanuki-loop/SPEC.md:178 -> specs/spec-tanuki-loop  (per spec)
-        tools/tanuki-ledger:1403    -> tanuki-ledger     (per tool, as before)
-        README.md:1                 -> README
-
-    The old rule was the file stem alone, which at corpus scale made "cluster"
-    a synonym for "file": host-source items cite only themselves, so a
-    147-subtopic map was a directory listing wearing a map's clothes. The
-    depth-two condition is what keeps `tools/*` and `specs/*` per-item while
-    collapsing a deep directory of siblings — both behaviours the map needs.
-
-    A pointer containing whitespace is PROSE, not a path: `evidence:` in the
-    articles repo holds free-text strings with embedded paths, so a last `/`
-    can fall mid-sentence. Prose names no subject and is refused here rather
-    than becoming a cluster name (the `" (first shipped consumer, Epic 14)"`
-    case, Story 18.70/#616).
-
-    Pure derivation: recomputed every invocation, recorded nowhere.
-    """
-    head = str(pointer).split("#")[0].split(":")[0].strip()
-    if not head or re.search(r"\s", head):
-        return None
-    head = head.rstrip("/")
-    parent = os.path.dirname(head)
-    if parent.count("/") >= 1:
-        return parent
-    stem = os.path.splitext(os.path.basename(head))[0].strip()
-    return stem or None
-
-
-def subtopic_defect(item):
-    """A declared subtopic key that is PRESENT but unusable, as
-    `(key, reason)` — else None (Story 18.74, #614).
-
-    The existence lint's counterpart for this vocabulary. A malformed
-    declaration must be a config defect SURFACED BY NAME, never a silent
-    fallback to derivation: today a non-string value simply fails the type test
-    and the item quietly clusters by evidence instead, so a typo in the
-    articles repo is indistinguishable from no declaration at all. Same shape
-    as the ratified track->topic existence lint — the articles repo is
-    authoritative, so a declaration the map cannot honour is the repo's defect
-    to fix, and it says so rather than degrading.
-    """
-    for key in SUBTOPIC_KEYS:
-        if key not in item:
-            continue
-        declared = item[key]
-        if isinstance(declared, list):
-            if not declared:
-                return key, "declares an empty list; name one subtopic or remove the key"
-            if len(declared) > 1:
-                return key, (f"declares {len(declared)} values "
-                             f"({', '.join(map(str, declared[:3]))}...); an item belongs "
-                             "to ONE subtopic — only the first would be used")
-            declared = declared[0]
-        if not isinstance(declared, str):
-            return key, (f"declares a value of type {type(declared).__name__}, "
-                         "not a name; subtopic names are strings")
-        if not declared.strip():
-            return key, "declares an empty name; remove the key instead"
-    return None
-
-
-def subtopic_key(item):
-    """Which cluster an item belongs to, in a fixed, explainable order of
-    DECLARED PRECEDENCE (OQ1, closed 2026-07-23):
-
-      1. a declared `subtopic:`/`cluster:` from the articles repo — the repo's
-         frontmatter schema is the API, and it names its own subjects;
-      2. else the PATH FAMILY its evidence pointers agree on (Story 18.73);
-      3. else `(unclustered)`.
-
-    The articles repo is authoritative: a cluster disagreeing with a declared
-    name is this tool's defect, never the repo's. Nothing is cached — the
-    declaration is read at assembly time on every invocation, so the mismatch
-    check is RECOMPUTATION, never reconciliation, and no vocabulary is
-    mirrored into plugin state. Never invented from prose.
-    """
-    for key in SUBTOPIC_KEYS:
-        declared = item.get(key)
-        if isinstance(declared, list) and declared:
-            declared = declared[0]
-        if isinstance(declared, str) and declared.strip():
-            return declared.strip(), "declared"
-    subjects = [s for s in (_pointer_subject(p) for p in item.get("evidence", [])) if s]
-    if subjects:
-        # The most-cited subject, ties broken alphabetically (determinism).
-        best = sorted(set(subjects), key=lambda s: (-subjects.count(s), s))[0]
-        # Same guard the declared branch above already holds: a name that is
-        # empty once stripped is NOT a name. Falling through to `(unclustered)`
-        # is honest; rendering an unnamed heading is not.
-        if best.strip():
-            return best.strip(), "evidence-subject"
-    return UNCLUSTERED, "unclustered"
-
-
-def estimate_depth(density, thresholds):
-    """The strongest declared level whose every minimum the density meets, plus
-    the reason it landed there — the estimate is EXPLAINABLE from the same
-    numbers it was derived from, never an opaque score."""
-    if not thresholds.get("available"):
-        return {"level": None, "ratified": None,
-                "why": ("no depth-threshold declaration is readable, so no estimate "
-                        f"is offered ({thresholds.get('reason')})"),
-                "thresholds_source": thresholds.get("source")}
-    counted = {"evidence_pointers": density["evidence_pointers"],
-               "unconsumed_lessons": density["unconsumed_lessons"],
-               "live_items": density["live_items"]}
-    chosen, unmet = thresholds["levels"][0], []
-    for level in thresholds["levels"]:
-        missing = [f"{k} {counted[k]} < {level['min_' + k]}"
-                   for k in counted if counted[k] < level["min_" + k]]
-        if missing:
-            unmet = missing
-            break
-        chosen = level
-    why = (f"{chosen['name']}: {counted['evidence_pointers']} evidence pointer(s), "
-           f"{counted['unconsumed_lessons']} unconsumed lesson(s), "
-           f"{counted['live_items']} live item(s)")
-    if unmet:
-        why += f"; the next level needs {', '.join(unmet)}"
-    return {"level": chosen["name"], "description": chosen["description"],
-            "ratified": thresholds.get("ratified"),
-            "counted": counted, "why": why,
-            "thresholds_source": thresholds.get("source"),
-            # Stated in the artifact so no consumer can read the estimate as
-            # permission: thresholds gate SURFACING, never what the owner picks.
-            "gates": "surfacing only — never what the owner may pick"}
-
-
-# The bar's width when there is no readable level declaration to take it from.
-# Only reachable on the no-estimate path, where every bar is empty anyway.
-GLANCE_FALLBACK_WIDTH = 4
-
-
-def _glance(depth, density, thresholds=None):
-    """A one-line density rendering so a rich subtopic and a lone seed are
-    visibly different AT A GLANCE. Data, not a screen — composing the screen is
-    CAP-3's job.
-
-    THE BAR IS THE ESTIMATE, RENDERED (Story 18.69, #613): one segment per
-    declared level, filled up to and including the level this subtopic landed
-    in. Two subtopics at the same level render the same bar, and a stronger
-    level never renders fewer segments than a weaker one.
-
-    It previously filled one segment per NON-ZERO density dimension, which
-    measured dimension DIVERSITY rather than accumulated depth — so a
-    seed-only subtopic with 7 live items and no evidence rendered `[##..]`
-    while an 85-pointer article series rendered `[#...]`. The bar and the depth
-    word beside it moved independently and sometimes in opposite directions,
-    which inverts exactly the comparison CAP-2's success criterion promises.
-
-    The rendering stays explainable from the counts printed on the same line,
-    because those counts are precisely what `estimate_depth` used to choose the
-    level (see its `why`). And it stays a SIGNAL: the bar reports where the
-    material landed, never what the owner may pick.
-    """
-    names = [lv["name"] for lv in (thresholds or {}).get("levels") or []]
-    level = depth.get("level")
-    if names and level in names:
-        width, filled = len(names), names.index(level) + 1
-    else:
-        # No readable declaration, so there is no ladder to place this subtopic
-        # on. An empty bar beside `no estimate` is the honest render — a bar
-        # invented here would be the "opaque score" the estimate refuses to be.
-        width, filled = len(names) or GLANCE_FALLBACK_WIDTH, 0
-    bar = "#" * filled + "." * (width - filled)
-    return (f"[{bar}] {level or 'no estimate'} - "
-            f"{density['evidence_pointers']} ptr, "
-            f"{density['unconsumed_lessons']} unconsumed, "
-            f"{density['live_items']} live")
-
-
-def cluster_subtopics(items, consumption, thresholds):
-    """Group a topic's items into subtopics and annotate each with its
-    evidence-density signal and depth estimate."""
-    consumed_index = (consumption or {}).get("consumed_index") or {}
-    groups = {}
-    for item in items:
-        name, basis = subtopic_key(item)
-        g = groups.setdefault(name, {"subtopic": name, "basis": basis, "items": []})
-        g["items"].append(item)
-
-    out = []
-    for name in sorted(groups):
-        g = groups[name]
-        pointers, elements, unconsumed = set(), set(), set()
-        backlog, consumed_items = [], 0
-        for item in g["items"]:
-            pointers.update(item.get("evidence") or [])
-            cited = []
-            for key in ELEMENT_KEYS:
-                cited.extend(_as_list(item.get(key)))
-            elements.update(cited)
-            item_consumed = bool(cited) and all(e in consumed_index for e in cited)
-            for eid in cited:
-                if eid not in consumed_index:
-                    unconsumed.add(eid)
-            if item_consumed:
-                consumed_items += 1
-            if item["section"] == "backlog":
-                backlog.append({"slug": item["slug"], "status": item["status"]})
-        live_items = [i for i in g["items"] if i["live"]]
-        density = {
-            # The declared sources' shipped size proxy, summed. A SIGNAL only:
-            # no declared level takes a minimum over it (CAP-2 — depth remains
-            # a signal, never a gate), it just lets a thin doc and a thick one
-            # look different in the readout.
-            "source_lines": sum(i.get("source_lines") or 0 for i in g["items"]),
-            "evidence_pointers": len(pointers),
-            "pointers": sorted(pointers),
-            "lessons_cited": len(elements),
-            "unconsumed_lessons": len(unconsumed),
-            "unconsumed": sorted(unconsumed),
-            "backlog_items": backlog,
-            "items": len(g["items"]),
-            "live_items": len(live_items),
-        }
-        depth = estimate_depth(density, thresholds)
-        out.append({
-            "subtopic": name,
-            "clustered_by": g["basis"],
-            "density": density,
-            "depth": depth,
-            "glance": _glance(depth, density, thresholds),
-            # Consumed material is MARKED, never hidden — and stays pickable.
-            "consumed_items": consumed_items,
-            "consumed": consumed_items > 0 and consumed_items == len(g["items"]),
-            "selectable": True,
-            "items": [dict(i, consumed=bool(
-                [e for k in ELEMENT_KEYS for e in _as_list(i.get(k))])
-                and all(e in consumed_index
-                        for k in ELEMENT_KEYS for e in _as_list(i.get(k))))
-                for i in g["items"]],
-        })
-    return out
 
 
 def lesson_elements(topics, gloss_info, consumption):
@@ -1709,23 +1249,14 @@ def build_map(args):
         repo, mapping, args.max_surfaces, root=root)
     stale = sorted(t for t in mapping if t not in tracks_seen)
     consumption = consumption_view(root)
-    thresholds = load_thresholds(root, getattr(args, "thresholds", None))
-    # Declared-subtopic defects, surfaced BY NAME rather than degrading into a
-    # silent derivation (Story 18.74, #614). Collected before clustering so the
-    # disclosure covers every item, including ones whose declaration was
-    # unusable and which therefore clustered by evidence instead.
+    # The declared-subtopic defect disclosure (Story 18.74, #614) went with
+    # clustering (Story 20.7, #809): it reported malformed `subtopic:`/
+    # `cluster:` declarations so a typo could not degrade into a silent
+    # derivation. Nothing derives from those keys now, so there is no
+    # degradation left to guard — and a lint on a key this tool no longer
+    # reads would be reporting a defect with no consequence. The articles repo
+    # may keep declaring them; that is its own schema's business.
     subtopic_defects = []
-    for topic in topics:
-        for item in topic["items"]:
-            found = subtopic_defect(item)
-            if found:
-                key, reason = found
-                subtopic_defects.append({
-                    "item": item.get("slug") or item.get("surface") or "",
-                    "surface": item.get("surface") or "",
-                    "key": key,
-                    "reason": reason,
-                })
     # The PRIMARY selection units (stance-3 pivot, 2026-07-27, #799): every hub
     # Lesson and every served Journey rendering is its own element beside the
     # decision/reversal projection. Built before the join so every element
@@ -1735,11 +1266,14 @@ def build_map(args):
                 + journey_elements(gloss_info, consumption))
     # Topic↔evidence usability join (Story 18.96, #669) — annotate every item
     # AND every element with its usability verdict and collect the
-    # NEEDS-RECORDING worklist BEFORE clustering, so the subtopic-item copies
-    # carry the verdict too.
+    # NEEDS-RECORDING worklist.
     needs_recording, recording_target = journey_join(root, topics, elements)
+    # NO CLUSTERING (Story 20.7, #809). The subtopic cluster is abandoned, not
+    # tuned: one dogfood run spent its whole budget to produce a single usable
+    # line. Strands — Lessons and Journeys — are the selection unit, and they
+    # are already built above.
     for topic in topics:
-        topic["subtopics"] = cluster_subtopics(topic["items"], consumption, thresholds)
+        topic["subtopics"] = []
     return {
         "kind": "topic-map",
         # CAP-1, stated in the artifact itself: this object is a view of the
@@ -1752,11 +1286,10 @@ def build_map(args):
         "track_topics": mapping,
         "unmapped_tracks": sorted(t for t in tracks_seen if t not in mapping),
         "stale_mapping_tracks": stale,
-        # The articles repo is authoritative for subtopic names; a declaration
-        # this map cannot honour is the repo's defect, named here rather than
-        # silently replaced by a derived cluster.
-        "subtopic_defects": sorted(subtopic_defects,
-                                   key=lambda d: (d["item"], d["key"])),
+        # Retained as an always-empty key so a consumer reading `map.json`
+        # does not KeyError across the removal; nothing populates it since
+        # clustering went (Story 20.7, #809).
+        "subtopic_defects": subtopic_defects,
         "topics": topics,
         # The topic↔evidence join's product (Story 18.96, #669): the
         # NEEDS-RECORDING worklist for hub-lesson candidates whose episode no
@@ -1777,13 +1310,12 @@ def build_map(args):
                   "journey_renderings": len(gloss_info["journeys"])},
         "coverage": coverage,
         "consumption": consumption,
-        "depth_thresholds": thresholds,
         # The PRIMARY selection units (stance-3 pivot, 2026-07-27, #799):
-        # typed elements — hub Lessons and Journeys first-class, plus the
-        # decision/reversal projection — each individually selectable, each
-        # carrying its visible usability verdict. The subtopic clusters above
-        # are the DERIVED, SECONDARY grouping and never gate what is
-        # selectable. Derived per invocation and stored nowhere.
+        # typed strands — hub Lessons and Journeys first-class, plus the
+        # decision/reversal projection — each individually
+        # selectable, each carrying its visible usability verdict. Since the
+        # cluster removal (Story 20.7, #809) they are the ONLY units. Derived
+        # per invocation and stored nowhere.
         "elements": elements,
     }
 
@@ -1842,10 +1374,6 @@ def build_parser():
                              "surfaces this invocation may read (default "
                              f"{DEFAULT_MAX_SURFACES}). Surfaces beyond it are "
                              "NAMED in the coverage disclosure, never dropped.")
-        sp.add_argument("--thresholds", metavar="PATH",
-                        help="depth-threshold declaration override (default: the "
-                             "per-repo file, else the shipped "
-                             f"config/{THRESHOLDS_FILE})")
         return sp
 
     a = common(sub.add_parser("assemble", help="the whole map as JSON"))
