@@ -24,6 +24,8 @@ sources:
 
 > **Amended 2026-07-26 (triage, #745)** per /triage-gh on the hand-authored-source refusal (tanuki dogfood run loop-20260726-201337, scenario adapt-canonical-ja): adaptation of a canonical that never had a `generated_by` birth record refused with "the record is immutable … cannot be added later without recording something untrue" and named **no way forward** — unlike this plugin's other refusals, which state their remedy. The immutability rule is untouched: a birth record is set at creation and never updated (CAP-4 inheritance verbatim, `scripts/adapt-canonical.py:524`). What this amendment adds is the missing creation act for the class of canonicals born outside the pipeline: an **owner-confirmed adoption step** mints a **truthful** birth record on the source canonical — `generated_by: owner-authored, adopted <YYYY-MM-DD>` — recording exactly what is true (hand authorship and the adoption date), never a fabricated run pointer. Adoption is explicit and gated (one confirmation naming the file and the record to be written; declining writes nothing), runs through the one canonical write path, and happens at most once per canonical — a source that already carries any birth record is not adoptable (immutability holds). The refusal text now names adoption as its remedy. Hand-authored canonicals thereby enter adaptation through the same CAP-1/CAP-3 gate as pipeline-born ones; nothing else about derivation changes.
 
+> **Amended 2026-07-27 (triage, #800)** per /triage-gh on an owner report that generated Japanese articles are structurally correct but carry "a large number of expressions no human writer would naturally use". The diagnosis is a **vacuously passing floor, not a missing pass**: CAP-4 already scoped a derived canonical's review to "language/framing quality plus claims-conformance", and OQ2 already parked the ceiling for first real use — but the language half named **no criterion**, so structure could pass while register failed and nothing in the review contract was violated. Meanwhile the target language's conventions were *already declared* and *already authoritative for generation* (`config/language-conventions.yaml:175` declares `ja` register as です/ます with no mixed 常体; `scripts/adapt-canonical.py:224-241` loads it), and were read **only** on the way in — so the pipeline instructed a register it never checked. This amendment closes that asymmetry: **review grades what adaptation was told to produce.** Scope stated: the four-dimension quality rubric is untouched (`skills/draft-article/quality-rubric.md` remains the closed set, EN drafts unaffected, the Stage 3→4 gate unchanged) — a fifth global dimension would have generalized a Japanese defect into an English gate. **Known cost, stated rather than assumed away:** this opens SPEC-article-review's deliberately-closed blocker-criterion set by one, scoped to derived canonicals; if that scoping blurs, the anchor weakens. Nothing here tunes a prompt — the owner's concrete examples are owed as a calibration set first, and tuning against zero examples is explicitly out of scope (carried as a story question, never as an acceptance criterion). No consult backed this: the served surface was consulted at this sitting and returned a **miss** (`consulted: hub@<private-pin> miss`) — it holds no position on naturalness as a graded dimension, so this is a new position rather than an applied one.
+
 > **Canonical contract.** This SPEC introduces the **adaptation step**: a
 > standalone, owner-gated invocation that derives a target-language canonical
 > (first target: Japanese) from a reviewed English canonical. It exists to keep
@@ -150,7 +152,18 @@ source material ──draft flow──▶ EN canonical ──emit──▶ devto
     its own `canonical-sha256` trailer like any canonical. It is eligible for
     review as a canonical; claim *verification* does not re-run (claims are
     inherited under CAP-2), review scope is language/framing quality plus
-    claims-conformance against the source. **A review round that applies edits
+    claims-conformance against the source. **The language half is graded
+    against the target language's DECLARED conventions** (amended 2026-07-27,
+    #800): `register` and `terminology` for that language code in
+    `config/language-conventions.yaml` are the criterion, so "language quality"
+    names a test with a definite verdict rather than a reviewer's taste. The
+    declaration already exists and is already authoritative for *generation*
+    (`scripts/adapt-canonical.py:224-241` loads it; `config/language-conventions.yaml:175`
+    declares `ja` as です/ます, no mixed 常体) — what this adds is that **review
+    grades what adaptation was told to produce**. A derived canonical whose
+    prose diverges from its declared register is a finding against that named
+    criterion; severity follows SPEC-article-review's criterion-anchored rule
+    (amended the same sitting). **A review round that applies edits
     to it re-enters on ANCESTRY evidence, not a provenance map** (amended
     2026-07-25, #704): the pin **well-formed** (checked by the gate itself),
     `lint-ancestry` **reported as a required check** the way the authored
@@ -204,9 +217,20 @@ source material ──draft flow──▶ EN canonical ──emit──▶ devto
   profile-pointer (no new declaration type) but the profile is packaging-scoped
   by ratified decision (intent vs packaging, 2026-07-16) — resolve at
   implementation with that boundary in view.
-- **OQ2 — review depth for derived canonicals.** Whether the full 9-axis rubric
-  or a reduced language/framing + claims-conformance pass applies. CAP-4 sets
-  the floor; the ceiling is an owner decision at first real use.
+- **OQ2 — review depth for derived canonicals. PARTLY RESOLVED 2026-07-27
+  (#800); the ceiling half stays open.** Whether the full 9-axis rubric or a
+  reduced language/framing + claims-conformance pass applies. CAP-4 sets the
+  floor; the ceiling is an owner decision at first real use. **First real use
+  has now occurred and reported a result**: JA canonicals came out structurally
+  correct but full of expressions no human writer would naturally use — so the
+  floor's language half was passing vacuously, because nothing graded it. The
+  **language half is therefore resolved**: it grades against the declared
+  `register`/`terminology` (CAP-4 above). What stays open is the original
+  ceiling question — whether the full rubric additionally applies to a derived
+  canonical — which this amendment deliberately does **not** answer, because
+  the four rubric dimensions are English-shaped (dimension 4 is mechanical over
+  English readability metrics) and extending them to a second language is a
+  separate decision with its own evidence.
 - **OQ3 — what `date` MEANS on a canonical (routed OUT of this spec, not open
   here).** Added 2026-07-25 (#700). Observed on the first derived canonical:
   `tanuki-honest-automation.ja.md` was derived on 2026-07-25 and carries
