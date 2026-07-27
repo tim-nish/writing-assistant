@@ -321,6 +321,55 @@ sources:
 > Free-form answer, element-level selection, and the hand-off to the existing
 > stage-0 `--brief` path are all unchanged — there is still no second proposer.
 
+> **Amended 2026-07-27 (re-triage of #809, later the same day) — the AXIS
+> decision above is SUSPENDED, and the cross-topic combination move SURVIVES
+> the cluster removal.** Two corrections to the sitting recorded immediately
+> above, both found by consulting the served surface rather than by reasoning
+> from this repository.
+>
+> **1. The axis is unresolved, and this spec says so rather than picking.** The
+> amendment above chose the served gloss tag as Screen 1's axis, on a verified
+> fact that still stands: there is **no served Lesson→Topic membership**, the
+> two vocabularies share only 3 names, and 6 of 9 topics carry no lessons
+> shard. Later the same day the upstream surface was found to have **ratified
+> "Topic-first navigation" by name**, together with the abandonment of the
+> cluster unit. Both cannot be honoured at once: the upstream verdict takes
+> precedence, and it is **not implementable by a consumer** — ratifying
+> Topic-first does not bring a membership surface into existence, and both
+> escape routes are already closed (a consumer-side tag→Topic mapping is
+> Declined upstream; CAP-4 forbids a map-side workaround). **So neither is
+> adopted here.** The conflict is recorded as a conflict — per the standing
+> rule that a later-dated upstream verdict wins **and the conflict is a finding
+> to surface, never to resolve silently** — and the axis is decided in its own
+> sitting, against the upstream, not inside this spec. **OQ8 is therefore no
+> longer a footnote: it is the blocking item.** Until it closes, Screen 1's
+> axis is **undecided**, and any story that would encode an axis is held.
+> Recorded: `owner decision record — 2026-07-27 (terrain axis suspended;
+> combinations re-based)`.
+>
+> **2. Cross-topic combinations are re-based, not retired.** Removing the
+> subtopic unit would have deleted the combination move as a side effect —
+> `candidates()` derives combinations *only* from subtopic pairs — and CAP-3
+> calls that move "the 'connect these topics along this axis' move that is the
+> reason the map exists". Nothing in the dogfood evidence rejected it: the runs
+> rejected **clustering**, and the combination move was collateral. **It
+> survives, re-based onto the selection unit**: two units from different axis
+> members that **share evidence** propose a combination, on the same rule as
+> today — a shared evidence source names the axis, and a pair with nothing
+> shared is a hunch the owner may voice at free-form and the machine may not
+> propose. Feasibility is verified, not assumed: the pairing rule reads shared
+> evidence-source stems, and the units carry an `evidence` cite list, so the
+> rule transfers to a different field. This is a derivation change, not a
+> rename. *(No served position exists on the combination move — consulted
+> 2026-07-27, miss. This is a consumer decision and is recorded as one.)*
+>
+> **3. Vocabulary: the unit is a STRAND, and `Seed` is rejected.** The upstream
+> gate of 2026-07-27 ratified **Strand** (one Lesson or Journey selected as
+> material; the selectable unit) and **Thesis**, and **rejected `Seed`** on a
+> two-way name collision. #803's body and the story text derived from it say
+> "Seeds"; that wording is superseded. This spec uses **Strand** for the
+> selectable unit from here.
+
 # Terrain
 
 ## Why
@@ -832,11 +881,18 @@ flows into the existing brief/structures path unchanged.**
   lane grounded in the consumer's code and not in the served surface. Grounding
   a claim about an upstream surface means consulting that surface.)*
 
-- **OQ8 — can the hub Topic ever be the navigation axis?** *(Raised 2026-07-27
-  by the #803 sitting, which disproved the premise that it already could be.)*
-  Screen 1 navigates by **served gloss tag** because that is the axis whose
-  membership the seam actually serves. The hub Topic is the structure the owner
-  actually maintains by hand, and it remains the more meaningful axis — but
+- **OQ8 — can the hub Topic ever be the navigation axis? BLOCKING (raised
+  2026-07-27 by the #803 sitting, which disproved the premise that it already
+  could be; escalated to blocking the same day by the #809 re-triage, which
+  found the upstream had ratified Topic-first navigation by name).** While this
+  is open, **Screen 1's axis is undecided and no story may encode one** — the
+  consumer cannot honour the upstream ratification without a served membership
+  surface, and it will not diverge from it silently either.
+  The gloss tag was chosen as the axis on 2026-07-27 because that is the axis
+  whose membership the seam actually serves; **that choice is suspended, not in
+  force** (see the re-triage amendment above). The hub Topic is the structure
+  the owner actually maintains by hand, and the upstream has now ratified
+  Topic-first navigation by name — but
   there is **no served Lesson→Topic membership**, the two vocabularies overlap
   in only 3 names, and 6 of 9 topics carry no lessons shard at all. Two
   non-answers, both already ruled out rather than merely unattractive:

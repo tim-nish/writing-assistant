@@ -698,7 +698,15 @@ INTERNAL_VOCAB = (
     "hub-lessons", "host-sources", "articles-items",
     "unclustered", "subtopic:", "cluster:", "frontmatter",
     " ptr,", " ptr)", "unconsumed", "live item", "density",
+    # Retired vocabulary is NOT banned here — see check-retired-vocabulary.sh.
+    # This lint runs over composed lines that QUOTE THE MATERIAL'S OWN WORDS
+    # (CAP-3 substance-led rendering), so it cannot tell the tool's vocabulary
+    # from the owner's content on the same line. Banning a common word here
+    # fires on content: "seed" flagged a fixture subtopic named "seed-heavy".
+    # The retired-vocabulary rule belongs at the layer where the TOOL's words
+    # are written, which is the source text.
 )
+
 
 
 def lint_owner_lines(lines):
@@ -735,7 +743,7 @@ def _terrain_size_line(topics, subs, elements=0):
     def plural(n, word):
         return f"{n} {word}" if n == 1 else f"{n} {word}s"
 
-    return (f"{plural(elements, 'element')} — each its own article idea — "
+    return (f"{plural(elements, 'element')} — each its own Strand — "
             f"and {plural(topics, 'topic')} containing "
             f"{plural(subs, 'subtopic')}")
 
@@ -770,7 +778,7 @@ def compose_view(map_data, cands):
         "",
         "Answer with an element's index (for example L3) or a subtopic's",
         "index (for example T1.2) and a short note about the angle you want.",
-        "Free text always wins. Each element is its own article idea, and its",
+        "Free text always wins. Each element is its own Strand, and its",
         "writability verdict is a disclosure, never a gate: an element whose",
         "evidence is not yet recorded is as pickable as a matched one —",
         "picking it records the gap and the draft still proceeds. Material",
@@ -884,7 +892,7 @@ def compose_payload(map_data, cands, view_path=None):
     item = {
         "where": _clip(
             f"Terrain at {map_data.get('coverage', {}).get('pin')}: "
-            f"{len(els)} element(s) — each its own article idea — and "
+            f"{len(els)} element(s) — each its own Strand — and "
             f"{len(topics)} topic(s), {len(subs)} subtopic(s) ({terrain}); "
             f"{consumed} already consumed and still selectable.", BUDGETS["where"]),
         "why": _clip(
@@ -927,7 +935,7 @@ def _compose_summary_payload(map_data, view_path):
     item = {
         "where": _fit_with_path(
             f"Terrain at {map_data.get('coverage', {}).get('pin')}: "
-            f"{len(els)} element(s) — each its own article idea — and "
+            f"{len(els)} element(s) — each its own Strand — and "
             f"{len(topics)} topic(s), {len(subs)} subtopic(s) ({terrain}); "
             f"{consumed} already consumed and still selectable. Too many to "
             f"fit on one screen.", view_path, BUDGETS["where"]),
