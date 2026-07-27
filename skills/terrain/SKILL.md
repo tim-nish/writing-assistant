@@ -213,7 +213,7 @@ nothing — re-run the map.
 
 ```
 python3 ${CLAUDE_PLUGIN_ROOT}/scripts/topic-map-directions.py brief \
-  --answer "$WS/answer.json" --map "$WS/map.json"
+  --payloads "$WS/presented-payloads.jsonl" --map "$WS/map.json"
 ```
 
 The outcome is a **brief in the owner's words**. Free text always wins;
