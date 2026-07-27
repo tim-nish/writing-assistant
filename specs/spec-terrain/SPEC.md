@@ -173,6 +173,77 @@ sources:
 > or on forward-only versus retrofit sweeps (`coverage: low`) — this decision is
 > the owner's, taken without a discriminating served line.
 
+> **Amended 2026-07-27 (#799) — the stance-3 tripwire FIRED; the pivot
+> executes.** Fired by **direct owner report**, at a severity beyond the
+> recorded tripwire: the shipped flow announced it would cluster and placed
+> almost the whole Lesson/Journey corpus into **one cluster**, so the corpus
+> yielded exactly one article idea — and the owner could not split it, because
+> **selection at the element level did not exist as a surface**. The tripwire
+> was written for a cluster split into ≥2 ideas at selection time; what was
+> observed was a terrain with no selection to split. Two ratified stances were
+> additionally violated in shipped behavior: the flow refused to draft when
+> Evidence was judged missing (stance 2), and with no element surface the
+> owner could never reach the place where a recording gap would be visible, so
+> the NEEDS-RECORDING product never materialized (stance 4). Owner ruling: "a
+> mechanism is not correct merely because it behaves according to its own
+> internal rules — if the user experience is bad, it is a mechanism built on
+> an incorrect design."
+>
+> **1. Elements are the PRIMARY selection unit.** The terrain lists **typed
+> elements — hub Lessons and Journeys — as the primary, individually
+> selectable article-idea units**: N elements are N distinct selectable ideas,
+> in their own index namespaces (`L<n>` lessons, `J<n>` journey renderings,
+> `E<topic>.<n>` decisions/reversals — stable within a pin, pin mismatch
+> refused, exactly as `T<topic>.<subtopic>`). This supersedes CAP-2's "the
+> subtopic cluster remains the map's primary unit" sentence. The **cluster is
+> demoted to a derived, secondary grouping**: it stays on the View below the
+> elements, labeled as derived, and **clusters never gate what is selectable**
+> — the flow no longer opens by clustering. This is the re-projection stance 3
+> pre-arranged (elements were already first-class), not a rebuild; CAP-1's
+> derived-never-stored properties are untouched.
+>
+> **2. Each element slot quotes the Gloss.** The slot's text is the served
+> `gloss:` / `journey_gloss:` rendering — the plain-register field the hub
+> ratifies at its distill gate (the hub's gloss contract; the ratified work
+> order carried on #726, step 3 — hub side complete, provenance private) —
+> reached through the seam's two-tier `gloss_index`
+> surface, **never the recall one-liner** (the pre-ratified "exactly one
+> amendment": quote the field instead of the one-liner). The one-liner remains
+> identification. Where the rendering is not served — the tool absent from the
+> deployed gateway, the surface undeclared in operator config, or no entry for
+> the lesson — the slot **discloses the absence with its reason**; nothing is
+> substituted for a ratified rendering, and serving it is a hub-side act,
+> never a consumer-side workaround.
+>
+> **3. Evidence-independence is enforced end to end.** Every element carries
+> its three-valued writability verdict **visibly on its row** — matched (with
+> the evidence pointers checked) / episodic-unrecorded / no-episode — plus
+> `cannot-determine` as the lookup's honest fourth outcome where no join key
+> exists (decision/reversal elements). Verdicts are **surfacing, never
+> filters, and never refusals**: an unmatched element stays selectable, and
+> selecting one yields the **gap disclosure plus a NEEDS-RECORDING tracking
+> artifact in the target repo** (an Issue, or an append under a
+> `## NEEDS-RECORDING` heading in the declared journey doc — the map names the
+> target on `recording_target`) while the draft **proceeds**. `no-episode`
+> ideas are offerable on the owner-attributed framing tier (a framing
+> contribution, not sourced claims), stated as such. The do-not-write-on-
+> missing-Evidence behavior is removed and may not return: there is no refusal
+> path on evidence anywhere in this surface.
+>
+> **Unchanged, stated so it is not re-litigated:** one screen, capped and
+> ranked, candidate directions plus free-form every time; the chosen direction
+> hands off to the existing stage-0 `--brief` path as brief text only (no
+> second structure proposer); all intermediates resolve through the path
+> resolver into the run workspace; the View is regenerated whole and never
+> read back; no cluster or topic name is invented — an unnamed grouping is
+> described by its contents; coverage and bounds stay disclosed per family
+> (the gloss surface is a declared family with the same
+> declared-but-not-enumerated disclosure shape).
+> **Forward-only.** Closed stories keep their wording; the hub-side companion
+> record (the ratification-seam half of the tripwire firing) is staged in the
+> hub's own intake, proposal-only, per the dogfood-findings-venue rule —
+> mechanism public, provenance private.
+
 # Terrain
 
 ## Why

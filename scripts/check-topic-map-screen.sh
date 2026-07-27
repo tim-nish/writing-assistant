@@ -440,15 +440,16 @@ def check(cond, msg):
 heads = re.findall(r"^#{2,4} (.+)$", view, re.M)
 check(heads and heads[0] == "Candidate directions",
       f"the View's FIRST section is the candidate directions (got {heads[:1]})")
-check("The terrain at a glance" in heads
-      and heads.index("The terrain at a glance") == 1,
-      "the at-a-glance summary is the SECOND section, before any detail")
+check("Subtopic clusters — a derived, secondary grouping" in heads
+      and heads.index("Subtopic clusters — a derived, secondary grouping") == 1,
+      "the cluster summary is the SECOND section, demoted to a derived "
+      "grouping (#799), before any detail")
 first_detail = next((i for i, h in enumerate(heads) if re.match(r"T\d+\.\d+ — ", h)), None)
 check(first_detail is not None and first_detail > 1,
       "per-subtopic detail comes only AFTER directions and the summary")
 
 # Every derived direction reaches the View, with the index selection uses.
-block = view.split("## The terrain at a glance")[0]
+block = view.split("## Subtopic clusters — a derived, secondary grouping")[0]
 # Since Story 18.81 (#647) elements are presented HERE, among the directions,
 # rather than in a section of their own — so every candidate is covered.
 directional = list(cands)
@@ -456,13 +457,19 @@ missing = [c["id"] for c in directional if f"**{c['id']}**" not in block]
 check(not missing, f"every derived direction appears in the section ({missing[:3]})")
 check(len(directional) > 7, f"the fixture derives an over-budget candidate set ({len(directional)})")
 
-# The combination move stays visible where the owner looks: combinations are
-# few and are listed FIRST, so the singles cannot push them below the fold.
+# ELEMENTS OPEN THE LIST (the stance-3 pivot, #799): the typed elements are
+# the primary selection units. The combination move stays visible right after
+# them, before the demoted cluster singles.
 rows = re.findall(r"^- \*\*(\S+)\*\* — (.+)$", block, re.M)
+elem_ids = {c["id"] for c in cands if c["kind"] == "element"}
 combo_ids = {c["id"] for c in cands if c["kind"] == "combination"}
 check(combo_ids, "the fixture derives at least one cross-topic combination")
+check(elem_ids, "the fixture carries elements to open the list")
+epos = [i for i, (rid, _) in enumerate(rows) if rid in elem_ids]
+check(epos and max(epos) < len(elem_ids),
+      "the elements — the primary units — open the candidate list (#799)")
 positions = [i for i, (rid, _) in enumerate(rows) if rid in combo_ids]
-check(positions and max(positions) < len(combo_ids),
+check(positions and max(positions) < len(elem_ids) + len(combo_ids),
       "combinations are listed before the single-subtopic directions")
 
 # Roughly ten pickable candidates in the first screenful — the whole point of
@@ -475,7 +482,7 @@ check(len(re.findall(r"^- \*\*", head, re.M)) >= 10,
 # carries the material's own claim where there is one, and the subject alone
 # where there is not — the glance (`[bar] level - N ptr`) is a description of
 # the corpus and now lives in the subtopic's own block.
-summary = view.split("## The terrain at a glance")[1].split("\n## ")[0]
+summary = view.split("## Subtopic clusters — a derived, secondary grouping")[1].split("\n## ")[0]
 srows = re.findall(r"^- \*\*(T\d+\.\d+)\*\* — \S", summary, re.M)
 check(len(srows) == len(set(srows)) and len(srows) >= 10,
       f"the summary carries one line per subtopic ({len(srows)})")
@@ -613,7 +620,7 @@ check(len(set(eids)) == len(eids), "element ids are unique")
 heads = re.findall(r"^#{2,4} (.+)$", view, re.M)
 check("What you decided" not in heads,
       f"elements have no section of their own ({heads[:4]})")
-block = view.split("## The terrain at a glance")[0]
+block = view.split("## Subtopic clusters — a derived, secondary grouping")[0]
 check(all(f"**{i}**" in block for i in eids),
       "every element appears among the candidate directions, with its index")
 check("reversal" in block and "decision" in block, "each element's kind is shown")
