@@ -14,7 +14,12 @@ root=$(git rev-parse --show-toplevel 2>/dev/null) || {
 cd "$root"
 
 TPL="skills/review-article/starter-article.md"
-SKILL="skills/review-article/SKILL.md"
+SKILL=$(mktemp)
+cat skills/review-article/SKILL.md skills/review-article/phases/entry.md \
+    skills/review-article/phases/passes.md skills/review-article/phases/arbitration.md \
+    skills/review-article/phases/reentry.md > "$SKILL"
+# ^ story 20.13 (#818): the skill is now a dispatcher + phase companions; checks
+#   assert over the concatenation, whose order matches the pre-split file.
 LINT="scripts/lint-article"
 RUC="scripts/resolve-user-config.py"
 EXAMPLE="config/user-config.example.yaml"
