@@ -114,6 +114,55 @@ sys.exit(1 if fail else 0)
 PYEOF
 [ $? -eq 0 ] || fail=1
 
+# --- E rows disclose an un-served rendering; row kinds are named ------------
+# (Story 20.20, #843.) A decision/reversal Strand with no served rendering
+# carries the SAME not-served disclosure shape lesson rows use — the raw
+# recall-register topic line is never presented as if it were a rendering —
+# and the disclosure retires BY DETECTION the moment a rendering is served.
+python3 - "$D" <<'PYEOF' || fail=1
+import importlib.util, sys
+spec = importlib.util.spec_from_file_location("dv", sys.argv[1])
+m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+fail = []
+def check(cond, msg):
+    print(("ok:   " if cond else "FAIL: ") + msg, file=sys.stdout if cond else sys.stderr)
+    if not cond: fail.append(msg)
+
+raw = ("The disposition axis is ADOPTED for the hub's own lane: a parked "
+       "item's state must be legible on the issue.")
+bare = {"kind": "decision", "summary": raw, "topic": "knowledge-architecture",
+        "date": "2026-07-22", "situation": "x:1@abc1234",
+        "evidence": ["x:1@abc1234"], "consumed": False}
+line = m._element_direction(bare)
+check("its plain-language rendering is not being served" in line,
+      "an un-served decision row carries the lesson-row disclosure shape")
+check(raw not in line,
+      "the raw topic line is never presented as if it were a rendering")
+check("2026-07-22" in line and "knowledge-architecture" in line,
+      "the disclosure still identifies the record (date and source)")
+served = dict(bare, gloss="We adopted a rule that a parked item says so on "
+                          "its own issue.")
+line2 = m._element_direction(served)
+check("not being served" not in line2 and served["gloss"] in line2,
+      "a served rendering retires the disclosure by detection")
+mm = {"kind": "topic-map", "topics": [], "coverage": {"pin": "h@1"},
+      "elements": [bare]}
+cand = m.candidates(mm)[0]
+check(not cand.get("why"),
+      "an un-served decision row leads with no claim (fallback-shaped)")
+check(m.candidates({"kind": "topic-map", "topics": [],
+                    "coverage": {"pin": "h@1"},
+                    "elements": [served]})[0].get("why") == served["gloss"],
+      "a served rendering becomes the row's claim")
+sys.exit(1 if fail else 0)
+PYEOF
+[ $? -eq 0 ] || fail=1
+
+# --- the row-kind legend is on both reading surfaces ------------------------
+grep -q "What each row IS" "$D" \
+  && ok "the row-kind legend is composed for the reading surfaces" \
+  || err "the row-kind legend is missing"
+
 # --- the Journey shortfall is DISCLOSED, detection-based (Story 20.10, #812) --
 python3 - "$D" <<'PYEOF' || fail=1
 import importlib.util, sys

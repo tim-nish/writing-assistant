@@ -525,10 +525,17 @@ brief = mod.brief_from_answer(
 check(claim in brief and brief.endswith("resolved — my angle"),
       "the composed brief carries the full claim and ends on a source word, never mid-word")
 
-# An element summary is carried whole for the same reason (the element path
-# carried the same clip since 18.80).
-ed = mod._element_direction({"kind": "reversal", "summary": claim, "date": "2026-07-23"})
-check(claim in ed, "an element summary is carried whole into its direction too")
+# A served decision/reversal rendering is carried whole for the same reason
+# (Story 20.20, #843: the direction quotes the SERVED rendering; the raw
+# topic-line summary is never presented as one, so the no-clip property now
+# attaches to the gloss).
+ed = mod._element_direction({"kind": "reversal", "gloss": claim,
+                             "summary": "raw line", "date": "2026-07-23"})
+check(claim in ed, "a served element rendering is carried whole into its direction too")
+bare = mod._element_direction({"kind": "reversal", "summary": claim,
+                               "date": "2026-07-23"})
+check(claim not in bare and "not being served" in bare,
+      "an un-served element discloses instead of quoting the raw topic line")
 sys.exit(1 if fail else 0)
 PYEOF
 [ $? -eq 0 ] || fail=1
@@ -612,7 +619,10 @@ python3 "$D" payload --map "$work/small-el.json" > "$work/small-el-payload.json"
 python3 - "$work/small-el-payload.json" <<'PYEOF' && ok "elements are offered on the in-conversation screen, not only in the View" || err "elements never reach the small-map screen"
 import json, sys
 labels = [c["label"] for c in json.load(open(sys.argv[1]))["items"][0]["choices"]]
-assert any("A small-map decision" in l for l in labels), labels
+# The decision row reaches the screen as a DISCLOSURE-shaped direction (Story
+# 20.20, #843): identified by kind, date and record — its raw topic line is
+# not the label any more.
+assert any("cover the decision" in l and "2026-07-20" in l for l in labels), labels
 assert any("name your own" in l for l in labels) and labels[-1] == "stop here", labels
 PYEOF
 [ $? -eq 0 ] || fail=1
