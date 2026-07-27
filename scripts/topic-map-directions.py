@@ -813,11 +813,65 @@ def member_sections(map_data, tag):
                         if str(t).strip() and str(t).strip() != tag)
         key = others[0] if others else tag
         sections.setdefault(key, []).append(el)
+    # THE SECTIONING CONTRACT (owner ruling, #850 D4; Story 20.23, #852): no
+    # direct parent section holds more than 20% of the member's Strands —
+    # subdivide, deterministically, until every one is under the bound. The
+    # small-member floor keeps the rule from degenerating into one-Strand
+    # sections: a section is never required below SECTION_FLOOR Strands. A
+    # section that cannot subdivide further (no additional shared label
+    # distinguishes its Strands) keeps its size and DISCLOSES the bound on
+    # its title line — the contract is violated visibly, never silently.
+    total = len(strands)
+    cap = max(SECTION_FLOOR, int(total * SECTION_SHARE_CAP))
     ordered = []
     for key in sorted(sections):
         title = (f"also {key}" if key != tag else f"{tag} alone")
-        ordered.append({"title": title, "strands": sections[key]})
-    return {"member": tag, "count": len(strands), "sections": ordered}
+        for sub_title, group, note in _subdivide_section(
+                title, sections[key], {tag, key}, cap):
+            ordered.append({"title": sub_title, "strands": group,
+                            "note": note})
+    return {"member": tag, "count": total, "sections": ordered}
+
+
+# The sectioning contract's constants (Story 20.23, #852): the 20% bound is
+# the owner's ruling verbatim; the floor is this implementation's stated
+# small-member guard (20% of 5 is 1 — a rule that forces one-Strand sections
+# helps nobody, so no section is required smaller than this).
+SECTION_SHARE_CAP = 0.2
+SECTION_FLOOR = 3
+
+
+def _subdivide_section(title, group, used_tags, cap):
+    """One section, subdivided until under the cap — or disclosed.
+
+    Deterministic: subdivision keys on each Strand's alphabetically-first
+    co-tag not already used by the section's ancestry (the same rule that
+    named the section), recursing with compound titles. Strands with no
+    further co-tag gather under the parent title. Yields
+    `(title, strands, note)` triples; `note` is the visible disclosure when a
+    group stays over the cap because no further shared label subdivides it.
+    """
+    if len(group) <= cap:
+        yield title, group, None
+        return
+    subs = {}
+    for el in group:
+        others = sorted(str(t).strip() for t in (el.get("tags") or [])
+                        if str(t).strip() and str(t).strip() not in used_tags)
+        subs.setdefault(others[0] if others else "", []).append(el)
+    if len(subs) <= 1:
+        yield (title, group,
+               "over the one-fifth bound — no further shared label "
+               "subdivides it")
+        return
+    for key in sorted(subs):
+        if not key:
+            note = ("over the one-fifth bound — no further shared label "
+                    "subdivides it") if len(subs[key]) > cap else None
+            yield title, subs[key], note
+            continue
+        yield from _subdivide_section(f"{title} + {key}", subs[key],
+                                      used_tags | {key}, cap)
 
 
 def _strand_context_line(el, member_tag):
@@ -870,7 +924,10 @@ def compose_member_listing(map_data, tag, cands):
     if jline:
         lines += [_clip_line(jline), ""]
     for sec in ms["sections"]:
-        lines.append(f"## {sec['title']} ({len(sec['strands'])})")
+        head = f"## {sec['title']} ({len(sec['strands'])})"
+        if sec.get("note"):
+            head += f" — {sec['note']}"
+        lines.append(head)
         lines.append("")
         for el in sec["strands"]:
             c = by_slug.get(el.get("slug"))
