@@ -244,6 +244,29 @@ sources:
 > hub's own intake, proposal-only, per the dogfood-findings-venue rule —
 > mechanism public, provenance private.
 
+> **Amended 2026-07-27 (triage, #802) — the View is the header plus Candidate
+> Directions, and nothing else.** Owner review of a 2,511-line generated view
+> (pinned `b574b37`): roughly **2,300 lines** after Candidate Directions —
+> "The terrain at a glance", "Maintenance", "Diagnostics" — served no function
+> the owner could identify ("the sections contained information whose purpose
+> was impossible to understand"), making them pure size and token cost. Two
+> clauses were holding them in place and both are amended above rather than
+> worked around: CAP-2's depth answerability, which pointed *at the
+> per-subtopic detail* and now points at the header's terrain-size line; and
+> CAP-4's disclosure duty, which is satisfied by a **line** and never by a
+> section. **Removal is of the emitting code paths, not just the rendering**,
+> so the assembly cost disappears with the output — a section deleted at
+> render time is still paid for. This is cheap to reverse and cheap to
+> supersede: the View is explicitly "a RENDERING … fully regenerated every
+> invocation and NEVER read back by any code path. Deleting it loses nothing"
+> (`scripts/topic-map-directions.py:894-898`). **Scope stated:** this decides
+> what the View *contains* under the current selection model; it does not
+> decide the model. The clustering-removal and Topic-first navigation proposal
+> (#803) is **escalated to its own spec session** and may supersede this
+> amendment wholesale — accepted deliberately, because the dead sections cost
+> tokens on every invocation until then and die under every candidate outcome
+> of that session.
+
 # Terrain
 
 ## Why
@@ -472,8 +495,12 @@ flows into the existing brief/structures path unchanged.**
     - **Counts demote.** Evidence-pointer counts, unconsumed/live tallies and
       depth arithmetic are map *metadata*: they may appear as a trailing
       annotation at most, and never as the content of a direction or terrain
-      line. CAP-2's "why this depth?" is still answerable — from the per-
-      subtopic detail, not from the ranked lines.
+      line. CAP-2's "why this depth?" is still answerable — **from the
+      header's terrain-size line** (amended 2026-07-27, #802; previously "from
+      the per-subtopic detail", which no longer exists on the view). The
+      counts that answer it are the topic/subtopic/element totals the size
+      line already carries; depth answerability is therefore a **property of
+      the header**, not a reason to retain a section.
     - **Elements are directions.** The element projection (CAP-2, Story 18.80)
       reaches the **same** candidate list the subtopics do and is presented
       **inside** the candidate directions, not in a section of its own. Two
@@ -523,6 +550,16 @@ flows into the existing brief/structures path unchanged.**
     harvest uses. **"Complete" is complete over a named denominator**: a
     coverage claim that does not name the families it covers is the defect
     this clause exists to prevent.
+    **Disclosure is a LINE, never a section (amended 2026-07-27, #802).** The
+    duty above is satisfied by the one-line coverage and gloss disclosures
+    that already sit directly under the candidate directions
+    (`_element_coverage_line`, `_gloss_disclosure_line` in
+    `scripts/topic-map-directions.py`), and by at most a one-line note in the
+    header when the assembly was bounded. A disclosure that grows into its own
+    section is **not** better disclosure: the observed failure is that ~2,300
+    of a 2,511-line view served no purpose the owner could identify, so the
+    duty was being discharged by volume rather than by legibility. What is
+    owed is that the denominator is *named*, not that it is *expanded*.
   - **the element family is bounded by the seam, and says so (added
     2026-07-23, #631/OQ4).** CAP-2's element projection reads the recall
     surface through the pinned read-only pointer, which serves `GLOSSARY.md`,
