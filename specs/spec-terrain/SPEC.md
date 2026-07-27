@@ -321,9 +321,31 @@ sources:
 > Free-form answer, element-level selection, and the hand-off to the existing
 > stage-0 `--brief` path are all unchanged — there is still no second proposer.
 
+> **RESOLVED 2026-07-27 (upstream gate, same day) — the axis suspension below
+> is LIFTED: the upstream ratified the SERVED TAG VOCABULARY as Screen 1's
+> axis.** The conflict this amendment records was surfaced to the upstream's
+> own gate through its intake, and the gate answered: the axis members are the
+> served tags (14 today); building a Lesson→Topic join to rescue the
+> "Topic-first" wording is **Declined**; and the UI word "Topic" is **retired
+> for the axis** to end the collision with the upstream's own topic files. The
+> consumer measured the fact; the upstream re-made the decision — per-axis
+> precedence working as intended. Three further rulings land with it, binding
+> on the held stories: **no within-axis cap** — a large member (measured: five
+> members at 40–53 entries) is served WHOLE with its count disclosed, and the
+> future remedy if one is ever needed is a second navigation step, not a cap
+> and not a re-tag; **presentation-only is re-worded** — a section carries
+> **no selection authority** (labels, counts and annotations are fine; only
+> gating is forbidden — "a title and nothing else" was mechanism-as-rule);
+> and the **three-valued writability verdict is preserved** under the
+> depth/density deletion. The tag-axis amendment above therefore resumes as
+> written, subject to those wordings. OQ8 is CLOSED. Recorded:
+> `owner decision record — 2026-07-27 (terrain axis resolved: served tags;
+> no cap; no-selection-authority)`.
+
 > **Amended 2026-07-27 (re-triage of #809, later the same day) — the AXIS
-> decision above is SUSPENDED, and the cross-topic combination move SURVIVES
-> the cluster removal.** Two corrections to the sitting recorded immediately
+> decision above is SUSPENDED** *(suspension lifted the same day — see the
+> resolution immediately above)* **, and the cross-topic combination move
+> SURVIVES the cluster removal.** Two corrections to the sitting recorded immediately
 > above, both found by consulting the served surface rather than by reasoning
 > from this repository.
 >
@@ -913,7 +935,13 @@ flows into the existing brief/structures path unchanged.**
   lane grounded in the consumer's code and not in the served surface. Grounding
   a claim about an upstream surface means consulting that surface.)*
 
-- **OQ8 — can the hub Topic ever be the navigation axis? BLOCKING (raised
+- **OQ8 — can the hub Topic ever be the navigation axis? CLOSED 2026-07-27:
+  NO — the axis is the served tag vocabulary, ratified upstream.** The
+  upstream gate answered the staged question: Topics-with-a-new-join is
+  Declined, the axis members are the served tags, and the UI word "Topic" is
+  retired for the axis. Screen 1's axis is decided; stories may encode it.
+  *(Historical text below, kept as the record of why it was blocking.)*
+  **(raised
   2026-07-27 by the #803 sitting, which disproved the premise that it already
   could be; escalated to blocking the same day by the #809 re-triage, which
   found the upstream had ratified Topic-first navigation by name).** While this
