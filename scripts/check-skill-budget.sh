@@ -36,6 +36,20 @@ COMP_HARD_LINES=600
 # Format: "<path>:<lines-at-adoption>", space-separated.
 COMP_RATCHETED="skills/draft-article/stages/stage0.md:731 skills/draft-article/stages/stage2.md:705 skills/draft-article/stages/stage3.md:603"
 
+# --- Spec-document family (Story 20.15, #819) ---------------------------------
+# Third axis of the per-file-class criterion (SPEC-writing-assistant,
+# 2026-07-27 amendment): spec documents are measured in BYTES (~tokens =
+# bytes/4), because a line ceiling is density-blind — the first offender is
+# 88 KB in 144 lines and passes any line budget by an order of magnitude.
+# The byte ceiling is a VISIBILITY instrument: a trip directs to a spec
+# decision, never to compacting ratified amendment text.
+SPEC_WARN_BYTES=36000   # ~9k tokens
+SPEC_HARD_BYTES=72000   # ~18k tokens
+# First offender at adoption (2026-07-27), RATCHETED — growth past
+# adoption+slack FAILS; shrinkage ratchets the entry down.
+# Format: "<path>:<bytes-at-adoption>", space-separated.
+SPEC_RATCHETED="specs/spec-article-draft-pipeline/SPEC.md:88474"
+
 # --- Script-surface family (Story 20.1, #759) --------------------------------
 # Same cost-typed class, second family: scripts/*.py. Thresholds sized from
 # the 2026-07-26 distribution (next-largest after the outlier: topic-map.py
@@ -115,6 +129,38 @@ for f in $(find skills -name '*.md' ! -name 'SKILL.md' | sort); do
 done
 [ "$compfound" -eq 1 ] || err "no skill companion .md found — wrong root?"
 
+
+# --- spec-document family loop (Story 20.15, #819) ----------------------------
+specfound=0
+for f in $(find specs -name '*.md' | sort); do
+  [ -f "$f" ] || continue
+  specfound=1
+  b=$(wc -c < "$f")
+  tok=$(( b / 4 / 1000 ))
+  ratchet=""
+  for entry in $SPEC_RATCHETED; do
+    case "$entry" in
+      "$f":*) ratchet="${entry##*:}" ;;
+    esac
+  done
+  if [ -n "$ratchet" ]; then
+    limit=$(( ratchet + ratchet * RATCHET_SLACK_PCT / 100 ))
+    if [ "$b" -gt "$limit" ]; then
+      err "$f is $b bytes (~${tok}k tokens) — GREW past its ratchet ($ratchet at adoption, +${RATCHET_SLACK_PCT}% slack = $limit). A trip is a SPEC decision about what the growth is made of — ratified amendment text is never compacted (Story 20.15, #819); never raise the ratchet to absorb growth"
+    elif [ "$b" -lt "$ratchet" ]; then
+      warn "$f is $b bytes (below its $ratchet ratchet) — ratchet DOWN: update the SPEC_RATCHETED entry to $b so the gain is locked in"
+    else
+      ok "$f is $b bytes (~${tok}k tokens; ratcheted spec outlier: <= $limit)"
+    fi
+  elif [ "$b" -gt "$SPEC_HARD_BYTES" ]; then
+    err "$f is $b bytes (~${tok}k tokens; > hard ceiling $SPEC_HARD_BYTES for spec documents) — take a spec decision on the growth; ratified amendment text is never compacted (Story 20.15, #819)"
+  elif [ "$b" -gt "$SPEC_WARN_BYTES" ]; then
+    warn "$f is $b bytes (~${tok}k tokens; > warning line $SPEC_WARN_BYTES, ceiling $SPEC_HARD_BYTES) — growth worth watching"
+  else
+    ok "$f is $b bytes (~${tok}k tokens; within budget)"
+  fi
+done
+[ "$specfound" -eq 1 ] || err "no specs/**/*.md found — wrong root?"
 
 # --- scripts/*.py family (Story 20.1, #759) ----------------------------------
 pyfound=0
