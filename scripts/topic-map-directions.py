@@ -783,6 +783,31 @@ def member_sections(map_data, tag):
     return {"member": tag, "count": len(strands), "sections": ordered}
 
 
+def _strand_context_line(el, member_tag):
+    """One deterministic context line per Strand (Story 20.21, #845).
+
+    Every field is READ from the map — the Topics beyond the member's own
+    tag, where the Strand originated, and whether its claim travels with its
+    recorded reasoning — never composed at render time: section background
+    prose is pre-ratified or absent (SPEC-terrain CAP-2, amended 2026-07-27,
+    #844), so a Strand's context lives on the Strand's own line and section
+    headers stay a title and a count. An absent field is stated as absent,
+    never guessed and never filled in.
+    """
+    others = sorted({str(t).strip() for t in (el.get("tags") or [])
+                     if str(t).strip() and str(t).strip() != member_tag})
+    topics = ("also in: " + ", ".join(others)) if others else "in no other Topic"
+    origin = el.get("situation") or el.get("surface") or ""
+    where = f"from {_short_path(origin)}" if origin else "origin not recorded"
+    # Presence is read, not judged: the claim is the served rendering (or the
+    # title standing in for one); the reasoning counts as present only when
+    # the map carries recorded backing for this Strand.
+    reasoning = ("claim and reasoning both recorded"
+                 if (el.get("evidence") or [])
+                 else "claim only — its reasoning is not recorded here")
+    return f"  ({topics} · {where} · {reasoning})"
+
+
 def compose_member_listing(map_data, tag, cands):
     """Screen 2 as a LISTING: the member's Strands, WHOLE, in sections.
 
@@ -813,6 +838,7 @@ def compose_member_listing(map_data, tag, cands):
             claim = el.get("gloss") or el.get("title") or el.get("slug", "")
             mark = " — already consumed, still selectable" if el.get("consumed") else ""
             lines.append(_clip_line(f"- **{ident}** — {claim}{mark}"))
+            lines.append(_clip_line(_strand_context_line(el, ms["member"])))
         lines.append("")
     return "\n".join(lines).rstrip() + "\n"
 
