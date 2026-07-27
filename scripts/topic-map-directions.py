@@ -681,6 +681,89 @@ def cmd_axis(args):
     return 0
 
 
+def member_sections(map_data, tag):
+    """Screen 2's sections for one axis member (Story 20.9, #811).
+
+    SECTIONING IS A PERMUTATION: every Strand of the member appears in exactly
+    one section, count-in == count-out, asserted by check-terrain-member.sh —
+    information loss is structurally impossible and the worst case is a badly
+    grouped but complete list.
+
+    Sections carry NO SELECTION AUTHORITY (the invariant as re-worded upstream
+    2026-07-27): a title and a count are presentation; nothing here gates,
+    filters, or ranks what is selectable. The grouping rule is DELIBERATELY
+    deterministic — a Strand's alphabetically-first co-tag names its section,
+    Strands with no co-tag gather under the member's own name — because a
+    wrong grouping costs nothing (presentation-only) while a model in this
+    loop would cost every invocation. If dogfooding shows the groups are too
+    crude, the rule can change freely: no contract points at it.
+    """
+    tag = str(tag).strip()
+    strands = [el for el in (map_data.get("elements") or [])
+               if tag in [str(t).strip() for t in (el.get("tags") or [])]]
+    sections = {}
+    for el in strands:
+        others = sorted(str(t).strip() for t in (el.get("tags") or [])
+                        if str(t).strip() and str(t).strip() != tag)
+        key = others[0] if others else tag
+        sections.setdefault(key, []).append(el)
+    ordered = []
+    for key in sorted(sections):
+        title = (f"also {key}" if key != tag else f"{tag} alone")
+        ordered.append({"title": title, "strands": sections[key]})
+    return {"member": tag, "count": len(strands), "sections": ordered}
+
+
+def compose_member_listing(map_data, tag, cands):
+    """Screen 2 as a LISTING: the member's Strands, WHOLE, in sections.
+
+    Served whole with the count disclosed — no within-member cap, no
+    truncation (upstream ruling 2026-07-27). Lines reuse the View's own
+    `- **<id>** — <claim>` convention so selection stays the shipped
+    `{index, note, pin}` hand-off: ids here are the SAME ids `candidates()`
+    assigns, so `brief` resolves a Screen-2 pick with no new entry pipeline.
+    """
+    ms = member_sections(map_data, tag)
+    by_slug = {c.get("slug"): c for c in cands if c.get("kind") == "element"}
+    pin = map_data.get("coverage", {}).get("pin")
+    lines = [f"# {ms['member']} — {ms['count']} Strand(s), shown whole",
+             "",
+             f"Pin: {pin}",
+             "Answer with a Strand's index (for example L3) and a short note",
+             "about the angle you want. Free text always wins.",
+             ""]
+    for sec in ms["sections"]:
+        lines.append(f"## {sec['title']} ({len(sec['strands'])})")
+        lines.append("")
+        for el in sec["strands"]:
+            c = by_slug.get(el.get("slug"))
+            ident = c["id"] if c else el.get("slug", "?")
+            claim = el.get("gloss") or el.get("title") or el.get("slug", "")
+            mark = " — already consumed, still selectable" if el.get("consumed") else ""
+            lines.append(_clip_line(f"- **{ident}** — {claim}{mark}"))
+        lines.append("")
+    return "\n".join(lines).rstrip() + "\n"
+
+
+def cmd_member(args):
+    m = load_map(args.map)
+    ms = member_sections(m, args.tag)
+    if not ms["count"]:
+        return _err(f"no Strand carries the tag {args.tag!r} at this pin — "
+                    f"re-run the axis and pick from the fresh listing")
+    cands = candidates(m)
+    listing = compose_member_listing(m, args.tag, cands)
+    out = {"kind": "terrain-member", "member": ms["member"],
+           "count": ms["count"],
+           "sections": [{"title": s["title"],
+                         "strands": [e.get("slug") for e in s["strands"]]}
+                        for s in ms["sections"]],
+           "listing": listing}
+    json.dump(out, sys.stdout, indent=2)
+    sys.stdout.write("\n")
+    return 0
+
+
 def compose_payload(map_data, cands, view_path=None):
     """The ONE screen.
 
@@ -984,6 +1067,10 @@ def main(argv=None):
     ax = sub.add_parser("axis", help="Screen 1: the served-tag axis listing "
                         "with per-member Strand counts, as JSON + payload")
     ax.add_argument("--map", required=True)
+    mb = sub.add_parser("member", help="Screen 2: one axis member's Strands, "
+                        "whole, in presentation-only sections")
+    mb.add_argument("--map", required=True)
+    mb.add_argument("--tag", required=True)
     c = sub.add_parser("candidates", help="candidate directions as JSON")
     c.add_argument("--map", required=True, help="assembled map JSON, or - for stdin")
     pa = sub.add_parser("payload", help="the one screen, as a proposal payload")
@@ -1006,7 +1093,7 @@ def main(argv=None):
     args = p.parse_args(argv)
     return {"candidates": cmd_candidates, "payload": cmd_payload,
             "view": cmd_view, "brief": cmd_brief,
-            "axis": cmd_axis}[args.cmd](args)
+            "axis": cmd_axis, "member": cmd_member}[args.cmd](args)
 
 
 if __name__ == "__main__":
