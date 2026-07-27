@@ -982,11 +982,17 @@ done
 
 # --- lockstep: the SKILL states the shipped mechanics ------------------------
 [ -f "$SKILL" ] && ok "the topic-map skill exists" || err "$SKILL missing"
-for token in 'topic-map.py assemble' 'topic-map-directions.py payload' \
+# The owner path is the two-screen flow (Story 20.19, #841): axis, then
+# member, then brief. The pre-pivot `payload --view` invocation left the
+# skill with that story; the View survives on the size switch's over-budget
+# branch via the `view` subcommand.
+for token in 'topic-map.py assemble' 'topic-map-directions.py axis' \
+             'topic-map-directions.py member' \
              'topic-map-directions.py brief' 'validate-proposal-payload.py' \
              'stage0' '--brief' 'free-form' 'every time' \
              'never composes narrative structures' 'single proposer' \
-             '--view' 'size switch' 'never read back' \
+             'topic-map-directions.py view' '--out' 'size switch' \
+             'never read back' \
              'resolve-paths.py topic-map-view' 'destination repository' \
              'stable within a pin' 'refused with the mismatch named' \
              'note verbatim'; do

@@ -5,22 +5,27 @@ description: >
   (also accepted, unchanged: "show the topic map", "what could I write about")
   to assemble the derived, bounded ELEMENT SURVEY of the hub — every Lesson
   and Journey an individually selectable Strand, quoting its served
-  Gloss rendering and carrying its visible writability verdict — present ONE
-  screen of candidate directions plus free-form, and hand the owner's chosen
-  direction to the existing stage-0 --brief path as an ordinary brief-carrying
-  run. The contract it fronts is SPEC-terrain CAP-1/CAP-2/CAP-3 as pivoted
-  2026-07-27 (#799); this skill re-implements nothing.
+  Gloss rendering and carrying its visible writability verdict — navigate it
+  in TWO SCREENS (the served-tag axis, then one member's complete material)
+  plus free-form, and hand the owner's chosen direction to the existing
+  stage-0 --brief path as an ordinary brief-carrying run. The contract it
+  fronts is SPEC-terrain CAP-1/CAP-2/CAP-3 as amended through 2026-07-27
+  (#799, #803, #844); this skill re-implements nothing.
 ---
 
 # Terrain
 
 The article-creation entry point for **"what could I write about?"**. It ends in
-a **brief**, not in a second proposer, and it **opens with the element
-survey** (the stance-3 pivot, #799): the typed elements — hub Lessons and
-Journeys — are the primary, individually selectable article-idea units. N
-elements are N distinct selectable ideas. The former subtopic clusters remain
-on the surface as a **derived, secondary grouping** that never gates what is
-selectable, and the flow no longer opens by clustering.
+a **brief**, not in a second proposer, and it **navigates in two screens over
+the served gloss tag** (the #803 resolution): **Screen 1** offers the axis —
+every served tag with its Strand count — as the owner's first choice of where
+to look; **Screen 2** shows the chosen member's complete material, every hub
+Lesson and Journey an individually selectable Strand. N Strands are N distinct
+selectable ideas. Navigation replaces filtering: nothing decides for the owner
+what appears, and nothing is withheld. (The former subtopic clustering was
+abandoned, not tuned — #809; its narration is gone from this flow, and this
+skill proposes no machine-derived combinations: naming a combination is the
+owner's free-form move.)
 
 ```
 show the terrain [<host-repo>]
@@ -72,27 +77,20 @@ quoting the served `gloss:` / `journey_gloss:` rendering (the plain-language
 text the hub ratified at its distill gate — **never the recall one-liner**;
 where the rendering is not being served the map says so, `gloss.reason`, and
 you relay the disclosure rather than substituting other text) — plus the
-subtopic clusters as the derived, secondary grouping, each cluster's
-evidence-density signal and depth estimate, and the coverage disclosure.
-**Depth is a signal for the owner's judgment, never a gate** — thresholds
-decide what is *surfaced*, never what the owner may pick, and a consumed
-element or subtopic is shown **marked consumed, not hidden**.
+coverage disclosure. The per-member Strand count on Screen 1 is **the only
+depth affordance** — a cue for choosing where to look, never a gate — and a
+consumed Strand is shown **marked consumed, not hidden**.
 
 If `coverage.complete` is false, say so in one line with the count the
 disclosure names: the map read up to its bound and the rest is listed, not
 silently dropped.
 
-**Subtopic names belong to the articles repo.** A declared `subtopic:` (or
-`cluster:`) in backlog frontmatter names the cluster; everything undeclared
-falls to the derived **path family**, and each cluster records which basis
-named it. The repo is authoritative — a cluster disagreeing with a declared
-name is this tool's defect, not the repo's — and nothing is cached: the
-declaration is re-read every invocation, so the mismatch check is
-recomputation, never reconciliation.
-
-If `subtopic_defects` is non-empty, relay each entry in one line: the item, the
-key, and the reason. A declaration the map cannot honour is a **configuration
-defect in the articles repo, named** — never a silent fall-back to derivation.
+**Reachability of decision/reversal Strands (E rows) — a known property, not
+a surprise.** A Strand's axis membership comes from its served gloss tags; a
+decision or reversal Strand that joins no gloss entry carries an empty tag
+list, so it appears in the **untagged-disclosure line**, not under any axis
+member. When you present Screen 1, that line is where such Strands live —
+relay it as given; do not hunt for them under a member or invent a tag.
 
 **Usability verdict per candidate (the topic↔evidence join, #669; enforced on
 every element, #799).** Each item AND each element carries a `usability`
@@ -125,89 +123,94 @@ defect this pivot removed (owner ruling, #799):
 The join **locates** evidence, it never **supplies** it: no hub line becomes a
 SOURCE pointer, and every offer stays a proposal the owner ratifies.
 
-## Step 2 — one screen
+## Step 2 — two screens
+
+**Screen 1 — the axis: where do you want to look?** This is the owner's first
+choice, offered before any material is shown:
 
 ```
-VIEW=$(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-paths.py topic-map-view --root <host-repo>)
-python3 ${CLAUDE_PLUGIN_ROOT}/scripts/topic-map-directions.py payload \
-  --map "$WS/map.json" --view "$VIEW" > "$WS/topic-map.payload.json"
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/topic-map-directions.py axis \
+  --map "$WS/map.json" > "$WS/terrain-axis.json"
+python3 -c 'import json,sys; json.dump(json.load(open(sys.argv[1]))["payload"], open(sys.argv[2],"w"))' \
+  "$WS/terrain-axis.json" "$WS/topic-map.payload.json"
 python3 ${CLAUDE_PLUGIN_ROOT}/scripts/validate-proposal-payload.py \
   --ws "$WS" --surface topic-map "$WS/topic-map.payload.json"
 ```
 
-**The View is the one artifact this flow does not put in the workspace.** It is
-written for the owner to *open and read*, so it lands at a fixed path in the
-`output.drafts` **destination repository** — the repo they work in — resolved
-by the path resolver and never composed here. Exit 3 means no destination is
-declared; relay the error, which names the fix. The directory is self-ignoring,
-so the destination repo never reports the View as untracked. Everything else
-(map, payload, answer) stays in `$WS`.
+Present the validated payload **in-conversation** under the
+[owner-facing proposal contract](../owner-facing-proposal-contract.md): every
+served tag listed deterministically with its Strand count — the count is a cue
+for choosing where to look, never a gate — plus the untagged-disclosure line
+when it applies (see Step 1). The payload is **plain text**: no `**bold**`, no
+backticks, no headings, no Markdown links (contract (g)). A non-zero exit
+means the payload is not presentable — fix the named field and re-validate; a
+blocked payload is never shown.
 
-Present the result **in-conversation** under the
-[owner-facing proposal contract](../owner-facing-proposal-contract.md) — **one
-screen**, the map plus machine-proposed candidate directions plus a **free-form
-response**, and never a second confirmation after they answer. The payload is
-**plain text**: no `**bold**`, no backticks, no headings, no Markdown links
-(contract (g)). A non-zero exit means the payload is not presentable — fix the
-named field and re-validate; a blocked payload is never shown.
+Screen 1 always also offers:
 
-The screen always carries, in this order:
-
-- the **candidate directions**, opening with the **elements** — every Lesson
-  (`L<n>`) and Journey (`J<n>`) an individually pickable idea quoting its
-  served rendering, its writability verdict visible on the row — then at least
-  one **cross-topic combination** when two subtopics in different topics share
-  evidence, then the demoted cluster directions;
-- **name your own direction or combination axis** — offered **every time**, not
-  only on rejection. The owner's own wording is a first-class outcome;
+- **name your own direction** — offered **every time**, not only on rejection.
+  The owner's own wording is a first-class outcome, including a combination
+  of subjects in their words (this skill proposes no machine-derived
+  combinations);
 - **stop here** — also first-class: nothing is drafted, no brief is recorded,
   and the map is recomputed fresh next time.
 
-Record the answer against the returned `ask_id`:
+**Screen 2 — the chosen member's complete material.** When the owner picks a
+member on Screen 1:
 
 ```
-printf '%s' '<answer JSON>' | python3 ${CLAUDE_PLUGIN_ROOT}/scripts/validate-proposal-payload.py \
-  --ws "$WS" --answer <ask_id>
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/topic-map-directions.py member \
+  --map "$WS/map.json" --tag <member> > "$WS/terrain-member.json"
 ```
 
-### The size switch — a large map gets a View file
-
-**One screen does not scale.** Past the composer's declared screen budget, a
-20+-subtopic terrain collapsed into a handful of options hides exactly what the
-map exists to show. So the composer switches on the map's own size, and the
-skill does not decide anything here — it just passes `--view` and relays what
-comes back:
-
-- **At or under the budget** — the flow above, unchanged. No View file is
-  written and no path appears on the screen.
-- **Above the budget** — the composer writes the terrain to the resolver-owned
-  `$VIEW` path and the payload becomes a short **summary plus that
-  path**. Relay the path as given and let the owner open it; selection is then
-  **by index** (`L3`, `J1`, `E2.1`, or `T3.2`) plus a short note about the
-  angle they want, rather than by matching a proposed direction string.
-  Free-form and **stop here** are offered exactly as above. A 100-element
-  terrain is always above the budget — the View **is** the element survey.
-
-Record an indexed answer with the **pin the View header shows**, alongside the
-owner's note:
+Relay the returned `listing` as given: **all** of the member's Strands, whole,
+in presentation-only sections, each Strand quoting its served rendering with
+its deterministic context line, and the count disclosed. Selection is by
+Strand index (`L3`, `J1`, `E2.1`) plus a short note about the angle; free-form
+and **stop here** stay on the table exactly as on Screen 1. Record the answer
+against the `ask_id` the validator returned, with the **pin the listing
+shows**:
 
 ```
-printf '%s' '{"index":"T3.2","note":"<the owner'\''s angle, their words>","pin":"<the View'\''s pin>"}' \
+printf '%s' '{"index":"L3","note":"<the owner'\''s angle, their words>","pin":"<the listing'\''s pin>"}' \
   | python3 ${CLAUDE_PLUGIN_ROOT}/scripts/validate-proposal-payload.py --ws "$WS" --answer <ask_id>
 ```
 
 The pin is not bookkeeping. Indexes are **stable within a pin**, not across
-repo states, so an index chosen against a View that has since gone stale is
+repo states, so an index chosen against a stale listing is
 **refused with the mismatch named** rather than re-resolved — re-run the map
-and choose from the fresh View. Free text still always wins; if the owner
-writes their own direction, that is the brief and no index is consulted.
+and pick from the fresh screens. Free text still always wins; if the owner writes their own
+direction, that is the brief and no index is consulted.
 
-This is the one case where the map hands the owner **an artifact to open**
-(SPEC-terrain CAP-3, amended 2026-07-23, superseding the earlier
-in-conversation-only reading for this branch only). The View is at the same
-status as a debug dump: a **fixed path**, **fully regenerated** on every
-invocation, and **never read back** by any code path. Deleting it loses
-nothing — re-run the map.
+### The size switch — an over-budget member gets a View file
+
+**The screen budget is measured over one axis member's Screen 2, not over the
+whole terrain** (SPEC-terrain size switch, re-based 2026-07-27, #803):
+two-screen navigation shrinks the overload condition without removing it,
+because a single tag can still hold many Strands. The composer switches on
+size; the skill decides nothing here — it relays what comes back:
+
+- **At or under the budget** — the Screen 2 flow above, unchanged. No View
+  file is written and no path appears on the screen.
+- **Above the budget** — the screen becomes a short **summary plus the path
+  of a View file**, rendered by the composer:
+
+  ```
+  VIEW=$(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-paths.py topic-map-view --root <host-repo>)
+  python3 ${CLAUDE_PLUGIN_ROOT}/scripts/topic-map-directions.py view \
+    --map "$WS/map.json" --out "$VIEW"
+  ```
+
+  The View is written for the owner to *open and read* in the `output.drafts`
+  destination repository — the one artifact this flow does not put in the
+  workspace. Relay the path as given; selection is **by index** plus a short
+  note, recorded exactly as on Screen 2, and the above-budget branch proposes
+  **no less** than the small one. Exit 3 means no destination is declared;
+  relay the error, which names the fix.
+
+The View is at the same status as a debug dump: a **fixed path**, **fully
+regenerated** on every invocation, and **never read back** by any code path.
+Deleting it loses nothing — re-run the map.
 
 ## Step 3 — the brief, then a normal run
 
@@ -218,11 +221,11 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/topic-map-directions.py brief \
 
 The outcome is a **brief in the owner's words**. Free text always wins;
 machine-proposed wording becomes the brief only when the owner selected it —
-by matching a direction or by naming its **index** — and then it is
-**owner-adopted wording**, never a tool-invented scope. For an indexed
-selection the brief is the subtopic's coverage wording **plus the owner's
-note verbatim**; from here it is one ordinary brief string and nothing downstream
-can tell it from one the owner typed.
+by naming a Strand's **index** — and then it is **owner-adopted wording**,
+never a tool-invented scope. For an indexed selection the brief is the
+Strand's served wording **plus the owner's note verbatim**; from here it is
+one ordinary brief string and nothing downstream can tell it from one the
+owner typed.
 
 Hand it to the **existing** stage-0 `--brief` path — the one shipped in Story
 18.24 (#505), unchanged:
@@ -262,22 +265,23 @@ lookup that did not look.
 
 ## Boundaries
 
-- **The map never composes narrative structures.** A candidate names *what* to
-  cover and, for a combination, the *axis* connecting two subjects — never how
-  the piece is told, ordered, or opened. Structure candidates remain the shipped
-  **single proposer's** job downstream (SPEC-article-draft-pipeline CAP-4, Story
-  18.45). A map that starts suggesting article shapes has become the second
-  proposer #554/#583 both forbid.
-- **The map is a view, not a gate.** It never refuses a subtopic on depth, never
+- **The map never composes narrative structures.** A Strand names *what* to
+  cover — never how the piece is told, ordered, or opened. Structure
+  candidates remain the shipped **single proposer's** job downstream
+  (SPEC-article-draft-pipeline CAP-4, Story 18.45). A map that starts
+  suggesting article shapes has become the second proposer #554/#583 both
+  forbid.
+- **The map is a view, not a gate.** It never refuses a member on depth, never
   hides consumed material, and never narrows the sources a run may read.
 - **Evidence never blocks drafting.** The writability verdict surfaces at
   selection and decides what the selection *yields* (evidence pre-located, or
   a gap disclosure plus its tracking artifact) — never whether the element
   appears and never whether the draft runs. There is no refusal path on
   evidence anywhere in this flow.
-- **Clusters never gate.** The subtopic grouping is a derived, secondary view
-  of the same material; nothing is selectable only through a cluster, and no
-  cluster's shape limits which elements the owner may pick.
+- **Sections never gate.** Screen 2's sectioning is presentation only — a
+  permutation of the member's complete material; nothing is selectable only
+  through a section, and no section's shape limits which Strands the owner
+  may pick.
 - **Stopping is an outcome.** A sitting that ends at the screen has cost
   nothing and left nothing behind.
 - **The View is a rendering, never a record.** Nothing reads it back, no
