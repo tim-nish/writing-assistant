@@ -499,6 +499,33 @@ def _terrain_size_line(topics, strands):
             f"from {plural(topics, 'topic')}")
 
 
+def _journey_disclosure_line(map_data):
+    """The Journey shortfall, named on the screen (Story 20.10, #812).
+
+    Journeys are article material equally with Lessons, but their shard tags
+    are shadowed by same-named lesson shards upstream, so a run may be unable
+    to address them at all. DETECTION-BASED, never a flag someone must flip:
+    the line keys off what this pin actually served —
+
+      * journey renderings served  -> None (no gap; silence by detection, so
+        the disclosure retires itself the moment the upstream fix lands);
+      * gloss served, zero journey renderings -> the shortfall named as
+        CANNOT-DETERMINE — an honest three-valued absence: from here, "no
+        journeys exist" and "journeys are shadowed" are indistinguishable,
+        so the line says absent-from-this-listing, never judged-empty;
+      * gloss not served at all -> None (the existing gloss disclosure line
+        already names that larger gap; two lines for one outage would be
+        the volume-not-legibility defect CAP-4 retired).
+    """
+    gloss = map_data.get("gloss", {}) or {}
+    if not gloss.get("served") or gloss.get("journey_renderings", 0) > 0:
+        return None
+    return ("No Journey renderings were served at this pin, so Journeys are "
+            "absent from this listing — absent, not judged empty: from here "
+            "a shadowed journey shard and a journey that does not exist are "
+            "indistinguishable (upstream addressability gap).")
+
+
 def compose_view(map_data, cands):
     """The View: one invocation's terrain, rendered so 20+ directions are
     legible and CAP-2's 'why this depth?' is answerable from the same counts
@@ -544,6 +571,9 @@ def compose_view(map_data, cands):
     # the disclosure guards against, so it moves here rather than lapsing.
     lines += ["", _element_coverage_line(map_data)]
     lines += ["", _gloss_disclosure_line(map_data)]
+    jline = _journey_disclosure_line(map_data)
+    if jline:
+        lines += ["", jline]
     # THE VIEW ENDS HERE (Story 20.5, #802). What used to follow — "Subtopic
     # clusters", "Maintenance", "Diagnostics" — was ~2,300 of a 2,511-line
     # view serving no function the owner could identify, so the sections AND
@@ -656,6 +686,9 @@ def compose_axis_payload(map_data):
     })
     where = (f"Terrain at {pin}: {len(axis['members'])} tag(s) from the "
              f"served vocabulary, each individually selectable.")
+    jline = _journey_disclosure_line(map_data)
+    if jline:
+        where += " " + jline
     if axis["untagged_strands"]:
         # The disclosure is a LINE, never a section (CAP-4): strands outside
         # the axis are named, not hidden, and free-form still reaches them.
@@ -732,6 +765,9 @@ def compose_member_listing(map_data, tag, cands):
              "Answer with a Strand's index (for example L3) and a short note",
              "about the angle you want. Free text always wins.",
              ""]
+    jline = _journey_disclosure_line(map_data)
+    if jline:
+        lines += [_clip_line(jline), ""]
     for sec in ms["sections"]:
         lines.append(f"## {sec['title']} ({len(sec['strands'])})")
         lines.append("")

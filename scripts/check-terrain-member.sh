@@ -103,5 +103,42 @@ sys.exit(1 if fail else 0)
 PYEOF
 [ $? -eq 0 ] || fail=1
 
+# --- the Journey shortfall is DISCLOSED, detection-based (Story 20.10, #812) --
+python3 - "$D" <<'PYEOF' || fail=1
+import importlib.util, sys
+spec = importlib.util.spec_from_file_location("dv", sys.argv[1])
+m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+fail = []
+def check(cond, msg):
+    print(("ok:   " if cond else "FAIL: ") + msg, file=sys.stdout if cond else sys.stderr)
+    if not cond: fail.append(msg)
+
+base = {"kind": "topic-map", "topics": [], "coverage": {"pin": "h@1"},
+        "elements": [{"kind": "lesson", "slug": "a", "title": "A",
+                      "gloss": "claim", "tags": ["workflow"],
+                      "evidence": [], "consumed": False}]}
+gap = dict(base, gloss={"served": True, "lesson_renderings": 3,
+                        "journey_renderings": 0})
+line = m._journey_disclosure_line(gap)
+check(line is not None and "absent, not judged empty" in line,
+      "zero served journeys yields the shortfall as a LINE, three-valued")
+check("\n" not in line and "##" not in line,
+      "the disclosure is a line, never a section")
+check("Journey" in m.compose_axis_payload(gap)["items"][0]["where"],
+      "the shortfall is named on the axis screen")
+check("No Journey renderings" in
+      m.compose_member_listing(gap, "workflow", m.candidates(gap)),
+      "the shortfall is named on the member listing")
+ok_served = dict(base, gloss={"served": True, "lesson_renderings": 3,
+                              "journey_renderings": 2})
+check(m._journey_disclosure_line(ok_served) is None,
+      "served journeys retire the disclosure BY DETECTION, no flag to flip")
+down = dict(base, gloss={"served": False, "reason": "gateway down"})
+check(m._journey_disclosure_line(down) is None,
+      "a whole-gloss outage is the gloss line's to name — no double disclosure")
+sys.exit(1 if fail else 0)
+PYEOF
+[ $? -eq 0 ] || fail=1
+
 [ "$fail" -eq 0 ] || { printf '\nFAILED.\n' >&2; exit 1; }
 printf '\nAll terrain-member checks passed (sectioning is a permutation).\n'
