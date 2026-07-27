@@ -203,12 +203,26 @@ def _element_direction(el):
         name = str(el.get("slug") or el.get("title") or "").strip() or noun
         return (f"cover the {noun} recorded as {name} — its plain-language "
                 f"rendering is not being served ({reason})")
-    summary = str(el.get("summary") or "").strip()
+    # Decision/reversal rows follow the SAME served-rendering-first rule as
+    # lesson rows (Story 20.20, #843): quote a served rendering when one
+    # exists, and otherwise DISCLOSE the absence — never substitute the raw
+    # recall-register topic line as if it were a rendering. The upstream half
+    # (serving renderings for topic decision lines) is the hub's; until it
+    # lands, every one of these rows takes the disclosure branch, and when it
+    # lands they take the served branch with no change here (detection, not a
+    # flag).
     kind = "reversal" if kind == "reversal" else "decision"
-    if not summary:
-        # Never a bare enum on the owner surface: describe what it is instead.
-        return f"cover the {kind} recorded at {el.get('date') or 'an undated line'}"
-    return f"cover the {kind} — {summary}"
+    gloss = str(el.get("gloss") or "").strip()
+    if gloss:
+        return f"cover the {kind} — {gloss}"
+    when = str(el.get("date") or "").strip() or "an undated line"
+    where = str(el.get("topic") or "").strip()
+    named = f"recorded {when}" + (f" in the {where} record" if where else "")
+    reason = str(el.get("gloss_unavailable") or
+                 "no plain-language rendering of decision records is being "
+                 "served yet").strip()
+    return (f"cover the {kind} {named} — its plain-language rendering is "
+            f"not being served ({reason})")
 
 
 def is_large(map_data):
@@ -243,9 +257,14 @@ def candidates(map_data):
             "date": el.get("date"),
             "situation": el.get("situation"),
             "depth": None,
-            # The claim the slot leads with: the served rendering for a
-            # lesson/journey strand, the topic-line summary otherwise.
-            "why": el.get("gloss") or el.get("summary"),
+            # The claim the slot leads with: the served rendering, only. A
+            # decision/reversal strand with no served rendering leads with a
+            # disclosure, not a claim (Story 20.20, #843), so its raw topic
+            # line never stands in as the substance here — the row is
+            # fallback-shaped until the rendering is served.
+            "why": el.get("gloss") or (
+                el.get("summary") if el.get("kind") in ("lesson", "journey")
+                else None),
             "gloss": el.get("gloss"),
             "gloss_unavailable": el.get("gloss_unavailable"),
             # The three-valued writability verdict, VISIBLE on every strand
@@ -584,6 +603,11 @@ def compose_view(map_data, cands):
         "",
         "Answer with an element's index (for example L3) or a subtopic's",
         "index (for example T1.2) and a short note about the angle you want.",
+        "What each row IS, before what covering it would mean: L rows are",
+        "Lessons (a rule distilled from experience), J rows are Journeys (how",
+        "a position changed over time), and E rows are decisions or reversals",
+        "from the record. A row's 'cover the ...' wording names what an",
+        "article picking it would be about.",
         "Free text always wins. Each element is its own Strand, and its",
         "writability verdict is a disclosure, never a gate: an element whose",
         "evidence is not yet recorded is as pickable as a matched one —",
@@ -825,6 +849,9 @@ def compose_member_listing(map_data, tag, cands):
              f"Pin: {pin}",
              "Answer with a Strand's index (for example L3) and a short note",
              "about the angle you want. Free text always wins.",
+             "What each row IS: L rows are Lessons (a rule distilled from",
+             "experience), J rows are Journeys (how a position changed over",
+             "time), and E rows are decisions or reversals from the record.",
              ""]
     jline = _journey_disclosure_line(map_data)
     if jline:
