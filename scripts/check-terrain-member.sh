@@ -75,9 +75,64 @@ check("41 Strand(s), shown whole" in d["listing"],
 # --- NO SELECTION AUTHORITY ------------------------------------------------
 check("already consumed, still selectable" in d["listing"],
       "a consumed Strand is marked, never hidden")
-heads = re.findall(r"^## (.+) \(\d+\)$", d["listing"], re.M)
+heads = re.findall(r"^## (.+) \(\d+\)(?: — .+)?$", d["listing"], re.M)
 check(len(heads) == len(d["sections"]) >= 2,
       f"sections carry a title and a count — presentation only ({heads[:3]})")
+
+# --- the sectioning contract: no direct parent over 20% (Story 20.23, #852) --
+total = d["count"]
+cap = max(3, int(total * 0.2))
+over = [(s["title"], len(s["strands"])) for s in d["sections"]
+        if len(s["strands"]) > cap]
+undisclosed = [t for t, _n in over
+               if f"{t} ({dict(over)[t]}) — over the one-fifth bound"
+               not in d["listing"]]
+check(not undisclosed,
+      f"every over-cap section discloses the bound on its title line ({over})")
+# A subdividable fixture: one dominant co-tag whose Strands carry a second
+# co-tag, so the 20% rule has a deterministic key to subdivide on.
+els3 = []
+for n in range(30):
+    els3.append({"kind": "lesson", "slug": f"s{n}", "title": f"S{n}",
+                 "gloss": f"claim {n}",
+                 "tags": ["workflow", "agents", "cost" if n % 2 else "risk"],
+                 "evidence": [], "consumed": False})
+m3 = {"kind": "topic-map", "topics": [], "coverage": {"pin": "h@abc1234"},
+      "elements": els3}
+f3 = tempfile.NamedTemporaryFile("w", suffix=".json", delete=False)
+json.dump(m3, f3); f3.close()
+out3 = subprocess.run(["python3", D, "member", "--map", f3.name,
+                       "--tag", "workflow"], capture_output=True, text=True)
+d3 = json.loads(out3.stdout)
+cap3 = max(3, int(30 * 0.2))
+titles3 = [s["title"] for s in d3["sections"]]
+check(any(" + " in t for t in titles3),
+      f"an over-cap section subdivides on the next shared label ({titles3})")
+listing3 = d3["listing"]
+bad3 = [s["title"] for s in d3["sections"]
+        if len(s["strands"]) > cap3
+        and "over the one-fifth bound" not in
+        (listing3.split(f"## {s['title']} (")[1].split("\n")[0]
+         if f"## {s['title']} (" in listing3 else "")]
+check(not bad3,
+      f"every section is under the bound or discloses why not ({bad3})")
+sectioned3 = [s for sec in d3["sections"] for s in sec["strands"]]
+check(len(sectioned3) == 30 and len(set(sectioned3)) == 30,
+      "subdivision preserves the permutation (count in == count out)")
+# Small-member floor: 20% of 5 is 1; the floor keeps sections >= viable size.
+els5 = [{"kind": "lesson", "slug": f"t{n}", "title": f"T{n}",
+         "gloss": f"c {n}", "tags": ["workflow", "agents"],
+         "evidence": [], "consumed": False} for n in range(5)]
+m5 = {"kind": "topic-map", "topics": [], "coverage": {"pin": "h@abc1234"},
+      "elements": els5}
+f5 = tempfile.NamedTemporaryFile("w", suffix=".json", delete=False)
+json.dump(m5, f5); f5.close()
+out5 = subprocess.run(["python3", D, "member", "--map", f5.name,
+                       "--tag", "workflow"], capture_output=True, text=True)
+d5 = json.loads(out5.stdout)
+check(all(len(s["strands"]) >= 1 for s in d5["sections"])
+      and len(d5["sections"]) <= 2,
+      "the small-member floor prevents one-Strand fragmentation")
 for banned in ("ranked", "top ", "best "):
     check(banned not in d["listing"].lower(),
           f"no ranking language on the listing ({banned!r})")
