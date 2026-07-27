@@ -1,0 +1,161 @@
+#!/usr/bin/env sh
+# check-review-declared-register.sh — the review pass grades a derived
+# canonical against the register its language DECLARES (Story 20.4, #800).
+#
+# The defect this guards is an asymmetry, not a missing feature: the target
+# language's conventions were already declared and already authoritative for
+# GENERATION (scripts/adapt-canonical.py reads them to decide how to write),
+# and were read only on the way in. Structure passed while register failed,
+# and nothing in the review contract was violated — a vacuously passing floor.
+# SPEC-canonical-adaptation CAP-4 now names the criterion; this check asserts
+# the shipped surface actually carries it.
+#
+# Scope discipline is the load-bearing half: the criterion is artifact-class
+# scoped (derived canonicals only). SPEC-article-review keeps a deliberately
+# CLOSED blocker-criterion set, and this opens it by exactly one class — so
+# the check asserts the scoping too, not merely the presence.
+#
+# POSIX shell + coreutils only, like every check-*.sh sibling.
+
+set -eu
+
+PROMPTS="skills/review-article/review-prompts.md"
+SKILL="skills/review-article/SKILL.md"
+RUBRIC="skills/draft-article/quality-rubric.md"
+CONV="config/language-conventions.yaml"
+SPEC_REVIEW="specs/spec-article-review/SPEC.md"
+SPEC_ADAPT="specs/spec-canonical-adaptation/SPEC.md"
+
+fail=0
+err() { printf 'FAIL: %s\n' "$1" >&2; fail=1; }
+ok()  { printf 'ok:   %s\n' "$1"; }
+
+for f in "$PROMPTS" "$SKILL" "$RUBRIC" "$CONV" "$SPEC_REVIEW" "$SPEC_ADAPT"; do
+  [ -f "$f" ] || { err "missing $f — wrong root?"; }
+done
+[ "$fail" -eq 0 ] || { printf '\ndeclared-register checks FAILED.\n' >&2; exit 1; }
+
+# --- 1. the criterion exists, and is scoped to derived canonicals ------------
+
+if grep -q 'Declared-convention conformance' "$PROMPTS"; then
+  ok "review-prompts declares the declared-convention criterion"
+else
+  err "review-prompts declares no declared-convention criterion (Story 20.4)"
+fi
+
+if grep -q 'adapted_from' "$PROMPTS"; then
+  ok "the criterion names its discriminator (adapted_from)"
+else
+  err "the criterion does not name adapted_from — an unscoped criterion would"\
+" fire on authored EN canonicals, which SPEC-article-review forbids"
+fi
+
+# The severity table must admit it as blocker-eligible AND say derived-only in
+# the same row; a blocker row that admits it without the scope is the exact
+# widening the spec refuses.
+row=$(grep -n '^| \*\*blocker\*\*' "$PROMPTS" | head -1 | cut -d: -f1)
+if [ -n "$row" ]; then
+  line=$(sed -n "${row}p" "$PROMPTS")
+  case "$line" in
+    *declared-convention*) ;;
+    *) err "the blocker severity row does not admit the declared-convention criterion" ;;
+  esac
+  case "$line" in
+    *"derived canonical"*) ok "the blocker row admits the criterion AS derived-canonical-scoped" ;;
+    *) err "the blocker row admits the criterion WITHOUT its derived-canonical scope" ;;
+  esac
+else
+  err "no blocker severity row found in $PROMPTS"
+fi
+
+# --- 2. undeclared language is skipped and DISCLOSED, never a defect ---------
+# Precedent: #701's title claim-verb test. A check that cannot judge a whole
+# artifact class must not report on it.
+
+if grep -qi 'skip' "$PROMPTS" && grep -qi 'disclos' "$PROMPTS"; then
+  ok "an undeclared language is skipped WITH the skip disclosed"
+else
+  err "no skip-and-disclose rule for a language with no declaration (#701 precedent)"
+fi
+
+# --- 3. the skill's prose pass routes to it (pointer, not copy) --------------
+
+if grep -q 'Declared-convention conformance' "$SKILL"; then
+  ok "the prose pass carries the declared-convention item"
+else
+  err "$SKILL prose pass does not mention declared-convention conformance"
+fi
+
+if grep -q 'review-prompts.md' "$SKILL"; then
+  ok "the skill POINTS at the full contract rather than restating it"
+else
+  err "the skill does not point at review-prompts.md for the contract"
+fi
+
+# --- 4. the four-dimension rubric is NOT extended ----------------------------
+# The chosen alternative was explicitly "no fifth dimension": the rubric also
+# gates the EN draft Stage 3->4 path, so extending it would turn a Japanese
+# defect into an English gate.
+
+ver=$(sed -n 's/^<!-- rubric-version: \([0-9][0-9]*\) -->$/\1/p' "$RUBRIC" | head -1)
+if [ "$ver" = "1" ]; then
+  ok "rubric-version is still 1 — the rubric was not extended"
+else
+  err "rubric-version is '$ver', expected 1: Story 20.4 must not touch the rubric"
+fi
+
+if grep -q 'Four dimensions' "$RUBRIC"; then
+  ok "the rubric still declares FOUR dimensions"
+else
+  err "$RUBRIC no longer declares four dimensions — the closed set moved"
+fi
+
+if grep -qi 'natural' "$RUBRIC"; then
+  err "naturalness leaked into the quality rubric — it is a sibling criterion,"\
+" not a fifth dimension (EN drafts and the Stage 3->4 gate must be unaffected)"
+else
+  ok "naturalness did NOT leak into the rubric (EN behavior unchanged)"
+fi
+
+# --- 5. the declaration the criterion grades against actually exists ---------
+# Reuses the repo's own stdlib YAML subset reader, exactly as
+# check-lint-article.sh does — a declaration is only a declaration if the
+# shipped parser reads it whole (#701).
+
+if python3 - "$CONV" <<'PY'
+import importlib.util, sys
+spec = importlib.util.spec_from_file_location("ruc", "scripts/resolve-user-config.py")
+m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+langs = (m.load_yaml(open(sys.argv[1], encoding="utf-8").read()) or {}).get("languages") or {}
+ja = langs.get("ja") or {}
+missing = [k for k in ("register", "terminology") if not ja.get(k)]
+if missing:
+    print("ja lost: " + ", ".join(missing)); sys.exit(1)
+sys.exit(0)
+PY
+then
+  ok "ja declares both register and terminology (the criterion has a target)"
+else
+  err "the ja block does not declare register+terminology — the criterion"\
+" would grade against nothing"
+fi
+
+# --- 6. both specs carry the decision ----------------------------------------
+
+if grep -q 'declared-convention violation' "$SPEC_REVIEW"; then
+  ok "SPEC-article-review's severity anchor names the fourth criterion"
+else
+  err "SPEC-article-review does not name the declared-convention criterion"
+fi
+
+if grep -q 'language half is graded' "$SPEC_ADAPT"; then
+  ok "SPEC-canonical-adaptation CAP-4 grades the language half"
+else
+  err "SPEC-canonical-adaptation CAP-4 does not state that the language half is graded"
+fi
+
+if [ "$fail" -eq 0 ]; then
+  printf '\nAll declared-register checks passed.\n'; exit 0
+else
+  printf '\ndeclared-register checks FAILED.\n' >&2; exit 1
+fi
