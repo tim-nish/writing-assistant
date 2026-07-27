@@ -320,8 +320,8 @@ sys.exit(1 if fail else 0)
 PYEOF
 [ $? -eq 0 ] || fail=1
 
-python3 - "$work/big-map.json" "$work/view.md" <<'PYEOF' || fail=1
-import json, re, sys
+python3 - "$work/big-map.json" "$work/view.md" "$D" <<'PYEOF' || fail=1
+import importlib.util, json, re, sys
 d = json.load(open(sys.argv[1]))
 view = open(sys.argv[2], encoding="utf-8").read()
 fail = []
@@ -329,88 +329,47 @@ def check(cond, msg):
     print(("ok:   " if cond else "FAIL: ") + msg, file=sys.stdout if cond else sys.stderr)
     if not cond: fail.append(msg)
 
-subs = [s for t in d["topics"] for s in t["subtopics"]]
-# A PLACEHOLDER name is the assembler's enum for "nothing named this", and the
-# View renders that state as prose instead (#634) — so those entries are
-# checked by their prose, not by the bare token they carry in map.json.
-PLACEHOLDERS = ("(unclustered)", "(untracked)", "(unnamed)")
-named = [s for s in subs if s["subtopic"] not in PLACEHOLDERS]
-check(all(s["subtopic"] in view for s in named),
-      f"the View lists every one of the {len(named)} named subtopics")
+# STORY 20.5 (#802): the View is the header plus Candidate Directions, and
+# NOTHING ELSE. ~2,300 of a 2,511-line view served no function the owner could
+# identify, so this asserts the ABSENCE of the three deleted sections — a
+# regression that re-adds one fails here rather than being noticed by token
+# cost months later.
+heads = re.findall(r"^## (.+)$", view, re.M)
+check(heads == ["Candidate directions"],
+      f"the View carries exactly ONE section: Candidate directions ({heads})")
+for gone in ("Subtopic clusters", "Maintenance", "Diagnostics"):
+    check(not any(h.startswith(gone) for h in heads),
+          f"the {gone!r} section is gone from the View")
+check(not re.search(r"^#### T\d+\.\d+ — ", view, re.M),
+      "no per-subtopic detail block survives")
+check("- glance:" not in view and "- evidence pointers (" not in view,
+      "the per-subtopic diagnostics fields are gone")
+
+# CAP-4's duty is discharged by a LINE, and dropping these would be a real
+# regression rather than more cleanup (SPEC-terrain, amended 2026-07-27).
+# Compared against the emitters themselves, not against guessed wording: a
+# substring test would keep passing if the line silently changed shape.
+spec = importlib.util.spec_from_file_location("dv", sys.argv[3])
+mod = importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)
+cov_line = mod._element_coverage_line(d)
+gloss_line = mod._gloss_disclosure_line(d)
+check(cov_line in view,
+      "the one-line element coverage disclosure still sits under the directions")
+check(gloss_line in view,
+      "the one-line gloss disclosure still sits under the directions")
+# The disclosure must reach the surface WHOLE. `_clip_line` would otherwise
+# truncate the reason — the actionable half — mid-word, leaving a disclosure
+# that names a gap without naming its remedy (Story 20.5, #802).
+check(len(gloss_line) <= mod.VIEW_LINE_CHARS,
+      f"the gloss disclosure fits the View line budget uncut ({len(gloss_line)})")
+check(len(cov_line) <= mod.VIEW_LINE_CHARS,
+      f"the coverage disclosure fits the View line budget uncut ({len(cov_line)})")
+check("below" not in gloss_line and "maintenance" not in gloss_line.lower(),
+      "no disclosure line points at a section this story deleted")
+
+# The header survives whole: it is what the amended CAP-2 points at.
 check(d["coverage"]["pin"] in view, "the View header carries the map's pin")
-check(re.search(r"^#### T\d+\.\d+ — ", view, re.M),
-      "every subtopic carries a stable ID (T<topic>.<subtopic>)")
-ids = re.findall(r"^#### (T\d+\.\d+) ", view, re.M)
-check(len(ids) == len(set(ids)) == len(subs), "the IDs are unique, one per subtopic")
-# IDs are assigned in RANK order (richest terrain first), so the View must show
-# them in numeric order (#612). A string sort renders T3.1, T3.10, … T3.19, T3.2
-# and scatters exactly the ranking that makes the file scannable.
-def _num(i):
-    return tuple(int(p) for p in re.findall(r"\d+", i))
-check(ids == sorted(ids, key=_num),
-      f"the View lists subtopics in NUMERIC id order, not lexicographic ({ids[:6]})")
-# Not vacuous: the two orders only differ once a topic reaches ten subtopics.
-check(any(_num(i)[1] >= 10 for i in ids),
-      f"the fixture reaches two-digit indexes, so the order above is a real test ({ids[-3:]})")
-check(all(t["topic"] in view for t in d["topics"]), "each subtopic sits under its topic")
-check("glance:" in view, "the depth glance is shown")
-# Evidence pointers are listed AGGREGATED PER FILE (#615), not line-granular:
-# the source file must appear, its line anchor must not.
-check("host/w5.md" in view, "the evidence source files are listed")
-check("host/w5.md:6@abc1234" not in view,
-      "raw per-line pointers are NOT dumped into the View")
-check(re.search(r"^\s+- \S+ ×\d+$", view, re.M),
-      "a file cited more than once is aggregated with a count (path ×N)")
-# The total stays printed beside the list, so "why this depth?" is still
-# answerable from the same counts the estimate used.
-check(re.search(r"- evidence pointers \(\d+\):", view),
-      "the pointer TOTAL is still shown alongside the aggregated list")
-check("Lesson 3" in view, "lesson-seed names are shown")
-# Lesson seeds are budgeted the same way evidence is (#634): one per line,
-# clipped, capped, remainder DISCLOSED — never one 10,000-character line.
-check(re.search(r"- lesson seeds \(\d+\):", view),
-      "the lesson-seed TOTAL is shown alongside the list")
-check(re.search(r"^\s+- Lesson \d+$", view, re.M),
-      "lesson seeds render ONE PER LINE, not comma-joined onto one line")
-seed_block = re.search(r"- lesson seeds \(\d+\):\n((?:\s+- .*\n)+)", view)
-check(seed_block and "…" in view and re.search(r"… and \d+ more seed\(s\)", view),
-      "past the cap the remaining seeds are DISCLOSED, never silently dropped")
-
-# The View is a human surface, so every line is budgeted (#633/#634). This is
-# the guard that keeps an 818-line unreadable View from recurring unnoticed.
-long_lines = [l for l in view.splitlines() if len(l) > 200]
-check(not long_lines,
-      f"no View line exceeds its display budget (worst: {max((len(l) for l in long_lines), default=0)} chars)")
-
-# The placeholder states read as PROSE THAT STATES THE REMEDY, never as a bare
-# internal enum in a headline position (#634).
-check(not re.search(r"^#{2,4} .*\((?:unclustered|untracked|unnamed)\)", view, re.M),
-      "no placeholder enum value appears in a heading")
-check("not yet clustered" in view and "declare `subtopic:`" in view,
-      "the not-yet-clustered state is named to the owner as prose with its remedy")
-check("consumed: yes" in view and "consumed: no" in view,
-      "consumed marks are shown, and consumed material is NOT hidden")
-
-# No opaque entries (Story 18.70, #616). An entry that shows counts and no
-# subjects is invisible terrain, and the unclustered bucket is exactly the
-# material nothing else surfaces.
-check(not re.search(r"^#### T\d+\.\d+ —\s*$", view, re.M),
-      "no subtopic heading is left empty (no dangling dash)")
-# Each entry's own block, so a member name found elsewhere in the file cannot
-# stand in for the entry that was supposed to list it.
-blocks = {h: b for h, b in re.findall(
-    r"^#### (T\d+\.\d+) — .*?$\n(.*?)(?=^#### |\Z)", view, re.M | re.S)}
-opaque = [s for s in subs if not (s.get("density", {}).get("pointers") or [])]
-check(opaque, "the fixture contains a pointerless entry to exercise this")
-missing = [s["subtopic"] for s in opaque
-           if not any("- items (" in b and all(
-               str(i.get("slug") or i.get("title") or "") in b
-               for i in s.get("items", []))
-               for b in blocks.values())]
-check(not missing,
-      f"a subtopic with no evidence pointers names its members, not just counts ({missing[:2]})")
-check(sum("- items (" in b for b in blocks.values()) >= len(opaque),
-      "every pointerless entry carries an explicit items list")
+check(re.search(r"\d+ topic", view), "the header carries the terrain-size line")
 sys.exit(1 if fail else 0)
 PYEOF
 [ $? -eq 0 ] || fail=1
@@ -440,16 +399,14 @@ def check(cond, msg):
 heads = re.findall(r"^#{2,4} (.+)$", view, re.M)
 check(heads and heads[0] == "Candidate directions",
       f"the View's FIRST section is the candidate directions (got {heads[:1]})")
-check("Subtopic clusters — a derived, secondary grouping" in heads
-      and heads.index("Subtopic clusters — a derived, secondary grouping") == 1,
-      "the cluster summary is the SECOND section, demoted to a derived "
-      "grouping (#799), before any detail")
-first_detail = next((i for i, h in enumerate(heads) if re.match(r"T\d+\.\d+ — ", h)), None)
-check(first_detail is not None and first_detail > 1,
-      "per-subtopic detail comes only AFTER directions and the summary")
+# Story 20.5 (#802): the cluster summary and the per-subtopic detail that used
+# to follow the directions are GONE, so "leads with the directions" is now the
+# stronger claim that they are the only section there is.
+check(heads == ["Candidate directions"],
+      f"the directions are the View's only section ({heads})")
 
 # Every derived direction reaches the View, with the index selection uses.
-block = view.split("## Subtopic clusters — a derived, secondary grouping")[0]
+block = view
 # Since Story 18.81 (#647) elements are presented HERE, among the directions,
 # rather than in a section of their own — so every candidate is covered.
 directional = list(cands)
@@ -482,25 +439,23 @@ check(len(re.findall(r"^- \*\*", head, re.M)) >= 10,
 # carries the material's own claim where there is one, and the subject alone
 # where there is not — the glance (`[bar] level - N ptr`) is a description of
 # the corpus and now lives in the subtopic's own block.
-summary = view.split("## Subtopic clusters — a derived, secondary grouping")[1].split("\n## ")[0]
-srows = re.findall(r"^- \*\*(T\d+\.\d+)\*\* — \S", summary, re.M)
-check(len(srows) == len(set(srows)) and len(srows) >= 10,
-      f"the summary carries one line per subtopic ({len(srows)})")
-check("[#" not in summary and " ptr," not in summary,
-      "no terrain line carries the glance bar or raw counters (CAP-3 substance-led)")
+# The per-subtopic summary section is gone (Story 20.5, #802); the glance-bar
+# and raw-counter ban now applies to the surviving surface, which is the whole
+# View.
+check("[#" not in view and " ptr," not in view,
+      "no line carries the glance bar or raw counters (CAP-3 substance-led)")
 
 # SUBSTANCE-LED (CAP-3, amended #647): a ranked line is what the material
 # says, never subject-plus-counts. Every direction and terrain row must carry
 # something beyond an index, a subject and a number.
 COUNTS_ONLY = re.compile(r"^- \*\*\S+\*\* — [^—]+ \(\d+ evidence pointer\(s\)\)$")
-bad_rows = [l for l in (block + summary).splitlines()
+bad_rows = [l for l in block.splitlines()
             if COUNTS_ONLY.match(l.strip())]
 check(not bad_rows,
       f"no direction or terrain line is a subject plus counts ({bad_rows[:2]})")
-# The depth word rides INSIDE the glance; printing it beside the glance would
-# render the same word twice on every line.
-check(not re.search(r"^- \*\*T\d+\.\d+\*\* — .+ · (\S.*) · \[[#.]+\] \1 ", summary, re.M),
-      "the summary does not repeat the depth word beside the glance")
+# The depth-word duplication check went with the summary section it guarded
+# (Story 20.5, #802): with no glance on the surface there is no beside-the-
+# glance position for a word to be repeated in.
 sys.exit(1 if fail else 0)
 PYEOF
 [ $? -eq 0 ] || fail=1
@@ -697,9 +652,13 @@ check("the next level needs" not in view,
       "the View does not carry the promotion predicate")
 check(not re.search(r"^- depth: .*\d+ < \d+", view, re.M),
       "no threshold arithmetic appears on a depth line")
-# The counts DO stay — CAP-2's "why this depth?" is answered from them.
-check(re.search(r"^- depth: .+ \d+ evidence pointer\(s\)", view, re.M),
-      "the depth line still shows the level and the counts it was derived from")
+# Story 20.5 (#802): depth lines no longer reach the View at all — the block
+# that rendered them is deleted. The ban above is therefore satisfied by
+# construction, and CAP-2's "why this depth?" is answered from the header's
+# terrain-size line instead (SPEC-terrain, amended 2026-07-27). `_depth_line`
+# itself survives with its unit test below; story 20.7 retires the estimator.
+check(not re.search(r"^- depth: ", view, re.M),
+      "no depth line reaches the View (the estimate is not an owner surface)")
 
 # A trim must never swallow a DISCLOSURE: a `why` with no predicate is passed
 # through whole, including "no depth-threshold declaration is readable".
@@ -903,7 +862,11 @@ cmp -s "$work/big-cands.json" "$work/big-cands2.json" \
   || err "the IDs are not stable within a pin"
 python3 - "$work/view-1.md" "$work/big-cands.json" <<'PYEOF' && ok "indexed selection: the View's IDs and the composer's IDs are the same identifiers" || err "the View and the composer disagree about indexes"
 import json, re, sys
-view_ids = set(re.findall(r"^#### (T\d+\.\d+) ", open(sys.argv[1], encoding="utf-8").read(), re.M))
+# Story 20.5 (#802): the per-subtopic detail headings are gone, so the View's
+# identifiers are read where they now live — the candidate direction rows,
+# which is the surface the owner actually answers from.
+view_ids = set(re.findall(r"^- \*\*(T\d+\.\d+)\*\* — ",
+                          open(sys.argv[1], encoding="utf-8").read(), re.M))
 cand_ids = {c["id"] for c in json.load(open(sys.argv[2]))["candidates"]
             if c["kind"] == "single"}
 assert cand_ids <= view_ids, cand_ids - view_ids
@@ -998,14 +961,13 @@ def check(cond, msg):
     print(("ok:   " if cond else "FAIL: ") + msg, file=sys.stdout if cond else sys.stderr)
     if not cond: fail.append(msg)
 
-heads = re.findall(r"^## (.+)$", view, re.M)
-check(any(h.startswith("Maintenance") for h in heads),
-      f"the View carries a maintenance section ({heads})")
-check(any(h.startswith("Diagnostics") for h in heads),
-      f"the View carries a diagnostics section ({heads})")
-reading = view.split("\n## Maintenance")[0]
-maint = view.split("\n## Maintenance")[1].split("\n## ")[0]
-diag = view.split("\n## Diagnostics")[1]
+# Story 20.5 (#802): with the maintenance and diagnostics sections deleted,
+# the reading path is THE WHOLE VIEW. The #646 boundary is not weakened by
+# this — it is satisfied trivially, because there is no longer a
+# non-owner-facing tail for internal vocabulary to hide in. The lint below is
+# therefore now the ONLY thing standing between a derivation defect and the
+# owner surface, which makes it more load-bearing than before, not less.
+reading = view
 
 # The lint's own contract: it FLAGS the pre-#646 line shape and passes the
 # shipped one — a lint that never fires would be a clean bill nobody earned.
@@ -1026,15 +988,14 @@ unregistered = [x for x in (levels | families) if x
 check(not unregistered,
       f"every depth level and source family is registered in INTERNAL_VOCAB ({unregistered})")
 
-# The remediation prompt left the reading path but did NOT lapse.
-check("declare" in maint and "subtopic:" in maint,
-      "the maintenance section carries the declaration prompt")
-check("declare" not in reading,
+# The remediation prompt and the counters were DELETED with their sections,
+# not relocated — and that is the story's point: they were ~2,300 lines nobody
+# could find a use for. What must survive is that the owner surface still
+# carries no remediation prompt inside a terrain or direction line.
+check("declare `subtopic:`" not in reading,
       "no remediation prompt sits inside a terrain or direction line")
-# The counters moved, they were not deleted: CAP-2's "why this depth?" is still
-# answerable from the same numbers the estimate used.
-check("[#" in diag and "ptr" in diag,
-      "the counters and the depth bar live in diagnostics, on the record")
+check("[#" not in reading,
+      "no depth bar reaches the owner surface")
 # IDs stay — they are the ratified selection mechanism.
 check(re.search(r"^- \*\*T\d+\.\d+\*\* — ", reading, re.M),
       "terrain lines still carry their index for selection")
