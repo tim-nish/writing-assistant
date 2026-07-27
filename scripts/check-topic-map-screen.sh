@@ -1053,5 +1053,49 @@ sys.exit(1 if fail else 0)
 PYEOF
 [ $? -eq 0 ] || fail=1
 
+# --- owner-surface text fits by authorship, never by clipping (#832) ---------
+# The slice-plus-fake-period idiom is gone for good: a truncation that ends in
+# "." masquerades as a sentence ("Too many to f."), which the owner reads as a
+# complete statement saying something else. Grep-asserted like the other
+# absences in this file.
+if grep -nE '\[:(budget|room) *- *1\]' scripts/topic-map-directions.py >/dev/null; then
+  err "the mid-word slice idiom is back in topic-map-directions.py (#832)"
+else
+  ok "no mid-word slice-plus-period idiom in the composer"
+fi
+python3 - scripts/topic-map-directions.py <<'PYEOF' || fail=1
+import importlib.util, sys
+fail = []
+def check(cond, msg):
+    print(("ok:   " if cond else "FAIL: ") + msg, file=sys.stdout if cond else sys.stderr)
+    if not cond: fail.append(msg)
+spec = importlib.util.spec_from_file_location("tmd", sys.argv[1])
+tmd = importlib.util.module_from_spec(spec); spec.loader.exec_module(tmd)
+# Static template text fits its budget BY CONSTRUCTION — measured here, at
+# authoring time, per the owner-facing proposal contract clause (e).
+check(len(tmd.WHY_TEXT) <= tmd.BUDGETS["why"],
+      f"WHY_TEXT is authored inside BUDGETS['why'] ({len(tmd.WHY_TEXT)}/{tmd.BUDGETS['why']})")
+# The summary `where` picks an authored variant beside the path — never slices.
+long_path = "/home/owner/work/some-articles-repo/drafts/topic-map/topic-map-view.md"
+where = tmd._fit_with_path(
+    ["Terrain at deadbeef: 61 element(s) — each its own Strand — and 3 "
+     "topic(s), 61 strand(s); 0 already consumed and still selectable.",
+     "Terrain at deadbeef: 61 Strands, 3 topic(s); 0 consumed.",
+     "Terrain: 61 Strands."], long_path, tmd.BUDGETS["where"])
+check(where.endswith(long_path), "the View path is never clipped")
+check(len(where) <= tmd.BUDGETS["where"],
+      f"an authored variant fits beside a realistic path ({len(where)}/{tmd.BUDGETS['where']})")
+prefix = where[: -len(" Open the View: " + long_path)]
+check(not __import__("re").search(r"\b\w\.$", prefix),
+      "the summary prefix is a whole authored wording, not a cut wearing a period")
+# View-line elision is visible and lands on a word boundary.
+e = tmd._elide("Too many to fit on one screen indeed", 20)
+check(e.endswith("…") and not e.endswith(" …") and "fit" not in e.split("…")[0].split()[-1][:1],
+      f"View elision is marked and word-bounded ({e!r})")
+check(tmd._elide("short", 20) == "short", "under-budget View value is untouched")
+sys.exit(1 if fail else 0)
+PYEOF
+[ $? -eq 0 ] || fail=1
+
 [ "$fail" -eq 0 ] && printf '\nAll topic-map screen checks passed.\n' \
   || { printf '\nFAILED.\n' >&2; exit 1; }
