@@ -53,6 +53,33 @@ At a fork-presenting stop point, before showing the table:
      power**, **no pre-selected default**; the gate never times out into a
      choice.
 
+2b. **Carry the comparison onto the gate (CAP-3, amended 2026-07-27, #808).**
+   Ordered, individually grounded candidates are **not enough**: the hardest
+   input at a fork is the *comparison*, and per-option advocacy leaves every
+   option plausible alone while nothing weighs them together. The procedure:
+
+   - **Attach the evidence to the option it bears on.** Before drawing the
+     panel, list what this sitting already measured or read — counts,
+     `file:line` citations, consult quotes — and place each beside the option
+     it argues for or against. A measurement the sitting holds and leaves in
+     prose above the gate is **withheld, not absent**. If an option has no
+     evidence, say so on the option.
+   - **State a ranked recommendation with its reasoning.** Name which
+     candidate you judge best and why, in one or two sentences, on the panel
+     itself.
+   - **Name what would overturn it.** This is the load-bearing half: a
+     recommendation carrying the evidence that would falsify it is agent-fed
+     input the owner can check cheaply; one without it is a **default wearing
+     a suggestion's clothes**. If the overturning condition is checkable, check
+     it before presenting and say what you found.
+   - **Render a shared premise with its negation.** If two or more options rest
+     on the same machine-computed assumption, state that assumption explicitly
+     and carry a candidate that denies it — otherwise every available answer
+     records something false.
+
+   **This is not a default.** Nothing is pre-selected, and
+   **rank is not pre-selection**; the gate still never times out into a choice.
+
 3. **Fresh pin per run — no consultation cache.** The `--pin` is supplied per
    run; nothing caches a consult result between runs.
 
