@@ -122,18 +122,18 @@ import json, sys
 cov = json.load(open(sys.argv[1]))["coverage"]
 fams = {f["family"]: f for f in cov["families"]}
 assert set(fams) == {"articles-items", "hub-lessons", "host-sources",
-                     "hub-elements"}, fams.keys()
+                     "hub-elements", "hub-gloss"}, fams.keys()
 assert all(d["family"] == "articles-items" for d in cov["read"]), cov["read"]
 assert fams["articles-items"]["enumerated"] is True, fams["articles-items"]
 # declared, not enumerated, and the reason is NAMED — never a silent empty family
-for name in ("hub-lessons", "host-sources", "hub-elements"):
+for name in ("hub-lessons", "host-sources", "hub-elements", "hub-gloss"):
     f = fams[name]
     assert f["declared"] is True and f["enumerated"] is False, f
     assert f["reason"], f
     assert f["matched"] == 0 and f["accounting_closes"] is True, f
 assert cov["families_enumerated"] == ["articles-items"], cov["families_enumerated"]
 assert [f["family"] for f in cov["families_not_enumerated"]] == [
-    "hub-lessons", "host-sources", "hub-elements"], cov
+    "hub-lessons", "host-sources", "hub-elements", "hub-gloss"], cov
 assert cov["families_not_enumerated"][0]["reason"] == fams["hub-lessons"]["reason"], cov
 PYEOF
 
@@ -486,6 +486,142 @@ grep -qi 'never silently' skills/terrain/SKILL.md \
   && ok "#669: topic-map SKILL presents verdicts + NEEDS-RECORDING, never silently filters" \
   || err "topic-map SKILL missing the usability-verdict presentation"
 
+# --- 7d. the stance-3 pivot (#799): elements primary, the Gloss quoted -------
+# With the two-tier gloss surface served (`gloss_index`, tsurezure-gateway#64),
+# every hub Lesson is a PRIMARY element quoting the ratified `gloss:` rendering
+# — never the recall one-liner — and a journey-named index path yields journey
+# elements quoting `journey_gloss:`. Every element carries its VISIBLE
+# three-valued usability verdict, verdicts never filter, and the map names the
+# recording target a gap artifact lands in.
+python3 - "$FX" <<'PYEOF'
+import json, sys
+fx = json.load(open(sys.argv[1]))
+fx["tools"] = ["glossary_entry", "lessons_index", "topic_thread",
+               "policy_lookup", "surface_names", "gloss_index"]
+fx["gloss_index"] = [
+    ["gloss/INDEX.md", 8,
+     "- **retry-storm** — GLOSS-ALPHA retries multiply their own load. (agents, cost)"],
+    ["gloss/INDEX.md", 9,
+     "- **cache-warmth** — GLOSS-BETA a warm cache hides every cold start. (testing)"],
+    ["gloss/journeys/INDEX.md", 4,
+     "- **retry-storm** — JOURNEY-ALPHA the belief inverted after the retro. (agents)"],
+]
+json.dump(fx, open(sys.argv[1], "w"))
+PYEOF
+MAP > "$work/pivot.json" 2>"$work/pivot.err" \
+  && ok "#799: the map assembles with the gloss surface served" \
+  || err "assemble failed with gloss served: $(cat "$work/pivot.err")"
+
+python3 - "$work/pivot.json" <<'PYEOF' && ok "#799: every Lesson and served Journey is a primary element; the slot quotes the served gloss, never the one-liner; team-shape's absent rendering is disclosed" || err "element pivot wrong in the assembled map"
+import json, sys
+d = json.load(open(sys.argv[1]))
+els = {(e["kind"], e.get("slug")): e for e in d["elements"]}
+assert ("lesson", "retry-storm") in els and ("lesson", "cache-warmth") in els \
+    and ("lesson", "team-shape") in els, sorted(els)
+assert ("journey", "retry-storm") in els, sorted(els)
+rs = els[("lesson", "retry-storm")]
+# The slot's quote is the SERVED rendering, verbatim — never the recall
+# one-liner ("The retry storm", the LESSONS.md link text).
+assert rs["gloss"].startswith("GLOSS-ALPHA"), rs["gloss"]
+assert rs["gloss_cite"].startswith("gloss/INDEX.md:8@"), rs["gloss_cite"]
+assert "The retry storm" not in (rs["gloss"] or ""), rs
+jy = els[("journey", "retry-storm")]
+assert jy["gloss"].startswith("JOURNEY-ALPHA"), jy["gloss"]
+# A lesson the served index carries no rendering for DISCLOSES that — nothing
+# is substituted for a ratified rendering.
+ts = els[("lesson", "team-shape")]
+assert ts["gloss"] is None and ts["gloss_unavailable"], ts
+# Every element carries its VISIBLE verdict; the journey record declared above
+# still matches retry-storm, and the others stay episodic-unrecorded.
+assert all(e.get("usability", {}).get("verdict") for e in d["elements"]), \
+    [e.get("usability") for e in d["elements"]]
+assert els[("lesson", "retry-storm")]["usability"]["verdict"] == "matched"
+assert els[("lesson", "cache-warmth")]["usability"]["verdict"] == "episodic-unrecorded"
+# The gap artifact's destination is named on the map.
+assert d["recording_target"]["file"].endswith("journey.md"), d["recording_target"]
+assert d["gloss"]["served"] is True and d["gloss"]["journey_renderings"] == 1, d["gloss"]
+fams = {f["family"]: f for f in d["coverage"]["families"]}
+assert fams["hub-gloss"]["enumerated"] is True, fams["hub-gloss"]
+PYEOF
+
+# The directions surface: elements are individually selectable ideas with their
+# verdicts visible; selecting an unmatched one yields the brief PLUS the gap
+# disclosure and its NEEDS-RECORDING artifact content — never a refusal.
+DIR="$root/scripts/topic-map-directions.py"
+python3 "$DIR" candidates --map "$work/pivot.json" > "$work/pivot-cands.json"
+python3 - "$work/pivot-cands.json" <<'PYEOF' && ok "#799: N elements are N selectable candidates (L/J namespaces), each quoting the gloss with its verdict attached" || err "element candidates wrong"
+import json, sys
+c = json.load(open(sys.argv[1]))["candidates"]
+els = {x["id"]: x for x in c if x.get("kind") == "element"}
+# Lesson ids in slug-sorted order; the journey rendering in its own namespace.
+assert {"L1", "L2", "L3", "J1"} <= set(els), sorted(els)
+assert els["L1"]["slug"] == "cache-warmth" and els["L2"]["slug"] == "retry-storm", els
+assert "GLOSS-ALPHA" in els["L2"]["direction"], els["L2"]["direction"]
+assert "JOURNEY-ALPHA" in els["J1"]["direction"], els["J1"]["direction"]
+# The one-liner is identification, never the quote.
+assert "The retry storm" not in els["L2"]["direction"], els["L2"]
+assert els["L2"]["usability"]["verdict"] == "matched", els["L2"]
+assert els["L1"]["usability"]["verdict"] == "episodic-unrecorded", els["L1"]
+PYEOF
+
+pivotpin=$(python3 -c "import json;print(json.load(open('$work/pivot.json'))['coverage']['pin'])")
+printf '{"index":"L1","note":"the cold-start angle","pin":"%s"}' "$pivotpin" > "$work/pivot-answer.json"
+python3 "$DIR" brief --answer "$work/pivot-answer.json" --map "$work/pivot.json" \
+  > "$work/pivot-brief.json" 2>"$work/pivot-brief.err" \
+  && ok "#799: selecting an episodic-unrecorded element STILL yields a brief (exit 0, never a refusal)" \
+  || err "an unmatched element selection was refused: $(cat "$work/pivot-brief.err")"
+python3 - "$work/pivot-brief.json" <<'PYEOF' && ok "#799: the unmatched selection carries the gap disclosure + NEEDS-RECORDING artifact content beside the brief" || err "gap disclosure wrong on the brief"
+import json, sys
+b = json.load(open(sys.argv[1]))
+assert b["brief"].startswith("cover the lesson — GLOSS-BETA"), b["brief"]
+assert b["brief"].endswith("the cold-start angle"), b["brief"]
+gap = b["gap"]
+assert gap["verdict"] == "episodic-unrecorded", gap
+assert "never" in gap["drafting"] and "gate" in gap["drafting"], gap
+nr = gap["needs_recording"]
+assert nr["slug"] == "cache-warmth" and nr["target_file"].endswith("journey.md"), nr
+assert nr["heading"] == "NEEDS-RECORDING" and nr["entry"], nr
+PYEOF
+
+# A MATCHED selection carries no gap block — the verdict already located its
+# evidence, and the brief is indistinguishable from any other.
+printf '{"index":"L2","note":"","pin":"%s"}' "$pivotpin" > "$work/pivot-answer2.json"
+python3 "$DIR" brief --answer "$work/pivot-answer2.json" --map "$work/pivot.json" \
+  > "$work/pivot-brief2.json" 2>/dev/null
+python3 - "$work/pivot-brief2.json" <<'PYEOF' && ok "#799: a matched element selection carries no gap block" || err "a matched selection grew a gap block"
+import json, sys
+b = json.load(open(sys.argv[1]))
+assert "gap" not in b, b.get("gap")
+assert "GLOSS-ALPHA" in b["brief"], b["brief"]
+PYEOF
+
+# Without gloss_index (an older gateway), the elements STILL exist — the pivot
+# does not depend on the rendering being served — and the absent rendering is
+# a named disclosure, never a silent fallback to the one-liner.
+python3 - "$FX" <<'PYEOF'
+import json, sys
+fx = json.load(open(sys.argv[1]))
+fx.pop("gloss_index", None)
+fx.pop("tools", None)
+json.dump(fx, open(sys.argv[1], "w"))
+PYEOF
+MAP > "$work/pivot-nogloss.json" 2>/dev/null \
+  && ok "#799: an older gateway (no gloss_index) still yields a map" \
+  || err "a gateway without gloss_index broke the map"
+python3 - "$work/pivot-nogloss.json" <<'PYEOF' && ok "#799: without the served rendering the element survives, discloses the reason, and never quotes the one-liner as a gloss" || err "gloss degradation wrong"
+import json, sys
+d = json.load(open(sys.argv[1]))
+els = {e.get("slug"): e for e in d["elements"] if e["kind"] == "lesson"}
+assert set(els) == {"retry-storm", "cache-warmth", "team-shape"}, sorted(els)
+assert all(e["gloss"] is None and e["gloss_unavailable"] for e in els.values()), \
+    [(e["gloss"], e["gloss_unavailable"]) for e in els.values()]
+assert d["gloss"]["served"] is False and d["gloss"]["reason"], d["gloss"]
+assert not [e for e in d["elements"] if e["kind"] == "journey"], "journeys invented"
+fams = {f["family"]: f for f in d["coverage"]["families"]}
+assert fams["hub-gloss"]["enumerated"] is False and fams["hub-gloss"]["reason"], \
+    fams["hub-gloss"]
+PYEOF
+
 # --- declared precedence + the malformed-declaration lint (18.74, #614) ------
 # The articles repo owns subtopic names; the derivation is the fallback. A
 # declaration the map cannot honour is a CONFIG DEFECT NAMED, never a silent
@@ -606,7 +742,7 @@ import json, sys
 cov = json.load(open(sys.argv[1]))["coverage"]
 assert cov["families_enumerated"] == ["articles-items", "hub-lessons"], cov["families_enumerated"]
 assert [f["family"] for f in cov["families_not_enumerated"]] == [
-    "host-sources", "hub-elements"], cov
+    "host-sources", "hub-elements", "hub-gloss"], cov
 fams = {f["family"]: f for f in cov["families"]}
 assert fams["hub-lessons"]["matched"] == 3, fams["hub-lessons"]
 for f in fams.values():

@@ -66,6 +66,14 @@ and every candidate surface carries the **source family** it came from
     sources make the family declared-but-not-enumerated with the reason, as
     above.
 
+  * `hub-gloss` — the served **plain-register Gloss overview index** (the
+    gateway's two-tier `gloss_index`, tsurezure-gateway#64), one bounded
+    tier-1 read: the ratified `gloss:` / `journey_gloss:` renderings the
+    PRIMARY element projection quotes (#799). A gateway that cannot serve it
+    makes the family declared-but-not-enumerated with the reason — and the
+    element slots disclose the absence rather than quoting the recall
+    one-liner in a rendering's place.
+
   * the **track↔topic mapping** — `policy_source.track_topics` in the host
     repo's `writing-sources.yaml`, read through
     `resolve-writing-sources.py policy-source` (#525). The articles repo owns
@@ -176,8 +184,17 @@ STRUCK = "~~"
 
 ELEMENT_SUMMARY_CHARS = 200
 FAMILY_HOST_SOURCES = "host-sources"
+FAMILY_HUB_GLOSS = "hub-gloss"
 DECLARED_FAMILIES = (FAMILY_ARTICLES_ITEMS, FAMILY_HUB_LESSONS,
-                     FAMILY_HOST_SOURCES, FAMILY_HUB_ELEMENTS)
+                     FAMILY_HOST_SOURCES, FAMILY_HUB_ELEMENTS,
+                     FAMILY_HUB_GLOSS)
+
+# One tier-1 Gloss overview line (`gloss/INDEX.md`): `- **<slug>** — <headline>
+# (<tags>)`. The headline is the FIRST SENTENCE of the lesson's ratified
+# `gloss:` rendering, verbatim (hub `specs/gloss.md` — consumers quote the
+# ratified field, never re-express it). Verified against the hub's generated
+# index rather than inferred.
+GLOSS_LINE = re.compile(r"^-\s+\*\*(.+?)\*\*\s+—\s+(.*?)(?:\s+\(([^()]*)\))?$")
 
 # A lesson seed enters the topic derivation through the SAME track->topic path
 # every item uses: it carries the family name as its track, so an owner who
@@ -666,6 +683,93 @@ def lesson_surfaces(root):
             for seed in seeds], None
 
 
+def gloss_read(root):
+    """The `hub-gloss` family: the served tier-1 Gloss overview index, ONE
+    bounded read through the shipped seam (`read-policy-source.py gloss`,
+    the gateway's two-tier `gloss_index` — tsurezure-gateway#64).
+
+    Returns `(by_file, reason)`. `by_file` is `[(rel, entries)]` in served
+    order; each entry is `{slug, gloss, tags, cite, journey}` — `gloss` is the
+    headline text verbatim (the first sentence of the ratified `gloss:` /
+    `journey_gloss:` rendering; the hub writes it at the distill gate and
+    consumers QUOTE it, never re-express it). An entry is a journey rendering
+    exactly when the hub serves it from a journey-named index file — the
+    consumer never guesses a journey arc from a lesson headline.
+
+    A `reason` means the family is DECLARED-BUT-NOT-ENUMERATED and names why:
+    an undeclared policy source, an unreachable gateway, a gateway that does
+    not register `gloss_index` (the named exit-13 gap — the live deployment
+    predates the tool or its operator config declares no gloss surface), or a
+    served miss. The map never substitutes any other text for a ratified
+    rendering: no gloss served means the slot DISCLOSES that, it never quotes
+    the recall one-liner in the rendering's place.
+    """
+    cmd = [sys.executable, POLICY_READER]
+    if root:
+        cmd += ["--root", root]
+    cmd += ["gloss"]
+    r = subprocess.run(cmd, capture_output=True, text=True)
+    if r.returncode != 0:
+        detail = (r.stderr.strip().split("\n")[-1] if r.stderr.strip()
+                  else f"the policy reader exited {r.returncode}")
+        return [], f"{detail} (read-policy-source.py exit {r.returncode})"
+    by_file, order, pin, current, commit = {}, [], None, None, None
+    for line in r.stdout.splitlines():
+        if line.startswith("pin: "):
+            pin = line[5:].strip()
+            continue
+        if line.startswith("miss: "):
+            return [], (f"the policy source served a miss for the gloss index "
+                        f"at {pin or 'an undisclosed pin'}")
+        if line.startswith("=== "):
+            head = line[4:]
+            path, _sep, sha = head.rpartition(" @ ")
+            current, commit = path.strip(), sha.strip()
+            if current not in by_file:
+                by_file[current] = []
+                order.append(current)
+            continue
+        if not current:
+            continue
+        number, _sep, text = line.partition(": ")
+        if not number.strip().isdigit():
+            continue
+        m = GLOSS_LINE.match(text.strip())
+        if not m:
+            continue
+        slug, headline, tags = m.group(1), m.group(2), m.group(3) or ""
+        headline = headline.replace("**", "").strip()
+        if not slug.strip() or not headline:
+            continue
+        by_file[current].append({
+            "slug": slug.strip(),
+            "gloss": headline,
+            "tags": [t.strip() for t in tags.split(",") if t.strip()],
+            "cite": f"{current}:{number.strip()}@{commit}",
+            # A journey rendering is what the hub serves from a journey-named
+            # index path (`gloss/journeys/...`) — the path is the hub's own
+            # naming, and the consumer never infers an arc from a headline.
+            "journey": "journey" in current.lower(),
+        })
+    entries = [(rel, by_file[rel]) for rel in order if by_file[rel]]
+    if not entries:
+        return [], (f"the served gloss index at {pin or 'an undisclosed pin'} "
+                    "lists no renderings")
+    return entries, None
+
+
+def gloss_surfaces(root):
+    """The `hub-gloss` family as surfaces: one per served tier-1 index file.
+    Returns `(surfaces, reason)`; the payload is the file's parsed entries —
+    these surfaces were already served in the one bounded read, no file is
+    opened for them."""
+    by_file, reason = gloss_read(root)
+    if reason:
+        return [], reason
+    return [(FAMILY_HUB_GLOSS, "gloss", rel, parsed)
+            for rel, parsed in by_file], None
+
+
 def _element_summary(text):
     """One line of a topic decision, as a person reads it.
 
@@ -840,6 +944,10 @@ def all_surfaces(repo, root, mapping=None):
             reason=("no hub topic is declared for this repo "
                     "(`policy_source.track_topics`), so no topic file may be read"))
     matched += elements
+    gloss, reason = gloss_surfaces(root)
+    if reason:
+        families[FAMILY_HUB_GLOSS].update(enumerated=False, reason=reason)
+    matched += gloss
     return matched, families
 
 
@@ -929,7 +1037,20 @@ def assemble(repo, mapping, max_surfaces, root=None):
 
     items, read_disclosure = [], []
     elements = []
+    gloss_lessons, gloss_journeys, gloss_served = {}, {}, False
     for family, section, rel, payload in read_now:
+        if family == FAMILY_HUB_GLOSS:
+            # The served plain-register renderings, keyed by lesson slug. The
+            # map QUOTES these — the ratified `gloss:` / `journey_gloss:`
+            # fields, written at the hub's distill gate — and never composes
+            # a rendering of its own (hub `specs/gloss.md` §1).
+            gloss_served = True
+            for entry in payload:
+                target = gloss_journeys if entry["journey"] else gloss_lessons
+                target.setdefault(entry["slug"], entry)
+            read_disclosure.append({"family": family, "surface": rel,
+                                    "entries": len(payload)})
+            continue
         if family == FAMILY_HUB_ELEMENTS:
             # Elements are a SECOND PROJECTION, not items: they never enter
             # the clustering that produces subtopics (CAP-2 — the cluster
@@ -1077,7 +1198,15 @@ def assemble(repo, mapping, max_surfaces, root=None):
     # deterministic within a pin — the property the E<topic>.<n> indexes
     # assigned downstream depend on.
     elements.sort(key=lambda e: (e["date"], e["situation"]), reverse=True)
-    return out_topics, coverage, tracks_seen, elements
+    gloss_info = {
+        "served": gloss_served,
+        "reason": (None if gloss_served else
+                   families[FAMILY_HUB_GLOSS].get("reason")
+                   or "the gloss family was not enumerated"),
+        "lessons": gloss_lessons,
+        "journeys": gloss_journeys,
+    }
+    return out_topics, coverage, tracks_seen, elements, gloss_info
 
 
 # --------------------------------------------------------------------------
@@ -1397,10 +1526,91 @@ def cluster_subtopics(items, consumption, thresholds):
     return out
 
 
-def journey_join(root, topics):
+def lesson_elements(topics, gloss_info, consumption):
+    """Every hub Lesson as a first-class ELEMENT — the primary selectable
+    article-idea unit (SPEC-terrain, stance-3 pivot 2026-07-27, #799): N
+    lessons are N distinct selectable ideas, and no cluster gates them.
+
+    The slot QUOTES the served `gloss:` rendering (the plain-register text the
+    hub ratifies at its distill gate), NEVER the recall one-liner — that is the
+    ratified amendment this projection exists to carry. Where the gloss surface
+    is not served, the slot states so with the reason; no other text is
+    substituted for a ratified rendering.
+    """
+    consumed_index = (consumption or {}).get("consumed_index") or {}
+    seen = {}
+    for topic in topics:
+        for item in topic["items"]:
+            if item.get("family") != FAMILY_HUB_LESSONS:
+                continue
+            slug = item.get("slug") or ""
+            if not slug or slug in seen:
+                continue
+            entry = gloss_info["lessons"].get(slug)
+            seen[slug] = {
+                "kind": "lesson",
+                "slug": slug,
+                "title": item.get("title") or slug,
+                "topic": topic["topic"],
+                # The ratified rendering, verbatim — or an honest absence with
+                # its reason. The recall one-liner is identification (`title`),
+                # never the quoted rendering.
+                "gloss": entry["gloss"] if entry else None,
+                "gloss_cite": entry["cite"] if entry else None,
+                "gloss_unavailable": (
+                    None if entry else
+                    (gloss_info["reason"] if not gloss_info["served"] else
+                     "the served gloss index carries no rendering for this lesson")),
+                "tags": entry["tags"] if entry else [],
+                "date": "",
+                "situation": item.get("surface") or "",
+                "evidence": list(item.get("evidence") or []),
+                "consumed": slug in consumed_index,
+                "consumption_join": ("consumed_index "
+                                     "(write-article-plan.py consult), "
+                                     "keyed by lesson id"),
+            }
+    return [seen[slug] for slug in sorted(seen)]
+
+
+def journey_elements(gloss_info, consumption):
+    """Every served `journey_gloss:` rendering as its own ELEMENT beside the
+    lesson's: a Journey (how a position changed) is a distinct article idea
+    from the rule the lesson states. Projected ONLY from what the hub serves
+    as a journey rendering — never synthesized from a lesson headline."""
+    consumed_index = (consumption or {}).get("consumed_index") or {}
+    out = []
+    for slug in sorted(gloss_info["journeys"]):
+        entry = gloss_info["journeys"][slug]
+        out.append({
+            "kind": "journey",
+            "slug": slug,
+            "title": slug,
+            "topic": "",
+            "gloss": entry["gloss"],
+            "gloss_cite": entry["cite"],
+            "gloss_unavailable": None,
+            "tags": entry["tags"],
+            "date": "",
+            "situation": entry["cite"],
+            "evidence": [entry["cite"]],
+            "consumed": slug in consumed_index,
+            "consumption_join": ("consumed_index "
+                                 "(write-article-plan.py consult), "
+                                 "keyed by lesson id"),
+        })
+    return out
+
+
+def journey_join(root, topics, elements=None):
     """Resolve each candidate's usability against the target repo's declared
-    sources — the mechanical topic↔evidence join (Story 18.96, #669). Returns the
-    NEEDS-RECORDING worklist and annotates every item in place with `usability`.
+    sources — the mechanical topic↔evidence join (Story 18.96, #669). Returns
+    `(needs_recording, recording_target)` and annotates every item AND every
+    element in place with `usability` — the pivot (#799) makes the verdict a
+    visible property of every element: it SURFACES at selection, it never
+    filters what appears, and an unmatched element stays selectable (picking
+    one yields the gap disclosure and its NEEDS-RECORDING tracking artifact,
+    never a refusal to draft).
 
     A hub-lesson candidate is `matched` when a declared **journey** entry carries
     its slug (the #671 join key resolves into declared sources); otherwise it is
@@ -1455,7 +1665,32 @@ def journey_join(root, topics):
                     "target_repo": target_repo,
                     "target_file": target_file,
                 })
-    return sorted(needs_recording, key=lambda t: t["slug"])
+    for el in elements or []:
+        if el.get("kind") in ("lesson", "journey"):
+            slug = el.get("slug") or ""
+            if slug and slug in haystack:
+                el["usability"] = {"verdict": "matched", "checked": checked}
+            else:
+                # The expected day-one majority. `no-episode` stays the
+                # owner's attribution at offer (Story 17.1 tier) — the seam
+                # serves index lines and renderings, not lesson bodies, so
+                # the map cannot mechanically tell the two apart (OQ3), and
+                # collapsing them would queue work that can never complete.
+                el["usability"] = {"verdict": "episodic-unrecorded",
+                                   "checked": checked}
+        else:
+            # A decision/reversal element carries no lesson slug a `journey:`
+            # entry could name — the LOOKUP has no key, and the honest outcome
+            # is `cannot-determine` (the contracted fourth outcome of the
+            # lookup, 2026-07-26 correction), never a merge into the three
+            # verdicts and never rendered as "none".
+            el["usability"] = {"verdict": "cannot-determine",
+                               "checked": checked,
+                               "reason": ("no join key — a decision/reversal "
+                                          "element names no lesson slug a "
+                                          "journey entry could carry")}
+    return (sorted(needs_recording, key=lambda t: t["slug"]),
+            {"repo": target_repo, "file": target_file})
 
 
 def build_map(args):
@@ -1470,7 +1705,7 @@ def build_map(args):
             "set-draft-location) or pass --repo\n")
         raise SystemExit(NO_ARTICLES_REPO)
     mapping = track_topics(root)
-    topics, coverage, tracks_seen, elements = assemble(
+    topics, coverage, tracks_seen, elements, gloss_info = assemble(
         repo, mapping, args.max_surfaces, root=root)
     stale = sorted(t for t in mapping if t not in tracks_seen)
     consumption = consumption_view(root)
@@ -1491,10 +1726,18 @@ def build_map(args):
                     "key": key,
                     "reason": reason,
                 })
+    # The PRIMARY selection units (stance-3 pivot, 2026-07-27, #799): every hub
+    # Lesson and every served Journey rendering is its own element beside the
+    # decision/reversal projection. Built before the join so every element
+    # carries its usability verdict.
+    elements = (elements
+                + lesson_elements(topics, gloss_info, consumption)
+                + journey_elements(gloss_info, consumption))
     # Topic↔evidence usability join (Story 18.96, #669) — annotate every item
-    # with its usability verdict and collect the NEEDS-RECORDING worklist BEFORE
-    # clustering, so the subtopic-item copies carry the verdict too.
-    needs_recording = journey_join(root, topics)
+    # AND every element with its usability verdict and collect the
+    # NEEDS-RECORDING worklist BEFORE clustering, so the subtopic-item copies
+    # carry the verdict too.
+    needs_recording, recording_target = journey_join(root, topics, elements)
     for topic in topics:
         topic["subtopics"] = cluster_subtopics(topic["items"], consumption, thresholds)
     return {
@@ -1520,12 +1763,27 @@ def build_map(args):
         # declared source carries. Never a silent drop — the unusable candidate
         # is surfaced as named backfill work (constrained-excludes-visibly).
         "needs_recording": needs_recording,
+        # Where a NEEDS-RECORDING gap is discharged: the target repo's declared
+        # journey file. Selecting an unmatched element yields the gap
+        # disclosure plus a tracking artifact HERE — never a refusal to draft.
+        "recording_target": recording_target,
+        # The gloss surface's own disclosure: whether the ratified renderings
+        # were served, and the reason when they were not. A slot without a
+        # served rendering states this — it never quotes the recall one-liner
+        # in the rendering's place.
+        "gloss": {"served": gloss_info["served"],
+                  "reason": gloss_info["reason"],
+                  "lesson_renderings": len(gloss_info["lessons"]),
+                  "journey_renderings": len(gloss_info["journeys"])},
         "coverage": coverage,
         "consumption": consumption,
         "depth_thresholds": thresholds,
-        # CAP-2's SECOND PROJECTION, beside the subtopic clusters and never
-        # merged into them: what was decided, and what changed. Derived per
-        # invocation and stored nowhere, exactly like everything else here.
+        # The PRIMARY selection units (stance-3 pivot, 2026-07-27, #799):
+        # typed elements — hub Lessons and Journeys first-class, plus the
+        # decision/reversal projection — each individually selectable, each
+        # carrying its visible usability verdict. The subtopic clusters above
+        # are the DERIVED, SECONDARY grouping and never gate what is
+        # selectable. Derived per invocation and stored nowhere.
         "elements": elements,
     }
 

@@ -42,6 +42,11 @@ import sys
 
 DEFAULT_TOOLS = ["glossary_entry", "lessons_index", "topic_thread",
                  "policy_lookup", "surface_names"]
+# `gloss_index` (tsurezure-gateway#64) is NOT in the default set on purpose:
+# the deployed gateway may predate it, and the reader must detect that via
+# tools/list and degrade to the named exit-13 gap. A fixture that wants the
+# gloss surface declares `"tools": [... "gloss_index"]` plus the payload keys
+# `"gloss_index"` (tier-1 triples) / `"gloss_shards"` ({tag: triples}).
 
 
 def registered_tools(fixture):
@@ -78,6 +83,15 @@ def responses(fixture):
             return hit(triples) if triples else miss(
                 name, {"question": args.get("question"),
                        "topic_hints": args.get("topic_hints")})
+        if name == "gloss_index":
+            if "gloss_index" not in tools:
+                return None
+            tag = args.get("tag")
+            if tag:
+                triples = fixture.get("gloss_shards", {}).get(tag, [])
+                return hit(triples) if triples else miss(name, {"tag": tag})
+            triples = fixture.get("gloss_index", [])
+            return hit(triples) if triples else miss(name, {"tag": None})
         if name == "surface_names":
             # An older gateway does not register the tool at all — the reader
             # gates on tools/list, but honor the boundary here too (unknown).

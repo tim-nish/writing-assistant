@@ -167,11 +167,26 @@ def _elements(map_data):
     `<n>` follows the assembler's order, which is recency-ranked and
     deterministic within a pin (Story 18.79). Computed here per invocation and
     stored nowhere, exactly as the subtopic IDs are.
+
+    Since the stance-3 pivot (2026-07-27, #799) the elements are the PRIMARY
+    selection units and carry three namespaces, so a selection is never
+    ambiguous: `L<n>` for hub Lessons and `J<n>` for Journey renderings (both
+    numbered in the assembler's slug-sorted order, deterministic within a
+    pin), and `E<topic>.<n>` for the decision/reversal projection, unchanged.
     """
     rows, seen = [], {}
-    topics = sorted({e.get("topic", "") for e in map_data.get("elements", [])})
+    counters = {"lesson": 0, "journey": 0}
+    hub = [e for e in map_data.get("elements", [])
+           if e.get("kind") not in counters]
+    topics = sorted({e.get("topic", "") for e in hub})
     index = {name: i for i, name in enumerate(topics, start=1)}
     for el in map_data.get("elements", []):
+        kind = el.get("kind")
+        if kind in counters:
+            counters[kind] += 1
+            prefix = "L" if kind == "lesson" else "J"
+            rows.append(dict(el, id=f"{prefix}{counters[kind]}"))
+            continue
         topic = el.get("topic", "")
         seen[topic] = seen.get(topic, 0) + 1
         rows.append(dict(el, id=f"E{index[topic]}.{seen[topic]}"))
@@ -185,8 +200,24 @@ def _element_direction(el):
     summary is carried in FULL: clipping is a render-only concern (#651), so
     the string the brief is composed from ends where the source did, never
     mid-word — the View bounds the displayed line itself (`_clip_line`)."""
+    kind = el.get("kind")
+    if kind in ("lesson", "journey"):
+        # The slot QUOTES the served `gloss:` / `journey_gloss:` rendering —
+        # the plain-register text the hub ratified at its distill gate — never
+        # the recall one-liner (#799, the pre-ratified amendment). Where no
+        # rendering is served, the slot says so with the reason; nothing is
+        # substituted for a ratified rendering.
+        noun = "lesson" if kind == "lesson" else "journey"
+        gloss = str(el.get("gloss") or "").strip()
+        if gloss:
+            return f"cover the {noun} — {gloss}"
+        reason = str(el.get("gloss_unavailable") or
+                     "its rendering was not served").strip()
+        name = str(el.get("slug") or el.get("title") or "").strip() or noun
+        return (f"cover the {noun} recorded as {name} — its plain-language "
+                f"rendering is not being served ({reason})")
     summary = str(el.get("summary") or "").strip()
-    kind = "reversal" if el.get("kind") == "reversal" else "decision"
+    kind = "reversal" if kind == "reversal" else "decision"
     if not summary:
         # Never a bare enum on the owner surface: describe what it is instead.
         return f"cover the {kind} recorded at {el.get('date') or 'an undated line'}"
@@ -218,8 +249,11 @@ def _shared_pointer_subjects(a, b):
 
 def is_large(map_data):
     """Does this map exceed the screen budget? The ONE predicate the size
-    switch turns on (CAP-3 as amended 2026-07-23)."""
-    return len(_subtopics(map_data)) > SCREEN_BUDGET
+    switch turns on (CAP-3 as amended 2026-07-23). Since the pivot (#799) the
+    elements are the primary units, so they count toward the budget too — a
+    100-lesson terrain with two subtopics is a large terrain."""
+    return (len(_subtopics(map_data))
+            + len(map_data.get("elements", []))) > SCREEN_BUDGET
 
 
 def candidates(map_data):
@@ -286,13 +320,21 @@ def candidates(map_data):
             "kind": "element",
             "element_kind": el.get("kind"),
             "id": el["id"],
+            "slug": el.get("slug"),
             "direction": _element_direction(el),
             "topics": [el.get("topic", "")],
             "subtopics": [],
             "date": el.get("date"),
             "situation": el.get("situation"),
             "depth": None,
-            "why": el.get("summary"),
+            # The claim the slot leads with: the served rendering for a
+            # lesson/journey element, the topic-line summary otherwise.
+            "why": el.get("gloss") or el.get("summary"),
+            "gloss": el.get("gloss"),
+            "gloss_unavailable": el.get("gloss_unavailable"),
+            # The three-valued writability verdict, VISIBLE on every element
+            # (#799): it surfaces at selection and never filters what appears.
+            "usability": el.get("usability"),
             "consumed": bool(el.get("consumed")),
             "evidence_pointers": len(el.get("evidence") or []),
         })
@@ -569,6 +611,37 @@ def _member_lines(sub):
 VIEW_SUMMARY_GLANCE = 70
 
 
+def _verdict_phrase(cand):
+    """A candidate's writability verdict as one short owner-readable phrase
+    (#799). The three-valued verdict SURFACES on every element — matched /
+    episodic-unrecorded / no-episode are the ratified verdict names, spoken as
+    themselves — and it is surfacing only: an unmatched element stays
+    selectable, and the phrase says what selecting one does instead of hiding
+    it. `cannot-determine` is the lookup's honest fourth outcome (2026-07-26
+    correction), never rendered as "none"."""
+    u = cand.get("usability") or {}
+    verdict = u.get("verdict")
+    if not verdict or cand.get("kind") != "element":
+        return ""
+    if verdict == "matched":
+        checked = [_short_path(p) for p in (u.get("checked") or [])]
+        where = f" — evidence at {', '.join(checked[:2])}" if checked else ""
+        return f"matched{where}"
+    if verdict == "episodic-unrecorded":
+        return ("episodic-unrecorded — selectable; picking it records the "
+                "gap, never blocks the draft")
+    if verdict == "no-episode":
+        return "no-episode — offerable as your own framing, stated as such"
+    return "evidence lookup: cannot-determine"
+
+
+def _short_path(path):
+    """A checked pointer, rendered short enough for a trailing annotation:
+    the last two path segments (the full path stays in `map.json`)."""
+    parts = [p for p in str(path).replace("\\", "/").split("/") if p]
+    return "/".join(parts[-2:]) if parts else str(path)
+
+
 def _direction_lines(cands):
     """The candidate directions, as pickable one-line rows (#632).
 
@@ -581,28 +654,40 @@ def _direction_lines(cands):
 
     Every row carries its INDEX, because selection is by index against the pin.
     """
+    # ELEMENTS FIRST (the stance-3 pivot, 2026-07-27, #799): the typed
+    # elements — hub Lessons and Journeys, then decisions/reversals — are the
+    # PRIMARY selection units, so they open the list. Cross-topic combinations
+    # follow (still ahead of the cluster singles, #632's rationale unchanged
+    # within the demoted grouping), and the subtopic singles close it.
+    elements = [c for c in cands if c.get("kind") == "element"]
     combos = [c for c in cands if c.get("kind") == "combination"]
-    # Elements are candidates like any other, and since Story 18.81 (#647) they
-    # are presented HERE rather than in a section of their own: two lists split
-    # by internal derivation kind is an implementation detail on the owner
-    # surface. An element's wording is claim-bearing by construction, so it
-    # sorts with the other substance-led rows.
-    rest = [c for c in cands if c.get("kind") != "combination"]
+    rest = [c for c in cands if c.get("kind") not in ("combination", "element")]
     rest.sort(key=lambda c: 0 if _is_substance_led(c) else 1)
     out = []
-    for c in combos + rest:
+    for c in elements + combos + rest:
         # COUNTS DEMOTE (CAP-3, substance-led rendering): a count may trail a
         # line that leads with a claim, but it is never what the line says. A
         # fallback line carries its subject alone — "subject plus counts" is
         # the exact shape the clause forbids, and the counts stay one section
         # down in the subtopic's own block.
         facts = []
+        verdict = _verdict_phrase(c)
+        if verdict:
+            # The writability verdict is VISIBLE on every element row (#799):
+            # it surfaces, it never filters, and it may not be clipped away —
+            # the claim gives way to it below, never the other way round.
+            facts.append(verdict)
         if _is_substance_led(c):
             facts.append(f"{c.get('evidence_pointers', 0)} evidence pointer(s)")
         if c.get("consumed"):
             facts.append("already consumed — still selectable")
         trailer = f" ({', '.join(facts)})" if facts else ""
-        out.append(f"- **{c['id']}** — {c['direction']}{trailer}")
+        head = f"- **{c['id']}** — "
+        room = VIEW_LINE_CHARS - len(head) - len(trailer)
+        direction = c["direction"]
+        if len(direction) > room > 0:
+            direction = _clip(direction, room)
+        out.append(f"{head}{direction}{trailer}")
     return out or ["- none: this map proposes no directions"]
 
 
@@ -634,6 +719,23 @@ def _element_coverage_line(map_data):
         line += (f" NOT covered: {', '.join(skipped)} — past the seam's read "
                  f"bound, so these are absent, not empty.")
     return line
+
+
+def _gloss_disclosure_line(map_data):
+    """Whether the plain-language renderings the element slots quote were
+    actually served — stated on the surface (#799). A terrain whose lesson
+    lines fell back to identification must say why, or the fallback reads as
+    the rendering."""
+    gloss = map_data.get("gloss", {}) or {}
+    if gloss.get("served"):
+        return (f"Renderings served: {gloss.get('lesson_renderings', 0)} "
+                f"lesson(s), {gloss.get('journey_renderings', 0)} "
+                f"journey arc(s).")
+    # The reason is a remedy statement (it names configuration), so it lives
+    # in the maintenance section — the reading path states only the fact.
+    return ("The plain-language renderings are not being served, so lesson "
+            "lines carry their names, not their renderings — the reason is "
+            "under maintenance below.")
 
 
 def _summary_lines(subs):
@@ -688,6 +790,10 @@ def _maintenance_lines(subs, map_data):
             out.append(f"- topic — {PLACEHOLDER_PROSE[topic]}")
     for defect in map_data.get("subtopic_defects") or []:
         out.append(f"- declaration defect — {defect}")
+    gloss = map_data.get("gloss", {}) or {}
+    if not gloss.get("served"):
+        out.append(f"- gloss surface — not served: "
+                   f"{gloss.get('reason') or 'not enumerated'}")
     return out or ["- none: every cluster and track is declared"]
 
 
@@ -754,7 +860,7 @@ def lint_owner_lines(lines):
     return found
 
 
-def _terrain_size_line(topics, subs):
+def _terrain_size_line(topics, subs, elements=0):
     """How big this terrain is, in one unambiguous line (#645).
 
     `Subtopics: 25 across 4 topic(s)` reads as a FRACTION — "four topics out of
@@ -769,7 +875,9 @@ def _terrain_size_line(topics, subs):
     def plural(n, word):
         return f"{n} {word}" if n == 1 else f"{n} {word}s"
 
-    return f"{plural(topics, 'topic')} containing {plural(subs, 'subtopic')}"
+    return (f"{plural(elements, 'element')} — each its own article idea — "
+            f"and {plural(topics, 'topic')} containing "
+            f"{plural(subs, 'subtopic')}")
 
 
 def compose_view(map_data, cands):
@@ -797,13 +905,16 @@ def compose_view(map_data, cands):
         "     code path; deleting this file loses nothing. Do not edit or commit. -->",
         "",
         f"Pin: {pin}",
-        _terrain_size_line(len(map_data.get("topics", [])), len(subs)),
+        _terrain_size_line(len(map_data.get("topics", [])), len(subs),
+                           len(map_data.get("elements", []))),
         "",
-        "Answer with a subtopic's index (for example T1.2) and a short note",
-        "about the angle you want. Free text always wins. How much material",
-        "sits behind a line is a signal for your judgment, never a gate:",
-        "a lone note is as pickable as a rich subject, and material you have",
-        "already written from stays selectable.",
+        "Answer with an element's index (for example L3) or a subtopic's",
+        "index (for example T1.2) and a short note about the angle you want.",
+        "Free text always wins. Each element is its own article idea, and its",
+        "writability verdict is a disclosure, never a gate: an element whose",
+        "evidence is not yet recorded is as pickable as a matched one —",
+        "picking it records the gap and the draft still proceeds. Material",
+        "you have already written from stays selectable.",
         "",
         "## Candidate directions",
         "",
@@ -814,7 +925,13 @@ def compose_view(map_data, cands):
     # #647) — but a bounded projection read as the whole record is exactly what
     # the disclosure guards against, so it moves here rather than lapsing.
     lines += ["", _element_coverage_line(map_data)]
-    lines += ["", "## The terrain at a glance", ""]
+    lines += ["", _gloss_disclosure_line(map_data)]
+    # DEMOTED (the stance-3 pivot, #799): the subtopic clusters are a derived,
+    # secondary grouping — they follow the elements and never gate selection.
+    lines += ["", "## Subtopic clusters — a derived, secondary grouping", "",
+              "Clusters group the same material another way. They never gate",
+              "what is selectable: every element above is individually",
+              "selectable on its own.", ""]
     lines += _summary_lines(subs)
     lines.append("")
     # END OF THE READING PATH (Story 18.82, #646). Everything below is upkeep
@@ -928,12 +1045,13 @@ def compose_payload(map_data, cands, view_path=None):
 
     choices = []
     for c in cands:
-        choices.append({
-            "label": c["direction"],
-            "effect": _clip(
-                f"starts a normal drafting run with this as your coverage brief; "
-                f"{c['evidence_pointers']} evidence pointer(s) behind it"),
-        })
+        verdict = _verdict_phrase(c)
+        effect = (f"starts a normal drafting run with this as your coverage "
+                  f"brief; {verdict}" if verdict else
+                  f"starts a normal drafting run with this as your coverage "
+                  f"brief; {c['evidence_pointers']} evidence pointer(s) "
+                  f"behind it")
+        choices.append({"label": c["direction"], "effect": _clip(effect)})
     # Free-form is offered EVERY time, not only on rejection.
     choices.append({
         "label": "name your own direction or combination axis",
@@ -946,15 +1064,18 @@ def compose_payload(map_data, cands, view_path=None):
                         "recomputed fresh next time"),
     })
 
+    els = map_data.get("elements", [])
     item = {
         "where": _clip(
-            f"Topic map at {map_data.get('coverage', {}).get('pin')}: "
+            f"Terrain at {map_data.get('coverage', {}).get('pin')}: "
+            f"{len(els)} element(s) — each its own article idea — and "
             f"{len(topics)} topic(s), {len(subs)} subtopic(s) ({terrain}); "
             f"{consumed} already consumed and still selectable.", BUDGETS["where"]),
         "why": _clip(
-            "Depth is a signal for your judgment, never a gate: a seed-only "
-            "subtopic is as pickable as a rich one. What you choose becomes the "
-            "coverage brief, in your words.", BUDGETS["why"]),
+            "Every element is its own selectable idea. Verdicts and depth "
+            "are a signal for your judgment, never a gate: a gap is "
+            "disclosed, recorded, and drafted anyway. Your choice becomes "
+            "the brief, in your words.", BUDGETS["why"]),
         "choices": choices,
     }
     return {"items": [item]}
@@ -975,9 +1096,9 @@ def _compose_summary_payload(map_data, view_path):
 
     choices = [
         {"label": "choose a direction by its index from the View",
-         "effect": _clip("answer with the index (for example T1.2) and a short "
-                         "note about the angle you want; your note is carried "
-                         "into the brief word for word")},
+         "effect": _clip("answer with the index (for example L3 or T1.2) and "
+                         "a short note about the angle you want; your note is "
+                         "carried into the brief word for word")},
         # Free-form is offered EVERY time, not only on rejection.
         {"label": "name your own direction or combination axis",
          "effect": _clip("starts the same run with your wording as the brief; "
@@ -986,19 +1107,75 @@ def _compose_summary_payload(map_data, view_path):
          "effect": _clip("nothing is drafted and no brief is recorded; the map "
                          "and the View are regenerated fresh next time")},
     ]
+    els = map_data.get("elements", [])
     item = {
         "where": _fit_with_path(
-            f"Topic map at {map_data.get('coverage', {}).get('pin')}: "
+            f"Terrain at {map_data.get('coverage', {}).get('pin')}: "
+            f"{len(els)} element(s) — each its own article idea — and "
             f"{len(topics)} topic(s), {len(subs)} subtopic(s) ({terrain}); "
             f"{consumed} already consumed and still selectable. Too many to "
             f"fit on one screen.", view_path, BUDGETS["where"]),
         "why": _clip(
-            "Depth is a signal for your judgment, never a gate: a seed-only "
-            "subtopic is as pickable as a rich one. What you choose becomes the "
-            "coverage brief, in your words.", BUDGETS["why"]),
+            "Every element is its own selectable idea. Verdicts and depth "
+            "are a signal for your judgment, never a gate: a gap is "
+            "disclosed, recorded, and drafted anyway. Your choice becomes "
+            "the brief, in your words.", BUDGETS["why"]),
         "choices": choices,
     }
     return {"items": [item]}
+
+
+def _selection_gap(candidate, recording_target):
+    """The gap disclosure a non-matched element selection yields (#799).
+
+    Evidence-independence, enforced end to end: the verdict decided nothing
+    about APPEARING, and it decides nothing about DRAFTING either. Selecting
+    an element whose episode no declared source carries yields this block —
+    the disclosure plus the NEEDS-RECORDING tracking artifact's content for
+    the target repo (an Issue, or an append under a NEEDS-RECORDING heading
+    in the declared journey doc) — and the brief is composed exactly as for a
+    matched one. NEVER a refusal: a mechanism that stops drafting here has
+    stopped being an assistant (owner ruling, #799).
+    """
+    if not candidate or candidate.get("kind") != "element":
+        return None
+    u = candidate.get("usability") or {}
+    verdict = u.get("verdict")
+    if not verdict or verdict == "matched":
+        return None
+    target = recording_target or {}
+    slug = str(candidate.get("slug") or "").strip()
+    gap = {"verdict": verdict, "slug": slug,
+           "checked": u.get("checked") or [],
+           "drafting": "proceeds — the verdict is a disclosure, never a gate"}
+    if verdict == "cannot-determine":
+        gap["disclosure"] = (
+            "the evidence lookup could not determine whether a declared "
+            f"source carries this ({u.get('reason') or 'no join key'}); "
+            "an absence is asserted only where it was established, so no "
+            "recording task is minted from a lookup that did not look")
+        return gap
+    if verdict == "no-episode":
+        gap["disclosure"] = (
+            "no episode is locatable for this element, so the draft offers it "
+            "on the owner-attributed framing tier: your framing contribution, "
+            "stated as such, never sourced claims")
+        gap["tier"] = "owner-attributed framing (Story 17.1)"
+    else:
+        gap["disclosure"] = (
+            "the hub records this element but no declared source in the "
+            "target repo carries its episode; the draft proceeds, and the "
+            "gap is recorded so the next run can locate evidence")
+    gap["needs_recording"] = {
+        "slug": slug,
+        "target_repo": target.get("repo"),
+        "target_file": target.get("file"),
+        "heading": "NEEDS-RECORDING",
+        "entry": (f"{slug} — selected on the terrain "
+                  f"({verdict}); record the episode here so the next "
+                  f"run can match it"),
+    }
+    return gap
 
 
 def _brief_from_index(answer, cands, map_pin):
@@ -1126,6 +1303,14 @@ def cmd_brief(args):
     cands = candidates(map_data) if map_data else []
     map_pin = (map_data or {}).get("coverage", {}).get("pin")
     out = brief_from_answer(answer, cands, map_pin)
+    # Evidence-independence at the hand-off (#799): a selected element's
+    # writability gap is DISCLOSED beside the brief — with the tracking
+    # artifact's content for the target repo — and the run proceeds. There is
+    # no refusal path here on evidence.
+    gap = _selection_gap(out.get("candidate"),
+                         (map_data or {}).get("recording_target"))
+    if gap:
+        out["gap"] = gap
     out["stage"] = "topic-map-brief"
     out["next"] = ("draft-pipeline.py stage0 <framework> <sources...> --brief "
                    "<this brief> — the existing stage-0 path, unchanged")

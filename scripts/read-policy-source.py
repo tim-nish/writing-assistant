@@ -41,6 +41,17 @@ Subcommands (each takes --root, the HOST repo root; default: git top-level):
                    one identifier per line. An older gateway that lacks
                    `surface_names` degrades to the named exit-13 gap and the
                    caller asks the owner for topic names (proposal contract).
+  gloss [--tag TAG]  Read the plain-register Gloss surface via the gateway's
+                   two-tier `gloss_index` tool (hub spec `specs/gloss.md`;
+                   tsurezure-gateway#64). With no --tag: the whole tier-1
+                   overview index (one headline line per lesson — the first
+                   sentence of the ratified `gloss:` rendering, verbatim).
+                   With --tag: that tier-2 shard whole. Output shape matches
+                   `read`: `pin:`, then `=== FILE @ sha` sections with
+                   `N: text` lines. A gateway that does not register
+                   `gloss_index` degrades to a NAMED exit-13 tool-surface gap
+                   (the same shape as the pre-#41 surface_names gap) — the
+                   caller discloses the reason and never invents a rendering.
   read [--only NAME ...] [--topics NAME.md ...]
                    Print the pin (`pin: <pin>`), then each served file as a
                    `=== FILE @ <sha>` section with `N: text` lines, numbers and
@@ -119,6 +130,11 @@ GAP_WHOLE_GLOSSARY = (
     "gateway cannot serve GLOSSARY.md whole (glossary_entry is per-entry by "
     "heading and entry names are not enumerable; policy_lookup serves only "
     "query-matched lines)")
+GAP_GLOSS = (
+    "gateway does not register gloss_index (the two-tier plain-register Gloss "
+    "surface, tsurezure-gateway#64) — the deployed gateway predates it or its "
+    "operator config declares no gloss surface; serving it is a hub-side act, "
+    "never a consumer-side workaround")
 
 
 def _load_rws():
@@ -404,6 +420,47 @@ def _emit_section(payload):
         print(f"{n}: {entry['text']}")
 
 
+def _emit_sections(payload):
+    """`=== FILE @ sha` sections from a gateway hit whose lines may span more
+    than one served file (the gloss tier-1 index is grouped per index file).
+    File names, line numbers, and text are the gateway's own, verbatim."""
+    current = None
+    for entry in payload["lines"]:
+        rel, n, sha = split_cite(entry["cite"])
+        if rel != current:
+            print(f"=== {rel} @ {sha}")
+            current = rel
+        print(f"{n}: {entry['text']}")
+
+
+def cmd_gloss(args):
+    """The plain-register Gloss surface, via `gloss_index` (two-tier: no tag ->
+    the whole tier-1 overview index; --tag -> that tier-2 shard whole). A
+    gateway that does not register the tool is the NAMED exit-13 gap — the
+    surface exists in the gateway's contract but this deployment cannot serve
+    it, and the caller degrades with the reason rather than substituting any
+    other text for a ratified rendering."""
+    root = RWS.host_root(args.root)
+    _block, err = resolve_policy_source(root)
+    if err:
+        return _unavailable(err)
+    try:
+        if "gloss_index" not in gateway_tool_names():
+            return _tool_gap(GAP_GLOSS)
+        arguments = {"tag": args.tag} if getattr(args, "tag", None) else {}
+        (payload,) = call_gateway([("gloss_index", arguments)])
+    except GatewayError as e:
+        return _unavailable((UNAVAIL_GATEWAY, f"gateway unreachable ({e})"))
+    print(f"pin: {payload['pin']}")
+    if payload.get("miss"):
+        # A miss is a SERVED answer under the pin — an empty or ungranted
+        # gloss surface, distinguishable from unavailability.
+        print(f"miss: gloss{f' --tag {args.tag}' if getattr(args, 'tag', None) else ''}")
+        return 0
+    _emit_sections(payload)
+    return 0
+
+
 def compose_glossary(names):
     """Compose the whole GLOSSARY.md section from per-entry `glossary_entry`
     calls (Story 18.16): `surface_names(kind=glossary)` gives the entry
@@ -502,6 +559,10 @@ def main(argv=None):
     sub.add_parser("whitelist", parents=[root_parent])
     sub.add_parser("pin", parents=[root_parent])
     sub.add_parser("list-topics", parents=[root_parent])
+    gp = sub.add_parser("gloss", parents=[root_parent])
+    gp.add_argument("--tag", metavar="TAG",
+                    help="tier-2 shard tag (a shard file's basename without "
+                         ".md); omit for the whole tier-1 overview index")
     sp = sub.add_parser("read", parents=[root_parent])
     sp.add_argument("--only", nargs="+",
                     help="restrict to these whitelist entries; anything else is refused (exit 5)")
@@ -514,7 +575,8 @@ def main(argv=None):
     if not hasattr(args, "root"):
         args.root = None
     return {"whitelist": cmd_whitelist, "pin": cmd_pin,
-            "list-topics": cmd_list_topics, "read": cmd_read}[args.cmd](args)
+            "list-topics": cmd_list_topics, "gloss": cmd_gloss,
+            "read": cmd_read}[args.cmd](args)
 
 
 if __name__ == "__main__":
