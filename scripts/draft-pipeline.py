@@ -4972,7 +4972,16 @@ def cmd_checkpoint(args):
             "error: checkpoint state has no `next_stage` — pass a stage's output "
             "state (start/consume/interview/...), which records where to resume\n")
         return 1
-    path = _checkpoint_path(args.ws)
+    path = _write_checkpoint(args.ws, state)
+    print(f"checkpoint: next_stage={state['next_stage']} -> {path}")
+    return 0
+
+
+def _write_checkpoint(ws, state):
+    """The one checkpoint write path (shared by `checkpoint` and stage0's
+    persist-by-construction, #830): pin carriage plus the atomic write.
+    Returns the checkpoint path."""
+    path = _checkpoint_path(ws)
     # Skill-contract pin (#743): minted at the FIRST checkpoint write, carried
     # immutably by every later one — it records what the run STARTED under.
     prior_pin = None
@@ -4988,8 +4997,7 @@ def cmd_checkpoint(args):
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(state, f, indent=2)
     os.replace(tmp, path)
-    print(f"checkpoint: next_stage={state['next_stage']} -> {path}")
-    return 0
+    return path
 
 
 def cmd_progress(args):
@@ -6779,6 +6787,17 @@ def cmd_stage0(args):
     # before scope is read, a workspace is minted, or a token is spent (#309).
     out = {"config_ok": True, "target": root, "run_state": run_state}
     out.update(_autostart(root, fresh=getattr(args, "fresh", False)))
+    # Durability by construction (#830): a freshly minted workspace persists the
+    # state stage0 just composed IN THE SAME INVOCATION — the enforced-mechanism
+    # invariant (SPEC-writing-assistant), not a per-skill checkpoint reminder.
+    # Without this, `_autostart`'s resume scan skips the checkpoint-less run dir
+    # and a later sitting mints a fresh run with no brief (the terrain pause).
+    # A RESUMED run is left alone: its checkpoint records real progress
+    # (next_stage may be past harvest), which stage0's start-state must never
+    # clobber.
+    if not out.get("resumed"):
+        _write_checkpoint(out["ws"], dict(run_state))
+        out["checkpointed"] = True
     # Informational (Story 18.19, #494): a declared syndication variant with no
     # resolvable platform profile is surfaced at draft start — NOT a hard fail,
     # so `config_ok`/`next_stage` are unchanged and the run proceeds.
