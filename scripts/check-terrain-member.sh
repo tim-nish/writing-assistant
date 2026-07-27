@@ -82,6 +82,17 @@ for banned in ("ranked", "top ", "best "):
     check(banned not in d["listing"].lower(),
           f"no ranking language on the listing ({banned!r})")
 
+# --- deterministic context fields (Story 20.21, #845) -----------------------
+ctx = re.findall(r"^  \((?:also in: .+|in no other Topic).*$", d["listing"], re.M)
+check(len(ctx) == 41,
+      f"every Strand line carries its deterministic context line ({len(ctx)})")
+check(any("in no other Topic" in c for c in ctx),
+      "a co-tagless Strand states the absence of other Topics, never a guess")
+check(any("origin not recorded" in c for c in ctx),
+      "an unrecorded origin is stated as absent, never invented")
+check(all("·" in c for c in ctx),
+      "context lines carry all three fields on the one line")
+
 # --- determinism + selection contract --------------------------------------
 check(out.stdout == run("workflow").stdout, "byte-identical across invocations")
 check(re.search(r"^- \*\*L\d+\*\* — ", d["listing"], re.M),
