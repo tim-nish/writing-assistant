@@ -478,6 +478,16 @@ Open with the shared reviewer preamble, then apply this rubric:
 6. **Non-native phrasing** — for EN drafts by a non-native author, flag
    unidiomatic phrasing, **but do not sand off voice** — opinions stay
    opinionated; flatten the phrasing, not the stance.
+7. **Declared-convention conformance — derived canonicals only** (Story 20.4,
+   #800). When the draft carries an `adapted_from` pin, also grade its prose
+   against the `register` and `terminology` its `language` declares in
+   `config/language-conventions.yaml`, and **state which language block you
+   graded against**. A language with no declaration is **skipped, and the skip
+   is disclosed** — never reported as a defect. Findings are blocker-eligible
+   and name the declared convention as their criterion. Authored canonicals are
+   untouched by this item. Full contract:
+   [`review-prompts.md`](review-prompts.md) §"Declared-convention conformance"
+   — read it there; it is not restated here.
 
 Emit findings in the standard contract format (severity, location, issue, fix),
 capped at 10, highest-leverage change first. **No rewrites** — name the prose
