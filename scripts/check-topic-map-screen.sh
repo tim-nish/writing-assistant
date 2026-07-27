@@ -1005,7 +1005,7 @@ for token in 'topic-map.py assemble' 'topic-map-directions.py axis' \
              'never read back' \
              'resolve-paths.py topic-map-view' 'destination repository' \
              'stable within a pin' 'refused with the mismatch named' \
-             'note verbatim'; do
+             'note verbatim' 'machine-composed'; do
   grep -q -- "$token" "$SKILL" && ok "SKILL carries the contract text: $token" \
     || err "SKILL is missing contract text: $token"
 done

@@ -165,7 +165,20 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/topic-map-directions.py member \
 
 Relay the returned `listing` as given: **all** of the member's Strands, whole,
 in presentation-only sections, each Strand quoting its served rendering with
-its deterministic context line, and the count disclosed. Selection is by
+its deterministic context line, and the count disclosed.
+
+**Section background (machine-composed, marked — SPEC-terrain CAP-2 as
+amended 2026-07-27, #850).** Before relaying, compose for each section one or
+two sentences of shared background from the returned `background.inputs`
+claims — what connects the section's Strands, in plain language (Tsurezure
+may be consulted; record any consult per the provenance rule). Render it
+directly under the section title, prefixed `background (machine-composed):`.
+The `background.rules` bind you as the composer: the prose is background
+only and never substitutes for a Strand's own text; every Strand stays
+exactly once and selectable — you never omit, merge, rank, or gate one; and
+when the gateway is unavailable or you skip composition, **say so** and
+relay the deterministic titles — a silent skip is the defect a stated
+absence is not. Selection is by
 Strand index (`L3`, `J1`, `E2.1`) plus a short note about the angle; free-form
 and **stop here** stay on the table exactly as on Screen 1. Record the answer
 against the `ask_id` the validator returned, with the **pin the listing
