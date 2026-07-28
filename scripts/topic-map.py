@@ -133,6 +133,7 @@ Exit codes: 0 ok · 2 not in a git repo · 3 no articles repo resolvable.
 """
 
 import argparse
+import hashlib
 import importlib.util
 import json
 import os
@@ -388,6 +389,49 @@ def lesson_seeds(root):
         return [], (f"the served LESSONS.md index at {pin or 'an undisclosed pin'} "
                     "lists no index lines")
     return seeds, None
+
+
+def hub_pin(root):
+    """The hub state this run actually read, as a bare sha.
+
+    The seam prints `<hub>@<sha>`; only the sha is kept. The hub's NAME is a
+    publication-boundary value (`CLAUDE.md` §"Claims about the served
+    surface"), so it is never carried into an artifact this tool writes, not
+    even an untracked one — the cheapest place to not leak a name is to never
+    store it.
+
+    Returns `None` when the seam cannot report one: an unknown hub state is
+    disclosed, never defaulted to the destination's sha, because a pin that
+    silently means the other repository is the defect this whole capability
+    exists to fix.
+    """
+    cmd = [sys.executable, POLICY_READER]
+    if root:
+        cmd += ["--root", root]
+    cmd += ["pin"]
+    r = subprocess.run(cmd, capture_output=True, text=True)
+    if r.returncode != 0 or not r.stdout.strip():
+        return None
+    _name, _sep, sha = r.stdout.strip().partition("@")
+    return (sha or None) if _sep else None
+
+
+def composite_pin(destination, hub):
+    """The map's pin: a digest over EVERY input an index can move with.
+
+    An index is stable "within a pin" (CAP-3). The map has two sources — the
+    destination repository and the hub — and until 2026-07-29 the guarded and
+    displayed value was the destination sha alone, so a hub commit re-pointed
+    what `L3` named while the refusal still passed. The rule this encodes:
+    **the guarded value must move whenever a guarded index can move.**
+
+    A digest rather than a concatenation, because this value is rendered into
+    artifacts (the View) and a real hub commit sha is a publication-boundary
+    value. The digest is derived from both, is not a sha of any object, and so
+    can be displayed anywhere.
+    """
+    basis = f"{destination or 'unpinned'}+{hub or 'unknown'}"
+    return hashlib.sha256(basis.encode("utf-8")).hexdigest()[:12]
 
 
 def repo_pin(repo):
@@ -1070,6 +1114,11 @@ def assemble(repo, mapping, max_surfaces, root=None):
     read_now = matched[:max_surfaces] if max_surfaces is not None else matched
     skipped = matched[len(read_now):]
     host_pin = repo_pin(root) if root else "unpinned"
+    # The hub state this run actually read (Story 20.31, #872). Captured once,
+    # here, so every screen and the staleness refusal speak about the same
+    # thing; None means the seam could not report one and the map says so
+    # rather than substituting the destination's sha.
+    hub = hub_pin(root)
 
     # --- the element family's own bound, applied BEFORE the loop ------------
     # The seam serves at most ELEMENT_TOPIC_BOUND topic files per read, which
@@ -1193,7 +1242,14 @@ def assemble(repo, mapping, max_surfaces, root=None):
                      accounting_closes=f_read + f_skipped == f_matched)
 
     coverage = {
-        "pin": repo_pin(repo),
+        # The pin is the COMPOSITE of the map's inputs (CAP-3 as amended
+        # 2026-07-28, #872), so a hub commit invalidates a stale selection
+        # exactly as a destination commit does. Both halves are carried
+        # separately so a mismatch can name WHICH moved; the hub half is a
+        # bare sha and its name is never stored.
+        "pin": composite_pin(repo_pin(repo), hub),
+        "destination_pin": repo_pin(repo),
+        "hub_pin": hub,
         "bound": max_surfaces,
         "matched": len(matched),
         "read": read_disclosure,

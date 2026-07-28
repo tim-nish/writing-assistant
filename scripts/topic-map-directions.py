@@ -880,9 +880,14 @@ def compose_axis_payload(map_data):
     # 2026-07-28): one count across both would be a completeness claim over
     # neither corpus.
     counts = {ax["noun"]: len(ax["members"]) for ax in axis["axes"]}
-    parts = [[f"Terrain at {pin}: {counts['tag']} tag(s) and "
+    # The pin is LABELLED here (Story 20.31, #872): an unlabelled sha was read
+    # as a statement about hub freshness. Longest-first, so the labels are the
+    # first thing the budget gives up rather than the counts.
+    parts = [[f"Terrain at {_pin_display(map_data)}: {counts['tag']} tag(s) and "
               f"{counts['topic']} topic(s) from the served vocabularies, each "
               f"individually selectable.",
+              f"Terrain at {_pin_display(map_data)}: {counts['tag']} tag(s), "
+              f"{counts['topic']} topic(s), each selectable.",
               f"Terrain at {pin}: {counts['tag']} tag(s), {counts['topic']} "
               f"topic(s), each selectable."]]
     jline = _journey_disclosure_line(map_data)
@@ -1059,6 +1064,32 @@ def _strand_context_line(el, member_tag):
     return f"  ({topics} · {where} · {reasoning})"
 
 
+def _pin_display(map_data, in_conversation=True):
+    """The pin as the owner sees it: the composite, with both halves named.
+
+    A single displayed sha taught its reader the wrong thing — it was read as
+    a statement about hub freshness, which it never was, and sent one triage
+    after a stale hub pin that did not exist (#872). So each half is LABELLED
+    with the source it names.
+
+    `in_conversation=False` is the artifact form (the View): the composite and
+    the destination half only. A real hub commit sha is a publication-boundary
+    value, so it is spoken, never written into a file this tool emits.
+    """
+    cov = map_data.get("coverage", {}) or {}
+    pin = cov.get("pin")
+    dest = cov.get("destination_pin")
+    hub = cov.get("hub_pin")
+    if not dest and not hub:
+        return str(pin)
+    parts = [f"destination {dest or 'unpinned'}"]
+    if in_conversation:
+        parts.append(f"hub {hub[:7] if hub else 'unknown'}")
+    else:
+        parts.append("hub pin shown in conversation only")
+    return f"{pin} — " + ", ".join(parts)
+
+
 def _journey_arc_line(el):
     """A Lesson's Journey arc, rendered on the Lesson's own row.
 
@@ -1094,7 +1125,7 @@ def compose_member_listing(map_data, tag, cands, axis="tag"):
     noun = "topic" if axis == "topic" else "tag"
     lines = [f"# {ms['member']} ({noun}) — {ms['count']} Strand(s), shown whole",
              "",
-             f"Pin: {pin}",
+             f"Pin: {_pin_display(map_data)}",
              "Answer with a Strand's index (for example L3) and a short note",
              "about the angle you want. Free text always wins.",
              "What each row IS: L rows are Lessons (a rule distilled from",
@@ -1229,7 +1260,7 @@ def compose_payload(map_data, cands, view_path=None):
     els = map_data.get("elements", [])
     item = {
         "where": _fit(
-            f"Terrain at {map_data.get('coverage', {}).get('pin')}: "
+            f"Terrain at {_pin_display(map_data)}: "
             f"{len(els)} element(s) — each its own Strand — and "
             f"{len(topics)} topic(s), {terrain}; "
             f"{consumed} already consumed and still selectable.", BUDGETS["where"]),
@@ -1267,7 +1298,8 @@ def _compose_summary_payload(map_data, view_path):
         "where": _fit_with_path([
             # Longest-first authored variants (#832); the View path already
             # says the screen overflowed, so no "too many to fit" sentence.
-            f"Terrain at {pin}: {len(els)} element(s) — each its own Strand "
+            f"Terrain at {_pin_display(map_data, in_conversation=False)}: "
+            f"{len(els)} element(s) — each its own Strand "
             f"— and {len(topics)} topic(s), {terrain}; "
             f"{consumed} already consumed and still selectable.",
             f"Terrain at {pin}: {len(els)} Strands, {len(topics)} topic(s); "
@@ -1333,7 +1365,32 @@ def _selection_gap(candidate, recording_target):
     return gap
 
 
-def _brief_from_index(answer, cands, map_pin):
+def _which_half_moved(answer, map_data):
+    """Which input moved, for the mismatch message — named, or honestly not.
+
+    The composite pin proves that SOMETHING moved; it cannot by itself say
+    what. When the recorded answer carried the halves, this names them. When
+    it did not (a selection made from the View, which never carries the hub
+    half), it says so — an unnameable half is disclosed, never inferred.
+    """
+    cov = map_data.get("coverage", {}) or {}
+    a_dest = str(answer.get("destination_pin") or "").strip()
+    a_hub = str(answer.get("hub_pin") or "").strip()
+    if not a_dest and not a_hub:
+        return ("Which input moved is not recorded in the selection, so it "
+                "cannot be named here.")
+    moved = []
+    if a_dest and a_dest != (cov.get("destination_pin") or ""):
+        moved.append("the destination repository")
+    if a_hub and a_hub != (cov.get("hub_pin") or ""):
+        moved.append("the hub")
+    if not moved:
+        return ("Neither recorded half differs, so the change is in a part "
+                "the selection did not record.")
+    return f"Moved: {' and '.join(moved)}."
+
+
+def _brief_from_index(answer, cands, map_pin, map_data=None):
     """An INDEXED selection from the View: `{index, note}` (Story 18.67, #602).
 
     The composed brief is the subtopic's coverage wording PLUS THE OWNER'S NOTE
@@ -1360,12 +1417,17 @@ def _brief_from_index(answer, cands, map_pin):
             "stale selection cannot be told from a current one. Re-run the map "
             "and choose again."))
     if map_pin and answer_pin != map_pin:
+        # The pin is the COMPOSITE of the map's inputs (Story 20.31, #872), so
+        # this fires when EITHER the destination repo or the hub moved. Name
+        # which, when the answer carried the halves; say plainly that it
+        # cannot be named when it did not, rather than guessing.
+        moved = _which_half_moved(answer, map_data or {})
         raise SystemExit(_err(
-            f"pin mismatch: index {index!r} was chosen against a View rendered "
-            f"at {answer_pin}, but this map is at {map_pin}. The repository "
-            "moved, so that index may now name a different subtopic — it is "
+            f"pin mismatch: index {index!r} was chosen against a listing "
+            f"rendered at {answer_pin}, but this map is at {map_pin}. "
+            f"{moved} That index may now name a different Strand, so it is "
             "refused rather than re-resolved. Re-run the map and choose from "
-            "the fresh View."))
+            "the fresh screens."))
     match = next((c for c in cands if c.get("id") == index), None)
     if match is None:
         raise SystemExit(_err(
@@ -1382,7 +1444,7 @@ def _brief_from_index(answer, cands, map_pin):
             "candidate": match}
 
 
-def brief_from_answer(answer, cands, map_pin=None):
+def brief_from_answer(answer, cands, map_pin=None, map_data=None):
     """The owner's outcome as the brief string for stage-0 `--brief`.
 
     Free text ALWAYS wins: machine-proposed wording becomes the brief only when
@@ -1398,7 +1460,7 @@ def brief_from_answer(answer, cands, map_pin=None):
             "the owner chose to stop at the map: no brief exists and no run "
             "follows. Stopping is a first-class outcome, not a failure."))
     if str(answer.get("index") or "").strip():
-        return _brief_from_index(answer, cands, map_pin)
+        return _brief_from_index(answer, cands, map_pin, map_data)
     for c in cands:
         if selection == c["direction"]:
             return {"brief": c["direction"], "provenance": "owner-authored",
@@ -1485,7 +1547,7 @@ def cmd_brief(args):
     map_data = load_map(args.map) if args.map else None
     cands = candidates(map_data) if map_data else []
     map_pin = (map_data or {}).get("coverage", {}).get("pin")
-    out = brief_from_answer(answer, cands, map_pin)
+    out = brief_from_answer(answer, cands, map_pin, map_data)
     # Evidence-independence at the hand-off (#799): a selected element's
     # writability gap is DISCLOSED beside the brief — with the tracking
     # artifact's content for the target repo — and the run proceeds. There is
