@@ -890,6 +890,9 @@ def compose_axis_payload(map_data):
               f"{counts['topic']} topic(s), each selectable.",
               f"Terrain at {pin}: {counts['tag']} tag(s), {counts['topic']} "
               f"topic(s), each selectable."]]
+    sline = _substitution_disclosure_line(map_data)
+    if sline:
+        parts.append([sline, _substitution_disclosure_line(map_data, terse=True)])
     jline = _journey_disclosure_line(map_data)
     if jline:
         parts.append([jline, _journey_disclosure_line(map_data, terse=True)])
@@ -1039,7 +1042,34 @@ def _subdivide_section(title, group, used_tags, cap):
                                       used_tags | {key}, cap)
 
 
-def _strand_context_line(el, member_tag):
+def _substituted_paths(map_data):
+    """The served paths this run got INSTEAD of what it asked for."""
+    subs = (map_data.get("coverage", {}) or {}).get("substitutions") or []
+    return {str(x.get("served")) for x in subs if x.get("served")}
+
+
+def _substitution_disclosure_line(map_data, terse=False):
+    """A served path that differs from the requested one, announced.
+
+    An abnormal condition, named at the point of substitution (CAP-4 as
+    amended 2026-07-29, #873). Nothing is missing in this failure — the wrong
+    thing arrives and reads as the right one — so no other check fires and no
+    absence is felt. Silence here is what let archived decisions display as
+    the live record.
+    """
+    subs = (map_data.get("coverage", {}) or {}).get("substitutions") or []
+    if not subs:
+        return None
+    pairs = "; ".join(f"asked for {x.get('requested')}, got {x.get('served')}"
+                      for x in subs)
+    if terse:
+        return f"SUBSTITUTED: {pairs}. Material below is marked."
+    return (f"ABNORMAL — a served path differs from the one requested "
+            f"({pairs}). Material from it is marked below and is NOT what was "
+            "asked for; this is a condition to fix, not a gap to tolerate.")
+
+
+def _strand_context_line(el, member_tag, substituted=()):
     """One deterministic context line per Strand (Story 20.21, #845).
 
     Every field is READ from the map — the Topics beyond the member's own
@@ -1061,7 +1091,13 @@ def _strand_context_line(el, member_tag):
     reasoning = ("claim and reasoning both recorded"
                  if (el.get("evidence") or [])
                  else "claim only — its reasoning is not recorded here")
-    return f"  ({topics} · {where} · {reasoning})"
+    # A Strand read from a SUBSTITUTED path says so on its own row: the
+    # screen-level line names the substitution, and the row names which
+    # material it affected (#873).
+    mark = ""
+    if origin and any(str(origin).startswith(p) for p in substituted):
+        mark = " · SUBSTITUTED SOURCE — not the path requested"
+    return f"  ({topics} · {where} · {reasoning}{mark})"
 
 
 def _pin_display(map_data, in_conversation=True):
@@ -1138,6 +1174,10 @@ def compose_member_listing(map_data, tag, cands, axis="tag"):
              f"What the words mean: {OWNER_TERMS_DOC} defines "
              f"{' and '.join(OWNER_TERMS)}.",
              ""]
+    subbed = _substituted_paths(map_data)
+    sline = _substitution_disclosure_line(map_data)
+    if sline:
+        lines += [_clip_line(sline), ""]
     jline = _journey_disclosure_line(map_data)
     if jline:
         lines += [_clip_line(jline), ""]
@@ -1153,7 +1193,7 @@ def compose_member_listing(map_data, tag, cands, axis="tag"):
             claim = el.get("gloss") or el.get("title") or el.get("slug", "")
             mark = " — already consumed, still selectable" if el.get("consumed") else ""
             lines.append(_clip_line(f"- **{ident}** — {claim}{mark}"))
-            lines.append(_clip_line(_strand_context_line(el, ms["member"])))
+            lines.append(_clip_line(_strand_context_line(el, ms["member"], subbed)))
             # The lesson's ARC, on the lesson's own row (Story 20.30, #871).
             # It is displayed, never selectable: the row's index still names
             # the Lesson, so picking it carries the rule and its arc together.
