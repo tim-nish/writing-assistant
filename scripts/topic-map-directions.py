@@ -560,8 +560,13 @@ def _terrain_size_line(topics, strands):
             f"from {plural(topics, 'topic')}")
 
 
-def _journey_disclosure_line(map_data):
+def _journey_disclosure_line(map_data, terse=False):
     """The Journey shortfall, named on the screen (Story 20.10, #812).
+
+    `terse` selects a SHORTER AUTHORED wording of the same disclosure, for
+    callers composing a budgeted payload field beside other disclosures
+    (#832: give by authorship, never by truncation). It never withdraws the
+    disclosure — only the elaboration of why the absence is three-valued.
 
     Journeys are article material equally with Lessons, but their shard tags
     are shadowed by same-named lesson shards upstream, so a run may be unable
@@ -581,6 +586,9 @@ def _journey_disclosure_line(map_data):
     gloss = map_data.get("gloss", {}) or {}
     if not gloss.get("served") or gloss.get("journey_renderings", 0) > 0:
         return None
+    if terse:
+        return ("No Journey renderings served at this pin — Journeys are "
+                "absent from this listing, not judged empty.")
     return ("No Journey renderings were served at this pin, so Journeys are "
             "absent from this listing — absent, not judged empty: from here "
             "a shadowed journey shard and a journey that does not exist are "
@@ -695,6 +703,29 @@ def _fit_with_path(prefixes, path, budget):
     return cands[0] + tail
 
 
+def _fit_parts(parts, budget):
+    """Join authored sentence-parts inside `budget` by CHOOSING SHORTER
+    AUTHORED WORDINGS, never by cutting (#832).
+
+    `parts` is a list of parts, each a longest-first list of authored variants
+    of the same content. Degradation is deterministic and rightmost-last: the
+    field steps the longest-saving trailing part down first, so the leading
+    orientation line keeps its full wording as long as anything can. If even
+    the tersest combination is over budget, the tersest is returned and the
+    validator blocks presentation naming the field — a named failure, never a
+    disclosure silently dropped."""
+    levels = [0] * len(parts)
+
+    def render(levels):
+        return " ".join(p[min(i, len(p) - 1)] for p, i in zip(parts, levels))
+
+    for idx in range(len(parts) - 1, -1, -1):
+        if len(render(levels)) <= budget:
+            break
+        levels[idx] = len(parts[idx]) - 1
+    return render(levels)
+
+
 def axis_members(map_data):
     """Screen 1's axis: the SERVED TAG VOCABULARY, derived from the tags the
     elements already carry (Story 20.8, #810; SPEC-terrain as resolved
@@ -757,17 +788,27 @@ def compose_axis_payload(map_data):
         "effect": _fit("nothing is drafted and no brief is recorded; the "
                         "axis is recomputed fresh next time"),
     })
-    where = (f"Terrain at {pin}: {len(axis['members'])} tag(s) from the "
-             f"served vocabulary, each individually selectable.")
+    # Each part is a longest-first list of AUTHORED wordings; the field takes
+    # the longest combination that fits (#832). Disclosures are never dropped
+    # — only stated more tersely — so a screen carrying both the Journey
+    # shortfall and the untagged count stays inside the budget instead of
+    # blocking presentation on a field nobody can shorten at the gate.
+    parts = [[f"Terrain at {pin}: {len(axis['members'])} tag(s) from the "
+              f"served vocabulary, each individually selectable.",
+              f"Terrain at {pin}: {len(axis['members'])} tag(s), each "
+              f"selectable."]]
     jline = _journey_disclosure_line(map_data)
     if jline:
-        where += " " + jline
+        parts.append([jline, _journey_disclosure_line(map_data, terse=True)])
     if axis["untagged_strands"]:
         # The disclosure is a LINE, never a section (CAP-4): strands outside
         # the axis are named, not hidden, and free-form still reaches them.
-        where += (f" {axis['untagged_strands']} Strand(s) carry no served "
-                  f"tag and sit outside this axis — name one at free-form "
-                  f"to reach it.")
+        parts.append([f"{axis['untagged_strands']} Strand(s) carry no served "
+                      f"tag and sit outside this axis — name one at free-form "
+                      f"to reach it.",
+                      f"{axis['untagged_strands']} Strand(s) carry no served "
+                      f"tag — reach one at free-form."])
+    where = _fit_parts(parts, BUDGETS["where"])
     return {"items": [{
         "where": _fit(where, BUDGETS["where"]),
         "why": _fit("Pick where to look first. The count is a signal for "
