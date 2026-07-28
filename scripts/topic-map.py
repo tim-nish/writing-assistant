@@ -671,6 +671,93 @@ def parse_decision_shard(stdout_text):
     return entries
 
 
+# A journey shard's entries are headed by the lesson slug whose arc they
+# carry (`## <slug>`), which is the join key back to the lesson element. Shape
+# read from the served surface, not inferred from the spec prose.
+JOURNEY_SHARD_HEAD = re.compile(r"^##\s+([a-z0-9][a-z0-9-]*)\s*$")
+
+
+def parse_journey_shard(stdout_text):
+    """Entries of one served `journeys/<tag>` shard, keyed by lesson slug.
+
+    Same reader shape as the decisions shard: `=== path @ sha` then `N: text`
+    lines, entry headings `## <lesson-slug>`, entry bodies the ratified
+    `journey_gloss:` rendering, whole. The rendering is quoted verbatim
+    downstream — a consumer never re-expresses it and never synthesises an arc
+    from a lesson headline.
+    """
+    entries, slug, headline_no, body = {}, None, None, []
+    path = sha = None
+
+    def flush():
+        if slug and body:
+            entries[slug] = {
+                "gloss": " ".join(" ".join(body).split()),
+                "cite": f"{path}:{headline_no}@{sha}",
+            }
+
+    for line in stdout_text.splitlines():
+        if line.startswith("miss: "):
+            return {}
+        if line.startswith("=== "):
+            head = line[4:]
+            p, _sep, c = head.rpartition(" @ ")
+            path, sha = p.strip(), c.strip()
+            continue
+        number, _sep, text = line.partition(": ")
+        if not number.strip().isdigit():
+            continue
+        t = text.strip()
+        m = JOURNEY_SHARD_HEAD.match(t)
+        if m:
+            flush()
+            slug, headline_no, body = m.group(1), number.strip(), []
+            continue
+        if slug and t and not t.startswith("#") and t != "---":
+            body.append(t)
+    flush()
+    return entries
+
+
+def journey_shard_read(root, shards):
+    """The served Journey renderings for the given `journeys/<tag>` shards.
+
+    Journeys are REQUESTED, not awaited (CAP-4 as amended 2026-07-28, #871):
+    the tier-1 index publishes a per-lesson `journeys/<tag>` marker and this
+    issues the tagged read for the shards those markers name. Before this, the
+    only gloss call was the untagged tier-1 one, so no journey shard was ever
+    asked for and `journey_renderings` was 0 on every real run — an omission
+    the screen reported as the hub not serving them.
+
+    Returns `(by_slug, misses)`. A miss names its reason per shard and is
+    NEVER folded into an empty dict: a shard that was requested and did not
+    arrive is disclosed as such, which is a different fact from a shard that
+    was never requested.
+    """
+    out, misses = {}, {}
+    for shard in shards:
+        cmd = [sys.executable, POLICY_READER]
+        if root:
+            cmd += ["--root", root]
+        cmd += ["gloss", "--tag", shard]
+        r = subprocess.run(cmd, capture_output=True, text=True)
+        if r.returncode != 0:
+            misses[shard] = (r.stderr.strip().split("\n")[-1] if r.stderr.strip()
+                             else f"the policy reader exited {r.returncode}")
+            continue
+        entries = parse_journey_shard(r.stdout)
+        if entries:
+            # Later shards never clobber an earlier arc: a lesson's arc is
+            # 1:0..1, so a slug seen twice is the same arc served from two
+            # tag shards, not two arcs.
+            for slug, entry in entries.items():
+                out.setdefault(slug, entry)
+        else:
+            misses[shard] = ("the served surface lists no journey renderings "
+                             "for this shard")
+    return out, misses
+
+
 def decision_gloss_read(root, topics):
     """The served decision-line renderings: one tier-2 `decisions/<topic>`
     shard per topic in the ALREADY-BOUNDED element-topic set — the run never
@@ -1171,6 +1258,19 @@ def assemble(repo, mapping, max_surfaces, root=None):
     # deterministic within a pin — the property the E<topic>.<n> indexes
     # assigned downstream depend on.
     elements.sort(key=lambda e: (e["date"], e["situation"]), reverse=True)
+    # The tagged journey read (Story 20.30, #871). The tier-1 marker names the
+    # shard carrying each lesson's arc; those markers are the request set, so
+    # a run asks for exactly the shards its own material points at and never
+    # enumerates the hub's shard directory. No marker anywhere means nothing
+    # was requested — which the disclosure reports as such, never as the hub
+    # failing to serve.
+    journey_shards = sorted({e.get("journey_shard") for e in gloss_lessons.values()
+                             if e.get("journey_shard")})
+    journey_misses = {}
+    if journey_shards:
+        served_journeys, journey_misses = journey_shard_read(root, journey_shards)
+        for slug, entry in served_journeys.items():
+            gloss_journeys.setdefault(slug, entry)
     gloss_info = {
         "served": gloss_served,
         "reason": (None if gloss_served else
@@ -1178,6 +1278,10 @@ def assemble(repo, mapping, max_surfaces, root=None):
                    or "the gloss family was not enumerated"),
         "lessons": gloss_lessons,
         "journeys": gloss_journeys,
+        # The three states CAP-4 requires a disclosure to distinguish:
+        # requested-and-served, requested-and-missing, not-requested.
+        "journeys_requested": journey_shards,
+        "journey_misses": journey_misses,
     }
     return out_topics, coverage, tracks_seen, elements, gloss_info
 
@@ -1202,6 +1306,32 @@ ELEMENT_KEYS = ("elements", "lessons")
 
 
 
+def _journey_absence(slug, entry, journeys, gloss_info):
+    """Why this lesson shows no arc — three-valued, never collapsed to one
+    (CAP-4 as amended 2026-07-28/29).
+
+    A corpus that was not REQUESTED is never reported as not SERVED: they are
+    different facts about different parties, and reporting the first as the
+    second attributes a consumer's omission to the source. That mistake, made
+    on exactly this surface, sent a real triage after a stale hub pin that did
+    not exist.
+    """
+    if slug in journeys:
+        return None
+    if not gloss_info.get("served"):
+        # The gloss disclosure already names this larger outage; a second line
+        # for one outage is the volume-not-legibility defect CAP-4 retired.
+        return None
+    shard = (entry or {}).get("journey_shard")
+    if not shard:
+        return ("no journey shard is named for this lesson on the served "
+                "index — not requested, so not judged absent")
+    miss = (gloss_info.get("journey_misses") or {}).get(shard)
+    if miss:
+        return (f"requested {shard} and it did not arrive: {miss}")
+    return (f"requested {shard}, which carries no rendering for this lesson")
+
+
 def lesson_elements(topics, gloss_info, consumption):
     """Every hub Lesson as a first-class ELEMENT — the primary selectable
     article-idea unit (SPEC-terrain, stance-3 pivot 2026-07-27, #799): N
@@ -1214,6 +1344,7 @@ def lesson_elements(topics, gloss_info, consumption):
     substituted for a ratified rendering.
     """
     consumed_index = (consumption or {}).get("consumed_index") or {}
+    journeys = gloss_info.get("journeys") or {}
     seen = {}
     for topic in topics:
         for item in topic["items"]:
@@ -1239,6 +1370,15 @@ def lesson_elements(topics, gloss_info, consumption):
                      "the served gloss index carries no rendering for this lesson")),
                 "tags": entry["tags"] if entry else [],
                 "journey_shard": entry.get("journey_shard") if entry else None,
+                # The lesson's ARC, on the lesson's own row (CAP-2 as amended
+                # 2026-07-28, #871). A Journey is not a Strand of its own:
+                # correspondence is 1:0..1 and the hub's discovery marker is
+                # per-lesson, so the arc is displayed with the rule it belongs
+                # to and the lesson is what the owner selects.
+                "journey": (journeys.get(slug) or {}).get("gloss"),
+                "journey_cite": (journeys.get(slug) or {}).get("cite"),
+                "journey_unavailable": _journey_absence(slug, entry, journeys,
+                                                        gloss_info),
                 "date": "",
                 "situation": item.get("surface") or "",
                 "evidence": list(item.get("evidence") or []),
@@ -1250,33 +1390,13 @@ def lesson_elements(topics, gloss_info, consumption):
     return [seen[slug] for slug in sorted(seen)]
 
 
-def journey_elements(gloss_info, consumption):
-    """Every served `journey_gloss:` rendering as its own ELEMENT beside the
-    lesson's: a Journey (how a position changed) is a distinct Strand
-    from the rule the lesson states. Projected ONLY from what the hub serves
-    as a journey rendering — never synthesized from a lesson headline."""
-    consumed_index = (consumption or {}).get("consumed_index") or {}
-    out = []
-    for slug in sorted(gloss_info["journeys"]):
-        entry = gloss_info["journeys"][slug]
-        out.append({
-            "kind": "journey",
-            "slug": slug,
-            "title": slug,
-            "topic": "",
-            "gloss": entry["gloss"],
-            "gloss_cite": entry["cite"],
-            "gloss_unavailable": None,
-            "tags": entry["tags"],
-            "date": "",
-            "situation": entry["cite"],
-            "evidence": [entry["cite"]],
-            "consumed": slug in consumed_index,
-            "consumption_join": ("consumed_index "
-                                 "(write-article-plan.py consult), "
-                                 "keyed by lesson id"),
-        })
-    return out
+# `journey_elements()` was REMOVED (Story 20.30, #871). A Journey stopped
+# being a Strand of its own: correspondence is 1:0..1, the hub's tier-1
+# discovery marker is per-lesson by ratified design, and an independently
+# selectable Journey would assert a reachability the served shape does not
+# carry. The arc now attaches to its lesson in `lesson_elements()`, and the
+# `J<n>` namespace is retired — it was never populated in production, because
+# nothing ever requested a journey shard.
 
 
 def journey_join(root, topics, elements=None):
@@ -1409,8 +1529,7 @@ def build_map(args):
         root, decision_topics)
     join_decision_gloss(elements, decision_gloss, decision_gloss_misses)
     elements = (elements
-                + lesson_elements(topics, gloss_info, consumption)
-                + journey_elements(gloss_info, consumption))
+                + lesson_elements(topics, gloss_info, consumption))
     # Topic↔evidence usability join (Story 18.96, #669) — annotate every item
     # AND every element with its usability verdict and collect the
     # NEEDS-RECORDING worklist.
@@ -1455,6 +1574,13 @@ def build_map(args):
                   "reason": gloss_info["reason"],
                   "lesson_renderings": len(gloss_info["lessons"]),
                   "journey_renderings": len(gloss_info["journeys"]),
+                  # The journey read's own disclosure (Story 20.30, #871):
+                  # which shards were REQUESTED, and which of those did not
+                  # arrive. Without these the screen cannot tell a corpus
+                  # nobody asked for from one the hub failed to serve — the
+                  # conflation CAP-4 now forbids.
+                  "journeys_requested": gloss_info.get("journeys_requested") or [],
+                  "journey_misses": gloss_info.get("journey_misses") or {},
                   # The decisions-shard join's own disclosure (Story 20.22,
                   # #851): how many renderings joined, and per-topic misses
                   # with their reasons — an absence is named, never folded

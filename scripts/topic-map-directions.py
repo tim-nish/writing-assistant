@@ -586,13 +586,28 @@ def _journey_disclosure_line(map_data, terse=False):
     gloss = map_data.get("gloss", {}) or {}
     if not gloss.get("served") or gloss.get("journey_renderings", 0) > 0:
         return None
+    requested = gloss.get("journeys_requested") or []
+    misses = gloss.get("journey_misses") or {}
+    if not requested:
+        # NOT REQUESTED. Never reported as not served: the two are facts about
+        # different parties, and the old line said the second while meaning the
+        # first (Story 20.30, #871).
+        if terse:
+            return ("No journey shard was requested at this pin — no lesson "
+                    "on the served index names one.")
+        return ("No journey shard was requested at this pin: no lesson on the "
+                "served index names one, so no arc was asked for. This is a "
+                "statement about what this run asked, NOT about what the hub "
+                "serves — an unasked corpus is never reported as an unserved "
+                "one.")
+    named = ", ".join(sorted(misses)) if misses else ", ".join(requested)
     if terse:
-        return ("No Journey renderings served at this pin — Journeys are "
-                "absent from this listing, not judged empty.")
-    return ("No Journey renderings were served at this pin, so Journeys are "
-            "absent from this listing — absent, not judged empty: from here "
-            "a shadowed journey shard and a journey that does not exist are "
-            "indistinguishable (upstream addressability gap).")
+        return (f"Requested {len(requested)} journey shard(s); none arrived "
+                f"({named}).")
+    return (f"Requested {len(requested)} journey shard(s) and none carried a "
+            f"rendering ({named}). A requested shard that does not arrive is "
+            "an abnormal condition to fix, not a tolerated gap — it is a "
+            "different fact from a shard nobody asked for.")
 
 
 def compose_view(map_data, cands):
@@ -1044,6 +1059,26 @@ def _strand_context_line(el, member_tag):
     return f"  ({topics} · {where} · {reasoning})"
 
 
+def _journey_arc_line(el):
+    """A Lesson's Journey arc, rendered on the Lesson's own row.
+
+    A Journey is not a Strand of its own (CAP-2 as amended 2026-07-28, #871):
+    correspondence is 1:0..1 and the hub's discovery marker is per-lesson, so
+    the arc is shown WITH the rule it belongs to and the Lesson is what gets
+    selected. The text is the served `journey_gloss:` rendering, quoted — a
+    consumer never re-expresses it and never synthesises an arc from a
+    headline. An absent arc states which of the three absences it is, rather
+    than being silently omitted.
+    """
+    if el.get("kind") != "lesson":
+        return None
+    arc = el.get("journey")
+    if arc:
+        return f"  how it changed: {arc}"
+    absent = el.get("journey_unavailable")
+    return f"  how it changed: not shown — {absent}" if absent else None
+
+
 def compose_member_listing(map_data, tag, cands, axis="tag"):
     """Screen 2 as a LISTING: the member's Strands, WHOLE, in sections.
 
@@ -1088,6 +1123,12 @@ def compose_member_listing(map_data, tag, cands, axis="tag"):
             mark = " — already consumed, still selectable" if el.get("consumed") else ""
             lines.append(_clip_line(f"- **{ident}** — {claim}{mark}"))
             lines.append(_clip_line(_strand_context_line(el, ms["member"])))
+            # The lesson's ARC, on the lesson's own row (Story 20.30, #871).
+            # It is displayed, never selectable: the row's index still names
+            # the Lesson, so picking it carries the rule and its arc together.
+            arc = _journey_arc_line(el)
+            if arc:
+                lines.append(_clip_line(arc))
         lines.append("")
     return "\n".join(lines).rstrip() + "\n"
 
