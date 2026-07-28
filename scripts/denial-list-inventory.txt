@@ -1,0 +1,37 @@
+# The PINNED INVENTORY of every enumerated denial list on the owner
+# surface, as of Story 20.27 (#862). Generated, never hand-edited:
+#   python3 scripts/pin-denial-lists.py > scripts/denial-list-inventory.txt
+#
+# Growing a list here is PROHIBITED as the response to a register leak
+# (SPEC-writing-assistant, owner-surface register, property (a)). The
+# lists are demoted, not deleted: they remain the cheap deterministic
+# first pass for the sub-class they were built for — coined identifiers.
+# To admit a genuinely correct addition, put an adjacent
+#   # register-exemption: <which leak, and why it is a coined identifier>
+# comment on the entry's own line, then re-pin.
+INTERNAL_VOCAB	(unclustered)
+INTERNAL_VOCAB	(untracked)
+INTERNAL_VOCAB	(unnamed)
+INTERNAL_VOCAB	seed-only
+INTERNAL_VOCAB	short-note
+INTERNAL_VOCAB	full-article
+INTERNAL_VOCAB	article-series
+INTERNAL_VOCAB	hub-lessons
+INTERNAL_VOCAB	host-sources
+INTERNAL_VOCAB	articles-items
+INTERNAL_VOCAB	unclustered
+INTERNAL_VOCAB	subtopic:
+INTERNAL_VOCAB	cluster:
+INTERNAL_VOCAB	frontmatter
+INTERNAL_VOCAB	 ptr,
+INTERNAL_VOCAB	 ptr)
+INTERNAL_VOCAB	unconsumed
+INTERNAL_VOCAB	live item
+INTERNAL_VOCAB	density
+INTERNAL_VOCAB	evidence lookup: cannot-determine
+INTERNAL_VOCAB	 evidence pointer
+FORBIDDEN_MARKERS	bold emphasis
+FORBIDDEN_MARKERS	underline emphasis
+FORBIDDEN_MARKERS	backtick markup
+FORBIDDEN_MARKERS	heading marker
+FORBIDDEN_MARKERS	markdown link
