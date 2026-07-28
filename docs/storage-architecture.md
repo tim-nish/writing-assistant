@@ -63,14 +63,19 @@ where classifying would be premature.
     contract, and this document does not change that (see O1). The
     invariant covers what dogfooding showed agents *defaulting* into the
     tree; it does not pre-decide the config model.
-  - *Destination-repo write surface (amended 2026-07-23, #611):* the
-    `output.drafts` **destination** repository's permitted surface is the two
-    GATED products plus **exactly two regenerated NON-GATING views** —
-    `INDEX.md` and the Terrain View (SPEC-terrain CAP-3). A non-gating
+  - *Destination-repo write surface (amended 2026-07-23, #611; the Terrain
+    View REMOVED 2026-07-28, #874):* the `output.drafts` **destination**
+    repository's permitted surface is the two GATED products plus **exactly
+    one regenerated NON-GATING view** — `INDEX.md`. A non-gating
     view qualifies only if it is fully regenerated per invocation, never read
     back as an input, and gates no decision; the surface is **enumerated
     exhaustively** in `scripts/check-footprint-invariant.sh`, so a write
     outside the set fails there and is named.
+    **The Terrain View is no longer a member** (owner ruling — 2026-07-28):
+    Terrain is a writing-assistant feature, so its outputs belong in the
+    writing-assistant repository, and writing the View into the articles repo
+    was incorrect. The set shrinks back to one; the check shrinks with it, in
+    the same sitting, per the named-class rule below.
     **This is a named class, not a hatch.** "Human-facing" does not exempt a
     file from the footprint invariant: a new member is added by amending this
     list and the check together, in the sitting that adds it — never by a
@@ -89,10 +94,36 @@ where classifying would be premature.
 
 ### D2 — Run workspaces for all intermediates
 
-Every pipeline invocation gets a workspace:
+**Amended 2026-07-28 (#874), owner ruling.** Terrain's outputs *and its debug
+artifacts* belong in the writing-assistant repository — the repo the human
+works in for this feature — not in a machine-state directory. The state root
+below is therefore no longer the destination for this feature's workspaces;
+the **resolver** owns the change (D1), so the scheme moves and nothing that
+calls it does.
+
+Three consequences are stated here because they were the ruling's cost, not
+objections to it:
+
+- **The tree must not be able to publish them.** This repository is public and
+  a run's `map.json` carries verbatim hub renderings and `<hub>@<sha>` pins,
+  which in a state directory sat outside every repository. Relocation is
+  therefore paired with a **committed** ignore entry (this is the tool's own
+  output, not a personal ignore pattern, so it ships rather than living in
+  `.git/info/exclude`) **and** a guard that fails if such an artifact is ever
+  staged. The boundary is not defended by remembering.
+- **Growth stops being deferrable.** Nothing auto-deletes runs today, which
+  was tolerable in a state directory nobody reads; inside a working tree it is
+  not. A retention rule is owed with the move.
+- **"The writing-assistant repo" is one place only when the plugin runs from
+  a working tree.** Installed, it is a marketplace clone the owner does not
+  work in — so the resolver, not a literal, decides, and where no working tree
+  is resolvable the state root remains the fallback rather than a clone
+  nobody looks at.
+
+Every pipeline invocation gets a workspace, resolved through D1's seam:
 
 ```
-<state-root>/<repo-key>/runs/<run-id>/
+<terrain-output-root>/<repo-key>/runs/<run-id>/
 ```
 
 All intermediates live there: the harvest fact sheet and NEEDS-OWNER list,

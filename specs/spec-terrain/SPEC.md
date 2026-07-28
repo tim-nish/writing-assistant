@@ -65,6 +65,12 @@ flows into the existing brief/structures path unchanged.**
       LESSONS.md`, the gateway's `lessons_index`: every index line at its true
       line number). Each index line is one lesson seed. *Lesson bodies and
       per-Lesson files are out of scope here — see OQ3.*
+      **A lesson's Journey rendering is fetched with it, as part of this
+      family (amended 2026-07-28, #871):** the tagged read
+      (`gloss --tag journeys/<tag>`) is issued for the tags a member holds,
+      and each arc attaches to its lesson rather than enumerating as a family
+      of its own — there is no `hub-journeys` family, because there is no
+      independently selectable Journey (CAP-2).
     - **host-sources** — the host repo's **declared writing sources**, from the
       single enumerator (`resolve-writing-sources.py files`), read at
       frontmatter/heading level only. **Removed from the candidate set
@@ -153,6 +159,32 @@ flows into the existing brief/structures path unchanged.**
       never information loss;
     - **elements remain the selectable unit** (`E<tag>.<n>` in the tag's
       namespace), and selection still composes an ordinary brief.
+    - **A Journey is an arc ON its lesson's row, not a Strand of its own
+      (amended 2026-07-28, #871).** The selectable units are `L<n>` (Lesson)
+      and `E<topic>.<n>` (decision or reversal); the `J<n>` namespace is
+      **retired**, having never once been populated in production. Where a
+      lesson carries a served `journey_gloss:` rendering, that rendering is
+      **displayed on the lesson's own row** as how the position changed, and
+      the lesson is what the owner selects. The correspondence is why:
+      Journey↔Lesson is 1:0..1 — a Journey **is** its lesson's arc, and the
+      hub's tier-1 discovery marker is per-lesson by ratified design, so an
+      independently selectable Journey would assert a reachability the served
+      shape does not carry. **This is the boundary to watch, not a settled
+      preference:** the hub recorded, live and against its own decision, that
+      a consumer needing to select a Journey *without* first selecting its
+      lesson turns that marker into a subordination the selection model does
+      not have
+      (owner decision record — 2026-07-28 (terrain membership and journey display)).
+      Adopting independent Journey selection later is
+      therefore a **hub-side conversation**, never a quiet consumer change.
+      Nothing is withheld by this: every served arc appears, on the row the
+      owner reaches it from.
+    - **The by-topic axis's members are the served `decisions/<topic>`
+      shards** — enumerated, never consumer-declared (see CAP-4's amended
+      denominator clause). The E Strands under a member are built from that
+      shard's **ratified entries**, each quoting its served rendering, so the
+      axis needs no raw `topics/*.md` read to be complete over its own
+      denominator.
   - **intent (historical — subtopic clustering, removed 2026-07-27):** Per
     topic, the map shows: its subtopic clusters (grouped from
     backlog items, unconsumed Lessons, and evidence pointers sharing a
@@ -303,11 +335,42 @@ flows into the existing brief/structures path unchanged.**
     - CAP-1's properties are unchanged and remain the binding constraints:
       deleting the View loses nothing, no code path reads it back, and no
       stored index comes into existence. Only the location moves.
+    - **The location moved again (owner ruling — 2026-07-28, #874).** The
+      View is **not** written into the `output.drafts` destination
+      repository: Terrain is a writing-assistant feature, so its outputs —
+      and its debug artifacts — belong in the writing-assistant repository.
+      The destination repo's permitted surface shrinks back to `INDEX.md`
+      alone, and `docs/storage-architecture.md` D1/D2 carry the scheme; the
+      resolver still owns the path, so nothing that calls it changes.
+      Because this repository is public and a run's intermediates carry hub
+      renderings and pins, the relocation binds together with the ignore
+      entry and the staged-artifact guard D2 names — a relocated artifact
+      that can be committed is a publication-boundary defect, not a storage
+      one.
   - **stable indexes and the indexed hand-off.** Every subtopic in the map
     (and View) carries a stable ID (e.g. `T3.2`) from a deterministic ordering
     (topics sorted, subtopics ranked as today), **stable within a pin**; the
     View header carries the map's pin, so a selection made against a stale map
     is **refused with the pin mismatch named**, never silently re-resolved.
+    **"The map's pin" is the COMPOSITE of the map's inputs (amended
+    2026-07-28, #872).** The clause above was written as though the map had
+    one source; it has two, and the guarded value was only ever the
+    destination repository's sha. Indexes over hub material — Lessons,
+    decisions, reversals, and the arcs beside them — move when the **hub**
+    moves, which the destination sha does not record, so the refusal passed
+    while the index it guarded had been re-pointed: exactly the silent
+    re-resolution this clause forbids, running inside the mechanism meant to
+    prevent it. The pin therefore carries **both** its inputs, each labelled
+    on the screen, and a mismatch in **either** refuses. The rule stated
+    once: **the guarded value must move whenever a guarded index can move.**
+    A single displayed sha also mis-taught its reader — it was read as a
+    statement about hub freshness, which it never was, and sent one triage
+    after a stale pin that did not exist.
+    **Publication boundary (binding on this clause):** the hub half is
+    `<hub>@<sha>`, so it is displayed **in-conversation** and never written
+    into tracked text; the View and any committed artifact carry the
+    destination pin plus a **generic** hub label, per
+    `specs/spec-writing-assistant/SPEC.md` §Publication boundary.
     Cross-pin stability stays OQ1's escape hatch (promote cluster names to
     recorded frontmatter on observed instability) — out of scope, but the ID
     scheme must not preclude it. Selection is `{index, note}`: the composed
@@ -435,8 +498,25 @@ flows into the existing brief/structures path unchanged.**
     denominator is **the served shard listing itself**, which the seam
     returns in one bounded enumeration — so an axis listing is complete by
     construction and the `≤2 topics/*.md per read` bound above stops being
-    load-bearing for it (it still binds the `decision`/`reversal` element
-    projection, unchanged).
+    load-bearing for it.
+    **The carve-out that kept the bound on the element projection is struck
+    (amended 2026-07-28, #873).** It read "it still binds the
+    `decision`/`reversal` element projection, unchanged", and it cannot stand
+    beside the denominator sentence above: an axis may not list three topics
+    whose Strands a run is forbidden to reach. What was measured is that the
+    two clauses composed into a silently config-bounded axis — the by-topic
+    element set was the consumer's declared `policy_source.track_topics`
+    capped at two, so one member appeared where the hub served three, and
+    Screen 1's "nothing is withheld" stance was false without saying so.
+    The resolution: **the topic axis and the Strands under it both derive from
+    the served `decisions/<topic>` shard listing**, whose ratified entries
+    carry their own renderings, so no raw thread read is required to project
+    them. The `≤2 topics/*.md` bound survives unchanged for anything that
+    still reads a raw `topics/*.md` thread, and its disclosure with it.
+    **Membership is never consumer-declared:** `track_topics` keeps its
+    track↔topic mapping role and stops being an axis denominator — a config
+    key deciding what the owner may reach is the withholding this axis exists
+    to prevent.
     **The denominator is per axis, never pooled:** the tag axis's
     denominator is the served `lessons/<tag>` shard listing and the topic
     axis's is the served `decisions/<topic>` shard listing, each disclosed
@@ -449,12 +529,29 @@ flows into the existing brief/structures path unchanged.**
     and it is **retired, never extended**. What survives is the per-axis
     denominator above; a Strand outside *every* axis is still disclosed as a
     line, per the disclosure-is-a-line rule.
-    **Journeys are the disclosed gap:** journey shard tags are shadowed by
+    **Journeys are requested, not awaited (amended 2026-07-28, #871 —
+    supersedes the shadowed-shard clause below).** A run **issues the tagged
+    read** for the member's tags (`gloss --tag journeys/<tag>`) and renders
+    each arc on its lesson's row per CAP-2. The shard **address** was fixed
+    upstream and **discovery** is the per-lesson tier-1 marker the map already
+    parses, so neither conjunct is outstanding; what was outstanding was the
+    request itself. A shard the run cannot address is **named on the screen**
+    as a line, per the disclosure-is-a-line rule above, and never omitted
+    silently.
+    **A corpus that was not requested is never reported as not served
+    (added 2026-07-28, #871/#872).** The two are different facts about
+    different parties, and reporting the first as the second attributes a
+    consumer's omission to the source. This is not hypothetical: a run
+    displaying "no Journey renderings were served at this pin" — while
+    issuing only the untagged tier-1 call, so no journey shard was ever asked
+    for — sent a real triage looking for a stale pin and a hub gap that did
+    not exist. Each disclosure line therefore names **which** of the three it
+    reports: requested-and-served, requested-and-missing (the abnormal
+    condition CAP-2 requires be fixed immediately), or not-requested.
+    *(Superseded, kept for the record: "journey shard tags are shadowed by
     same-named lesson shards upstream, so until the hub's addressability issue
-    lands a run **names the shortfall on the screen** — which journeys it could
-    not address, as a line, per the disclosure-is-a-line rule above — and never
-    omits them silently. An undisclosed omission here is the exact defect
-    CAP-4's named-denominator rule exists to prevent.
+    lands a run names the shortfall on the screen." The upstream fix landed;
+    the shortfall outlived it because nothing asked.)*
   - **success:** Map assembly cost scales with index size, not corpus body
     size; an over-bound invocation's output names what it skipped; the closed
     accounting (`read + skipped == matched`) holds **per family**; a reader of
