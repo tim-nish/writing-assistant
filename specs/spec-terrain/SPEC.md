@@ -552,6 +552,24 @@ flows into the existing brief/structures path unchanged.**
     same-named lesson shards upstream, so until the hub's addressability issue
     lands a run names the shortfall on the screen." The upstream fix landed;
     the shortfall outlived it because nothing asked.)*
+    **A served path that differs from the requested one is an abnormal
+    condition, announced at the point of substitution (added 2026-07-29,
+    #873).** The map **cites the path the seam actually served**, never one
+    recomposed from what it asked for; where the two differ the run says so on
+    the screen, as a line, and the affected material is marked rather than
+    presented as the thing that was requested. A recomposed cite is not a
+    cosmetic shortcut — it is what makes a substitution *unobservable*, and an
+    unobservable substitution is indistinguishable from a correct read.
+    Measured, twice, on this exact seam: a request for `topics/<t>.md` was
+    served `topics/archive/<t>.md`, and because the cite was rebuilt from the
+    requested topic key the screen displayed archived decisions as the live
+    record with nothing anywhere reporting it. **The consumer never relies on
+    an upstream fix to make this visible:** the detection is the consumer's
+    own, because the failure this rule exists to catch is precisely the one
+    where the upstream fix is believed to have landed and has not. The
+    general form is the same rule CAP-2 states for a missing rendering — an
+    abnormal condition is fixed, not tolerated — applied to a *substituted*
+    one, which is the harder case because nothing is missing.
   - **success:** Map assembly cost scales with index size, not corpus body
     size; an over-bound invocation's output names what it skipped; the closed
     accounting (`read + skipped == matched`) holds **per family**; a reader of
