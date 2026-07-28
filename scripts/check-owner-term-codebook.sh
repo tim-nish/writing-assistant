@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/usr/bin/env sh
 # check-owner-term-codebook.sh — a term meant to reach the owner is DEFINED
 # where the owner reads it (Story 20.26, #861; SPEC-writing-assistant,
 # owner-surface register, property (d)).
@@ -20,9 +20,14 @@
 # ITS STATED LIMIT: it binds DECLARED terms. Catching an undeclared new coinage
 # is the same enumeration problem this class is trying to leave behind, and it
 # belongs to the typed composition seam — still an open question in the spec.
-set -uo pipefail
+# POSIX shell only — the loop's gate runs every check as `sh "$t"`
+# (`~/.tanuki/scenarios/writing-assistant.scenarios.json`, key `loop.test_cmd`),
+# so `set -o pipefail`, here-strings and process substitution are unavailable:
+# a bash-only check fails the gate on `main` rather than guarding anything (#866).
+set -u
 cd "$(dirname "$0")/.."
 fail=0
+TMP=$(mktemp); trap 'rm -f "$TMP"' EXIT
 ok()   { echo "ok:   $1"; }
 bad()  { echo "FAIL: $1" >&2; fail=1; }
 
@@ -43,13 +48,17 @@ for t in $TERMS; do
 done
 
 # --- 2. no dead entry ------------------------------------------------------
+# Redirected from a FILE, never piped: a pipeline runs the loop in a subshell,
+# so `fail=1` would be set and then discarded — the check would print FAIL and
+# still exit 0.
+grep '^## ' "$DOC" | sed 's/^## //' > "$TMP"
 while read -r entry; do
   [ -z "$entry" ] && continue
   case " $TERMS " in
     *" $entry "*) ok "codebook entry '$entry' is declared first-class vocabulary" ;;
     *) bad "codebook entry '$entry' is declared nowhere — a definition for a term the surface never uses is drift" ;;
   esac
-done < <(grep '^## ' "$DOC" | sed 's/^## //')
+done < "$TMP"
 
 # --- 3. the surfaces are one step from the codebook ------------------------
 # Screen 2's composed listing must carry the pointer, and the skill that
@@ -103,7 +112,7 @@ rm -rf "$tmp"
 # --- 6. this check adds nothing to any denial list --------------------------
 if grep -qE 'INTERNAL_VOCAB|FORBIDDEN_MARKERS' "$0"; then
   case "$(grep -cE 'INTERNAL_VOCAB|FORBIDDEN_MARKERS' "$0")" in
-    *) grep -qE '^\s*(INTERNAL_VOCAB|FORBIDDEN_MARKERS)=' "$0" \
+    *) grep -qE '^[[:space:]]*(INTERNAL_VOCAB|FORBIDDEN_MARKERS)=' "$0" \
          && bad "this check defines a denial list — the prohibited remedy shape" \
          || ok "this check names the denial lists only to disclaim them, never extends one" ;;
   esac
