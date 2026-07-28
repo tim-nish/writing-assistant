@@ -735,6 +735,29 @@ def _fit_parts(parts, budget):
 # unlabelled member list would mint a rival key with no declared precedence.
 AXES = ({"key": "tag", "noun": "tag"}, {"key": "topic", "noun": "topic"})
 
+# The FIRST-CLASS OWNER-FACING VOCABULARY of this surface (Story 20.26, #861):
+# terms the product genuinely asks the owner to think in, each of which must be
+# DEFINED WHERE THE OWNER READS IT — `specs/spec-writing-assistant/SPEC.md`,
+# owner-surface register, property (d).
+#
+# This is an ADMISSION list, not a denial list, and the difference is the whole
+# point: a denial list's non-member fallback is *admit*, which is why extending
+# one is prohibited as the response to a register leak. This list's non-member
+# fallback is "not first-class vocabulary", and its members carry a POSITIVE
+# obligation — a definition the owner can reach. The failure it catches is an
+# ABSENT DEFINITION, which no denial list can express.
+#
+# Its limit, stated rather than papered over: it binds terms that are DECLARED.
+# Detecting an *undeclared* new coinage is the same enumeration problem, and it
+# is the typed composition seam's job — deliberately still an open question in
+# the spec, with its own reopen trigger.
+OWNER_TERMS = ("brief", "Strand")
+
+# Where the codebook lives, relative to the repository root. The surface points
+# at it rather than restating it: one definition, reachable, never N drifting
+# paraphrases.
+OWNER_TERMS_DOC = "docs/owner-terms.md"
+
 # The kinds the topic axis is keyed over. The topic axis runs over the DECISION
 # corpus only: lesson elements also carry a `topic` field, but their axis is the
 # tag — putting them on both would double-count the denominator and silently
@@ -1042,6 +1065,12 @@ def compose_member_listing(map_data, tag, cands, axis="tag"):
              "What each row IS: L rows are Lessons (a rule distilled from",
              "experience), J rows are Journeys (how a position changed over",
              "time), and E rows are decisions or reversals from the record.",
+             # The codebook pointer (Story 20.26, #861): the words this screen
+             # asks the owner to think in are defined one step away, on a page
+             # they can read. A pointer, never a restatement — one definition
+             # that cannot drift from N paraphrases.
+             f"What the words mean: {OWNER_TERMS_DOC} defines "
+             f"{' and '.join(OWNER_TERMS)}.",
              ""]
     jline = _journey_disclosure_line(map_data)
     if jline:

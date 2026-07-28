@@ -145,6 +145,14 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/validate-proposal-payload.py \
   --ws "$WS" --surface topic-map "$WS/topic-map.payload.json"
 ```
 
+**The words the screen uses are defined for the owner, one step away.**
+Screen 1's fields are budgeted, so *you* are the carrier: when you present it,
+point at [`docs/owner-terms.md`](../../docs/owner-terms.md) — the reader-facing
+codebook for the first-class terms this surface uses (**brief**, **Strand**).
+Point at it; never restate a definition in your own words, which is how N
+paraphrases drift from one contract. If the owner asks what a term means,
+the codebook is the answer, not the implementation.
+
 Present the validated payload **in-conversation** under the
 [owner-facing proposal contract](../owner-facing-proposal-contract.md): every
 served tag listed deterministically with its Strand count — the count is a cue
