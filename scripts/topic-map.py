@@ -879,7 +879,7 @@ def _element_summary(text):
     return body
 
 
-def parse_topic_elements(topic, served, commit):
+def parse_topic_elements(topic, served, commit, served_path=None):
     """The typed elements in one served topic file (CAP-2's element projection).
 
     `served` is the seam's `N: text` lines for the file, in order. Two element
@@ -910,7 +910,12 @@ def parse_topic_elements(topic, served, commit):
         date, body = m.group(1), m.group(2)
         declined = heading.startswith(DECLINED_HEADING)
         kind = "reversal" if (declined or STRUCK in body) else "decision"
-        cite = f"topics/{topic}.md:{number}@{commit}"
+        # The cite names the path the seam ACTUALLY SERVED, never one
+        # recomposed from the topic key (CAP-4 as amended 2026-07-29, #873).
+        # Recomposing it is what made an archive-for-live substitution
+        # unobservable: the screen displayed archived decisions as the live
+        # record and nothing anywhere reported it.
+        cite = f"{served_path or f'topics/{topic}.md'}:{number}@{commit}"
         # The line's trailing provenance pointer, captured BEFORE the summary
         # strips it (Story 20.22, #851): it is the JOIN KEY into the served
         # `decisions/<topic>` shard, whose entries are headed by the same
@@ -958,7 +963,7 @@ def read_topic_elements(root, topics):
     never issues extra reads to widen coverage (CAP-4).
     """
     if not topics:
-        return {}, None
+        return {}, None, []
     cmd = [sys.executable, POLICY_READER]
     if root:
         cmd += ["--root", root]
@@ -967,13 +972,16 @@ def read_topic_elements(root, topics):
     if r.returncode != 0:
         detail = (r.stderr.strip().split("\n")[-1] if r.stderr.strip()
                   else f"the policy reader exited {r.returncode}")
-        return {}, f"{detail} (read-policy-source.py exit {r.returncode})"
+        return {}, f"{detail} (read-policy-source.py exit {r.returncode})", []
     by_topic, pin, current, commit, served = {}, None, None, None, []
-    misses = []
+    misses, substitutions, served_path = [], [], None
 
     def flush():
         if current and served:
-            by_topic[current] = parse_topic_elements(current, served, commit)
+            # EXTEND, never assign: two served surfaces resolving to one topic
+            # key would otherwise drop the earlier set silently (#873).
+            by_topic.setdefault(current, []).extend(
+                parse_topic_elements(current, served, commit, served_path))
 
     for line in r.stdout.splitlines():
         if line.startswith("pin: "):
@@ -987,9 +995,18 @@ def read_topic_elements(root, topics):
             head = line[4:]
             path, _sep, sha = head.rpartition(" @ ")
             commit, served = sha.strip(), []
-            name = os.path.basename(path.strip())
+            served_path = path.strip()
+            name = os.path.basename(served_path)
             current = (os.path.splitext(name)[0]
-                       if path.strip().startswith("topics/") else None)
+                       if served_path.startswith("topics/") else None)
+            # A SERVED path that differs from the requested one is an abnormal
+            # condition, recorded here and announced on the screen. The key is
+            # the basename, so `topics/archive/<t>.md` answers a request for
+            # `topics/<t>.md` and every downstream consumer would otherwise see
+            # only the key.
+            if current and served_path != f"topics/{current}.md":
+                substitutions.append({"requested": f"topics/{current}.md",
+                                      "served": served_path})
             continue
         if not current:
             continue
@@ -999,8 +1016,8 @@ def read_topic_elements(root, topics):
     flush()
     if misses and not by_topic:
         return {}, (f"the policy source served a miss for {', '.join(misses)} "
-                    f"at {pin or 'an undisclosed pin'}")
-    return by_topic, None
+                    f"at {pin or 'an undisclosed pin'}"), substitutions
+    return by_topic, None, substitutions
 
 
 def element_surfaces(mapping):
@@ -1128,7 +1145,7 @@ def assemble(repo, mapping, max_surfaces, root=None):
     elem_surfaces = [s for s in read_now if s[0] == FAMILY_HUB_ELEMENTS]
     elem_read = elem_surfaces[:ELEMENT_TOPIC_BOUND]
     elem_over = elem_surfaces[ELEMENT_TOPIC_BOUND:]
-    elements_by_topic, element_reason = read_topic_elements(
+    elements_by_topic, element_reason, substitutions = read_topic_elements(
         root, [payload for _f, _s, _r, payload in elem_read])
     if element_reason:
         families[FAMILY_HUB_ELEMENTS].update(enumerated=False,
@@ -1250,6 +1267,11 @@ def assemble(repo, mapping, max_surfaces, root=None):
         "pin": composite_pin(repo_pin(repo), hub),
         "destination_pin": repo_pin(repo),
         "hub_pin": hub,
+        # Substituted served paths (CAP-4 as amended 2026-07-29, #873): a
+        # request answered with a different path is an abnormal condition,
+        # carried here so the screen can announce it. Empty is the normal
+        # case and says nothing.
+        "substitutions": substitutions,
         "bound": max_surfaces,
         "matched": len(matched),
         "read": read_disclosure,
