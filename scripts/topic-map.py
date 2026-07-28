@@ -187,11 +187,18 @@ DECLARED_FAMILIES = (FAMILY_ARTICLES_ITEMS, FAMILY_HUB_LESSONS,
                      FAMILY_HUB_GLOSS)
 
 # One tier-1 Gloss overview line (`gloss/INDEX.md`): `- **<slug>** — <headline>
-# (<tags>)`. The headline is the FIRST SENTENCE of the lesson's ratified
-# `gloss:` rendering, verbatim (hub `specs/gloss.md` — consumers quote the
-# ratified field, never re-express it). Verified against the hub's generated
-# index rather than inferred.
-GLOSS_LINE = re.compile(r"^-\s+\*\*(.+?)\*\*\s+—\s+(.*?)(?:\s+\(([^()]*)\))?$")
+# (<tags>)[ · journeys/<tag>]`. The headline is the FIRST SENTENCE of the
+# lesson's ratified `gloss:` rendering, verbatim (hub `specs/gloss.md` —
+# consumers quote the ratified field, never re-express it). The optional
+# trailing marker is the hub's per-lesson Journey discovery (`specs/gloss.md`
+# §5.1, product-lab#106): the address of the journey shard holding this
+# lesson's arc. Verified against the hub's generated index rather than
+# inferred.
+GLOSS_LINE = re.compile(
+    r"^-\s+\*\*(.+?)\*\*\s+—\s+(.*?)"
+    r"(?:\s+\(([^()]*)\))?"
+    r"(?:\s+·\s+(journeys/[\w-]+))?$"
+)
 
 # A lesson seed enters the topic derivation through the SAME track->topic path
 # every item uses: it carries the family name as its track, so an owner who
@@ -585,6 +592,9 @@ def gloss_read(root):
             # index path (`gloss/journeys/...`) — the path is the hub's own
             # naming, and the consumer never infers an arc from a headline.
             "journey": "journey" in current.lower(),
+            # The tier-1 marker names the journey shard carrying this lesson's
+            # arc — discovery data, kept verbatim; None when the line has none.
+            "journey_shard": m.group(4),
         })
     entries = [(rel, by_file[rel]) for rel in order if by_file[rel]]
     if not entries:
@@ -1228,6 +1238,7 @@ def lesson_elements(topics, gloss_info, consumption):
                     (gloss_info["reason"] if not gloss_info["served"] else
                      "the served gloss index carries no rendering for this lesson")),
                 "tags": entry["tags"] if entry else [],
+                "journey_shard": entry.get("journey_shard") if entry else None,
                 "date": "",
                 "situation": item.get("surface") or "",
                 "evidence": list(item.get("evidence") or []),
