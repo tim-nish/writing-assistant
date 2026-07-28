@@ -93,10 +93,27 @@ flows into the existing brief/structures path unchanged.**
     signal, the depth estimate and their thresholds — all three were derived
     per subtopic and have no carrier once the unit is gone. Read the clause
     that follows as the historical design; the binding content is:
-    - **the axis is the served gloss tag** (Screen 1), listed
-      deterministically with **an element count per member** — the only
-      surviving depth affordance, a cue for choosing where to look, never a
-      direction line and never a gate;
+    - **Screen 1 offers TWO named axes (amended 2026-07-28, #860/#859),**
+      each listed deterministically with **an element count per member** —
+      the only surviving depth affordance, a cue for choosing where to look,
+      never a direction line and never a gate:
+      - **by tag** — the served gloss tag, over Lessons and Journeys;
+      - **by topic** — the served decision topic, over decisions and
+        reversals.
+      **Neither axis joins anything.** Each corpus is keyed by the only
+      classification it carries, and both keys are *already* shard keys on
+      the served side (`gloss/lessons/<tag>`, `gloss/decisions/<topic>`;
+      owner decision record — 2026-07-28 (decision axis reopen)). This is
+      why the axis pair is not the Lesson→Topic join OQ8 declined — see the
+      scoping clause on OQ8 below.
+      **Each axis carries its own kind label and its own denominator**, and a
+      member is selected within its axis: a shared count line would be false
+      for both, and the two vocabularies overlap by name (measured: 2 of 3
+      served decision topics are also lessons tags), so an unlabelled member
+      list would mint a rival key with no declared precedence — the same
+      defect that declined per-entry tags on decision renderings.
+      Both members lead to the **same Screen 2**, which is unchanged: no
+      screen is added, and the two-screen presentation below still binds;
     - **Screen 2 is that member's complete material** — all its Lessons and
       Journeys, arranged into **presentation-only sections** whose first line
       is a derived group title. Each Strand's line carries its **deterministic
@@ -413,12 +430,25 @@ flows into the existing brief/structures path unchanged.**
     family. Widening that scope is a **hub-side ratification**, never a
     map-side workaround; a run may not issue extra reads to synthesize whole
     coverage, and no element is invented for a topic that was not read.
-  - **the axis is served whole, and Journeys degrade loudly (amended
-    2026-07-27, #803).** Under the gloss-tag axis, Screen 1's denominator is
-    **the served shard-tag listing itself**, which the seam returns in one
-    bounded enumeration — so the axis listing is complete by construction and
-    the `≤2 topics/*.md per read` bound above stops being load-bearing for it
-    (it still binds the `decision`/`reversal` element projection, unchanged).
+  - **each axis is served whole, and Journeys degrade loudly (amended
+    2026-07-27, #803; made per-axis 2026-07-28, #860).** Screen 1's
+    denominator is **the served shard listing itself**, which the seam
+    returns in one bounded enumeration — so an axis listing is complete by
+    construction and the `≤2 topics/*.md per read` bound above stops being
+    load-bearing for it (it still binds the `decision`/`reversal` element
+    projection, unchanged).
+    **The denominator is per axis, never pooled:** the tag axis's
+    denominator is the served `lessons/<tag>` shard listing and the topic
+    axis's is the served `decisions/<topic>` shard listing, each disclosed
+    against its own axis. Pooling them would produce a count that is a
+    completeness claim over neither corpus.
+    **A consequence, stated so it is not lost:** while decisions and
+    reversals had no axis, Screen 1 disclosed them as a residue outside the
+    axis ("N Strand(s) carry no served tag"). That line is **false the
+    moment the topic axis is offered** — those Strands are now reachable —
+    and it is **retired, never extended**. What survives is the per-axis
+    denominator above; a Strand outside *every* axis is still disclosed as a
+    line, per the disclosure-is-a-line rule.
     **Journeys are the disclosed gap:** journey shard tags are shadowed by
     same-named lesson shards upstream, so until the hub's addressability issue
     lands a run **names the shortfall on the screen** — which journeys it could
@@ -577,6 +607,19 @@ flows into the existing brief/structures path unchanged.**
   upstream gate answered the staged question: Topics-with-a-new-join is
   Declined, the axis members are the served tags, and the UI word "Topic" is
   retired for the axis. Screen 1's axis is decided; stories may encode it.
+  **SCOPED 2026-07-28 (#860/#859) — this closure covers a Lesson→Topic
+  JOIN, and nothing else.** What was declined is *building a join* to give
+  Lessons a Topic membership they do not have: measured, 6 of 9 Topics carry
+  no lessons shard and only 3 of 9 names overlap, so the membership had to be
+  manufactured. A **decisions-by-topic axis manufactures nothing** — it runs
+  over a different corpus in the opposite direction, and a decision line's
+  topic *is already its shard key* (verified by bounded enumeration:
+  `gloss/decisions/` serves 3 topic shards; owner decision record —
+  2026-07-28 (decision axis reopen)). CAP-2 therefore now carries two axes,
+  and the decline above stands untouched — it is simply not about this.
+  *(Method note: the collision was asserted, then disproved by consulting the
+  served surface — the same method this OQ's own note prescribes. Being the
+  rule's author is not exemption from it.)*
   *(Historical text below, kept as the record of why it was blocking.)*
   **(raised
   2026-07-27 by the #803 sitting, which disproved the premise that it already
