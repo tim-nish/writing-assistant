@@ -503,22 +503,34 @@ fx["gloss_index"] = [
      "- **retry-storm** — GLOSS-ALPHA retries multiply their own load. (agents, cost) · journeys/agents"],
     ["gloss/INDEX.md", 9,
      "- **cache-warmth** — GLOSS-BETA a warm cache hides every cold start. (testing)"],
-    ["gloss/journeys/INDEX.md", 4,
-     "- **retry-storm** — JOURNEY-ALPHA the belief inverted after the retro. (agents)"],
 ]
+# The tier-2 journey shard the tier-1 marker names. Journeys are REQUESTED
+# (Story 20.30, #871): the arc arrives from `gloss --tag journeys/<tag>`, not
+# from a tier-1 journeys index — the hub publishes no such index, which is why
+# `journey_renderings` was 0 on every real run before the tagged read shipped.
+fx["gloss_shards"] = {
+    "journeys/agents": [
+        ["gloss/journeys/agents.md", 4,
+         "## retry-storm"],
+        ["gloss/journeys/agents.md", 6,
+         "JOURNEY-ALPHA the belief inverted after the retro."],
+    ],
+}
 json.dump(fx, open(sys.argv[1], "w"))
 PYEOF
 MAP > "$work/pivot.json" 2>"$work/pivot.err" \
   && ok "#799: the map assembles with the gloss surface served" \
   || err "assemble failed with gloss served: $(cat "$work/pivot.err")"
 
-python3 - "$work/pivot.json" <<'PYEOF' && ok "#799: every Lesson and served Journey is a primary element; the slot quotes the served gloss, never the one-liner; team-shape's absent rendering is disclosed" || err "element pivot wrong in the assembled map"
+python3 - "$work/pivot.json" <<'PYEOF' && ok "#799/#871: every Lesson is a primary element and its Journey rides its row; the slot quotes the served gloss, never the one-liner; team-shape's absent rendering is disclosed" || err "element pivot wrong in the assembled map"
 import json, sys
 d = json.load(open(sys.argv[1]))
 els = {(e["kind"], e.get("slug")): e for e in d["elements"]}
 assert ("lesson", "retry-storm") in els and ("lesson", "cache-warmth") in els \
     and ("lesson", "team-shape") in els, sorted(els)
-assert ("journey", "retry-storm") in els, sorted(els)
+# A Journey is NOT an element of its own (Story 20.30, #871): the arc
+# attaches to its lesson's row, and the J namespace is retired.
+assert not any(k == "journey" for k, _ in els), sorted(els)
 rs = els[("lesson", "retry-storm")]
 # The slot's quote is the SERVED rendering, verbatim — never the recall
 # one-liner ("The retry storm", the LESSONS.md link text).
@@ -530,8 +542,13 @@ assert rs["tags"] == ["agents", "cost"], rs["tags"]
 assert rs["journey_shard"] == "journeys/agents", rs.get("journey_shard")
 assert "journeys/" not in rs["gloss"], rs["gloss"]
 assert "The retry storm" not in (rs["gloss"] or ""), rs
-jy = els[("journey", "retry-storm")]
-assert jy["gloss"].startswith("JOURNEY-ALPHA"), jy["gloss"]
+# The arc rides the LESSON, quoting the served rendering verbatim.
+assert rs["journey"].startswith("JOURNEY-ALPHA"), rs.get("journey")
+assert rs["journey_cite"].startswith("gloss/journeys/agents.md:"), rs.get("journey_cite")
+# A lesson whose tier-1 line names no shard is NOT REQUESTED, and says so —
+# never reported as the hub failing to serve.
+cw = els[("lesson", "cache-warmth")]
+assert cw.get("journey") is None and "not requested" in (cw.get("journey_unavailable") or ""), cw
 # A lesson the served index carries no rendering for DISCLOSES that — nothing
 # is substituted for a ratified rendering.
 ts = els[("lesson", "team-shape")]
@@ -545,6 +562,7 @@ assert els[("lesson", "cache-warmth")]["usability"]["verdict"] == "episodic-unre
 # The gap artifact's destination is named on the map.
 assert d["recording_target"]["file"].endswith("journey.md"), d["recording_target"]
 assert d["gloss"]["served"] is True and d["gloss"]["journey_renderings"] == 1, d["gloss"]
+assert d["gloss"]["journeys_requested"] == ["journeys/agents"], d["gloss"]
 fams = {f["family"]: f for f in d["coverage"]["families"]}
 assert fams["hub-gloss"]["enumerated"] is True, fams["hub-gloss"]
 PYEOF
@@ -554,15 +572,16 @@ PYEOF
 # disclosure and its NEEDS-RECORDING artifact content — never a refusal.
 DIR="$root/scripts/topic-map-directions.py"
 python3 "$DIR" candidates --map "$work/pivot.json" > "$work/pivot-cands.json"
-python3 - "$work/pivot-cands.json" <<'PYEOF' && ok "#799: N elements are N selectable candidates (L/J namespaces), each quoting the gloss with its verdict attached" || err "element candidates wrong"
+python3 - "$work/pivot-cands.json" <<'PYEOF' && ok "#799/#871: N elements are N selectable candidates (L namespace; J retired), each quoting the gloss with its verdict attached" || err "element candidates wrong"
 import json, sys
 c = json.load(open(sys.argv[1]))["candidates"]
 els = {x["id"]: x for x in c if x.get("kind") == "element"}
-# Lesson ids in slug-sorted order; the journey rendering in its own namespace.
-assert {"L1", "L2", "L3", "J1"} <= set(els), sorted(els)
+# Lesson ids in slug-sorted order. The J namespace is RETIRED (Story 20.30,
+# #871): an arc is not separately selectable, so it mints no candidate.
+assert {"L1", "L2", "L3"} <= set(els), sorted(els)
+assert not any(i.startswith("J") for i in els), sorted(els)
 assert els["L1"]["slug"] == "cache-warmth" and els["L2"]["slug"] == "retry-storm", els
 assert "GLOSS-ALPHA" in els["L2"]["direction"], els["L2"]["direction"]
-assert "JOURNEY-ALPHA" in els["J1"]["direction"], els["J1"]["direction"]
 # The one-liner is identification, never the quote.
 assert "The retry storm" not in els["L2"]["direction"], els["L2"]
 assert els["L2"]["usability"]["verdict"] == "matched", els["L2"]

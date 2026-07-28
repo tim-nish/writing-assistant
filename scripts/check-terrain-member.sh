@@ -255,20 +255,40 @@ base = {"kind": "topic-map", "topics": [], "coverage": {"pin": "h@1"},
         "elements": [{"kind": "lesson", "slug": "a", "title": "A",
                       "gloss": "claim", "tags": ["workflow"],
                       "evidence": [], "consumed": False}]}
+# NOT REQUESTED (Story 20.30, #871): no lesson names a shard, so nothing was
+# asked for. This must NEVER be reported as the hub failing to serve — the two
+# are facts about different parties, and the old line said the second while
+# meaning the first, which sent a real triage after a hub gap that did not
+# exist (CAP-4, amended 2026-07-28).
 gap = dict(base, gloss={"served": True, "lesson_renderings": 3,
-                        "journey_renderings": 0})
+                        "journey_renderings": 0, "journeys_requested": [],
+                        "journey_misses": {}})
 line = m._journey_disclosure_line(gap)
-check(line is not None and "absent, not judged empty" in line,
-      "zero served journeys yields the shortfall as a LINE, three-valued")
+check(line is not None and "requested" in line.lower(),
+      "nothing requested yields the shortfall as a LINE, named as not-requested")
+check("served at this pin" not in line,
+      "a not-requested corpus is NEVER reported as a not-served one")
 check("\n" not in line and "##" not in line,
       "the disclosure is a line, never a section")
-check("Journey" in m.compose_axis_payload(gap)["items"][0]["where"],
+check("requested" in m.compose_axis_payload(gap)["items"][0]["where"].lower(),
       "the shortfall is named on the axis screen")
-check("No Journey renderings" in
-      m.compose_member_listing(gap, "workflow", m.candidates(gap)),
+check("requested" in
+      m.compose_member_listing(gap, "workflow", m.candidates(gap)).lower(),
       "the shortfall is named on the member listing")
+# REQUESTED AND MISSING: a different fact, and an abnormal condition to fix.
+missing = dict(base, gloss={"served": True, "lesson_renderings": 3,
+                            "journey_renderings": 0,
+                            "journeys_requested": ["journeys/workflow"],
+                            "journey_misses": {"journeys/workflow": "served a miss"}})
+mline = m._journey_disclosure_line(missing)
+check(mline is not None and "journeys/workflow" in mline
+      and "abnormal condition" in mline,
+      "a requested shard that did not arrive is named as the abnormal condition")
+check(mline != line,
+      "requested-and-missing is a DIFFERENT line from not-requested")
 ok_served = dict(base, gloss={"served": True, "lesson_renderings": 3,
-                              "journey_renderings": 2})
+                              "journey_renderings": 2,
+                              "journeys_requested": ["journeys/workflow"]})
 check(m._journey_disclosure_line(ok_served) is None,
       "served journeys retire the disclosure BY DETECTION, no flag to flip")
 down = dict(base, gloss={"served": False, "reason": "gateway down"})
