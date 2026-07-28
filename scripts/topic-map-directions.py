@@ -726,35 +726,75 @@ def _fit_parts(parts, budget):
     return render(levels)
 
 
+# Screen 1's two axes (Story 20.25, #860/#859). Each corpus is keyed by the
+# ONLY classification it carries, and BOTH keys are already shard keys on the
+# served side — `gloss/lessons/<tag>` and `gloss/decisions/<topic>` — so
+# neither axis performs a join. The `noun` is the axis's kind label, which is
+# what keeps a member unambiguous: the two vocabularies overlap by name
+# (measured: 2 of the 3 served decision topics are also lessons tags), so an
+# unlabelled member list would mint a rival key with no declared precedence.
+AXES = ({"key": "tag", "noun": "tag"}, {"key": "topic", "noun": "topic"})
+
+# The kinds the topic axis is keyed over. The topic axis runs over the DECISION
+# corpus only: lesson elements also carry a `topic` field, but their axis is the
+# tag — putting them on both would double-count the denominator and silently
+# revive the Lesson→Topic join OQ8 declined.
+DECISION_KINDS = ("decision", "reversal")
+
+
 def axis_members(map_data):
-    """Screen 1's axis: the SERVED TAG VOCABULARY, derived from the tags the
-    elements already carry (Story 20.8, #810; SPEC-terrain as resolved
-    2026-07-27).
+    """Screen 1's TWO axes (Story 20.25, #860/#859; SPEC-terrain CAP-2 as
+    amended 2026-07-28) — the served tag vocabulary over Lessons and Journeys,
+    and the served decision topic over decisions and reversals.
 
-    Deterministic by construction — no model decides what appears: every tag
-    on any Strand is a member, members sort alphabetically, and the count is
-    plain arithmetic. The count is a screen affordance for choosing where to
-    look (legitimate presentation under the no-selection-authority wording),
-    never a gate: every member is offered whatever its size, and a large
-    member is served WHOLE downstream — no within-axis cap.
+    Deterministic by construction — no model decides what appears: every tag on
+    any Strand is a member of the tag axis, every topic carrying a decision or
+    reversal is a member of the topic axis, members sort alphabetically within
+    their axis, and the counts are plain arithmetic. A count is a screen
+    affordance for choosing where to look (legitimate presentation under the
+    no-selection-authority wording), never a gate: every member is offered
+    whatever its size, and a large member is served WHOLE downstream.
 
-    Strands carrying NO tag (a lesson whose rendering was not served has an
-    empty tag list) would be reachable through no member, so their count is
-    returned as a DISCLOSURE the screen must carry as a line — the
-    named-denominator rule (CAP-4): they are named as outside the axis, never
-    hidden, and free-form still reaches them.
+    NEITHER AXIS JOINS ANYTHING. A decision line's topic IS its shard key, so
+    the topic axis reads a classification the corpus already carries — which is
+    why this is not the Lesson→Topic join OQ8 declined (that one had to
+    manufacture a membership Lessons do not have).
+
+    The denominator is PER AXIS and never pooled (CAP-4 as amended
+    2026-07-28): a single count across both would be a completeness claim over
+    neither corpus. `unreachable_strands` is the separate, global disclosure —
+    Strands outside EVERY axis, which reach no member at all and are named on
+    the screen as a line, never hidden, with free-form still reaching them.
+
+    Before this story the decision corpus had no axis and its Strands fell into
+    that disclosure wholesale (the shard join, Story 20.22, attaches renderings
+    but the served entries carry no per-entry tags — `topic-map.py`
+    `decision_shard_entries`). They are reachable now, so the count they
+    inflated is a real residue again rather than a standing 54% of the corpus.
     """
-    members, untagged = {}, 0
+    tag_members, topic_members, unreachable = {}, {}, 0
     for el in map_data.get("elements", []) or []:
         tags = [str(t).strip() for t in (el.get("tags") or []) if str(t).strip()]
-        if not tags:
-            untagged += 1
-            continue
+        topic = str(el.get("topic") or "").strip()
+        reached = False
         for t in tags:
-            members[t] = members.get(t, 0) + 1
-    listing = [{"member": name, "strands": n}
-               for name, n in sorted(members.items())]
-    return {"members": listing, "untagged_strands": untagged}
+            tag_members[t] = tag_members.get(t, 0) + 1
+            reached = True
+        if el.get("kind") in DECISION_KINDS and topic:
+            topic_members[topic] = topic_members.get(topic, 0) + 1
+            reached = True
+        if not reached:
+            unreachable += 1
+
+    def listing(counts):
+        return [{"member": name, "strands": n}
+                for name, n in sorted(counts.items())]
+
+    return {
+        "axes": [dict(AXES[0], members=listing(tag_members)),
+                 dict(AXES[1], members=listing(topic_members))],
+        "unreachable_strands": unreachable,
+    }
 
 
 def compose_axis_payload(map_data):
@@ -769,15 +809,20 @@ def compose_axis_payload(map_data):
     axis = axis_members(map_data)
     pin = map_data.get("coverage", {}).get("pin")
     choices = []
-    for m in axis["members"]:
-        n = m["strands"]
-        plural = "s" if n != 1 else ""
-        choices.append({
-            "label": f"{m['member']} ({n} Strand{plural})",
-            "effect": _fit(f"shows all {n} of this tag's Strands, whole — "
-                            f"nothing capped, nothing ranked; you pick the "
-                            f"material there"),
-        })
+    # Every member of EITHER axis is individually selectable and leads to the
+    # same Screen 2. The label carries its axis's kind word, which is what
+    # keeps two same-named members apart — `claude-code-ops` is both a served
+    # tag and a served decision topic, and they are different material.
+    for ax in axis["axes"]:
+        for m in ax["members"]:
+            n = m["strands"]
+            plural = "s" if n != 1 else ""
+            choices.append({
+                "label": f"by {ax['noun']} — {m['member']} ({n} Strand{plural})",
+                "effect": _fit(f"shows all {n} Strands under this "
+                                f"{ax['noun']}, whole — nothing capped, "
+                                f"nothing ranked; you pick the material there"),
+            })
     choices.append({
         "label": "name your own direction or combination axis",
         "effect": _fit("skips the listing and starts the run with your "
@@ -793,27 +838,35 @@ def compose_axis_payload(map_data):
     # — only stated more tersely — so a screen carrying both the Journey
     # shortfall and the untagged count stays inside the budget instead of
     # blocking presentation on a field nobody can shorten at the gate.
-    parts = [[f"Terrain at {pin}: {len(axis['members'])} tag(s) from the "
-              f"served vocabulary, each individually selectable.",
-              f"Terrain at {pin}: {len(axis['members'])} tag(s), each "
-              f"selectable."]]
+    # The denominator is stated PER AXIS and never pooled (CAP-4 as amended
+    # 2026-07-28): one count across both would be a completeness claim over
+    # neither corpus.
+    counts = {ax["noun"]: len(ax["members"]) for ax in axis["axes"]}
+    parts = [[f"Terrain at {pin}: {counts['tag']} tag(s) and "
+              f"{counts['topic']} topic(s) from the served vocabularies, each "
+              f"individually selectable.",
+              f"Terrain at {pin}: {counts['tag']} tag(s), {counts['topic']} "
+              f"topic(s), each selectable."]]
     jline = _journey_disclosure_line(map_data)
     if jline:
         parts.append([jline, _journey_disclosure_line(map_data, terse=True)])
-    if axis["untagged_strands"]:
-        # The disclosure is a LINE, never a section (CAP-4): strands outside
-        # the axis are named, not hidden, and free-form still reaches them.
-        parts.append([f"{axis['untagged_strands']} Strand(s) carry no served "
-                      f"tag and sit outside this axis — name one at free-form "
-                      f"to reach it.",
-                      f"{axis['untagged_strands']} Strand(s) carry no served "
-                      f"tag — reach one at free-form."])
+    if axis["unreachable_strands"]:
+        # The disclosure is a LINE, never a section (CAP-4): Strands outside
+        # EVERY axis are named, not hidden, and free-form still reaches them.
+        # This is no longer the pre-2026-07-28 "carry no served tag" line,
+        # which asserted an unreachability the topic axis makes false — that
+        # line is retired, not reworded.
+        parts.append([f"{axis['unreachable_strands']} Strand(s) sit outside "
+                      f"both listings — name one at free-form to reach it.",
+                      f"{axis['unreachable_strands']} Strand(s) sit outside "
+                      f"both — reach one at free-form."])
     where = _fit_parts(parts, BUDGETS["where"])
     return {"items": [{
         "where": _fit(where, BUDGETS["where"]),
-        "why": _fit("Pick where to look first. The count is a signal for "
-                     "your judgment, never a gate: every tag is offered "
-                     "whatever its size, and its material is shown whole.",
+        "why": _fit("Pick where to look first, by tag or by topic. The count "
+                     "is a signal for your judgment, never a gate: every "
+                     "member is offered whatever its size, and its material "
+                     "is shown whole.",
                      BUDGETS["why"]),
         "choices": choices,
     }]}
@@ -828,8 +881,27 @@ def cmd_axis(args):
     return 0
 
 
-def member_sections(map_data, tag):
-    """Screen 2's sections for one axis member (Story 20.9, #811).
+def _axis_strands(map_data, member, axis):
+    """The Strands under one member of one axis (Story 20.25, #860).
+
+    Each axis reads the classification its corpus actually carries: the tag
+    axis matches a Strand's served tags, the topic axis matches a decision or
+    reversal's own topic. Nothing is joined and nothing is derived — this is a
+    filter over what the map already holds.
+    """
+    elements = map_data.get("elements") or []
+    if axis == "topic":
+        return [el for el in elements
+                if el.get("kind") in DECISION_KINDS
+                and str(el.get("topic") or "").strip() == member]
+    return [el for el in elements
+            if member in [str(t).strip() for t in (el.get("tags") or [])]]
+
+
+def member_sections(map_data, tag, axis="tag"):
+    """Screen 2's sections for one axis member (Story 20.9, #811; a member of
+    either axis since Story 20.25, #860 — Screen 2 itself is unchanged, and no
+    third screen exists).
 
     SECTIONING IS A PERMUTATION: every Strand of the member appears in exactly
     one section, count-in == count-out, asserted by check-terrain-member.sh —
@@ -846,10 +918,16 @@ def member_sections(map_data, tag):
     crude, the rule can change freely: no contract points at it.
     """
     tag = str(tag).strip()
-    strands = [el for el in (map_data.get("elements") or [])
-               if tag in [str(t).strip() for t in (el.get("tags") or [])]]
+    strands = _axis_strands(map_data, tag, axis)
     sections = {}
     for el in strands:
+        if axis == "topic":
+            # The topic axis's Strands carry no co-tags to group by, so the
+            # deterministic key is the kind the map already records. Same
+            # freedom as the co-tag rule below: no contract points at it.
+            key = "reversal" if el.get("kind") == "reversal" else "decision"
+            sections.setdefault(key, []).append(el)
+            continue
         others = sorted(str(t).strip() for t in (el.get("tags") or [])
                         if str(t).strip() and str(t).strip() != tag)
         key = others[0] if others else tag
@@ -866,12 +944,15 @@ def member_sections(map_data, tag):
     cap = max(SECTION_FLOOR, int(total * SECTION_SHARE_CAP))
     ordered = []
     for key in sorted(sections):
-        title = (f"also {key}" if key != tag else f"{tag} alone")
+        if axis == "topic":
+            title = "reversals" if key == "reversal" else "decisions"
+        else:
+            title = (f"also {key}" if key != tag else f"{tag} alone")
         for sub_title, group, note in _subdivide_section(
                 title, sections[key], {tag, key}, cap):
             ordered.append({"title": sub_title, "strands": group,
                             "note": note})
-    return {"member": tag, "count": total, "sections": ordered}
+    return {"member": tag, "count": total, "axis": axis, "sections": ordered}
 
 
 # The sectioning contract's constants (Story 20.23, #852): the 20% bound is
@@ -940,7 +1021,7 @@ def _strand_context_line(el, member_tag):
     return f"  ({topics} · {where} · {reasoning})"
 
 
-def compose_member_listing(map_data, tag, cands):
+def compose_member_listing(map_data, tag, cands, axis="tag"):
     """Screen 2 as a LISTING: the member's Strands, WHOLE, in sections.
 
     Served whole with the count disclosed — no within-member cap, no
@@ -949,10 +1030,11 @@ def compose_member_listing(map_data, tag, cands):
     `{index, note, pin}` hand-off: ids here are the SAME ids `candidates()`
     assigns, so `brief` resolves a Screen-2 pick with no new entry pipeline.
     """
-    ms = member_sections(map_data, tag)
+    ms = member_sections(map_data, tag, axis)
     by_slug = {c.get("slug"): c for c in cands if c.get("kind") == "element"}
     pin = map_data.get("coverage", {}).get("pin")
-    lines = [f"# {ms['member']} — {ms['count']} Strand(s), shown whole",
+    noun = "topic" if axis == "topic" else "tag"
+    lines = [f"# {ms['member']} ({noun}) — {ms['count']} Strand(s), shown whole",
              "",
              f"Pin: {pin}",
              "Answer with a Strand's index (for example L3) and a short note",
@@ -983,13 +1065,15 @@ def compose_member_listing(map_data, tag, cands):
 
 def cmd_member(args):
     m = load_map(args.map)
-    ms = member_sections(m, args.tag)
+    axis = getattr(args, "axis", "tag") or "tag"
+    ms = member_sections(m, args.tag, axis)
     if not ms["count"]:
-        return _err(f"no Strand carries the tag {args.tag!r} at this pin — "
-                    f"re-run the axis and pick from the fresh listing")
+        noun = "topic" if axis == "topic" else "tag"
+        return _err(f"no Strand sits under the {noun} {args.tag!r} at this "
+                    f"pin — re-run the axis and pick from the fresh listing")
     cands = candidates(m)
-    listing = compose_member_listing(m, args.tag, cands)
-    out = {"kind": "terrain-member", "member": ms["member"],
+    listing = compose_member_listing(m, args.tag, cands, axis)
+    out = {"kind": "terrain-member", "member": ms["member"], "axis": axis,
            "count": ms["count"],
            "sections": [{"title": s["title"],
                          "strands": [e.get("slug") for e in s["strands"]],
@@ -1351,13 +1435,19 @@ def main(argv=None):
     p = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = p.add_subparsers(dest="cmd", required=True)
-    ax = sub.add_parser("axis", help="Screen 1: the served-tag axis listing "
-                        "with per-member Strand counts, as JSON + payload")
+    ax = sub.add_parser("axis", help="Screen 1: the two served axis listings "
+                        "(by tag, by topic) with per-member Strand counts, "
+                        "as JSON + payload")
     ax.add_argument("--map", required=True)
     mb = sub.add_parser("member", help="Screen 2: one axis member's Strands, "
                         "whole, in presentation-only sections")
     mb.add_argument("--map", required=True)
-    mb.add_argument("--tag", required=True)
+    mb.add_argument("--tag", required=True, metavar="MEMBER",
+                    help="the member's name, within the axis named by --axis")
+    mb.add_argument("--axis", choices=[a["key"] for a in AXES], default="tag",
+                    help="which axis MEMBER belongs to (default: tag). The two "
+                         "vocabularies overlap by name, so this is what keeps "
+                         "a member unambiguous.")
     c = sub.add_parser("candidates", help="candidate directions as JSON")
     c.add_argument("--map", required=True, help="assembled map JSON, or - for stdin")
     pa = sub.add_parser("payload", help="the one screen, as a proposal payload")

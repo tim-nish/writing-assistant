@@ -49,8 +49,8 @@ m = {"kind": "topic-map", "topics": [], "coverage": {"pin": "h@abc1234"},
      "elements": els}
 f = tempfile.NamedTemporaryFile("w", suffix=".json", delete=False)
 json.dump(m, f); f.close()
-run = lambda tag: subprocess.run(
-    ["python3", D, "member", "--map", f.name, "--tag", tag],
+run = lambda tag, axis="tag": subprocess.run(
+    ["python3", D, "member", "--map", f.name, "--tag", tag, "--axis", axis],
     capture_output=True, text=True)
 
 out = run("workflow")
@@ -169,9 +169,17 @@ check(re.search(r"^- \*\*L\d+\*\* — ", d["listing"], re.M),
       "lines carry the candidate ids selection already resolves")
 
 # --- an empty member is a disclosed refusal --------------------------------
+# The refusal names the member AND the axis it was looked up in (Story 20.25):
+# the two vocabularies overlap, so "not found" without the axis would leave the
+# owner unable to tell a wrong name from a right name on the wrong axis.
 bad = run("no-such-tag")
-check(bad.returncode != 0 and "no Strand carries the tag" in bad.stderr,
-      "an unknown member is refused with the reason named")
+check(bad.returncode != 0 and "no Strand sits under the tag" in bad.stderr
+      and "no-such-tag" in bad.stderr,
+      "an unknown tag member is refused with the reason named")
+bad_topic = run("no-such-topic", "topic")
+check(bad_topic.returncode != 0
+      and "no Strand sits under the topic" in bad_topic.stderr,
+      "an unknown topic member is refused, naming the topic axis")
 
 # --- NEGATIVE TEST: a broken permutation must fail RED ---------------------
 # Simulated at the assertion layer: feed the checker a sectioning that drops
