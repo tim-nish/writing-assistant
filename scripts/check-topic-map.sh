@@ -500,7 +500,7 @@ fx["tools"] = ["glossary_entry", "lessons_index", "topic_thread",
                "policy_lookup", "surface_names", "gloss_index"]
 fx["gloss_index"] = [
     ["gloss/INDEX.md", 8,
-     "- **retry-storm** — GLOSS-ALPHA retries multiply their own load. (agents, cost)"],
+     "- **retry-storm** — GLOSS-ALPHA retries multiply their own load. (agents, cost) · journeys/agents"],
     ["gloss/INDEX.md", 9,
      "- **cache-warmth** — GLOSS-BETA a warm cache hides every cold start. (testing)"],
     ["gloss/journeys/INDEX.md", 4,
@@ -524,6 +524,11 @@ rs = els[("lesson", "retry-storm")]
 # one-liner ("The retry storm", the LESSONS.md link text).
 assert rs["gloss"].startswith("GLOSS-ALPHA"), rs["gloss"]
 assert rs["gloss_cite"].startswith("gloss/INDEX.md:8@"), rs["gloss_cite"]
+# The tier-1 journey marker (hub specs/gloss.md §5.1) never swallows the tags
+# — and the shard address it names is kept for journey discovery.
+assert rs["tags"] == ["agents", "cost"], rs["tags"]
+assert rs["journey_shard"] == "journeys/agents", rs.get("journey_shard")
+assert "journeys/" not in rs["gloss"], rs["gloss"]
 assert "The retry storm" not in (rs["gloss"] or ""), rs
 jy = els[("journey", "retry-storm")]
 assert jy["gloss"].startswith("JOURNEY-ALPHA"), jy["gloss"]
