@@ -64,6 +64,10 @@ case "$ws" in
   "$HOST"/*) err "run workspace is INSIDE the host tree ($ws)" ;;
   *) ok "run workspace is outside the host tree" ;;
 esac
+# D2 as amended 2026-07-28 (#874) moved TERRAIN's outputs and debug artifacts
+# to the terrain output root; the draft pipeline's workspaces are not Terrain
+# outputs and stay here, under the machine state root. Both are outside the
+# HOST tree, which is the invariant this section defends.
 case "$ws" in
   "$XDG_STATE_HOME"/*) ok "run workspace is under the state root" ;;
   *) err "run workspace not under the state root ($ws)" ;;
@@ -234,15 +238,16 @@ else
 fi
 rm -f "$DEST/stray-artifact.md"
 
-# --- The topic-map View: the SECOND regenerated non-gating view (18.72, #611) --
-# D1's destination surface grew from three files to four. The View is the only
-# artifact the topic-map flow puts in the destination repo, it is fixed (not
-# per-run), and it must leave the tree CLEAN — a regenerated debug artifact that
-# shows up as untracked would hand the owner a dirty repo on every invocation.
+# --- The topic-map View: NO LONGER a destination artifact (#874) ------------
+# Owner ruling 2026-07-28: Terrain is a writing-assistant feature, so its
+# outputs and debug artifacts live in the writing-assistant repository. D1's
+# destination surface therefore shrinks back to INDEX.md alone, and the check
+# shrinks with it in the same sitting — a permitted-surface list and its check
+# are amended together or the list is not the surface.
 vpath=$(python3 "$root/scripts/resolve-paths.py" topic-map-view --root "$HOST")
 case "$vpath" in
-  "$DEST"/*) ok "View resolves inside the output.drafts destination repo" ;;
-  *) err "View resolved outside the destination repo ($vpath)" ;;
+  "$DEST"/*) err "View still resolves inside the output.drafts destination repo ($vpath)" ;;
+  *) ok "View resolves OUTSIDE the destination repo (#874)" ;;
 esac
 vpath2=$(python3 "$root/scripts/resolve-paths.py" topic-map-view --root "$HOST")
 [ "$vpath" = "$vpath2" ] \
@@ -252,15 +257,32 @@ case "$vpath" in
   */runs/*) err "View path still points into a per-run workspace ($vpath)" ;;
   *) ok "View path is not a per-run workspace path" ;;
 esac
+# Writing the View must not dirty the DESTINATION tree — it is not written
+# there at all now, so the surface stays exactly the products plus INDEX.md.
+# The View now lands under the terrain output root, and a Terrain run
+# workspace goes with it (#874) — asserted here so the scoped move cannot
+# silently revert to the destination repo.
+troot=$($PY terrain-output-root)
+case "$vpath" in
+  "$troot"/*) ok "View lands under the terrain output root" ;;
+  *) err "View is not under the terrain output root ($vpath, root=$troot)" ;;
+esac
+tws=$(cd "$HOST" && $PY new-run --terrain --root "$HOST")
+case "$tws" in
+  "$troot"/*) ok "a Terrain run workspace lands under the terrain output root" ;;
+  *) err "Terrain run workspace not under the terrain output root ($tws)" ;;
+esac
+case "$tws" in
+  "$HOST"/*) err "Terrain run workspace is INSIDE the host tree ($tws)" ;;
+  *) ok "Terrain run workspace is outside the host tree" ;;
+esac
+mkdir -p "$(dirname "$vpath")"
 printf '# probe view\n' > "$vpath"
 after=$(dsurface)
 [ "$after" = "$expected" ] \
-  && ok "writing the View leaves the destination tree clean (self-ignoring dir)" \
+  && ok "writing the View leaves the destination tree clean (it lands elsewhere)" \
   || err "the View dirtied the destination tree: got [$after], expected [$expected]"
-# Not vacuous: the guard is the tool-owned ignore, not luck.
-[ -f "$(dirname "$vpath")/.gitignore" ] \
-  && ok "the View's directory carries its own ignore rule" \
-  || err "the View's directory has no .gitignore; the destination tree will go dirty"
+rm -f "$vpath"
 # The View is never read back — CAP-1's derived-never-stored property, at the
 # same strength it held when the file lived in a run workspace.
 if grep -nE '(open|read_text|json\.load|cat)[^)]*VIEW_FILENAME' \

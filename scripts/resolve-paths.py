@@ -137,8 +137,58 @@ def repo_key(root):
     return re.sub(r"[^A-Za-z0-9]+", "-", root)
 
 
+def plugin_root():
+    """This plugin's own repository root — the directory holding `scripts/`."""
+    return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+def terrain_output_root():
+    """Where this tool's outputs and debug artifacts live (D2, amended
+    2026-07-28, #874 — owner ruling).
+
+    Terrain is a writing-assistant feature, so its outputs and its debug
+    artifacts belong in the writing-assistant repository: the repo the human
+    works in for this feature. The resolver owns the choice, per D1 — no
+    caller composes it and no literal appears anywhere else.
+
+    **"The writing-assistant repo" is one place only when the plugin runs from
+    a working tree.** Installed, it is a marketplace clone under
+    `~/.claude/plugins/` that the owner does not work in and that is known to
+    go stale; writing per-run data there puts it where no human will look. So
+    an installed clone falls back to the machine state root, which is where
+    these artifacts lived before the ruling and remains a correct place for
+    them — the ruling moves them TOWARD the human, and a location no human
+    opens does not satisfy it.
+    """
+    here = plugin_root()
+    installed = os.path.join(os.path.expanduser("~"), ".claude", "plugins")
+    if os.path.commonpath([os.path.abspath(here), os.path.abspath(installed)]) \
+            == os.path.abspath(installed):
+        return state_root()
+    if not os.path.isdir(os.path.join(here, ".git")):
+        return state_root()
+    return os.path.join(here, TERRAIN_OUTPUT_DIR)
+
+
 def repo_dir(root):
     return os.path.join(state_root(), repo_key(root))
+
+
+def terrain_repo_dir(root):
+    """Terrain's own per-host directory under the terrain output root.
+
+    SCOPED DELIBERATELY (#874). The ruling is about Terrain's outputs and
+    Terrain's debug artifacts; the draft pipeline's harvest caches, plan
+    fallbacks and stage checkpoints are not Terrain outputs and stay under the
+    machine state root where D2 has always put them. A wholesale move was
+    tried first and four unrelated checks failed on it — which is the
+    subsystems saying, correctly, that the ruling did not reach them.
+    """
+    return os.path.join(terrain_output_root(), repo_key(root))
+
+
+def terrain_runs_dir(root):
+    return os.path.join(terrain_repo_dir(root), "runs")
 
 
 # --------------------------------------------------------------------------
@@ -156,6 +206,10 @@ def repo_dir(root):
 
 TOPIC_MAP_VIEW_DIR = "topic-map"
 TOPIC_MAP_VIEW_BASENAME = "topic-map-view.md"
+# The in-repo directory holding this tool's outputs and debug artifacts
+# (D2, amended 2026-07-28, #874). Ignored by the repo and guarded by a check:
+# a run's intermediates carry hub renderings, and this repository is public.
+TERRAIN_OUTPUT_DIR = ".writing-assistant"
 
 
 def articles_repo_root(root):
@@ -206,11 +260,13 @@ def topic_map_view(root):
     and remain binding: fully regenerated every invocation, never read back by
     any code path, and deleting it loses nothing.
     """
-    repo = articles_repo_root(root)
-    if not repo:
-        return None
-    return os.path.join(repo, TOPIC_MAP_VIEW_DIR, repo_key(root),
-                        TOPIC_MAP_VIEW_BASENAME)
+    # RELOCATED 2026-07-28 (#874, owner ruling): the View is a
+    # writing-assistant output, so it lands in the writing-assistant
+    # repository — not in the `output.drafts` destination, whose permitted
+    # surface shrinks back to INDEX.md alone (D1). It stays a FIXED path so a
+    # file opened during a sitting can be reopened later, and stays
+    # host-qualified because one tool serves many host repos.
+    return os.path.join(terrain_repo_dir(root), TOPIC_MAP_VIEW_BASENAME)
 
 
 SOURCES_BASENAME = "writing-sources.yaml"
@@ -290,7 +346,7 @@ def _update_latest(base, ws):
             pass
 
 
-def new_run(root, run_id=None):
+def new_run(root, run_id=None, terrain=False):
     """Create <repo-dir>/runs/<run-id>/ and return it (Story 9.2).
 
     Every intermediate a pipeline run produces — fact sheet, NEEDS-OWNER list,
@@ -304,7 +360,10 @@ def new_run(root, run_id=None):
     appended until the directory does not already exist. A `latest` symlink is
     repointed at the new run for easy re-finding (F40).
     """
-    base = runs_dir(root)
+    # `terrain=True` mints under the terrain output root (#874): Terrain's
+    # intermediates are Terrain outputs and belong where the owner works.
+    # Everything else keeps the machine state root — see terrain_repo_dir.
+    base = terrain_runs_dir(root) if terrain else runs_dir(root)
     if run_id is not None:
         ws = os.path.join(base, run_id)
         os.makedirs(ws)  # exist_ok=False: an explicit id must be new
@@ -408,8 +467,14 @@ def cmd_sources_file(args):
     return 0
 
 
+def cmd_terrain_output_root(args):
+    print(terrain_output_root())
+    return 0
+
+
 def cmd_new_run(args):
-    print(new_run(host_root(args.root), args.run_id))
+    print(new_run(host_root(args.root), args.run_id,
+                  terrain=getattr(args, "terrain", False)))
     return 0
 
 
@@ -530,6 +595,9 @@ def main(argv=None):
     sp.add_argument("--root", help="host-repo root (default: git top-level of cwd; errors outside a git repo)")
 
     sp = sub.add_parser("new-run", help="create and print a fresh per-run workspace")
+    sp.add_argument("--terrain", action="store_true",
+                    help="mint under the terrain output root (#874) — Terrain "
+                         "outputs and debug artifacts live where the owner works")
     sp.add_argument("--root", help="host-repo root (default: git top-level of cwd; errors outside a git repo)")
     sp.add_argument("--run-id", help="explicit run id (must not already exist; default: fresh timestamp id)")
 
@@ -537,6 +605,9 @@ def main(argv=None):
     sp.add_argument("--root", help="host-repo root (default: git top-level of cwd; errors outside a git repo)")
     sp.add_argument("--run-id", required=True, help="the run id whose workspace to print")
 
+    sub.add_parser("terrain-output-root",
+                   help="print the root this tool's outputs and debug "
+                        "artifacts live under (D2, #874)")
     sp = sub.add_parser("topic-map-view", help="print the topic-map View's fixed path in the "
                         "output.drafts destination repo (Story 18.72); creates its directory")
     sp.add_argument("--root", help="host-repo root (default: git top-level of cwd; errors outside a git repo)")
@@ -560,6 +631,7 @@ def main(argv=None):
         "sources-file": cmd_sources_file,
         "new-run": cmd_new_run,
         "run-workspace": cmd_run_workspace,
+        "terrain-output-root": cmd_terrain_output_root,
         "topic-map-view": cmd_topic_map_view,
         "list-drafts": cmd_list_drafts,
         "target": cmd_target,

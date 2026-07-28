@@ -48,11 +48,12 @@ Relay it as `Operating on host repo: <path>`.
 
 Everything this flow writes is an **intermediate**, never a product: the map,
 the payload, the recorded answer. They go to the run's **workspace outside the
-host repo** (`docs/storage-architecture.md` D1/D2), never into the host working
+host repo** — under the writing-assistant repository, where the owner works
+(owner ruling — 2026-07-28; `docs/storage-architecture.md` D2) (`docs/storage-architecture.md` D1/D2), never into the host working
 tree. Mint one before anything below uses `$WS`:
 
 ```
-WS=$(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-paths.py new-run --root <host-repo>)
+WS=$(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-paths.py new-run --terrain --root <host-repo>)
 ```
 
 **The path resolver owns every storage path** — this skill composes none of
