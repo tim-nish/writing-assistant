@@ -28,3 +28,9 @@ __pycache__/
 # Local crash / scratch artifacts (e.g. Cygwin/WSL stack dumps).
 *.stackdump
 
+
+# This tool's own outputs and debug artifacts (D2, #874). Committed, not a
+# personal pattern: it ships with the plugin, so every clone stays clean.
+# A run's intermediates carry hub renderings and this repository is public —
+# the ignore is convenience; check-relocated-artifact-boundary.sh is the guard.
+.writing-assistant/
