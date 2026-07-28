@@ -85,12 +85,18 @@ If `coverage.complete` is false, say so in one line with the count the
 disclosure names: the map read up to its bound and the rest is listed, not
 silently dropped.
 
-**Reachability of decision/reversal Strands (E rows) — a known property, not
-a surprise.** A Strand's axis membership comes from its served gloss tags; a
-decision or reversal Strand that joins no gloss entry carries an empty tag
-list, so it appears in the **untagged-disclosure line**, not under any axis
-member. When you present Screen 1, that line is where such Strands live —
-relay it as given; do not hunt for them under a member or invent a tag.
+**Decision/reversal Strands (E rows) have their own axis** (Story 20.25,
+#860; SPEC-terrain CAP-2 as amended 2026-07-28). Screen 1 offers **two**
+axes: **by tag** over Lessons and Journeys, and **by topic** over decisions
+and reversals. A decision line's topic *is* its shard key, so nothing is
+joined or derived for either. Relay both listings — an E row is reached
+under its topic, not hunted for under a tag and never given one.
+
+The two vocabularies **overlap by name** (a name can be both a served tag
+and a served decision topic, holding different material), so always carry
+the axis word with the member when you present or resolve a choice. A
+Strand belonging to neither axis appears in the **outside-both disclosure
+line**; relay that line as given.
 
 **Usability verdict per candidate (the topic↔evidence join, #669; enforced on
 every element, #799).** Each item AND each element carries a `usability`
@@ -125,8 +131,10 @@ SOURCE pointer, and every offer stays a proposal the owner ratifies.
 
 ## Step 2 — two screens
 
-**Screen 1 — the axis: where do you want to look?** This is the owner's first
-choice, offered before any material is shown:
+**Screen 1 — the two axes: where do you want to look?** This is the owner's
+first choice, offered before any material is shown. Both listings are offered
+together, each member carrying its axis word; selecting either leads to the
+same Screen 2, and there is no third screen:
 
 ```
 python3 ${CLAUDE_PLUGIN_ROOT}/scripts/topic-map-directions.py axis \
@@ -160,7 +168,8 @@ member on Screen 1:
 
 ```
 python3 ${CLAUDE_PLUGIN_ROOT}/scripts/topic-map-directions.py member \
-  --map "$WS/map.json" --tag <member> > "$WS/terrain-member.json"
+  --map "$WS/map.json" --tag <member> --axis <tag|topic> \
+  > "$WS/terrain-member.json"
 ```
 
 Relay the returned `listing` as given: **all** of the member's Strands, whole,

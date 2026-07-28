@@ -1011,12 +1011,22 @@ for token in 'topic-map.py assemble' 'topic-map-directions.py axis' \
 done
 
 
-# --- SCREEN 1: the served-tag axis (Story 20.8, #810) ------------------------
-# The axis is decided (upstream, 2026-07-27): members are the served tags,
-# derived from the tags the Strands already carry; deterministic; no cap; the
-# UI word "Topic" retired for the axis; strands outside the axis disclosed as
-# a line. Asserted on a fixture that exercises every clause, including a
-# 53-entry member so serve-whole is tested at the measured worst case.
+# --- SCREEN 1: the two served axes (Story 20.8, #810; Story 20.25, #860) -----
+# Screen 1 offers TWO axes (SPEC-terrain CAP-2 as amended 2026-07-28): the
+# served TAG vocabulary over Lessons and Journeys, and the served decision
+# TOPIC over decisions and reversals. Both keys are already shard keys, so
+# neither axis joins anything. Deterministic; no cap; per-axis denominators,
+# never pooled; Strands outside EVERY axis disclosed as a line.
+#
+# The word "topic" is legitimate on this screen for the topic axis and its
+# members. What the 2026-07-27 retirement forbids is the TAG axis calling its
+# members topics — the collision with `topics/*.md` — and that is what the
+# assertion below tests, rather than the blanket absence it used to.
+#
+# Asserted on a fixture that exercises every clause: a 53-entry member so
+# serve-whole is tested at the measured worst case, a NAME COLLIDING across
+# both vocabularies, decisions and reversals carrying no tags, and one Strand
+# outside both axes.
 python3 - "$D" <<'PYEOF' || fail=1
 import json, subprocess, sys, tempfile
 D = sys.argv[1]
@@ -1035,6 +1045,15 @@ els.append({"kind": "journey", "slug": "j1", "title": "J1",
             "tags": ["agents"], "evidence": [], "consumed": True})
 els.append({"kind": "lesson", "slug": "untagged", "title": "U",
             "tags": [], "evidence": [], "consumed": False})
+# The topic axis's corpus: decisions and reversals carry NO tags (the served
+# shard entries have none), and their topic IS their shard key. `workflow`
+# deliberately collides with a tag-axis member name.
+els.append({"kind": "decision", "slug": "d1", "title": "D1", "tags": [],
+            "topic": "workflow", "evidence": [], "consumed": False})
+els.append({"kind": "decision", "slug": "d2", "title": "D2", "tags": [],
+            "topic": "articles", "evidence": [], "consumed": False})
+els.append({"kind": "reversal", "slug": "r1", "title": "R1", "tags": [],
+            "topic": "workflow", "evidence": [], "consumed": False})
 m = {"kind": "topic-map", "topics": [], "coverage": {"pin": "h@abc1234"},
      "elements": els}
 f = tempfile.NamedTemporaryFile("w", suffix=".json", delete=False)
@@ -1044,22 +1063,54 @@ run = lambda: subprocess.run(
 out = run()
 check(out.returncode == 0, f"axis composes (rc={out.returncode})")
 d = json.loads(out.stdout)
-members = {x["member"]: x["strands"] for x in d["axis"]["members"]}
-check(members == {"workflow": 54, "agents": 2},
-      f"members are exactly the element tags with correct counts ({members})")
-check(d["axis"]["untagged_strands"] == 1,
-      "a Strand with no served tag is counted outside the axis")
+axes = {a["key"]: a for a in d["axis"]["axes"]}
+check(sorted(axes) == ["tag", "topic"], f"Screen 1 offers two axes ({sorted(axes)})")
+tags = {x["member"]: x["strands"] for x in axes["tag"]["members"]}
+topics = {x["member"]: x["strands"] for x in axes["topic"]["members"]}
+check(tags == {"workflow": 54, "agents": 2},
+      f"tag-axis members are exactly the element tags with correct counts ({tags})")
+check(topics == {"workflow": 2, "articles": 1},
+      f"topic-axis members are exactly the decision topics with correct counts ({topics})")
+# The collision case: one name, two axes, different material. Neither member
+# absorbs the other's Strands — which is why a merged listing was refused.
+check(tags["workflow"] == 54 and topics["workflow"] == 2,
+      "a name served by BOTH vocabularies stays two distinct members")
+check(d["axis"]["unreachable_strands"] == 1,
+      "a Strand outside EVERY axis is counted, and decisions no longer are")
+
+# PER-AXIS COMPLETENESS (Story 20.25): count in == count out, on each axis
+# independently, recomputed here rather than trusted from the payload.
+want_tag, want_topic, want_out = {}, {}, 0
+for el in els:
+    hit = False
+    for t in el.get("tags") or []:
+        want_tag[t] = want_tag.get(t, 0) + 1; hit = True
+    if el["kind"] in ("decision", "reversal") and el.get("topic"):
+        want_topic[el["topic"]] = want_topic.get(el["topic"], 0) + 1; hit = True
+    if not hit: want_out += 1
+check(tags == want_tag and topics == want_topic
+      and d["axis"]["unreachable_strands"] == want_out,
+      "each axis reconciles independently against a recount of the elements")
+
 item = d["payload"]["items"][0]
 labels = [c["label"] for c in item["choices"]]
-check(labels[0] == "agents (2 Strands)" and labels[1] == "workflow (54 Strands)",
+check(labels[0] == "by tag — agents (2 Strands)"
+      and labels[1] == "by tag — workflow (54 Strands)",
       f"every member is offered with its count — 54 entries included, no cap ({labels[:2]})")
+check(labels[2] == "by topic — articles (1 Strand)"
+      and labels[3] == "by topic — workflow (2 Strands)",
+      f"the topic axis's members are offered too, kind-labelled ({labels[2:4]})")
 check(labels[-2:] == ["name your own direction or combination axis", "stop here"],
       "free-form is offered and stop stays last")
-check("no served tag" in item["where"],
-      "the outside-the-axis disclosure is a line on the screen")
-surface = json.dumps(d["payload"])
-check("Topic" not in surface and "topic" not in surface.replace("topic-map", ""),
-      "the UI word Topic never appears in the axis screen copy")
+check("outside both listings" in item["where"],
+      "the outside-every-axis disclosure is a line on the screen")
+check("no served tag" not in item["where"],
+      "the retired untagged-strand line is gone, not reworded")
+check("tag(s) and" in item["where"] and "topic(s)" in item["where"],
+      f"the denominator is stated per axis, never pooled ({item['where'][:70]})")
+tag_labels = [x for x in labels if x.startswith("by tag")]
+check(all("topic" not in x for x in tag_labels),
+      "the tag axis never calls its members topics (the retired UI word)")
 check(out.stdout == run().stdout, "the axis listing is byte-identical across invocations")
 v = subprocess.run(["python3", "scripts/validate-proposal-payload.py",
                     "--surface", "topic-map", "/dev/stdin"],
