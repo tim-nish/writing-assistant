@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/usr/bin/env sh
 # check-denial-list-growth.sh — extending an enumerated denial list is REFUSED
 # as the response to a register leak (Story 20.27, #862;
 # SPEC-writing-assistant, owner-surface register, property (a)).
@@ -27,7 +27,11 @@
 #
 # (The exemption marker is developer-facing source vocabulary, not owner-facing
 # surface vocabulary, so the codebook rule of Story 20.26 does not bind it.)
-set -uo pipefail
+# POSIX shell only — the loop's gate runs every check as `sh "$t"`
+# (`~/.tanuki/scenarios/writing-assistant.scenarios.json`, key `loop.test_cmd`),
+# so `set -o pipefail`, here-strings and process substitution are unavailable:
+# a bash-only check fails the gate on `main` rather than guarding anything (#866).
+set -u
 cd "$(dirname "$0")/.."
 fail=0
 ok()  { echo "ok:   $1"; }
@@ -38,7 +42,8 @@ MARKER='# register-exemption:'
 
 [ -f "$PIN" ] || { bad "the pinned inventory $PIN is missing — nothing to compare against"; exit 1; }
 
-CUR=$(mktemp); trap 'rm -f "$CUR" "$CUR.pin"' EXIT
+TAB=$(printf '\t')
+CUR=$(mktemp); trap 'rm -f "$CUR" "$CUR.now" "$CUR.pin" "$CUR.added"' EXIT
 python3 scripts/pin-denial-lists.py > "$CUR" 2>/dev/null || { bad "could not read the denial lists"; exit 1; }
 
 grep -v '^#' "$CUR" | sort > "$CUR.now"
@@ -49,7 +54,11 @@ added=$(comm -23 "$CUR.now" "$CUR.pin")
 if [ -z "$added" ]; then
   ok "no denial list has grown since the pin"
 else
-  while IFS=$'\t' read -r list entry; do
+  # Redirected from a FILE, never piped: a pipeline runs the loop in a
+  # subshell, so `fail=1` would be set and then discarded — the check would
+  # print FAIL and still exit 0.
+  printf '%s\n' "$added" > "$CUR.added"
+  while IFS="$TAB" read -r list entry; do
     [ -z "${entry:-}" ] && continue
     # An addition is admitted ONLY by an adjacent, human-written exemption on
     # the entry's own source line. Deny, never warn — and name the entry.
@@ -60,7 +69,7 @@ else
     else
       bad "$list gained '$entry' with no register-exemption — extending an enumerated denial list is prohibited as the response to a register leak (SPEC-writing-assistant, owner-surface register, property (a)). A denial list's non-member fallback is admit; the defect is the shape, not the contents. If this entry really is a coined identifier, add an adjacent '$MARKER <which leak, and why>' and re-pin with scripts/pin-denial-lists.py."
     fi
-  done <<< "$added"
+  done < "$CUR.added"
 fi
 
 # --- removals are fine, and worth saying ------------------------------------
@@ -74,7 +83,7 @@ else
 fi
 
 # --- this check is not itself the prohibited remedy -------------------------
-if grep -qE '^\s*(INTERNAL_VOCAB|FORBIDDEN_MARKERS)\s*=' "$0"; then
+if grep -qE '^[[:space:]]*(INTERNAL_VOCAB|FORBIDDEN_MARKERS)[[:space:]]*=' "$0"; then
   bad "this check defines a denial list of its own — the prohibited remedy shape"
 else
   ok "this check defines no denial list and extends none"
@@ -83,7 +92,7 @@ fi
 # --- NEGATIVE TEST: prove the check can fail --------------------------------
 # A check nobody has seen fail is indistinguishable from one that cannot.
 probe_pin=$(mktemp)
-grep -v '^#' "$PIN" | sort | head -n -1 > "$probe_pin"   # pin missing one entry
+grep -v '^#' "$PIN" | sort | sed '$d' > "$probe_pin"   # pin missing one entry
 if [ -n "$(comm -23 "$CUR.now" "$probe_pin")" ]; then
   ok "negative test: an entry absent from the pin is detected as growth"
 else
