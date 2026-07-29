@@ -65,7 +65,7 @@ PY_HARD_LINES=2000
 # per-stage command modules — which is a SPEC decision, not this check's:
 # the check points, it never restructures.
 # Format: "<path>:<lines-at-adoption>", space-separated.
-RATCHETED="scripts/draft-pipeline.py:6655"   # adopted 2026-07-26
+RATCHETED="scripts/draft-pipeline.py:6042"   # adopted 2026-07-26
 RATCHET_SLACK_PCT=1
 
 root=$(git rev-parse --show-toplevel 2>/dev/null) || {
