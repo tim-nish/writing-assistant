@@ -647,16 +647,140 @@ def gloss_read(root):
     return entries, None
 
 
+def elements_read(root):
+    """The served element manifest as structured records (the seam's
+    `elements` subcommand — the gateway's `element_survey`,
+    tsurezure-gateway#76; SPEC-terrain amendment 2026-07-29, #884).
+
+    Returns `(records, reason)`. Each record is the manifest's JSON object
+    verbatim — `{slug, kind, tags, renderings, source, ...}` — plus the
+    served line's `cite` (`file:line@commit`). A `reason` means record
+    acquisition is unavailable (older gateway's named exit-13 gap, a served
+    miss, an unreachable gateway) and names why; the caller then falls back
+    to the tier-1 parse WITH the substitution disclosed, never silently.
+    """
+    cmd = [sys.executable, POLICY_READER]
+    if root:
+        cmd += ["--root", root]
+    cmd += ["elements"]
+    r = subprocess.run(cmd, capture_output=True, text=True)
+    if r.returncode != 0:
+        detail = (r.stderr.strip().split("\n")[-1] if r.stderr.strip()
+                  else f"the policy reader exited {r.returncode}")
+        return [], f"{detail} (read-policy-source.py exit {r.returncode})"
+    records, current, commit = [], None, None
+    for line in r.stdout.splitlines():
+        if line.startswith("miss: "):
+            return [], "the policy source served a miss for the element manifest"
+        if line.startswith("=== "):
+            head = line[4:]
+            path, _sep, sha = head.rpartition(" @ ")
+            current, commit = path.strip(), sha.strip()
+            continue
+        number, _sep, text = line.partition(": ")
+        if not current or not number.strip().isdigit():
+            continue
+        try:
+            record = json.loads(text)
+        except ValueError:
+            # The manifest contract says every line is a record; conformance
+            # is guarded at the hub's generation, never re-derived here.
+            continue
+        if not isinstance(record, dict) or not record.get("slug"):
+            continue
+        record["cite"] = f"{current}:{number.strip()}@{commit}"
+        records.append(record)
+    if not records:
+        return [], "the served element manifest carries no records"
+    return records, None
+
+
+def strand_entries(root):
+    """The hub-gloss family with RECORD-authoritative membership (SPEC-terrain
+    amendment 2026-07-29, #884 — the consumer half of tsurezure-gateway#76).
+
+    Which Strands exist, their tags, and which carry a Journey arc come from
+    the served element records — labelled fields, never re-parsed markdown.
+    The tier-1 read supplies only the headline TEXT, joined by slug (the
+    ratified rendering is quoted verbatim; the manifest embeds no bodies).
+    Records unavailable degrades to the tier-1 acquisition with the
+    substitution named — a surface that falls back to source must say so at
+    the point of substitution.
+
+    Returns `(by_file, strands, reason)`. `strands` is the acquisition
+    disclosure: which source composed the set, the served per-kind record
+    counts, the composed count (count-in = count-out against a served
+    denominator), and every record<->tier-1 mismatch as a named finding —
+    a status conflict is surfaced, never silently resolved in either
+    direction (hub rule, product-lab#98).
+    """
+    records, rec_reason = elements_read(root)
+    by_file, gloss_reason = gloss_read(root)
+    if rec_reason:
+        return by_file, {
+            "source": "tier-1 markdown (fallback)",
+            "fallback_reason": rec_reason,
+        }, gloss_reason
+    text_by_slug = {}
+    for _rel, entries in by_file:
+        for e in entries:
+            text_by_slug.setdefault(e["slug"], e)
+    lesson_records = [r for r in records if r.get("kind") == "lesson"]
+    journey_records = {r["slug"]: r for r in records
+                       if r.get("kind") == "journey"}
+    conflicts = []
+    composed = []
+    for r in lesson_records:
+        text = text_by_slug.get(r["slug"])
+        if text is None and not gloss_reason:
+            conflicts.append(
+                f"manifest record '{r['slug']}' has no tier-1 headline line")
+        arc = journey_records.get(r["slug"])
+        shard = None
+        if arc:
+            shard = next((str(p) for p in (arc.get("renderings") or [])
+                          if str(p).startswith("journeys/")), None)
+        composed.append({
+            "slug": r["slug"],
+            # The ratified headline, quoted verbatim from tier-1 — or None,
+            # so the marked-absent path fires downstream; a rendering is
+            # never substituted or composed here, and an empty string never
+            # impersonates a served one.
+            "gloss": (text or {}).get("gloss") or None,
+            "tags": [str(t) for t in (r.get("tags") or [])],
+            "cite": (text or {}).get("cite") or r["cite"],
+            "journey": False,
+            "journey_shard": shard,
+            "record_cite": r["cite"],
+        })
+    record_slugs = {r["slug"] for r in lesson_records}
+    for slug in text_by_slug:
+        if slug not in record_slugs:
+            conflicts.append(
+                f"tier-1 line '{slug}' has no manifest record")
+    rel = by_file[0][0] if by_file else "gloss/ELEMENTS.jsonl"
+    strands = {
+        "source": "element manifest (records)",
+        "lesson_records": len(lesson_records),
+        "journey_records": len(journey_records),
+        "composed": len(composed),
+        "complete": len(composed) == len(lesson_records),
+        "conflicts": conflicts,
+        "headline_source_reason": gloss_reason,
+    }
+    return [(rel, composed)], strands, None
+
+
 def gloss_surfaces(root):
-    """The `hub-gloss` family as surfaces: one per served tier-1 index file.
-    Returns `(surfaces, reason)`; the payload is the file's parsed entries —
-    these surfaces were already served in the one bounded read, no file is
-    opened for them."""
-    by_file, reason = gloss_read(root)
-    if reason:
-        return [], reason
+    """The `hub-gloss` family as surfaces: one per served file. Membership is
+    record-authoritative via `strand_entries` (#884); these surfaces were
+    already served in the bounded reads, no file is opened for them.
+    Returns `(surfaces, strands, reason)`."""
+    by_file, strands, reason = strand_entries(root)
+    if reason and not by_file:
+        return [], strands, reason
     return [(FAMILY_HUB_GLOSS, "gloss", rel, parsed)
-            for rel, parsed in by_file], None
+            for rel, parsed in by_file], strands, reason
 
 
 # A topic decision line's trailing provenance pointer and a decisions-shard
@@ -1068,7 +1192,11 @@ def all_surfaces(repo, root, mapping=None):
             reason=("no hub topic is declared for this repo "
                     "(`policy_source.track_topics`), so no topic file may be read"))
     matched += elements
-    gloss, reason = gloss_surfaces(root)
+    gloss, strands, reason = gloss_surfaces(root)
+    # The Strand-acquisition disclosure (#884): which source composed the
+    # membership set, the served record counts, and any record<->tier-1
+    # findings ride the family record so gloss_info can report them.
+    families[FAMILY_HUB_GLOSS]["strands"] = strands
     if reason:
         families[FAMILY_HUB_GLOSS].update(enumerated=False, reason=reason)
     matched += gloss
@@ -1349,6 +1477,17 @@ def assemble(repo, mapping, max_surfaces, root=None):
         served_journeys, journey_misses = journey_shard_read(root, journey_shards)
         for slug, entry in served_journeys.items():
             gloss_journeys.setdefault(slug, entry)
+    # The per-run completeness checks (#884): composed count against the
+    # served lesson-record denominator (count-in = count-out), journey
+    # attachment against the journey-record count, and record<->tier-1
+    # findings — checked every run, reported never assumed.
+    strands = dict(families[FAMILY_HUB_GLOSS].get("strands") or {})
+    if strands.get("source") == "element manifest (records)":
+        attached = sum(1 for e in gloss_lessons.values()
+                       if e.get("journey_shard"))
+        strands["journeys_attached"] = attached
+        strands["journeys_attached_complete"] = (
+            attached == strands.get("journey_records"))
     gloss_info = {
         "served": gloss_served,
         "reason": (None if gloss_served else
@@ -1360,6 +1499,8 @@ def assemble(repo, mapping, max_surfaces, root=None):
         # requested-and-served, requested-and-missing, not-requested.
         "journeys_requested": journey_shards,
         "journey_misses": journey_misses,
+        # The Strand-acquisition disclosure and completeness checks (#884).
+        "strands": strands,
     }
     return out_topics, coverage, tracks_seen, elements, gloss_info
 
@@ -1440,10 +1581,10 @@ def lesson_elements(topics, gloss_info, consumption):
                 # The ratified rendering, verbatim — or an honest absence with
                 # its reason. The recall one-liner is identification (`title`),
                 # never the quoted rendering.
-                "gloss": entry["gloss"] if entry else None,
+                "gloss": (entry.get("gloss") or None) if entry else None,
                 "gloss_cite": entry["cite"] if entry else None,
                 "gloss_unavailable": (
-                    None if entry else
+                    None if entry and entry.get("gloss") else
                     (gloss_info["reason"] if not gloss_info["served"] else
                      "the served gloss index carries no rendering for this lesson")),
                 "tags": entry["tags"] if entry else [],
@@ -1659,6 +1800,12 @@ def build_map(args):
                   # conflation CAP-4 now forbids.
                   "journeys_requested": gloss_info.get("journeys_requested") or [],
                   "journey_misses": gloss_info.get("journey_misses") or {},
+                  # The Strand-acquisition disclosure (#884): which source
+                  # composed the membership set (element manifest records, or
+                  # the tier-1 fallback WITH its reason), the served record
+                  # counts, the count-in = count-out verdicts, and every
+                  # record<->tier-1 mismatch as a named finding.
+                  "strands": gloss_info.get("strands") or {},
                   # The decisions-shard join's own disclosure (Story 20.22,
                   # #851): how many renderings joined, and per-topic misses
                   # with their reasons — an absence is named, never folded

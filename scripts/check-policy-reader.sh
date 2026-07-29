@@ -306,6 +306,48 @@ got=$($PY --root "$host" pin)
   && ok "toggle present + gateway up: served (12 retired, never emitted)" \
   || err "toggle + gateway: got '$got'"
 
+# --- 9b. elements: the manifest survey subcommand (#884, gateway#76) ----------
+# Records pass through VERBATIM in the standard grammar; an older gateway is
+# the named exit-13 gap; a served miss is a served answer under the pin.
+cat > "$work/elements-fixture.json" <<JSON
+{
+  "pin": "product-lab@$SHA",
+  "tools": ["glossary_entry", "lessons_index", "topic_thread",
+            "policy_lookup", "surface_names", "element_survey"],
+  "elements": [
+    {"slug": "alpha", "kind": "lesson", "tags": ["method"],
+     "renderings": ["lessons/method"], "source": "lessons/alpha.md:1"},
+    {"slug": "alpha", "kind": "journey", "tags": ["method"],
+     "renderings": ["journeys/method"], "source": "lessons/alpha.md:1"},
+    {"slug": "beta", "kind": "lesson", "tags": ["agents"],
+     "renderings": ["lessons/agents"], "source": "lessons/beta.md:1"}
+  ]
+}
+JSON
+ECMD="python3 $root/$STUB $work/elements-fixture.json"
+eout=$(WRITING_ASSISTANT_GATEWAY_CMD="$ECMD" $PY --root "$host" elements)
+printf '%s' "$eout" | grep -q "^pin: product-lab@$SHA" \
+  && [ "$(printf '%s\n' "$eout" | grep -c '^[0-9]*: {')" -eq 3 ] \
+  && printf '%s' "$eout" | grep -qF '"renderings": ["journeys/method"]' \
+  && ok "elements: all records served verbatim under the pin (complete per query)" \
+  || err "elements pass-through: got '$eout'"
+kout=$(WRITING_ASSISTANT_GATEWAY_CMD="$ECMD" $PY --root "$host" elements --kind journey)
+[ "$(printf '%s\n' "$kout" | grep -c '^[0-9]*: {')" -eq 1 ] \
+  && printf '%s' "$kout" | grep -qF '"kind": "journey"' \
+  && ok "elements --kind filters records, still verbatim" \
+  || err "elements --kind: got '$kout'"
+mout=$(WRITING_ASSISTANT_GATEWAY_CMD="$ECMD" $PY --root "$host" elements --tag no-such-tag)
+printf '%s' "$mout" | grep -q '^miss: elements --tag no-such-tag' \
+  && ok "elements: an unmatched filter is a served miss, exit 0" \
+  || err "elements miss: got '$mout'"
+set +e
+msg=$(WRITING_ASSISTANT_GATEWAY_CMD="python3 $root/$STUB $work/fixture.json" \
+      $PY --root "$host" elements 2>&1 >/dev/null); rc=$?
+set -e
+[ "$rc" -eq 13 ] && printf '%s' "$msg" | grep -q 'element_survey' \
+  && ok "elements: older gateway is the NAMED exit-13 gap (GAP_ELEMENTS)" \
+  || err "elements gap: rc=$rc msg='$msg'"
+
 # --- 10. Zero hub reads, read-only: nothing under any local path is touched ---
 sleep 1  # mtime granularity
 stamp="$work/stamp"; touch "$stamp"
