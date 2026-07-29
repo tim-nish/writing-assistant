@@ -71,10 +71,15 @@ and every candidate surface carries the **source family** it came from
     element slots disclose the absence rather than quoting the recall
     one-liner in a rendering's place.
 
+  * `hub-elements` — the **served decision topics**, enumerated from the
+    element manifest's `decision` records (Story 20.35, #886): membership,
+    counts and the E Strands arrive as labelled fields, so no raw
+    `topics/*.md` thread is read and no consumer config bounds the axis.
   * the **track↔topic mapping** — `policy_source.track_topics` in the host
     repo's `writing-sources.yaml`, read through
     `resolve-writing-sources.py policy-source` (#525). The articles repo owns
-    track names, the hub owns topic names, the mapping is consumer config.
+    track names, the hub owns topic names, the mapping is consumer config —
+    and since #886 it is **not** an axis denominator.
   * the **Lesson-consumption derived view** — READ, never re-implemented, from
     `write-article-plan.py consult` (`consumed_index` /
     `project_consumed_index`), which is the shipped instantiation of the
@@ -788,6 +793,8 @@ def gloss_surfaces(root):
 # shard shape read from the served surface, not inferred). Rally suffixes and
 # the heading's `· <date>` tail are outside the captured key on both sides.
 DECISION_POINTER = re.compile(r"\(q_a/([^\s)]+)\s+D(\d+)[^)]*\)\s*$")
+# The batch date inside a record's own slug — served, never re-parsed prose.
+RECORD_BATCH_DATE = re.compile(r"^q_a/(\d{4}-\d{2}-\d{2})")
 DECISION_SHARD_HEAD = re.compile(r"^##\s*\(q_a/([^\s)]+)\s+D(\d+)[^)]*\)\s*$")
 
 
@@ -1004,23 +1011,18 @@ def _element_summary(text):
 
 
 def parse_topic_elements(topic, served, commit, served_path=None):
-    """The typed elements in one served topic file (CAP-2's element projection).
+    """The typed elements in one served topic file — FALLBACK ONLY since Story
+    20.35 (#886); the axis now comes from the manifest, and this path runs when
+    records cannot be acquired.
 
-    `served` is the seam's `N: text` lines for the file, in order. Two element
-    kinds are recognised, and BOTH markers were verified against the served
-    surface (product-lab@<private-pin>) rather than inferred from the spec prose:
-
-    * `reversal` — a dated line under the `## Declined` heading (things
-      considered and rejected), or a dated line carrying a struck-through
-      clause (`~~...~~`), which is how a superseded position is recorded
-      in place. These are "the recall surface's native reversal records".
-    * `decision` — any other dated line: the standing record of what was
-      decided, with its reasoning.
+    `served` is the seam's `N: text` lines, in order. Two kinds are recognised,
+    both markers verified against the served surface rather than inferred:
+    `reversal` — a dated line under `## Declined`, or one carrying a
+    struck-through clause; `decision` — any other dated line.
 
     Section membership is what types a Declined line — NOT the word "declined",
-    which appears inline in many ordinary decision lines ("... declined as a
-    conformance copy ...", topics/articles.md:12) and would type most of a
-    topic file as a reversal.
+    which appears inline in many ordinary decision lines and would otherwise
+    type most of a topic file as a reversal.
     """
     elements, heading = [], ""
     for number, text in served:
@@ -1069,22 +1071,59 @@ def parse_topic_elements(topic, served, commit, served_path=None):
 
 
 def element_topics(mapping):
-    """The topics this run may project elements from: the ones the repo already
-    declared through `policy_source.track_topics`, deduplicated and ordered
-    deterministically. A run never widens its own scope to reach more."""
+    """FALLBACK ONLY (Story 20.35, #886): the topics a repo declared through
+    `policy_source.track_topics`. No longer the axis denominator — reached only
+    when the manifest cannot be acquired, and then the substitution is NAMED,
+    because a consumer-declared allowlist over a hub-enumerated vocabulary
+    makes the served surface's completeness unobservable from the consumer."""
     names = {t for topics in mapping.values() for t in topics if t}
     return sorted(names)
 
 
+def elements_from_records(records):
+    """The by-topic element projection, built from served records rather than
+    parsed markdown (Story 20.35, #886). Returns `{topic: [element, ...]}` —
+    membership AND denominator in one pass.
+
+    Only `kind == "decision"` participates: `reversal` is not a served kind,
+    and a consumer never infers one from rendering prose. The record's `slug`
+    IS the `q_a/<batch> D<n>` pointer the shard heads its entries with, so it
+    is the join key with no re-derivation; the record embeds no body, so
+    `summary` stays None and the rendering arrives through
+    `join_decision_gloss` exactly as on the parsed path.
+    """
+    out = {}
+    for r in records:
+        if r.get("kind") != "decision" or not r.get("topic"):
+            continue
+        slug = str(r.get("slug") or "")
+        m = RECORD_BATCH_DATE.search(slug)
+        # The cite names the line the manifest itself points at.
+        cite = f"{r.get('source') or r['cite']}@{r['cite'].rpartition('@')[2]}"
+        out.setdefault(str(r["topic"]), []).append({
+            "kind": "decision",
+            "decision_pointer": slug or None,
+            "summary": None,
+            "topic": str(r["topic"]),
+            "date": m.group(1) if m else "",
+            "situation": cite,
+            "evidence": [cite],
+            "consumed": False,
+            "consumption_join": ("none — the articles repo declares no "
+                                 "element-citation key"),
+            "record_cite": r["cite"],
+        })
+    return out
+
+
 def read_topic_elements(root, topics):
     """Read up to `ELEMENT_TOPIC_BOUND` topic files through the shipped seam
-    and parse their elements.
+    and parse their elements — FALLBACK ONLY since Story 20.35 (#886).
 
-    Returns `(by_topic, reason)`. A `reason` is the family's
+    Returns `(by_topic, reason, substitutions)`. A `reason` is the family's
     declared-but-not-enumerated disclosure, exactly as `lesson_seeds` returns
-    it — an undeclared policy source, an unreachable gateway, a too-old tool
-    surface, or a served miss. ONE read covers the whole bounded set; a run
-    never issues extra reads to widen coverage (CAP-4).
+    it. ONE read covers the whole bounded set; a run never issues extra reads
+    to widen coverage (CAP-4).
     """
     if not topics:
         return {}, None, []
@@ -1144,16 +1183,52 @@ def read_topic_elements(root, topics):
     return by_topic, None, substitutions
 
 
-def element_surfaces(mapping):
-    """The `hub-elements` family as surfaces: one per DECLARED topic file.
+def element_surfaces(topics):
+    """The `hub-elements` family as surfaces: one per topic on the axis, which
+    since Story 20.35 (#886) is the SERVED topic list, not a declared mapping.
 
-    Every declared topic is `matched` here, including the ones the seam bound
-    will not reach — that is what lets the per-family accounting close over the
-    real denominator and name which topics went unread, instead of quietly
-    redefining "all topics" as "the two we read".
+    Every axis topic is `matched` here — that is what lets the per-family
+    accounting close over the real denominator and name which topics went
+    unread, instead of quietly redefining "all topics" as "the ones we read".
     """
     return [(FAMILY_HUB_ELEMENTS, "topic", f"topics/{t}.md", t)
-            for t in element_topics(mapping)]
+            for t in topics]
+
+
+def element_axis(root, mapping):
+    """The by-topic axis: members, elements, and how they were acquired
+    (Story 20.35, #886; SPEC-terrain CAP-2/CAP-4 carry the reasoning).
+
+    Membership is the SERVED manifest — never consumer-declared, and never
+    bounded by `ELEMENT_TOPIC_BOUND`, which here bounds nothing: not the
+    members, not the counts, not the Strands. The promise shipped 2026-07-28
+    and the code did not, so a repo declaring no `track_topics` offered 0
+    members while four topics were served.
+
+    Returns `(topics, elements_by_topic, disclosure)`; records unavailable
+    degrades to the declared mapping with the substitution NAMED.
+    """
+    records, reason = elements_read(root)
+    if reason:
+        return element_topics(mapping), None, {
+            "source": "consumer-declared mapping (fallback)",
+            "fallback_reason": reason,
+            "bounded_by_consumer_config": True,
+        }
+    elements = elements_from_records(records)
+    topics = sorted(elements)
+    return topics, elements, {
+        "source": "element manifest (records)",
+        "topics": topics,
+        "records_per_topic": {t: len(elements[t]) for t in topics},
+        "decision_records": sum(len(v) for v in elements.values()),
+        # Stated positively so the retired gate cannot quietly return.
+        "bounded_by_consumer_config": False,
+        "served_kinds": sorted({str(r.get("kind")) for r in records}),
+        # Disclosed, never inferred away: "no reversal is shown" must read as
+        # NOT SERVED rather than as "none exists".
+        "reversal_served": any(r.get("kind") == "reversal" for r in records),
+    }
 
 
 def all_surfaces(repo, root, mapping=None):
@@ -1181,16 +1256,20 @@ def all_surfaces(repo, root, mapping=None):
         enumerated=False,
         reason=("host source files are not article material (Story 20.7, "
                 "#809): Strands are Lessons and Journeys"))
-    # The element family's surfaces are the DECLARED topic files. An
-    # undeclared mapping yields none, which is not an error: a repo that maps
-    # no topics simply has no elements to project, and the family reports that
-    # rather than inventing topics to read.
-    elements = element_surfaces(mapping or {})
+    # The element family's surfaces are the SERVED decision topics (#886).
+    # The acquisition disclosure rides the family record so the screen can
+    # report which source composed the axis and, when it degraded, why.
+    axis_topics, axis_elements, axis = element_axis(root, mapping or {})
+    families[FAMILY_HUB_ELEMENTS]["axis"] = axis
+    families[FAMILY_HUB_ELEMENTS]["elements_by_topic"] = axis_elements
+    elements = element_surfaces(axis_topics)
     if not elements:
         families[FAMILY_HUB_ELEMENTS].update(
             enumerated=False,
-            reason=("no hub topic is declared for this repo "
-                    "(`policy_source.track_topics`), so no topic file may be read"))
+            reason=(f"the policy source served no decision topics "
+                    f"({axis['fallback_reason']})"
+                    if axis.get("fallback_reason") else
+                    "the policy source serves no decision topics"))
     matched += elements
     gloss, strands, reason = gloss_surfaces(root)
     # The Strand-acquisition disclosure (#884): which source composed the
@@ -1271,10 +1350,24 @@ def assemble(repo, mapping, max_surfaces, root=None):
     # One read covers the whole reachable set; the topics past it are skipped
     # by NAME with the seam as the stated reason.
     elem_surfaces = [s for s in read_now if s[0] == FAMILY_HUB_ELEMENTS]
-    elem_read = elem_surfaces[:ELEMENT_TOPIC_BOUND]
-    elem_over = elem_surfaces[ELEMENT_TOPIC_BOUND:]
-    elements_by_topic, element_reason, substitutions = read_topic_elements(
-        root, [payload for _f, _s, _r, payload in elem_read])
+    axis = families[FAMILY_HUB_ELEMENTS].get("axis") or {}
+    # Popped, never serialized: the composed elements are the projection's
+    # payload and travel in `elements`, not in the coverage manifest.
+    record_elements = families[FAMILY_HUB_ELEMENTS].pop("elements_by_topic", None)
+    if record_elements is not None:
+        # RECORD-AUTHORITATIVE (#886): no raw `topics/*.md` read to bound, so
+        # ELEMENT_TOPIC_BOUND bounds nothing here — every member is read, none
+        # skipped for a bound this path never pays. The bound itself survives
+        # for anything that still reads a raw thread.
+        elem_read, elem_over = elem_surfaces, []
+        elements_by_topic, element_reason, substitutions = record_elements, None, []
+    else:
+        # Degraded: fall back to the bounded raw-thread read, substitution
+        # named on the family.
+        elem_read = elem_surfaces[:ELEMENT_TOPIC_BOUND]
+        elem_over = elem_surfaces[ELEMENT_TOPIC_BOUND:]
+        elements_by_topic, element_reason, substitutions = read_topic_elements(
+            root, [payload for _f, _s, _r, payload in elem_read])
     if element_reason:
         families[FAMILY_HUB_ELEMENTS].update(enumerated=False,
                                              reason=element_reason)
@@ -1424,6 +1517,10 @@ def assemble(repo, mapping, max_surfaces, root=None):
         # the owner never reads a bounded projection as the whole record.
         "element_topics_read": [payload for _f, _s, _r, payload in elem_read],
         "element_topics_skipped": [payload for _f, _s, _r, payload in elem_over],
+        # How the by-topic axis was acquired (#886): the served source, the
+        # per-member counts that ARE its denominator, the served kinds, and —
+        # when degraded — the reason, so a fallback is never silent.
+        "element_axis": axis,
     }
 
     # --- topics: a pure per-invocation derivation (OQ1) ---------------------

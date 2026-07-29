@@ -972,6 +972,138 @@ assert s["source"] == "tier-1 markdown (fallback)", s
 assert "element_survey" in (s.get("fallback_reason") or ""), s
 PYEOF
 
+# --- 8. #886/Story 20.35: the by-topic axis enumerates from the SERVED manifest -
+# The defect: the axis population was consumer config (`track_topics`, bounded
+# by ELEMENT_TOPIC_BOUND), so a repo declaring nothing offered 0 members
+# whatever the hub served, and the screen could not distinguish "the hub serves
+# one topic" from "we asked for one topic".
+python3 - "$FX" <<'AXIS_FIXTURE'
+import json, sys
+fx = json.load(open(sys.argv[1]))
+fx["tools"] = ["glossary_entry", "lessons_index", "topic_thread", "policy_lookup",
+               "surface_names", "gloss_index", "element_survey"]
+# THREE served decision topics. None is declared in `track_topics` (which still
+# maps delivery/nowhere/zeta) — so if any consumer-side gate survives, the axis
+# cannot show these at all. Three also exceeds ELEMENT_TOPIC_BOUND (2).
+fx["elements"] = [
+    {"slug": "q_a/2026-07-28-alpha D1", "kind": "decision", "tags": [],
+     "topic": "served-a", "renderings": ["decisions/served-a"],
+     "source": "topics/served-a.md:9"},
+    {"slug": "q_a/2026-07-28-alpha D2", "kind": "decision", "tags": [],
+     "topic": "served-a", "renderings": ["decisions/served-a"],
+     "source": "topics/served-a.md:10"},
+    {"slug": "q_a/2026-07-27-beta D1", "kind": "decision", "tags": [],
+     "topic": "served-b", "renderings": ["decisions/served-b"],
+     "source": "topics/served-b.md:4"},
+    {"slug": "q_a/2026-07-26-gamma D1", "kind": "decision", "tags": [],
+     "topic": "served-c", "renderings": ["decisions/served-c"],
+     "source": "topics/served-c.md:2"},
+    {"slug": "only-a-lesson", "kind": "lesson", "tags": ["agents"],
+     "renderings": ["lessons/agents"], "source": "lessons/only-a-lesson.md:1"},
+]
+fx["gloss_shards"] = dict(fx.get("gloss_shards", {}), **{
+    "decisions/served-a": [
+        ["gloss/decisions/served-a.md", 1, "## (q_a/2026-07-28-alpha D1 - 2026-07-28)"],
+        ["gloss/decisions/served-a.md", 2, "RENDERED-A1 the ratified plain-register line."],
+        ["gloss/decisions/served-a.md", 4, "## (q_a/2026-07-28-alpha D2 - 2026-07-28)"],
+        ["gloss/decisions/served-a.md", 5, "RENDERED-A2 another ratified line."],
+    ],
+    "decisions/served-b": [
+        ["gloss/decisions/served-b.md", 1, "## (q_a/2026-07-27-beta D1 - 2026-07-27)"],
+        ["gloss/decisions/served-b.md", 2, "RENDERED-B1 the ratified line."],
+    ],
+    "decisions/served-c": [
+        ["gloss/decisions/served-c.md", 1, "## (q_a/2026-07-26-gamma D1 - 2026-07-26)"],
+        ["gloss/decisions/served-c.md", 2, "RENDERED-C1 the ratified line."],
+    ],
+})
+json.dump(fx, open(sys.argv[1], "w"))
+AXIS_FIXTURE
+MAP > "$work/axis.json" 2>/dev/null
+python3 - "$work/axis.json" <<'AXIS_ASSERT' && ok "#886: the by-topic axis is the SERVED decision topics — no consumer config bounds its members, counts, or Strands" || err "the by-topic axis is not record-authoritative"
+import json, sys
+d = json.load(open(sys.argv[1]))
+cov, els = d["coverage"], d["elements"]
+ax = cov["element_axis"]
+
+# AC1 — members are the served topics, not the declared mapping. The repo
+# declares delivery/nowhere/zeta and NONE of them may appear.
+assert ax["source"] == "element manifest (records)", ax
+assert ax["topics"] == ["served-a", "served-b", "served-c"], ax["topics"]
+declared = {"delivery", "nowhere", "zeta"}
+assert not (set(ax["topics"]) & declared), ax["topics"]
+assert not any(e.get("topic") in declared for e in els), "a declared topic reached the axis"
+
+# AC2 — no consumer-side bound survives: three served topics is MORE than
+# ELEMENT_TOPIC_BOUND, and all three are read with none skipped.
+assert ax["bounded_by_consumer_config"] is False, ax
+assert cov["element_topics_read"] == ["served-a", "served-b", "served-c"], cov
+assert cov["element_topics_skipped"] == [], cov["element_topics_skipped"]
+assert not [s for s in cov["skipped"] if s["family"] == "hub-elements"], cov["skipped"]
+
+# AC4 — the denominator is the served record set, per member, and the
+# per-family accounting closes over it.
+assert ax["records_per_topic"] == {"served-a": 2, "served-b": 1, "served-c": 1}, ax
+assert ax["decision_records"] == 4, ax
+dec = [e for e in els if e["kind"] == "decision"]
+assert len(dec) == 4, len(dec)
+f = {x["family"]: x for x in cov["families"]}["hub-elements"]
+assert f["enumerated"] and f["matched"] == 3 and f["read"] == 3, f
+assert f["skipped"] == 0 and f["accounting_closes"] and f["complete"], f
+
+# AC6 — the axis claims only what is served: no `reversal` is derived, and the
+# absence is DISCLOSED rather than inferred away.
+assert ax["reversal_served"] is False, ax
+assert "reversal" not in ax["served_kinds"], ax["served_kinds"]
+assert not any(e["kind"] == "reversal" for e in els), "a reversal was derived from prose"
+
+# Each Strand quotes its SERVED rendering, joined by the record slug — the
+# manifest embeds no bodies, so a missing join would show as a disclosure.
+by_ptr = {e["decision_pointer"]: e for e in dec}
+assert by_ptr["q_a/2026-07-28-alpha D1"]["gloss"].startswith("RENDERED-A1"), by_ptr
+assert by_ptr["q_a/2026-07-26-gamma D1"]["gloss"].startswith("RENDERED-C1"), by_ptr
+# The cite names the manifest's own source line, never a recomposed path.
+assert by_ptr["q_a/2026-07-27-beta D1"]["situation"].startswith("topics/served-b.md:4@"), by_ptr
+# The date comes from the record's own batch slug.
+assert by_ptr["q_a/2026-07-27-beta D1"]["date"] == "2026-07-27", by_ptr
+AXIS_ASSERT
+
+# AC7 — a reintroduced consumer-side gate is caught mechanically, asserted on
+# the shipped source rather than on a mocked boolean.
+python3 - <<'AXIS_GUARD' && ok "#886: no consumer-declared gate stands between the manifest and the axis (regression guard)" || err "a consumer-side gate is reachable from the record-authoritative axis path"
+src = open("scripts/topic-map.py").read()
+axis = src.split("def element_axis(", 1)[1].split("\ndef ", 1)[0]
+body = axis.split('"""', 2)[2]
+# The record-authoritative branch must not consult the declared mapping or the
+# seam bound. `element_topics(mapping)` may appear ONLY on the fallback return.
+assert body.count("element_topics(") == 1, body
+assert "ELEMENT_TOPIC_BOUND" not in body, "the axis re-acquired the seam bound"
+# And the bound must still exist for whatever still reads a raw thread.
+assert "ELEMENT_TOPIC_BOUND" in src, "the raw-thread bound was deleted, not just lifted"
+rt = src.split("def read_topic_elements(", 1)[1].split("\ndef ", 1)[0]
+assert "--topics" in rt, "the raw-thread read path vanished"
+AXIS_GUARD
+
+# AC5 — records unavailable degrades LOUDLY: the axis falls back to the
+# declared mapping and NAMES the reason at the point of substitution.
+python3 - "$FX" <<'AXIS_DEGRADE'
+import json, sys
+fx = json.load(open(sys.argv[1]))
+fx["tools"] = [t for t in fx["tools"] if t != "element_survey"]
+json.dump(fx, open(sys.argv[1], "w"))
+AXIS_DEGRADE
+MAP > "$work/axis-fallback.json" 2>/dev/null \
+  && ok "#886: the map still assembles when the manifest is unavailable" \
+  || err "assemble failed on the degraded axis path"
+python3 - "$work/axis-fallback.json" <<'AXIS_DEGRADE_ASSERT' && ok "#886: a degraded axis NAMES its substitution and says it is consumer-bounded, never silently empty" || err "the degraded axis is silent"
+import json, sys
+ax = json.load(open(sys.argv[1]))["coverage"]["element_axis"]
+assert ax["source"] == "consumer-declared mapping (fallback)", ax
+assert "element_survey" in (ax.get("fallback_reason") or ""), ax
+assert ax["bounded_by_consumer_config"] is True, ax
+AXIS_DEGRADE_ASSERT
+
+
 if [ "$fail" -eq 0 ]; then
   printf '\nAll topic-map checks passed.\n'; exit 0
 else
