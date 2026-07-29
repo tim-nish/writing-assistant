@@ -146,11 +146,38 @@ flows into the existing brief/structures path unchanged.**
       and the owner withdrew it (owner decision record — 2026-07-27 (#850 D3:
       composition reopen admissible; invariants bind harder)). The clause
       binds the composer, not just the renderer:
-      - composed prose is **background only** and is **marked as
-        machine-composed** on the surface; a Strand's own text still quotes
-        **only** its served rendering or the not-served disclosure — a
-        composer's paraphrase never substitutes for either (the
-        no-silent-fallback rule, #850 D1);
+      - composed prose asserts **only what the members of the group have in
+        common**, and is **marked as machine-composed** on the surface; a
+        Strand's own text still quotes **only** its served rendering or the
+        not-served disclosure — a composer's paraphrase never substitutes for
+        either (the no-silent-fallback rule, #850 D1);
+        **"background" is retired here, and the retirement is a correction of
+        meaning rather than of taste (amended 2026-07-29, #888).** For a
+        co-tag group the composed sentence states the group's *reason for
+        existing* — the germ of a Thesis — and "background" invited reading it
+        as context standing behind the members, which is decoration. The
+        constraint above is **unchanged in force**: what the composer may
+        assert is narrower than before only in the sense that it is now named
+        correctly. Where a noun is needed the term is **group claim**, defined
+        for the owner in `docs/owner-terms.md` in the act of coining and
+        declared in the owner-facing vocabulary list, with an explicit
+        boundary: it is **not** a fact-sheet claim. Bare "claim" was
+        unavailable — `docs/pipeline-vocabulary.md` already owns it for the
+        provenance-classed, verbatim-copied fact-sheet unit, and the composed
+        line carries no provenance class, so one word over both objects is the
+        two-things-contend-for-one-name failure the kind-qualification rule
+        exists to prevent (owner decision record — 2026-07-27 (every
+        identifier on a served surface is kind-qualified), which also holds
+        that the rendering is the consumer's call while the obligation is
+        not). The compound was collision-checked by the method that rejected
+        `Seed` — whole-word, case-insensitive, across both repositories —
+        and returned zero hits in each (measured 2026-07-29).
+        **The same sentence lifted into a thesis-candidate proposal plays that
+        proposal's claim role there:** same text, role named per surface,
+        which is why the term is defined once with its surfaces rather than
+        duplicated per screen. The internal payload key that carries these
+        inputs is **not** renamed — a field name is not owner-facing
+        vocabulary, and `docs/owner-terms.md` says so in its own preamble;
       - **the permutation and no-selection-authority invariants extend to
         composed sections and bind harder with a model in the loop**: every
         Strand appears exactly once (`count in == count out`, asserted by the
@@ -223,7 +250,8 @@ flows into the existing brief/structures path unchanged.**
       - **co-tags** — the manifest's `tags` field. Served as data.
       - **Journey similarity** — over the **served** arc renderings
         (`gloss --tag journeys/<tag>`, the read CAP-1 already issues).
-        Served as data.
+        Served as data. **Built, but NOT OFFERED until it has been measured
+        once (amended 2026-07-29, #889)** — see the offering gate below.
       - **shared source batch** — served only as prose, inside a shard
         trailer line (a `Source: … · origin: <batch> (<date>) · tags: …` trailer).
         **Not projected**: extracting it is consumer re-derivation of hub
@@ -241,6 +269,47 @@ flows into the existing brief/structures path unchanged.**
       Both absences are **disclosed as a line** where the substrate would
       have been offered, so "this substrate is missing" is distinguishable
       from "this substrate found nothing";
+    - **a model-judged substrate is offered only after one measurement run
+      (added 2026-07-29, #889).** A deterministic substrate is offered as
+      soon as it is built: its output is inspectable by reading the key it
+      grouped on. A **model-judged** one is not, because whether its groups
+      read as *one shared background* is the very thing at issue, and the
+      owner has not yet seen one. So Journey similarity is **built and
+      exercised, and withheld from the offered set**, until:
+      - one run over the `agents` member renders its groups in the screen's
+        compact form, each with its `in common:` line stating the shared arc;
+      - the remainder renders in an explicit **"no shared path"** section —
+        never a silent drop;
+      - completeness is checked mechanically. This substrate is expected to
+        be **single-valued** (a Strand sits in one shared-path group), so the
+        stronger exactly-once form applies to it, per the cover clause above,
+        which holds exactly-once as the floor's stronger case rather than as
+        a competing rule;
+      - the **owner** verdicts whether the groups read as real backgrounds.
+        Pass → it joins the offered set. Fail → the finding (which substrate
+        combination, if any, to try next) is the output, and the substrate
+        does not ship anyway.
+      **The gate names its own generating mechanism deliberately**, because a
+      deferral to data that does not is indefinite by construction and reads
+      as patience rather than as a gap: the corpus, the judgment input (the
+      served arc renderings), the render form, the completeness check and the
+      verdict-holder are all fixed above, so the condition is dischargeable by
+      a single identifiable act.
+      **This is not a general ceremony for new substrates.** The
+      discriminator is *model-judged versus deterministic*, and the
+      precedent is specific: a presentation-only unit shipped provisionally
+      once before, and two dogfood runs produced the anticipated failure
+      verbatim — one placing nearly the whole corpus in a single group. The
+      presentation-only invariant bounds the *damage* of a wrong grouping; it
+      does not make an unreadable one useful.
+    - **groups carry a `G` id, and it is a DISPLAY kind (added 2026-07-29,
+      #889).** A group is addressable so the owner can refer to one, and the
+      surface declares the kind — every identifier on a surface is
+      kind-qualified, and a reader who is not told the kinds never learns the
+      others exist. `G` confers **no selection authority**: selection remains
+      by element id, per the presentation-only invariant. Stated explicitly
+      because an id that looks selectable and is not is precisely the defect
+      that retired the `J<n>` namespace.
     - **elements remain the selectable unit** (`E<tag>.<n>` in the tag's
       namespace), and selection still composes an ordinary brief.
     - **A Journey is an arc ON its lesson's row, not a Strand of its own
