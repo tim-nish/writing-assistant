@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
 # check-adaptation-staleness.sh — verify staleness CHAINS through the derivation
 # (Story 18.58, #589; SPEC-canonical-adaptation CAP-5). POSIX sh + stdlib Python;
 # every fixture write lands under mktemp -d.

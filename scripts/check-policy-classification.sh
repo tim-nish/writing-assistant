@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
 # check-policy-classification.sh — verify CAP-7 policy-result classification
 # (Story 13.75, SPEC-policy-source-seam CAP-7 added 2026-07-18, umbrella #365;
 # seam-formats.md §2 reconciliation item). POSIX shell + stdlib Python only.

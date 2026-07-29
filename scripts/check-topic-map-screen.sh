@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
 # check-topic-map-screen.sh — verify the map ends in a BRIEF, not in a second
 # proposer (Story 18.63, #591; SPEC-topic-map CAP-3). POSIX sh + stdlib Python;
 # every fixture write lands under mktemp -d.

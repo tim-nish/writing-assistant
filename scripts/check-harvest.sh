@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
 # check-harvest.sh — verify the harvest skill scaffold, standalone invocation,
 # and source-scope enforcement (Story 3.1). POSIX shell + stdlib Python.
 #

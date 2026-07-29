@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
 # check-repo-onboarding.sh — verify SPEC-repo-onboarding: the CAP-2 config
 # writers (set-policy-source, set-sources), the setup skill (CAP-1/3), and the
 # README/manifest surface (CAP-4). POSIX shell + stdlib Python only.

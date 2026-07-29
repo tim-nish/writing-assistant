@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
 # check-review-reentry.sh — verify review's post-arbitration re-entry (Story
 # 13.70, #371, umbrella #362; SPEC-article-review "Post-arbitration re-entry",
 # SPEC-platform-variants CAP-3). An arbitration round that applied >=1 edit

@@ -92,3 +92,15 @@ this repo's to state: it lives in `claude-toolkit/specs/spec-triage-gh/SPEC.md`
 ("Implementation grounding"), per the pointer-not-copy rule recorded in
 `specs/spec-spec-sitting/SPEC.md`. This section is the duty owed by agents
 working in *this* repository, which is where the incident happened.
+
+## Validation tiers (#913)
+
+Checks run through `scripts/run-checks.sh`, never as an ad-hoc full-suite
+sweep. Two tiers, declared per check (`# tier: full` header; headerless =
+inner): **`--tier inner`** is the per-edit loop — every check must clear the
+runtime ceiling the runner declares (`INNER_MS`), and a violation fails with
+the remedy named; **`--tier full`** runs everything once before `gh pr
+create`. End-to-end pipeline reruns belong in the full tier only. This is
+ambient here, not only in a skill, for the reason the fork-gate section
+states: the rule is broken at the moment an agent runs a 30s check inside an
+edit loop, in any sitting.

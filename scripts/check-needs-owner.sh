@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
 # check-needs-owner.sh — verify the NEEDS-OWNER list, its schema, and the strict
 # partition from the fact sheet (Story 3.3). POSIX shell + stdlib Python.
 

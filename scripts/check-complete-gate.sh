@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
 # check-complete-gate.sh — verify the dual-product completion gate (Story
 # 13.68, SPEC-article-draft-pipeline 2026-07-18 amendment; SPEC-platform-
 # variants CAP-1). The `complete` subcommand is the only sanctioned way to

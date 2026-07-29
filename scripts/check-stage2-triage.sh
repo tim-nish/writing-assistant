@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
 # check-stage2-triage.sh — verify the three-outcome triage over harvest output
 # (Story 10.2). POSIX shell + stdlib Python.
 #

@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
 # check-one-entry-mechanism.sh — verify Story 18.47 (#560, SPEC-article-draft-
 # pipeline CAP-9 2026-07-22 #554 amendment): the #431 named-element pin is the
 # DEGENERATE CASE of the free-form entry point, not a second mechanism; and

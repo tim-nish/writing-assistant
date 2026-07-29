@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
 # check-stage2-recommended.sh — verify recommended answers with dispositions
 # (Story 10.3). POSIX shell + stdlib Python.
 #
