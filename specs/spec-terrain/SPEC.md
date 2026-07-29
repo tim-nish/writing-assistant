@@ -104,8 +104,20 @@ flows into the existing brief/structures path unchanged.**
       the only surviving depth affordance, a cue for choosing where to look,
       never a direction line and never a gate:
       - **by tag** — the served gloss tag, over Lessons and Journeys;
-      - **by topic** — the served decision topic, over decisions and
-        reversals.
+      - **by topic** — the served decision topic, over decisions.
+      **The axis label names `decisions` alone, and this is a served fact
+      rather than a scoping choice (amended 2026-07-29, #886).** The served
+      element vocabulary is exactly three kinds — `decision`, `journey`,
+      `lesson` (measured 2026-07-29 against the served surface: 87 / 109 /
+      117 records) — and **no `reversal` kind is served at all.** The
+      earlier label promised a kind the recall surface does not carry, which
+      is a claim about someone else's surface made without consulting it.
+      The upstream reason is recorded, not inferred: *"decisions shard by
+      TOPIC because that is the only classification a decision line
+      carries"* (owner decision record — 2026-07-28 (a decision line's only classification is its topic)). Widening
+      the axis back to reversals is therefore a **hub-side extension**, never
+      a consumer re-derivation — see the not-served clause on the element
+      projection below.
       **Neither axis joins anything.** Each corpus is keyed by the only
       classification it carries, and both keys are *already* shard keys on
       the served side (`gloss/lessons/<tag>`, `gloss/decisions/<topic>`;
@@ -157,6 +169,78 @@ flows into the existing brief/structures path unchanged.**
       **exactly once**, `count in == count out`, asserted by a check script.
       Completeness is structural, so a wrong grouping is a cosmetic defect and
       never information loss;
+    - **grouping runs on a named SUBSTRATE, and completeness is a COVER
+      counted in PLACEMENTS (added 2026-07-29, #887).** A substrate is a
+      named function from the member's Strand set to named sections. The
+      owner picks which substrate is active; substrates **compose** (a
+      co-tag sectioning refined by Journey similarity), and each composition
+      step carries the same contract as a single one.
+      The exactly-once wording above is **corrected, not weakened**: it was
+      written for a single-valued key and is false for a multi-valued one —
+      a Strand carrying four tags belongs in four co-tag sections, and
+      forcing it into one requires a tie-break, which is a machine deciding
+      which relationship the owner is allowed to see. The ratified form is
+      the one the hub states: *"An axis is admissible on the two ratified
+      invariants — completeness and presentation-only — NEVER on being a
+      partition … The ratified tag axis is already multi-valued, so
+      multi-valuedness disqualifies nothing"*, and *"because the field is
+      multi-valued the >20% cap is computed against PLACEMENTS rather than
+      elements or it silently under-reports"*
+      (owner decision record — 2026-07-28 (axis admissibility; placements as the counting unit)). So:
+      - **completeness** — every Strand appears in **at least one** section;
+        `count in ≤ count out` and **every Strand accounted for**, asserted
+        by a check script exactly as the permutation form was;
+      - **placements are the counting unit** — the 20% sectioning cap above
+        is computed against placements, never against distinct Strands;
+      - **a Strand with no relation under the active substrate renders in an
+        explicit named section** ("no shared batch", "no cross-links"),
+        never a silent drop — the same rider the hub attached to the
+        `projects:` portfolio-wide case;
+      - where a substrate **is** single-valued, exactly-once still holds and
+        is the stronger check; the cover form is the floor, not a licence.
+    - **the composer may partition and may never narrow (added 2026-07-29,
+      #887).** A model in the render loop is admissible (the cost ground was
+      withdrawn 2026-07-27), and this clause states where the line falls,
+      because a similarity substrate is a *scoring* operation by nature and
+      scoring is the barred act's own vocabulary. The boundary, quoted:
+      *"a combination becomes a PROPOSAL exactly when something other than
+      the owner narrows the candidate set. Enumerating every combination,
+      letting the owner filter, sorting deterministically by a declared key,
+      and offering the owner's own approaches as modes are all navigation;
+      ranking, scoring, recommending a subset, or hiding low-scoring
+      combinations are proposals and fall on the far side of the ban"*
+      (owner decision record — 2026-07-28 (the second-proposer boundary)). Applied here: a substrate **may**
+      place Strands into sections and derive each section's title; it **may
+      not** rank sections, order them by score, surface only the strongest,
+      hide a weak section, or omit a Strand. Section order is a **declared
+      deterministic key**, never a quality judgment. The count check runs
+      **after** composition, on the composed output, because a composer that
+      cannot omit in principle can still omit in fact.
+    - **two substrates ship, and the other two are NOT SERVED (added
+      2026-07-29, #887).** Reachability is a property of the seam, measured
+      rather than assumed, and the measurement corrects a coverage table
+      taken hub-side:
+      - **co-tags** — the manifest's `tags` field. Served as data.
+      - **Journey similarity** — over the **served** arc renderings
+        (`gloss --tag journeys/<tag>`, the read CAP-1 already issues).
+        Served as data.
+      - **shared source batch** — served only as prose, inside a shard
+        trailer line (a `Source: … · origin: <batch> (<date>) · tags: …` trailer).
+        **Not projected**: extracting it is consumer re-derivation of hub
+        data by markdown parsing, which is the named defect class — *"serve
+        structure so there is nothing to parse … Every 2026-07-28 defect was
+        consumer RE-DERIVATION of hub data"*
+        (owner decision record — 2026-07-28 (constrain generation, not post-hoc detection)). The route is a
+        served `origin` **field**, asked upstream.
+      - **`[[slug]]` cross-links** — **not served at all**: measured
+        2026-07-29, the served `gloss/lessons/<tag>` shard contains zero
+        `[[` occurrences, and the graph lives in lesson bodies, which OQ3
+        records as unservable. The 426-edge measurement in the request was
+        taken hub-side, against files a consumer cannot read. The route is a
+        served `links` field, asked upstream.
+      Both absences are **disclosed as a line** where the substrate would
+      have been offered, so "this substrate is missing" is distinguishable
+      from "this substrate found nothing";
     - **elements remain the selectable unit** (`E<tag>.<n>` in the tag's
       namespace), and selection still composes an ordinary brief.
     - **A Journey is an arc ON its lesson's row, not a Strand of its own
@@ -185,6 +269,23 @@ flows into the existing brief/structures path unchanged.**
       shard's **ratified entries**, each quoting its served rendering, so the
       axis needs no raw `topics/*.md` read to be complete over its own
       denominator.
+      **The enumeration is the served element manifest, not a shard read
+      (amended 2026-07-29, #886).** Every `decision` record carries its own
+      `topic` and its `decisions/<topic>` rendering as **labelled fields**,
+      so one manifest read yields the axis members, their per-member counts,
+      and the E Strands under them together. Measured 2026-07-29 against the served
+      surface: 87 decision records over 4 topics
+      (`knowledge-architecture` 50, `articles` 33, `claude-code-ops` 2,
+      `monetization` 2), each sourced at `topics/<topic>.md:<line>`.
+      This is **the same acquisition path CAP-1 already binds for Strand
+      membership** (amended 2026-07-29, #884) — not a second mechanism —
+      and it is chosen over re-reading the shard renderings for the reason
+      the hub states: consumer **re-derivation** of data the hub already
+      serves as fields is the defect class, and a consumer that receives an
+      element as fields cannot mis-parse it
+      (owner decision record — 2026-07-28 (constrain generation, not post-hoc detection)). Records unavailable
+      degrades exactly as CAP-1's Strand acquisition does — to the read it
+      can still make, **with the substitution named**, never silently.
   - **intent (historical — subtopic clustering, removed 2026-07-27):** Per
     topic, the map shows: its subtopic clusters (grouped from
     backlog items, unconsumed Lessons, and evidence pointers sharing a
@@ -210,6 +311,24 @@ flows into the existing brief/structures path unchanged.**
     evidence pointer. **The subtopic cluster remains the map's primary unit**
     — clusters answer "what material do I have?", elements answer "what did I
     decide, and what changed my mind?", and the owner picks from either.
+    - **`reversal` is NOT SERVED, and is therefore not projected (amended
+      2026-07-29, #886).** The clause above is kept rather than deleted,
+      because the *promise* is not withdrawn — what is recorded is that the
+      recall surface carries no such kind to project. The served element
+      vocabulary is `decision`, `journey`, `lesson` and nothing else
+      (measured 2026-07-29 against the served surface); a decision line's only
+      classification is its topic
+      (owner decision record — 2026-07-28 (a decision line's only classification is its topic)). The two derivations
+      the original clause named — "a Declined or struck-through topic line"
+      and "a `LESSONS.md` index line whose lesson records one" — are
+      **consumer inference over rendering prose, and are forbidden**: a
+      consumer quotes a ratified field and never paraphrases one into
+      existence. So the projection **discloses the absence as a line** per
+      the disclosure-is-a-line rule, and the route to reversals is a
+      **hub-side extension of the manifest**, requested as an obligation and
+      never re-derived here. Until it lands, "no reversal is shown" means
+      *not served*, which is distinct from *none exists* — and the screen
+      says which.
     - **`thinking` is deliberately absent** until OQ3 closes: its payload is
       the `## Journey` body in `lessons/*.md`, which the seam cannot serve.
       No projection may synthesize it from what is readable.
@@ -250,6 +369,36 @@ flows into the existing brief/structures path unchanged.**
     same brief handed to the same stage-0 `--brief` path. Navigation replaces
     filtering: no LLM decides what appears on Screen 1, and nothing is withheld
     on Screen 2.
+  - **navigation is in-invocation, over held state (added 2026-07-29,
+    #887).** Screen 2's substrates are only usable if the owner can move
+    between them — tag → co-tags → Journey similarity, and *back* when a
+    grouping turns out to be a dead end. Two constraints make this
+    structural rather than cosmetic: the surface has no back button, and a
+    member holding ~50 Strands can neither be reprinted into the
+    conversation per view nor live only in a file, which would make it
+    uninspectable at the moment of selection. So:
+    - **one invocation = one corpus load.** Every deterministic substrate
+      join is computed once at the start; similarity is computed lazily on
+      first use of the view that needs it, then **held for the invocation**.
+      "Back" and "switch substrate" **re-present held state** — never
+      recompute, never re-invoke `/terrain`. Recomputation is not merely
+      slow here: a second computation of a model-judged substrate can
+      return a different grouping, so re-deriving on "back" would make the
+      owner's own history unstable.
+    - **the screen shows summaries; the path holds the whole.** Each view
+      prints compact section summaries (derived title, member ids, counts,
+      per the label rule above); the complete rendering of the **current**
+      view is written to a per-invocation path the owner may open.
+    - **this is the CAP-3 supersession's own shape, not an exception to
+      it.** That ruling admits a file as *"a rendering of one invocation
+      addressed by path — never a named entity … regenerate per invocation,
+      never read back (grep-assertable), no identity the rest of the system
+      can refer to"*. In-invocation memory is fine because it is not
+      storage; a **cross-invocation view cache is forbidden**, and so is
+      reading the written rendering back as an input.
+    - **every screen carries the standing exits:** switch substrate, back
+      to the member list, free-form direction, stop. An exit missing from
+      one screen is the dead end this clause exists to prevent.
   - **size switch (amended 2026-07-23; re-based per axis member 2026-07-27,
     #803).** One screen does not scale: past a **screen budget** (~7
     candidates) a large terrain collapses into a handful of options and the map
@@ -517,6 +666,23 @@ flows into the existing brief/structures path unchanged.**
     track↔topic mapping role and stops being an axis denominator — a config
     key deciding what the owner may reach is the withholding this axis exists
     to prevent.
+    **Stated as an implementation obligation, because the promise above
+    shipped and the code did not (amended 2026-07-29, #886).** The clause
+    was written 2026-07-28 and the axis still enumerated from
+    `policy_source.track_topics` bounded by `ELEMENT_TOPIC_BOUND=2`
+    (`scripts/topic-map.py:1071-1078, 1155-1156, 1273-1275`), so on every
+    repo declaring no mapping — the default — the axis offered **0 members**
+    while the hub served 4 topics and 87 decisions. A promise whose
+    implementation is unwritten reads exactly like a promise being kept:
+    nothing failed, and the screen's own disclosure said the axis was empty
+    *because no topic was declared*, which was true and was the defect.
+    So the obligation is written as one: **for this axis, `track_topics` and
+    `ELEMENT_TOPIC_BOUND` bound nothing** — neither the member list, nor the
+    per-member count, nor the E Strands beneath it — and a run may not
+    reintroduce a consumer-side bound under any name. The `≤2 topics/*.md`
+    bound survives unchanged for anything that still reads a raw thread.
+    **The denominator is the served manifest's decision records for that
+    topic**, disclosed against the axis, per the manifest clause in CAP-2.
     **The denominator is per axis, never pooled:** the tag axis's
     denominator is the served `lessons/<tag>` shard listing and the topic
     axis's is the served `decisions/<topic>` shard listing, each disclosed
@@ -765,3 +931,28 @@ flows into the existing brief/structures path unchanged.**
   and survived into an accepted issue body. One `surface_names` call refuted
   it. Grounding a claim about an upstream surface means consulting that
   surface.)*
+
+- **OQ9 — is Screen 1 an axis chooser or an APPROACH chooser? OPEN, raised
+  2026-07-29 (#886).** CAP-2 above models Screen 1 as **two named axes** side
+  by side (amended 2026-07-28). One day later the hub ratified a different
+  shape: *"screen 1 selects an APPROACH, each approach carries its own axis
+  over its own population, and topic selection lives only inside the Decision
+  flow"* — by-repository on the attribution field, Decisions-within-one-Topic
+  on the topic, Lessons-plus-Journeys on tags
+  (owner decision record — 2026-07-28 (screen 1 selects an approach), which names this issue chain as its carrier).
+  The divergence is **recorded here and deliberately not resolved under
+  #886**, whose mandate is an axis returning 0 members; rewriting the screen
+  model would be a larger act than the report, decided without the owner at
+  the fork. What is *not* in doubt is the half both shapes share and #886
+  executes: enumeration comes from the served side, and `track_topics` +
+  `ELEMENT_TOPIC_BOUND` bound nothing.
+  Two facts to carry into whichever sitting closes this:
+  - the **owner's own vocabulary** in #886 and #887 is "entry point 2" /
+    "entry point 3" — the approach model, not the axis model;
+  - the hub line claims the 132-Strands-outside-the-axis gap *"vanishes once
+    approach 2 exists"*, and approach 2 runs on the decision **attribution**
+    field, whose backfill is **prospective only**
+    (owner decision record — 2026-07-28 (decision attribution at the gate)) — so that approach is
+    near-empty today, which is the stated reason the owner deferred it.
+    A closing sitting that adopts approaches inherits an approach with almost
+    no data, and should say so rather than discover it.
