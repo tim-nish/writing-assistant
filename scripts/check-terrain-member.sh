@@ -541,5 +541,94 @@ sys.exit(1 if fail else 0)
 JOURNEY_EOF
 [ $? -eq 0 ] || fail=1
 
+
+# --- Story 20.38 (#892): in-invocation view navigation over HELD state
+# (SPEC-terrain CAP-3 as amended 2026-07-29). The screen summarises, the path
+# holds the whole view, and the file is never read back.
+python3 - <<'NAV_EOF'
+import json, subprocess, tempfile, os, sys
+
+D = "scripts/topic-map-directions.py"
+SK = "skills/terrain/SKILL.md"
+fail = 0
+
+
+def check(cond, msg):
+    global fail
+    if cond:
+        print(f"ok:   {msg}")
+    else:
+        print(f"FAIL: {msg}", file=sys.stderr)
+        fail = 1
+
+
+els = [{"kind": "lesson", "slug": f"v{n}", "title": f"V{n}", "gloss": f"g{n}",
+        "tags": ["agents", "cost"], "journey": f"arc {n}",
+        "evidence": [], "consumed": False} for n in range(8)]
+d = {"kind": "topic-map", "topics": [], "coverage": {"pin": "h@abc1234"},
+     "elements": els}
+f = tempfile.NamedTemporaryFile("w", suffix=".json", delete=False)
+json.dump(d, f); f.close()
+out = tempfile.mktemp(suffix=".md")
+
+# --- AC4: the screen summarises; the path holds the whole view -------------
+r = subprocess.run(["python3", D, "view", "--map", f.name, "--tag", "agents",
+                    "--out", out], capture_output=True, text=True)
+check(r.returncode == 0 and os.path.exists(out),
+      f"a member's whole view renders to the given path (rc={r.returncode})")
+body = open(out).read()
+check(all(f"`v{n}`" in body for n in range(8)),
+      "the file carries EVERY Strand of the member — the whole view, not a summary")
+mem = json.loads(subprocess.run(["python3", D, "member", "--map", f.name,
+                                 "--tag", "agents"],
+                                capture_output=True, text=True).stdout)
+check(all(s["group_id"] in body for s in mem["sections"]),
+      "the file and the screen address the same groups by the same ids")
+
+# --- AC1/AC2: regenerated per invocation, byte-identical from held inputs ---
+out2 = tempfile.mktemp(suffix=".md")
+subprocess.run(["python3", D, "view", "--map", f.name, "--tag", "agents",
+                "--out", out2], capture_output=True, text=True)
+check(open(out).read() == open(out2).read(),
+      "the same map renders the same view — nothing accumulates between renders")
+
+# --- AC5/AC6: never read back; no cross-invocation cache -------------------
+# Grep-shaped, exactly as CAP-3's existing never-read-back rule is enforced.
+src = open(D).read()
+after_write = src.split("def write_view(", 1)[1]
+check("open(" not in after_write.split("\ndef ", 1)[0].replace("open(path", "OK"),
+      "write_view only writes — it never opens the view for reading")
+check(not any(tok in src for tok in ("read_view(", "load_view(", "VIEW_CACHE")),
+      "no reader and no cache exist for the view file (grep-assertable)")
+
+# --- AC7: the standing exits are on the screen -----------------------------
+sk = open(SK).read()
+for exit_name in ("switch substrate", "back to the member list",
+                  "name your own direction", "stop here"):
+    check(exit_name in sk, f"the standing exit '{exit_name}' is on the screen")
+
+# --- AC3: back/switch re-present, and the reason is recorded ---------------
+check("RE-PRESENT held state" in sk and "Never recompute" in sk,
+      "back/switch re-present held state rather than recomputing")
+check("different grouping" in sk and "unstable" in sk,
+      "the REASON is recorded: recomputing a judged substrate can return a "
+      "different grouping, destabilising the owner's own history")
+
+# --- AC1: one corpus load, stated as the rule ------------------------------
+check("One invocation = one corpus load" in sk,
+      "the one-corpus-load rule is stated on the presenting surface")
+check("lazily" in sk and "held for the rest of the invocation" in sk,
+      "a judged substrate is computed lazily, then held")
+
+# --- the forbidden shape is named, not merely omitted ----------------------
+check("cross-invocation view cache is forbidden" in sk,
+      "the forbidden cross-invocation cache is named explicitly")
+
+for p in (out, out2):
+    os.path.exists(p) and os.unlink(p)
+sys.exit(1 if fail else 0)
+NAV_EOF
+[ $? -eq 0 ] || fail=1
+
 [ "$fail" -eq 0 ] || { printf '\nFAILED.\n' >&2; exit 1; }
 printf '\nAll terrain-member checks passed (every Strand is covered).\n'

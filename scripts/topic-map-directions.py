@@ -1722,10 +1722,63 @@ def cmd_payload(args):
     return 0
 
 
+def compose_member_view(map_data, ms):
+    """One member's WHOLE view, for the file the screen points at (#892).
+
+    The screen carries compact summaries — a derived title, member ids and
+    counts — because ~50 Strands reprinted per view is unreadable; the file
+    carries the complete rendering, because a view that lives only in a file
+    is uninspectable at the moment of selection. Neither alone is the
+    requirement; the split is.
+    """
+    lines = [f"# {ms['member']} — {ms['count']} Strand(s), grouped by "
+             f"{ms['substrate']}", "",
+             f"{ms['placements']} placement(s) across {len(ms['sections'])} "
+             f"group(s). Every Strand appears at least once.", ""]
+    for sec in ms["sections"]:
+        head = f"## {sec.get('group_id') or ''} {sec['title']} "\
+               f"({len(sec['strands'])})".strip()
+        lines.append(head)
+        if sec.get("note"):
+            lines.append(f"_{sec['note']}_")
+        lines.append("")
+        for el in sec["strands"]:
+            lines.append(f"- `{el.get('slug')}` — "
+                         f"{el.get('gloss') or el.get('title') or ''}")
+        lines.append("")
+    return "\n".join(lines).rstrip() + "\n"
+
+
 def cmd_view(args):
     """Render the View alone — the same rendering `payload --view` writes, for
-    a caller that wants it without composing a screen."""
+    a caller that wants it without composing a screen.
+
+    With `--tag` it renders ONE VIEW of one member instead (Story 20.38,
+    #892): the complete sectioning the screen shows only in summary. The file
+    is a rendering of one invocation addressed by path — regenerated every
+    time, NEVER read back, and holding no identity the rest of the system can
+    refer to. In-invocation memory is not storage; a cross-invocation view
+    cache is forbidden.
+    """
     data = load_map(args.map)
+    tag = getattr(args, "tag", None)
+    if tag:
+        axis = getattr(args, "axis", "tag") or "tag"
+        grouping = None
+        if getattr(args, "grouping", None):
+            try:
+                grouping = json.loads(args.grouping)
+            except ValueError as e:
+                return _err(f"--grouping is not valid JSON ({e})")
+        ms = member_sections(data, str(tag).strip(), axis,
+                             substrate=getattr(args, "substrate",
+                                               SUBSTRATE_DEFAULT),
+                             grouping=grouping)
+        if not ms["count"]:
+            return _err(f"no Strand sits under {tag!r} at this pin")
+        write_view(args.out, compose_member_view(data, ms))
+        print(args.out)
+        return 0
     write_view(args.out, compose_view(data, candidates(data)))
     print(args.out)
     return 0
@@ -1858,6 +1911,13 @@ def main(argv=None):
                          f"unchanged. The View is WRITE-ONLY: nothing reads it "
                          f"back.")
     v = sub.add_parser("view", help="render the View file alone")
+    v.add_argument("--tag", metavar="MEMBER",
+                   help="render ONE member's whole view instead of the terrain "
+                        "View: the complete sectioning the screen summarises")
+    v.add_argument("--axis", choices=[a["key"] for a in AXES], default="tag")
+    v.add_argument("--substrate", default=SUBSTRATE_DEFAULT,
+                   choices=sorted(set(SUBSTRATES) | set(SUBSTRATES_UNOFFERED)))
+    v.add_argument("--grouping", metavar="JSON")
     v.add_argument("--map", required=True, help="assembled map JSON, or - for stdin")
     v.add_argument("--out", required=True, metavar="PATH",
                    help=f"where to write it (the run workspace's {VIEW_FILENAME})")

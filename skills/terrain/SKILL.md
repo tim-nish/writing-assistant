@@ -217,6 +217,43 @@ repo states, so an index chosen against a stale listing is
 and pick from the fresh screens. Free text still always wins; if the owner writes their own
 direction, that is the brief and no index is consulted.
 
+### Navigation — one invocation, one corpus load, held state
+
+**A grouping you can reach but not leave is a dead end**, and this surface has
+no back button. So navigation is in-invocation and runs over **held state**
+(SPEC-terrain CAP-3 as amended 2026-07-29, #892):
+
+- **One invocation = one corpus load.** Assemble the map once, at the start.
+  Every deterministic substrate join comes from that one assembly. A judged
+  substrate (journey similarity) is computed **lazily**, on first use of the
+  view that needs it, and then **held for the rest of the invocation**.
+- **"Back" and "switch substrate" RE-PRESENT held state.** Never recompute,
+  never re-assemble, never re-invoke `/terrain`. This is a correctness rule
+  and not a speed one: a second run of a judged substrate can return a
+  different grouping, which would make the owner's own history unstable —
+  they would go back and find a different screen than the one they left.
+- **The screen carries summaries; the path carries the whole view.** Print
+  compact group summaries — the derived title, the member ids, the counts.
+  Write the complete rendering of the **current** view to the per-invocation
+  path:
+
+  ```
+  VIEW=$(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-paths.py topic-map-view --root <host-repo>)
+  python3 ${CLAUDE_PLUGIN_ROOT}/scripts/topic-map-directions.py view \
+    --map "$WS/map.json" --tag <member> --out "$VIEW"
+  ```
+
+  Neither half alone is the requirement: ~50 Strands reprinted per view is
+  unreadable, and a view living only in a file is uninspectable at the moment
+  of selection. **The split is the requirement.**
+- **The file is never read back.** It is a rendering of one invocation
+  addressed by path, regenerated every time, with no identity anything else
+  refers to. In-invocation memory is fine — it is not storage. **A
+  cross-invocation view cache is forbidden.**
+- **Every screen carries the standing exits**, without exception: switch
+  substrate, back to the member list, name your own direction, stop here. A
+  screen missing one is the dead end this whole section exists to remove.
+
 ### The size switch — an over-budget member gets a View file
 
 **The screen budget is measured over one axis member's Screen 2, not over the
