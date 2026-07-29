@@ -427,6 +427,89 @@ grep -q "validate_cache_population" "scripts/validate-fact-sheet.py" \
   && ok "validator implements the cache-population assertion (lockstep)" \
   || err "validate-fact-sheet.py missing validate_cache_population"
 
+# --- Story 20.44 (#907): the harvest pin is the determinism triple ----------
+# The pin IS the version: no separate version number is stored, because a
+# stored number beside the pins it duplicates is a conformance copy that
+# drifts exactly when it matters.
+hpwork=$(mktemp -d); trap 'rm -rf "$hpwork"' EXIT
+fs="$hpwork/fs.md"
+mk() { printf '# Fact sheet\n\n## Coverage\n%s\n' "$1" > "$fs"; }
+V() { python3 scripts/validate-fact-sheet.py "$fs" "$@" >"$hpwork/v.out" 2>&1; }
+
+mk 'pin: abc1234
+harvest: repo=host commit=abc1234 extractor=harvest-1
+matched: 1
+read: docs/a.md (2)
+skipped: none'
+V --require-harvest-pin \
+  && ok "#907: a sheet carrying the full determinism triple validates" \
+  || err "#907: a well-formed harvest pin was rejected: $(tail -1 "$hpwork/v.out")"
+
+# AC1 — a PARTIAL triple is a defect, not a partial record.
+for partial in 'harvest: repo=host commit=abc1234' \
+               'harvest: repo=host extractor=harvest-1' \
+               'harvest: commit=abc1234 extractor=harvest-1'; do
+  mk "pin: abc1234
+$partial
+matched: 1
+read: docs/a.md (2)
+skipped: none"
+  if V; then
+    err "#907: a partial harvest triple was accepted ($partial)"
+  else
+    grep -q 'needs all three fields' "$hpwork/v.out" \
+      && ok "#907: partial triple rejected AS a defect ($partial)" \
+      || err "#907: partial triple rejected with the wrong reason"
+  fi
+done
+
+# AC1 — the flag makes absence a rejection; without it, old sheets still pass.
+mk 'pin: abc1234
+matched: 1
+read: docs/a.md (2)
+skipped: none'
+V --require-harvest-pin \
+  && err "#907: --require-harvest-pin accepted a sheet with no harvest line" \
+  || ok "#907: --require-harvest-pin rejects a sheet with no determinism triple"
+V \
+  && ok "#907: without the flag an existing sheet still validates (binds new, not old)" \
+  || err "#907: adding the requirement retroactively failed an existing sheet"
+
+# AC2 — repo qualification is a MANIFEST fact; a multi-repo pool must state it.
+mk 'pin: abc1234
+repo: host /a
+repo: notes /b
+matched: 1
+read: docs/a.md (2)
+skipped: none'
+V \
+  && err "#907: a multi-repo pool with no harvest line was accepted" \
+  || ok "#907: a pool spanning repositories must state which repo it was harvested from"
+
+mk 'pin: abc1234
+harvest: repo=host commit=abc1234 extractor=harvest-1
+repo: host /a
+repo: host /b
+matched: 1
+read: docs/a.md (2)
+skipped: none'
+V \
+  && err "#907: a repository declared twice was accepted" \
+  || ok "#907: a repository mapping to two roots is rejected as ambiguous"
+
+# AC3/AC4 — no version field is introduced, and the ENTRY grammar is untouched.
+if grep -qE '^\s*(VERSION|SHEET_VERSION|FORMAT_VERSION)\s*=' scripts/validate-fact-sheet.py; then
+  err "#907: a stored version number was introduced — the pin is the version"
+else
+  ok "#907: no stored version number exists (the pin is the version)"
+fi
+if grep -q 'COV_HARVEST_RE' scripts/validate-fact-sheet.py \
+   && ! grep -qE 'ENTRY_RE\s*=\s*re\.compile.*harvest' scripts/validate-fact-sheet.py; then
+  ok "#907: the triple lives in the manifest — no field was added to an entry"
+else
+  err "#907: the entry grammar was touched"
+fi
+
 if [ "$fail" -eq 0 ]; then
   printf '\nAll harvest checks passed.\n'; exit 0
 else

@@ -345,6 +345,17 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/validate-fact-sheet.py <harvest-doc> --roo
 (`--root` defaults to the git top-level of cwd; the validator errors if the
 resolved host has no `writing-sources.yaml`, rather than mass-rejecting every
 pointer against an empty source list.) `--require-coverage` makes the
+**The `harvest:` line is the determinism triple (Story 20.44, #907):** which
+repo was harvested, at which commit, by which extractor version. Emit all
+three or none — a partial triple is a defect rather than a partial record,
+because provenance that cannot be reconstructed is unverifiable rather than
+merely incomplete. **No separate version number is stored anywhere:** the pin
+IS the version, and a stored number beside the pins it duplicates is a
+conformance copy that drifts exactly when it matters. When the pool spans
+repositories, emit one `repo: <name> <root>` line per contributor so a reader
+maps a source path to its repo without inferring it — the entry grammar is
+untouched, which is the point.
+
 `## Coverage` manifest (§2a, #514) mandatory and checks its accounting closes
 (read + skipped == matched); a sheet that discloses nothing about coverage is
 rejected just like an unsourced entry.
@@ -505,6 +516,7 @@ always-present NEEDS-OWNER list:
 
 ## Coverage
 pin: abc1234
+harvest: repo=quantbench commit=abc1234 extractor=harvest-1
 matched: 3
 read: bench/results.md (4)
 read: README.md (1)
