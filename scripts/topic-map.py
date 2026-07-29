@@ -146,6 +146,11 @@ import re
 import subprocess
 import sys
 
+# The seam layer is a sibling module (Story 20.40, #903), so the script
+# directory must be importable before it is referenced.
+sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
+import terrain_seam  # noqa: E402
+
 NO_ARTICLES_REPO = 3
 
 # Item directories, in a fixed read order (determinism). `graveyard/` is read
@@ -218,18 +223,12 @@ LESSON_SECTION = FAMILY_HUB_LESSONS
 # name as a track the owner may map like any other.
 
 
-def host_root(arg_root):
-    """--root or the git toplevel of cwd, realpath'd. Keep in sync with the
-    identical helper in resolve-paths.py / resolve-user-config.py /
-    resolve-writing-sources.py / resolve-platform-profiles.py."""
-    if arg_root:
-        return os.path.realpath(arg_root)
-    r = subprocess.run(["git", "rev-parse", "--show-toplevel"],
-                       capture_output=True, text=True)
-    if r.returncode != 0 or not r.stdout.strip():
-        sys.stderr.write("error: not inside a git repository (pass --root)\n")
-        raise SystemExit(2)
-    return os.path.realpath(r.stdout.strip())
+# The seam layer lives in its own module (Story 20.40, #903): invocation and
+# the served envelope, with the degradation rules concentrated beside them.
+# Nothing here invokes the policy source directly.
+host_root = terrain_seam.host_root
+hub_pin = terrain_seam.hub_pin
+elements_read = terrain_seam.elements_read
 
 
 # --------------------------------------------------------------------------
@@ -239,7 +238,6 @@ def host_root(arg_root):
 SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
 SRC_RES = os.path.join(SCRIPT_DIR, "resolve-writing-sources.py")
 PLAN_WRITER = os.path.join(SCRIPT_DIR, "write-article-plan.py")
-POLICY_READER = os.path.join(SCRIPT_DIR, "read-policy-source.py")
 
 def articles_repo(root, repo_override=None):
     """The articles repo root: an explicit --repo (tests / non-default
@@ -360,65 +358,26 @@ def lesson_seeds(root):
     every one of those cases; a family that cannot be enumerated is disclosed,
     never silently empty.
     """
-    cmd = [sys.executable, POLICY_READER]
-    if root:
-        cmd += ["--root", root]
-    cmd += ["read", "--only", "LESSONS.md"]
-    r = subprocess.run(cmd, capture_output=True, text=True)
-    if r.returncode != 0:
-        detail = (r.stderr.strip().split("\n")[-1] if r.stderr.strip()
-                  else f"the policy reader exited {r.returncode}")
-        return [], f"{detail} (read-policy-source.py exit {r.returncode})"
-    pin, commit, seeds = None, None, []
-    in_section = False
-    for line in r.stdout.splitlines():
-        if line.startswith("pin: "):
-            pin = line[5:].strip()
-            continue
-        if line.startswith("miss: "):
-            return [], (f"the policy source served a miss for {line[6:].strip()} "
-                        f"at {pin or 'an undisclosed pin'}")
-        if line.startswith("=== "):
-            in_section = True
-            commit = line.rsplit(" @ ", 1)[-1].strip()
-            continue
-        if not in_section:
-            continue
-        number, _sep, text = line.partition(": ")
-        if not number.strip().isdigit():
-            continue
-        seed = _lesson_seed(text, f"LESSONS.md:{number.strip()}@{commit}")
-        if seed:
-            seeds.append(seed)
+    served = terrain_seam.read_served(root, ["read", "--only", "LESSONS.md"])
+    if served["reason"]:
+        return [], served["reason"]
+    pin = served["pin"]
+    if served["misses"]:
+        return [], (f"the policy source served a miss for "
+                    f"{', '.join(served['misses'])} "
+                    f"at {pin or 'an undisclosed pin'}")
+    seeds = []
+    for section in served["sections"]:
+        for number, text in section["lines"]:
+            seed = _lesson_seed(text, f"LESSONS.md:{number}@{section['sha']}")
+            if seed:
+                seeds.append(seed)
     if not seeds:
         return [], (f"the served LESSONS.md index at {pin or 'an undisclosed pin'} "
                     "lists no index lines")
     return seeds, None
 
 
-def hub_pin(root):
-    """The hub state this run actually read, as a bare sha.
-
-    The seam prints `<hub>@<sha>`; only the sha is kept. The hub's NAME is a
-    publication-boundary value (`CLAUDE.md` §"Claims about the served
-    surface"), so it is never carried into an artifact this tool writes, not
-    even an untracked one — the cheapest place to not leak a name is to never
-    store it.
-
-    Returns `None` when the seam cannot report one: an unknown hub state is
-    disclosed, never defaulted to the destination's sha, because a pin that
-    silently means the other repository is the defect this whole capability
-    exists to fix.
-    """
-    cmd = [sys.executable, POLICY_READER]
-    if root:
-        cmd += ["--root", root]
-    cmd += ["pin"]
-    r = subprocess.run(cmd, capture_output=True, text=True)
-    if r.returncode != 0 or not r.stdout.strip():
-        return None
-    _name, _sep, sha = r.stdout.strip().partition("@")
-    return (sha or None) if _sep else None
 
 
 def composite_pin(destination, hub):
@@ -595,56 +554,40 @@ def gloss_read(root):
     rendering: no gloss served means the slot DISCLOSES that, it never quotes
     the recall one-liner in the rendering's place.
     """
-    cmd = [sys.executable, POLICY_READER]
-    if root:
-        cmd += ["--root", root]
-    cmd += ["gloss"]
-    r = subprocess.run(cmd, capture_output=True, text=True)
-    if r.returncode != 0:
-        detail = (r.stderr.strip().split("\n")[-1] if r.stderr.strip()
-                  else f"the policy reader exited {r.returncode}")
-        return [], f"{detail} (read-policy-source.py exit {r.returncode})"
-    by_file, order, pin, current, commit = {}, [], None, None, None
-    for line in r.stdout.splitlines():
-        if line.startswith("pin: "):
-            pin = line[5:].strip()
-            continue
-        if line.startswith("miss: "):
-            return [], (f"the policy source served a miss for the gloss index "
-                        f"at {pin or 'an undisclosed pin'}")
-        if line.startswith("=== "):
-            head = line[4:]
-            path, _sep, sha = head.rpartition(" @ ")
-            current, commit = path.strip(), sha.strip()
-            if current not in by_file:
-                by_file[current] = []
-                order.append(current)
-            continue
-        if not current:
-            continue
-        number, _sep, text = line.partition(": ")
-        if not number.strip().isdigit():
-            continue
-        m = GLOSS_LINE.match(text.strip())
-        if not m:
-            continue
-        slug, headline, tags = m.group(1), m.group(2), m.group(3) or ""
-        headline = headline.replace("**", "").strip()
-        if not slug.strip() or not headline:
-            continue
-        by_file[current].append({
-            "slug": slug.strip(),
-            "gloss": headline,
-            "tags": [t.strip() for t in tags.split(",") if t.strip()],
-            "cite": f"{current}:{number.strip()}@{commit}",
-            # A journey rendering is what the hub serves from a journey-named
-            # index path (`gloss/journeys/...`) — the path is the hub's own
-            # naming, and the consumer never infers an arc from a headline.
-            "journey": "journey" in current.lower(),
-            # The tier-1 marker names the journey shard carrying this lesson's
-            # arc — discovery data, kept verbatim; None when the line has none.
-            "journey_shard": m.group(4),
-        })
+    served = terrain_seam.read_served(root, ["gloss"])
+    if served["reason"]:
+        return [], served["reason"]
+    pin = served["pin"]
+    if served["misses"]:
+        return [], (f"the policy source served a miss for the gloss index "
+                    f"at {pin or 'an undisclosed pin'}")
+    by_file, order = {}, []
+    for section in served["sections"]:
+        current, commit = section["path"], section["sha"]
+        if current not in by_file:
+            by_file[current] = []
+            order.append(current)
+        for number, text in section["lines"]:
+            m = GLOSS_LINE.match(text.strip())
+            if not m:
+                continue
+            slug, headline, tags = m.group(1), m.group(2), m.group(3) or ""
+            headline = headline.replace("**", "").strip()
+            if not slug.strip() or not headline:
+                continue
+            by_file[current].append({
+                "slug": slug.strip(),
+                "gloss": headline,
+                "tags": [t.strip() for t in tags.split(",") if t.strip()],
+                "cite": f"{current}:{number}@{commit}",
+                # A journey rendering is what the hub serves from a
+                # journey-named index path — the path is the hub's own naming,
+                # and the consumer never infers an arc from a headline.
+                "journey": "journey" in current.lower(),
+                # The tier-1 marker names the journey shard carrying this
+                # lesson's arc — kept verbatim; None when the line has none.
+                "journey_shard": m.group(4),
+            })
     entries = [(rel, by_file[rel]) for rel in order if by_file[rel]]
     if not entries:
         return [], (f"the served gloss index at {pin or 'an undisclosed pin'} "
@@ -652,52 +595,6 @@ def gloss_read(root):
     return entries, None
 
 
-def elements_read(root):
-    """The served element manifest as structured records (the seam's
-    `elements` subcommand — the gateway's `element_survey`,
-    tsurezure-gateway#76; SPEC-terrain amendment 2026-07-29, #884).
-
-    Returns `(records, reason)`. Each record is the manifest's JSON object
-    verbatim — `{slug, kind, tags, renderings, source, ...}` — plus the
-    served line's `cite` (`file:line@commit`). A `reason` means record
-    acquisition is unavailable (older gateway's named exit-13 gap, a served
-    miss, an unreachable gateway) and names why; the caller then falls back
-    to the tier-1 parse WITH the substitution disclosed, never silently.
-    """
-    cmd = [sys.executable, POLICY_READER]
-    if root:
-        cmd += ["--root", root]
-    cmd += ["elements"]
-    r = subprocess.run(cmd, capture_output=True, text=True)
-    if r.returncode != 0:
-        detail = (r.stderr.strip().split("\n")[-1] if r.stderr.strip()
-                  else f"the policy reader exited {r.returncode}")
-        return [], f"{detail} (read-policy-source.py exit {r.returncode})"
-    records, current, commit = [], None, None
-    for line in r.stdout.splitlines():
-        if line.startswith("miss: "):
-            return [], "the policy source served a miss for the element manifest"
-        if line.startswith("=== "):
-            head = line[4:]
-            path, _sep, sha = head.rpartition(" @ ")
-            current, commit = path.strip(), sha.strip()
-            continue
-        number, _sep, text = line.partition(": ")
-        if not current or not number.strip().isdigit():
-            continue
-        try:
-            record = json.loads(text)
-        except ValueError:
-            # The manifest contract says every line is a record; conformance
-            # is guarded at the hub's generation, never re-derived here.
-            continue
-        if not isinstance(record, dict) or not record.get("slug"):
-            continue
-        record["cite"] = f"{current}:{number.strip()}@{commit}"
-        records.append(record)
-    if not records:
-        return [], "the served element manifest carries no records"
-    return records, None
 
 
 def strand_entries(root):
@@ -911,14 +808,9 @@ def journey_shard_read(root, shards):
     """
     out, misses = {}, {}
     for shard in shards:
-        cmd = [sys.executable, POLICY_READER]
-        if root:
-            cmd += ["--root", root]
-        cmd += ["gloss", "--tag", shard]
-        r = subprocess.run(cmd, capture_output=True, text=True)
+        r = terrain_seam.run_reader(root, ["gloss", "--tag", shard])
         if r.returncode != 0:
-            misses[shard] = (r.stderr.strip().split("\n")[-1] if r.stderr.strip()
-                             else f"the policy reader exited {r.returncode}")
+            misses[shard] = terrain_seam.failure_reason(r)
             continue
         entries = parse_journey_shard(r.stdout)
         if entries:
@@ -944,14 +836,9 @@ def decision_gloss_read(root, topics):
     disclosed as the abnormal condition it is (owner ruling, #850 D4)."""
     out, misses = {}, {}
     for topic in topics:
-        cmd = [sys.executable, POLICY_READER]
-        if root:
-            cmd += ["--root", root]
-        cmd += ["gloss", "--tag", f"decisions/{topic}"]
-        r = subprocess.run(cmd, capture_output=True, text=True)
+        r = terrain_seam.run_reader(root, ["gloss", "--tag", f"decisions/{topic}"])
         if r.returncode != 0:
-            misses[topic] = (r.stderr.strip().split("\n")[-1] if r.stderr.strip()
-                             else f"the policy reader exited {r.returncode}")
+            misses[topic] = terrain_seam.failure_reason(r)
             continue
         entries = parse_decision_shard(r.stdout)
         if entries:
@@ -1127,59 +1014,35 @@ def read_topic_elements(root, topics):
     """
     if not topics:
         return {}, None, []
-    cmd = [sys.executable, POLICY_READER]
-    if root:
-        cmd += ["--root", root]
-    cmd += ["read", "--topics"] + [f"{t}.md" for t in topics]
-    r = subprocess.run(cmd, capture_output=True, text=True)
-    if r.returncode != 0:
-        detail = (r.stderr.strip().split("\n")[-1] if r.stderr.strip()
-                  else f"the policy reader exited {r.returncode}")
-        return {}, f"{detail} (read-policy-source.py exit {r.returncode})", []
-    by_topic, pin, current, commit, served = {}, None, None, None, []
-    misses, substitutions, served_path = [], [], None
-
-    def flush():
-        if current and served:
-            # EXTEND, never assign: two served surfaces resolving to one topic
-            # key would otherwise drop the earlier set silently (#873).
-            by_topic.setdefault(current, []).extend(
-                parse_topic_elements(current, served, commit, served_path))
-
-    for line in r.stdout.splitlines():
-        if line.startswith("pin: "):
-            pin = line[5:].strip()
-            continue
-        if line.startswith("miss: "):
-            misses.append(line[6:].strip())
-            continue
-        if line.startswith("=== "):
-            flush()
-            head = line[4:]
-            path, _sep, sha = head.rpartition(" @ ")
-            commit, served = sha.strip(), []
-            served_path = path.strip()
-            name = os.path.basename(served_path)
-            current = (os.path.splitext(name)[0]
-                       if served_path.startswith("topics/") else None)
-            # A SERVED path that differs from the requested one is an abnormal
-            # condition, recorded here and announced on the screen. The key is
-            # the basename, so `topics/archive/<t>.md` answers a request for
-            # `topics/<t>.md` and every downstream consumer would otherwise see
-            # only the key.
-            if current and served_path != f"topics/{current}.md":
-                substitutions.append({"requested": f"topics/{current}.md",
-                                      "served": served_path})
-            continue
+    served = terrain_seam.read_served(
+        root, ["read", "--topics"] + [f"{t}.md" for t in topics])
+    if served["reason"]:
+        return {}, served["reason"], []
+    by_topic, substitutions = {}, []
+    for section in served["sections"]:
+        served_path, commit = section["path"], section["sha"]
+        name = os.path.basename(served_path)
+        current = (os.path.splitext(name)[0]
+                   if served_path.startswith("topics/") else None)
         if not current:
             continue
-        number, _sep, text = line.partition(": ")
-        if number.strip().isdigit():
-            served.append((number.strip(), text))
-    flush()
-    if misses and not by_topic:
-        return {}, (f"the policy source served a miss for {', '.join(misses)} "
-                    f"at {pin or 'an undisclosed pin'}"), substitutions
+        # A SERVED path that differs from the requested one is an abnormal
+        # condition, recorded here and announced on the screen. The key is the
+        # basename, so `topics/archive/<t>.md` answers a request for
+        # `topics/<t>.md` and every downstream consumer would otherwise see
+        # only the key. Detection is the seam layer's (#903).
+        sub = terrain_seam.substitution(f"topics/{current}.md", served_path)
+        if sub:
+            substitutions.append(sub)
+        # EXTEND, never assign: two served surfaces resolving to one topic key
+        # would otherwise drop the earlier set silently (#873).
+        by_topic.setdefault(current, []).extend(
+            parse_topic_elements(current, section["lines"], commit, served_path))
+    by_topic = {k: v for k, v in by_topic.items() if v}
+    if served["misses"] and not by_topic:
+        return {}, (f"the policy source served a miss for "
+                    f"{', '.join(served['misses'])} "
+                    f"at {served['pin'] or 'an undisclosed pin'}"), substitutions
     return by_topic, None, substitutions
 
 

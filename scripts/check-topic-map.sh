@@ -874,9 +874,22 @@ used = set(re.findall(r'_budget\(\)\.(\w+)', src))
 assert not used, f"harvest-budget attributes still used: {sorted(used)}"
 PYEOF
 # The hub-lessons family goes through the SHIPPED seam — never a second reader.
-grep -q 'POLICY_READER' "$M" \
-  && ok "hub-lessons: the family is served by the shipped read-policy-source.py seam" \
-  || err "topic-map.py does not read the policy source through the shipped seam"
+# Since the seam split (Story 20.40, #903) the reader is owned by ONE module,
+# which is a stronger form of the same property: `topic-map.py` cannot reach
+# the policy source except through it, so "one reader" is structural rather
+# than a convention this grep polices.
+SEAM="scripts/terrain_seam.py"
+grep -q 'POLICY_READER' "$SEAM" \
+  && ok "the seam module owns the shipped read-policy-source.py invocation" \
+  || err "$SEAM does not invoke the shipped policy reader"
+grep -q 'terrain_seam' "$M" \
+  && ok "hub-lessons: the family is served through the seam module" \
+  || err "topic-map.py does not reach the policy source through the seam module"
+# INVOCATION SHAPES, never prose (#834's rule): the docstrings still name the
+# reader, and should — what must not survive is a call to it.
+grep -qE 'POLICY_READER|subprocess\.run\(\[sys\.executable, *[A-Z_]*READER' "$M" \
+  && err "topic-map.py invokes the policy reader directly — the seam layer is bypassed (#903)" \
+  || ok "no seam invocation remains in topic-map.py (the split holds)"
 grep -qE 'lessons_index|LESSONS\.md.*open\(|policy_lookup' "$CODE" \
   && err "topic-map.py talks to the gateway itself (the seam is the only reader)" \
   || ok "hub-lessons: no second policy reader exists in the implementation"
