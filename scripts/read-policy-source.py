@@ -135,6 +135,10 @@ GAP_GLOSS = (
     "surface, tsurezure-gateway#64) — the deployed gateway predates it or its "
     "operator config declares no gloss surface; serving it is a hub-side act, "
     "never a consumer-side workaround")
+GAP_ELEMENTS = (
+    "gateway does not register element_survey (the structured element-manifest "
+    "survey, tsurezure-gateway#76) — the deployed gateway predates it; serving "
+    "it is a hub-side act, never a consumer-side workaround")
 
 
 def _load_rws():
@@ -461,6 +465,40 @@ def cmd_gloss(args):
     return 0
 
 
+def cmd_elements(args):
+    """The hub's element manifest as structured records, via `element_survey`
+    (tsurezure-gateway#76): every record matching the optional --kind/--tag
+    filters, complete per query (the tool's contract — no floor, no cap, no
+    truncation), each record line passed through VERBATIM in the standard
+    output grammar. A gateway that does not register the tool is the NAMED
+    exit-13 gap; a served miss (undeclared or empty manifest, unknown filter)
+    is a served answer under the pin, distinguishable from unavailability."""
+    root = RWS.host_root(args.root)
+    _block, err = resolve_policy_source(root)
+    if err:
+        return _unavailable(err)
+    arguments = {}
+    if getattr(args, "kind", None):
+        arguments["kind"] = args.kind
+    if getattr(args, "tag", None):
+        arguments["tag"] = args.tag
+    try:
+        if "element_survey" not in gateway_tool_names():
+            return _tool_gap(GAP_ELEMENTS)
+        (payload,) = call_gateway([("element_survey", arguments)])
+    except GatewayError as e:
+        return _unavailable((UNAVAIL_GATEWAY, f"gateway unreachable ({e})"))
+    print(f"pin: {payload['pin']}")
+    if payload.get("miss"):
+        suffix = "".join(
+            f" --{k} {v}" for k, v in (("kind", arguments.get("kind")),
+                                       ("tag", arguments.get("tag"))) if v)
+        print(f"miss: elements{suffix}")
+        return 0
+    _emit_sections(payload)
+    return 0
+
+
 def compose_glossary(names):
     """Compose the whole GLOSSARY.md section from per-entry `glossary_entry`
     calls (Story 18.16): `surface_names(kind=glossary)` gives the entry
@@ -563,6 +601,12 @@ def main(argv=None):
     gp.add_argument("--tag", metavar="TAG",
                     help="tier-2 shard tag (a shard file's basename without "
                          ".md); omit for the whole tier-1 overview index")
+    ep = sub.add_parser("elements", parents=[root_parent])
+    ep.add_argument("--kind", metavar="KIND",
+                    help="filter records to one element kind "
+                         "(lesson | journey | decision); omit for all")
+    ep.add_argument("--tag", metavar="TAG",
+                    help="filter records to those carrying this tag; omit for all")
     sp = sub.add_parser("read", parents=[root_parent])
     sp.add_argument("--only", nargs="+",
                     help="restrict to these whitelist entries; anything else is refused (exit 5)")
@@ -576,7 +620,7 @@ def main(argv=None):
         args.root = None
     return {"whitelist": cmd_whitelist, "pin": cmd_pin,
             "list-topics": cmd_list_topics, "gloss": cmd_gloss,
-            "read": cmd_read}[args.cmd](args)
+            "elements": cmd_elements, "read": cmd_read}[args.cmd](args)
 
 
 if __name__ == "__main__":

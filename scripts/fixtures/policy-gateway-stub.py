@@ -47,6 +47,11 @@ DEFAULT_TOOLS = ["glossary_entry", "lessons_index", "topic_thread",
 # tools/list and degrade to the named exit-13 gap. A fixture that wants the
 # gloss surface declares `"tools": [... "gloss_index"]` plus the payload keys
 # `"gloss_index"` (tier-1 triples) / `"gloss_shards"` ({tag: triples}).
+# `element_survey` (tsurezure-gateway#76) follows the same rule: a fixture
+# that wants the element manifest declares `"tools": [... "element_survey"]`
+# plus `"elements"` — a list of record dicts served verbatim as JSONL lines
+# under `"elements_file"` (default `gloss/ELEMENTS.jsonl`), filtered by the
+# call's kind/tag exactly as the live tool filters, complete per query.
 
 
 def registered_tools(fixture):
@@ -92,6 +97,20 @@ def responses(fixture):
                 return hit(triples) if triples else miss(name, {"tag": tag})
             triples = fixture.get("gloss_index", [])
             return hit(triples) if triples else miss(name, {"tag": None})
+        if name == "element_survey":
+            if "element_survey" not in tools:
+                return None
+            kind, tag = args.get("kind"), args.get("tag")
+            rel = fixture.get("elements_file", "gloss/ELEMENTS.jsonl")
+            matched = []
+            for i, record in enumerate(fixture.get("elements", []), start=1):
+                if kind is not None and record.get("kind") != kind:
+                    continue
+                if tag is not None and tag not in (record.get("tags") or []):
+                    continue
+                matched.append((rel, i, json.dumps(record)))
+            return (hit(matched) if matched
+                    else miss(name, {"kind": kind, "tag": tag}))
         if name == "surface_names":
             # An older gateway does not register the tool at all — the reader
             # gates on tools/list, but honor the boundary here too (unknown).

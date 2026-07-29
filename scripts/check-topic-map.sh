@@ -894,6 +894,84 @@ grep -q 'output.drafts' "$work/none.err" \
   && ok "the refusal names the declaration that is missing" \
   || err "the refusal does not name output.drafts"
 
+# --- 7f. record-authoritative Strand membership (#884, gateway#76) -----------
+# With element_survey served, membership/tags/journey-attachment come from the
+# manifest records; tier-1 supplies only headline text (joined by slug); the
+# three completeness checks run and record<->tier-1 mismatches are FINDINGS.
+# Without it, the tier-1 fallback engages WITH the substitution disclosed.
+python3 - "$FX" <<'PYEOF'
+import json, sys
+fx = json.load(open(sys.argv[1]))
+fx["tools"] = ["glossary_entry", "lessons_index", "topic_thread",
+               "policy_lookup", "surface_names", "gloss_index",
+               "element_survey"]
+# Tier-1 must be SERVED here: a later section emptied it, and with the whole
+# index a miss the composer rightly discloses one headline_source_reason
+# instead of per-slug findings — this section tests the per-slug finding.
+fx["gloss_index"] = [
+    ["gloss/INDEX.md", 8,
+     "- **retry-storm** — GLOSS-ALPHA retries multiply their own load. (agents, cost) · journeys/agents"],
+    ["gloss/INDEX.md", 9,
+     "- **cache-warmth** — GLOSS-BETA a warm cache hides every cold start. (testing)"],
+]
+fx["elements"] = [
+    {"slug": "retry-storm", "kind": "lesson", "tags": ["agents", "cost"],
+     "renderings": ["lessons/agents", "lessons/cost"],
+     "source": "lessons/retry-storm.md:1"},
+    {"slug": "retry-storm", "kind": "journey", "tags": ["agents", "cost"],
+     "renderings": ["journeys/agents", "journeys/cost"],
+     "source": "lessons/retry-storm.md:1"},
+    {"slug": "cache-warmth", "kind": "lesson", "tags": ["testing"],
+     "renderings": ["lessons/testing"], "source": "lessons/cache-warmth.md:1"},
+    {"slug": "ghost-lesson", "kind": "lesson", "tags": ["method"],
+     "renderings": ["lessons/method"], "source": "lessons/ghost-lesson.md:1"},
+]
+json.dump(fx, open(sys.argv[1], "w"))
+PYEOF
+MAP > "$work/records.json" 2>"$work/records.err" \
+  && ok "#884: the map assembles with the element manifest served" \
+  || err "assemble failed with records served: $(cat "$work/records.err")"
+python3 - "$work/records.json" <<'PYEOF' && ok "#884: membership is record-authoritative; count-in = count-out against the served denominator; journey attachment from record pointers; mismatches are named findings" || err "record-authoritative composition wrong"
+import json, sys
+d = json.load(open(sys.argv[1]))
+s = d["gloss"]["strands"]
+assert s["source"] == "element manifest (records)", s
+# The served denominator and the count-in = count-out verdict.
+assert s["lesson_records"] == 3 and s["composed"] == 3 and s["complete"], s
+# Journey attachment comes from the journey record's kind-qualified pointer,
+# and its completeness is checked against the journey-record count.
+assert s["journey_records"] == 1, s
+assert s["journeys_attached"] == 1 and s["journeys_attached_complete"], s
+# ghost-lesson is a record with no tier-1 line: a NAMED finding, and its row
+# takes the marked-absent path — never an empty quote, never substituted.
+assert any("ghost-lesson" in c and "no tier-1 headline" in c
+           for c in s["conflicts"]), s["conflicts"]
+els = {(e["kind"], e.get("slug")): e for e in d["elements"]}
+rs = els[("lesson", "retry-storm")]
+assert rs["tags"] == ["agents", "cost"], rs["tags"]
+assert rs["journey_shard"] == "journeys/agents", rs.get("journey_shard")
+assert rs["gloss"].startswith("GLOSS-ALPHA"), rs["gloss"]
+PYEOF
+# The fallback: no element_survey -> tier-1 acquisition, disclosed by name.
+python3 - "$FX" <<'PYEOF'
+import json, sys
+fx = json.load(open(sys.argv[1]))
+fx["tools"] = ["glossary_entry", "lessons_index", "topic_thread",
+               "policy_lookup", "surface_names", "gloss_index"]
+fx.pop("elements", None)
+json.dump(fx, open(sys.argv[1], "w"))
+PYEOF
+MAP > "$work/fallback.json" 2>/dev/null \
+  && ok "#884: the map still assembles without element_survey (older gateway)" \
+  || err "assemble failed on the fallback path"
+python3 - "$work/fallback.json" <<'PYEOF' && ok "#884: the tier-1 fallback DISCLOSES the substitution and its reason at the point it happens" || err "fallback substitution not disclosed"
+import json, sys
+d = json.load(open(sys.argv[1]))
+s = d["gloss"]["strands"]
+assert s["source"] == "tier-1 markdown (fallback)", s
+assert "element_survey" in (s.get("fallback_reason") or ""), s
+PYEOF
+
 if [ "$fail" -eq 0 ]; then
   printf '\nAll topic-map checks passed.\n'; exit 0
 else
