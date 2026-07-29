@@ -990,11 +990,98 @@ def _substrate_co_tags(strands, tag, axis):
     return sections, placements
 
 
+# --- journey similarity (Story 20.37, #891) ---------------------------------
+# MODEL-JUDGED, so the script owns the inputs and the enforcement and never the
+# judgment. It is BUILT AND NOT OFFERED (SPEC-terrain CAP-2's offering gate,
+# #889): a deterministic substrate is inspectable by reading the key it grouped
+# on; this one is not, because whether its groups read as one shared background
+# is the very thing under test. It joins the offered set only after one
+# measurement run passes an owner verdict.
+JOURNEY_SUBSTRATE = "journey-similarity"
+NO_ARC_TITLE = "no served journey arc"
+NO_SHARED_PATH_TITLE = "no shared path"
+
+
+def journey_similarity_inputs(strands, tag):
+    """The judgment inputs: each Strand's SERVED arc, quoted verbatim.
+
+    Never a paraphrase and never a lesson body (unservable, OQ3). A Strand
+    whose arc is not served is carried with `served: false` and its reason, so
+    the composer can tell "no arc exists" from "no arc arrived".
+    """
+    out = []
+    for el in strands:
+        arc = el.get("journey")
+        out.append({"slug": el.get("slug"),
+                    "arc": arc if isinstance(arc, str) and arc.strip() else None,
+                    "arc_cite": el.get("journey_cite"),
+                    "served": bool(isinstance(arc, str) and arc.strip()),
+                    "not_served_reason": el.get("journey_unavailable")})
+    return out
+
+
+def apply_journey_grouping(strands, grouping):
+    """Assemble sections from a model-proposed grouping, enforcing the boundary.
+
+    The composer MAY place Strands and name what they share. It may not rank,
+    score, order by strength, surface only the strongest, hide a weak group, or
+    omit a Strand — so this function ignores any ordering the proposal carries
+    and re-derives it from a declared key, and it re-attaches every Strand the
+    proposal left out rather than accepting the shortfall.
+
+    Returns `(sections, placements)` like any substrate. Enforcement happens
+    HERE, after composition, because a composer that cannot omit in principle
+    can still omit in fact.
+    """
+    by_slug = {str(el.get("slug")): el for el in strands}
+    sections, placed = {}, set()
+    for group in grouping or []:
+        title = str((group or {}).get("in_common") or "").strip()
+        members = [str(x) for x in ((group or {}).get("members") or [])]
+        keep = [by_slug[m] for m in members if m in by_slug]
+        if not title or not keep:
+            continue
+        sections.setdefault(title, []).extend(keep)
+        placed.update(m for m in members if m in by_slug)
+    # Whatever the composer did not place is re-attached, never dropped: an
+    # arc-less Strand to its own named section, an arc-bearing one to the
+    # explicit "no shared path" residue.
+    for slug, el in by_slug.items():
+        if slug in placed:
+            continue
+        arc = el.get("journey")
+        key = (NO_SHARED_PATH_TITLE
+               if isinstance(arc, str) and arc.strip() else NO_ARC_TITLE)
+        sections.setdefault(key, []).append(el)
+    placements = sum(len(v) for v in sections.values())
+    return sections, placements
+
+
+def _substrate_journey_similarity(strands, tag, axis, grouping=None):
+    """The substrate wrapper. With no proposed grouping every Strand lands in
+    the residue — the honest empty state, never an invented grouping."""
+    return apply_journey_grouping(strands, grouping)
+
+
+# OFFERED substrates — what the owner may choose today.
 SUBSTRATES = {"co-tags": _substrate_co_tags}
+# BUILT BUT NOT OFFERED (#889). Reachable through the dogfood harness only.
+SUBSTRATES_UNOFFERED = {JOURNEY_SUBSTRATE: _substrate_journey_similarity}
 SUBSTRATE_DEFAULT = "co-tags"
 
 
-def member_sections(map_data, tag, axis="tag", substrate=SUBSTRATE_DEFAULT):
+def _substrate_fn(name):
+    """Resolve a substrate by name across both sets. Membership of the OFFERED
+    set is what the chooser reads; this resolver is what the harness uses."""
+    if name in SUBSTRATES:
+        return SUBSTRATES[name]
+    if name in SUBSTRATES_UNOFFERED:
+        return SUBSTRATES_UNOFFERED[name]
+    raise KeyError(name)
+
+
+def member_sections(map_data, tag, axis="tag", substrate=SUBSTRATE_DEFAULT,
+                    grouping=None):
     """Screen 2's sections for one axis member (Story 20.9, #811; a member of
     either axis since Story 20.25, #860 — Screen 2 itself is unchanged, and no
     third screen exists).
@@ -1017,7 +1104,10 @@ def member_sections(map_data, tag, axis="tag", substrate=SUBSTRATE_DEFAULT):
     """
     tag = str(tag).strip()
     strands = _axis_strands(map_data, tag, axis)
-    sections, placements = SUBSTRATES[substrate](strands, tag, axis)
+    fn = _substrate_fn(substrate)
+    sections, placements = (fn(strands, tag, axis, grouping)
+                            if substrate == JOURNEY_SUBSTRATE
+                            else fn(strands, tag, axis))
     # THE SECTIONING CONTRACT (owner ruling, #850 D4; Story 20.23, #852): no
     # direct parent section holds more than 20% of the member's Strands —
     # subdivide, deterministically, until every one is under the bound. The
@@ -1038,12 +1128,34 @@ def member_sections(map_data, tag, axis="tag", substrate=SUBSTRATE_DEFAULT):
     # Sorted by title — a DECLARED deterministic key. The no-relation section
     # sorts last by construction so the screen ends with what shares nothing,
     # rather than opening on it; that is ordering, never ranking.
-    for key in sorted(sections, key=lambda k: (k == NO_RELATION_TITLE, k)):
+    residue = {NO_RELATION_TITLE, NO_ARC_TITLE, NO_SHARED_PATH_TITLE}
+    for key in sorted(sections, key=lambda k: (k in residue, k)):
+        # SUBDIVISION IS THE CO-TAG SUBSTRATE'S OWN MOVE and does not travel
+        # (Story 20.37, #891). Subdividing a judged substrate's sections on
+        # co-tags would silently mix two substrates in one screen: the section
+        # would carry a title from one and a boundary from another, and the
+        # owner could not tell which produced the grouping they are reading.
+        # An over-cap section under a judged substrate DISCLOSES instead.
+        if substrate != SUBSTRATE_DEFAULT:
+            note = (f"over the one-fifth bound ({len(sections[key])} of "
+                    f"{placements} placements) — a judged substrate is not "
+                    f"subdivided on another substrate's key"
+                    if len(sections[key]) > cap else None)
+            ordered.append({"title": key, "strands": sections[key],
+                            "note": note})
+            continue
         used = {tag} | ({key[5:]} if key.startswith("also ") else set())
         for sub_title, group, note in _subdivide_section(
                 key, sections[key], used, cap):
             ordered.append({"title": sub_title, "strands": group,
                             "note": note})
+    # GROUP IDS ARE A DISPLAY KIND (Story 20.37, #891): a group is addressable
+    # so the owner can refer to one, and the surface declares the kind. `G`
+    # confers NO selection authority — selection stays by element id, per the
+    # presentation-only invariant. Stated because an id that looks selectable
+    # and is not is exactly what retired the `J<n>` namespace.
+    for n, sec in enumerate(ordered, start=1):
+        sec["group_id"] = f"G{n}"
     return {"member": tag, "count": total, "axis": axis, "sections": ordered,
             # The acquisition disclosure: which substrate grouped this, how
             # many placements it made, and whether every Strand is covered.
@@ -1262,7 +1374,15 @@ def compose_member_listing(map_data, tag, cands, axis="tag"):
 def cmd_member(args):
     m = load_map(args.map)
     axis = getattr(args, "axis", "tag") or "tag"
-    ms = member_sections(m, args.tag, axis)
+    grouping = None
+    if getattr(args, "grouping", None):
+        try:
+            grouping = json.loads(args.grouping)
+        except ValueError as e:
+            return _err(f"--grouping is not valid JSON ({e})")
+    ms = member_sections(m, args.tag, axis,
+                         substrate=getattr(args, "substrate", SUBSTRATE_DEFAULT),
+                         grouping=grouping)
     if not ms["count"]:
         noun = "topic" if axis == "topic" else "tag"
         return _err(f"no Strand sits under the {noun} {args.tag!r} at this "
@@ -1275,9 +1395,11 @@ def cmd_member(args):
            # produced these sections, how many placements it made — the unit
            # the cap is computed against — and its own coverage assertion.
            "substrate": ms["substrate"],
+           "substrate_offered": ms["substrate"] in SUBSTRATES,
            "placements": ms["placements"],
            "covered": ms["covered"],
            "sections": [{"title": s["title"],
+                         "group_id": s.get("group_id"),
                          "strands": [e.get("slug") for e in s["strands"]],
                          "note": s.get("note")}
                         for s in ms["sections"]],
@@ -1664,6 +1786,29 @@ def cmd_brief(args):
     return 0
 
 
+def cmd_journey_inputs(args):
+    """The judgment inputs for the journey-similarity substrate (#891).
+
+    Emitted as data so the composer judges from SERVED arcs and nothing else.
+    The count is carried so the caller can verify the grouping it gets back
+    covers what it was given.
+    """
+    m = load_map(args.map)
+    axis = getattr(args, "axis", "tag") or "tag"
+    strands = _axis_strands(m, str(args.tag).strip(), axis)
+    if not strands:
+        return _err(f"no Strand sits under {args.tag!r} at this pin")
+    inputs = journey_similarity_inputs(strands, str(args.tag).strip())
+    print(json.dumps({"kind": "journey-similarity-inputs",
+                      "member": str(args.tag).strip(), "axis": axis,
+                      "count": len(inputs),
+                      "served": sum(1 for x in inputs if x["served"]),
+                      "substrate": JOURNEY_SUBSTRATE,
+                      "offered": JOURNEY_SUBSTRATE in SUBSTRATES,
+                      "inputs": inputs}, indent=2))
+    return 0
+
+
 def main(argv=None):
     p = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -1681,6 +1826,26 @@ def main(argv=None):
                     help="which axis MEMBER belongs to (default: tag). The two "
                          "vocabularies overlap by name, so this is what keeps "
                          "a member unambiguous.")
+    # The dogfood harness (Story 20.37, #891): the substrate is BUILT and NOT
+    # OFFERED, so it is reachable only by naming it here. `--grouping` carries
+    # the model's proposal; without one every Strand lands in the residue,
+    # which is the honest empty state rather than an invented grouping.
+    mb.add_argument("--substrate", default=SUBSTRATE_DEFAULT,
+                    choices=sorted(set(SUBSTRATES) | set(SUBSTRATES_UNOFFERED)),
+                    help="grouping substrate (default: %(default)s). Substrates "
+                         "outside the offered set are reachable for measurement "
+                         "only, until an owner verdict admits them.")
+    mb.add_argument("--grouping", metavar="JSON",
+                    help="a model-proposed grouping for a judged substrate: "
+                         "[{\"in_common\": str, \"members\": [slug, ...]}]. "
+                         "Placement only — any ordering it carries is ignored "
+                         "and any Strand it omits is re-attached.")
+    ji = sub.add_parser("journey-inputs",
+                        help="the judgment inputs for the journey-similarity "
+                             "substrate: each Strand's SERVED arc, verbatim")
+    ji.add_argument("--map", required=True)
+    ji.add_argument("--tag", required=True, metavar="MEMBER")
+    ji.add_argument("--axis", choices=[a["key"] for a in AXES], default="tag")
     c = sub.add_parser("candidates", help="candidate directions as JSON")
     c.add_argument("--map", required=True, help="assembled map JSON, or - for stdin")
     pa = sub.add_parser("payload", help="the one screen, as a proposal payload")
@@ -1710,7 +1875,8 @@ def main(argv=None):
     args = p.parse_args(argv)
     return {"candidates": cmd_candidates, "payload": cmd_payload,
             "view": cmd_view, "brief": cmd_brief,
-            "axis": cmd_axis, "member": cmd_member}[args.cmd](args)
+            "axis": cmd_axis, "member": cmd_member,
+            "journey-inputs": cmd_journey_inputs}[args.cmd](args)
 
 
 if __name__ == "__main__":
