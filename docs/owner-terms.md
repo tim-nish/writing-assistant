@@ -28,6 +28,25 @@ already exists — nothing is drafted until a brief exists.
 Wording you accept from a machine-proposed option becomes your wording. You
 can always write your own instead; free text wins over any offered choice.
 
+## group claim
+
+**What a group of Strands has in common.** When a listing is grouped, each
+group carries one or two sentences saying why its members belong together —
+the thread running through them. It is the germ of an article's thesis: if the
+sentence reads as something worth arguing, the group is worth writing from.
+
+It is written by the machine and marked as such. It never replaces a Strand's
+own words, and it never decides anything — a group claim you disagree with
+costs you nothing, because you still pick Strands by their own index.
+
+**Not a fact-sheet claim.** A fact-sheet claim is evidence: it is copied
+verbatim from a source and carries a provenance class. A group claim carries
+neither — it describes a grouping on screen. The two words are kept apart on
+purpose, so that neither is read as the other.
+
+When the same sentence is carried into a proposed thesis, it plays that
+proposal's claim role there. Same words, different job, named per surface.
+
 ## Strand
 
 **One selectable piece of recorded material.** A Strand is a single item you

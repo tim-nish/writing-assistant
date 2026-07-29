@@ -185,14 +185,18 @@ Relay the returned `listing` as given: **all** of the member's Strands, whole,
 in presentation-only sections, each Strand quoting its served rendering with
 its deterministic context line, and the count disclosed.
 
-**Section background (machine-composed, marked — SPEC-terrain CAP-2 as
-amended 2026-07-27, #850).** Before relaying, compose for each section one or
-two sentences of shared background from the returned `background.inputs`
-claims — what connects the section's Strands, in plain language (Tsurezure
-may be consulted; record any consult per the provenance rule). Render it
-directly under the section title, prefixed `background (machine-composed):`.
-The `background.rules` bind you as the composer: the prose is background
-only and never substitutes for a Strand's own text; every Strand stays
+**The group claim (machine-composed, marked — SPEC-terrain CAP-2 as
+amended 2026-07-29, #888).** Before relaying, compose for each section one or
+two sentences stating **what its Strands have in common** from the returned
+`background.inputs` claims — the group's reason for existing, in plain
+language (Tsurezure may be consulted; record any consult per the provenance
+rule). Render it directly under the section title, prefixed
+`in common (machine-composed):`. Say what they share, not what sits behind
+them: this line is the germ of a Thesis, and "background" invited reading it
+as decoration. It is a **group claim** — never a fact-sheet claim, which is a
+different object with a provenance class (`docs/owner-terms.md`).
+The `background.rules` bind you as the composer: the prose asserts only that
+commonality and never substitutes for a Strand's own text; every Strand stays
 exactly once and selectable — you never omit, merge, rank, or gate one; and
 when the gateway is unavailable or you skip composition, **say so** and
 relay the deterministic titles — a silent skip is the defect a stated
