@@ -3,11 +3,16 @@
 # sections carry NO SELECTION AUTHORITY (Story 20.9, #811; SPEC-terrain as
 # resolved 2026-07-27).
 #
-# The permutation invariant is the whole point: every Strand of the selected
-# member appears in EXACTLY ONE section — count-in == count-out — so the
-# information loss the abandoned cluster unit suffered cannot compile, and the
-# worst case is a badly grouped but complete list. This check FAILS LOUDLY on
-# a dropped or duplicated Strand; a count mismatch is never a warning.
+# The completeness invariant is the whole point: every Strand of the selected
+# member appears in AT LEAST ONE section — count-in == count-out over distinct
+# Strands — so the information loss the abandoned cluster unit suffered cannot
+# compile, and the worst case is a badly grouped but complete list. This check
+# FAILS LOUDLY on a dropped Strand; a count mismatch is never a warning.
+#
+# It is a COVER, not a partition (Story 20.36, #890): under a multi-valued
+# substrate a Strand belongs in every section it relates to, and PLACEMENTS
+# are the counting unit for the >20% cap. Exactly-once survives as the
+# stronger check wherever the substrate is single-valued.
 #
 # POSIX sh + stdlib Python.
 
@@ -117,8 +122,19 @@ bad3 = [s["title"] for s in d3["sections"]
 check(not bad3,
       f"every section is under the bound or discloses why not ({bad3})")
 sectioned3 = [s for sec in d3["sections"] for s in sec["strands"]]
-check(len(sectioned3) == 30 and len(set(sectioned3)) == 30,
-      "subdivision preserves the permutation (count in == count out)")
+# COMPLETENESS IS A COVER counted in PLACEMENTS (Story 20.36, #890): each of
+# these Strands carries two co-tags besides `workflow`, so it belongs in two
+# sections. Every Strand appears at LEAST once — the assertion the contract
+# actually makes — and the placement total is what the cap is computed
+# against. The old exactly-once form was written for a single-valued key and
+# is false here; asserting it would demand a tie-break that hides half of
+# every Strand's relationships.
+check(len(set(sectioned3)) == 30,
+      f"every Strand is covered — count-in == count-out over distinct Strands ({len(set(sectioned3))})")
+check(len(sectioned3) >= 30 and d3["placements"] == len(sectioned3),
+      f"placements are the counting unit and are reported ({d3.get('placements')} vs {len(sectioned3)})")
+check(d3["covered"] is True and d3["substrate"] == "co-tags",
+      f"the substrate names itself and asserts its own coverage ({d3.get('substrate')}, {d3.get('covered')})")
 # Small-member floor: 20% of 5 is 1; the floor keeps sections >= viable size.
 els5 = [{"kind": "lesson", "slug": f"t{n}", "title": f"T{n}",
          "gloss": f"c {n}", "tags": ["workflow", "agents"],
@@ -181,7 +197,7 @@ check(bad_topic.returncode != 0
       and "no Strand sits under the topic" in bad_topic.stderr,
       "an unknown topic member is refused, naming the topic axis")
 
-# --- NEGATIVE TEST: a broken permutation must fail RED ---------------------
+# --- NEGATIVE TEST: a broken cover must fail RED ---------------------------
 # Simulated at the assertion layer: feed the checker a sectioning that drops
 # one Strand and assert THIS logic would catch it (a check never shown to
 # fire is a clean bill nobody earned).
@@ -298,5 +314,97 @@ sys.exit(1 if fail else 0)
 PYEOF
 [ $? -eq 0 ] || fail=1
 
+
+# --- Story 20.36 (#890): grouping runs on a NAMED SUBSTRATE, and completeness
+# is a COVER counted in PLACEMENTS (SPEC-terrain CAP-2 as amended 2026-07-29).
+python3 - <<'SUBSTRATE_EOF'
+import json, subprocess, tempfile, sys
+
+D = "scripts/topic-map-directions.py"
+fail = 0
+
+
+def check(cond, msg):
+    global fail
+    if cond:
+        print(f"ok:   {msg}")
+    else:
+        print(f"FAIL: {msg}", file=sys.stderr)
+        fail = 1
+
+
+def member(els, tag):
+    m = {"kind": "topic-map", "topics": [], "coverage": {"pin": "h@abc1234"},
+         "elements": els}
+    f = tempfile.NamedTemporaryFile("w", suffix=".json", delete=False)
+    json.dump(m, f); f.close()
+    r = subprocess.run(["python3", D, "member", "--map", f.name, "--tag", tag],
+                       capture_output=True, text=True)
+    return json.loads(r.stdout)
+
+
+# --- AC1/AC2: a multi-valued substrate is a COVER, and it names itself ------
+# Each Strand carries two co-tags besides `agents`, so each belongs in two
+# sections. The single-valued predecessor would have hidden one of the two.
+els = [{"kind": "lesson", "slug": f"m{n}", "title": f"M{n}", "gloss": f"g{n}",
+        "tags": ["agents", "cost", "method"], "evidence": [], "consumed": False}
+       for n in range(10)]
+d = member(els, "agents")
+placed = [s for sec in d["sections"] for s in sec["strands"]]
+check(d["substrate"] == "co-tags", f"the active substrate is named ({d['substrate']})")
+check(len(set(placed)) == 10 and d["covered"] is True,
+      "every Strand is covered at least once (count-in == count-out over distinct Strands)")
+check(len(placed) == 20 and d["placements"] == 20,
+      f"a multi-valued substrate PLACES each Strand under every co-tag it carries ({d['placements']})")
+titles = {s["title"] for s in d["sections"]}
+check(any(t.startswith("also cost") for t in titles)
+      and any(t.startswith("also method") for t in titles),
+      f"both relationships are visible, not just the alphabetically-first ({sorted(titles)})")
+
+# --- AC3: no-relation Strands get an EXPLICIT NAMED section ----------------
+els2 = [{"kind": "lesson", "slug": "solo", "title": "Solo", "gloss": "g",
+         "tags": ["agents"], "evidence": [], "consumed": False}]
+els2 += [{"kind": "lesson", "slug": f"p{n}", "title": f"P{n}", "gloss": "g",
+          "tags": ["agents", "cost"], "evidence": [], "consumed": False}
+         for n in range(4)]
+d2 = member(els2, "agents")
+no_rel = [s for s in d2["sections"] if s["title"] == "no shared co-tag"]
+check(len(no_rel) == 1 and no_rel[0]["strands"] == ["solo"],
+      f"a Strand sharing nothing lands in an explicitly NAMED section, never dropped ({[s['title'] for s in d2['sections']]})")
+placed2 = [s for sec in d2["sections"] for s in sec["strands"]]
+check(len(set(placed2)) == 5 and d2["covered"] is True,
+      "the no-relation section participates in the coverage assertion")
+check([s["title"] for s in d2["sections"]][-1] == "no shared co-tag",
+      "the no-relation section sorts LAST by a declared key — ordering, never ranking")
+
+# --- AC4: the cap is computed against PLACEMENTS ---------------------------
+# 30 Strands x 2 co-tags = 60 placements. A cap on Strands (6) would demand
+# subdivisions this material cannot support; on placements it is 12.
+els4 = [{"kind": "lesson", "slug": f"c{n}", "title": f"C{n}", "gloss": "g",
+         "tags": ["agents", "cost", "risk" if n % 2 else "method"],
+         "evidence": [], "consumed": False} for n in range(30)]
+d4 = member(els4, "agents")
+check(d4["placements"] == 60,
+      f"placements exceed the member count under a multi-valued substrate ({d4['placements']} vs {d4['count']})")
+cap = max(3, int(d4["placements"] * 0.2))
+undisclosed = [s["title"] for s in d4["sections"]
+               if len(s["strands"]) > cap and not s.get("note")]
+check(not undisclosed,
+      f"every section is under the placement cap or discloses why not ({undisclosed})")
+
+# --- AC6: the mega-group anti-pattern cannot render silently ---------------
+# One meaningless group holding the whole member is the recorded T4.1 collapse.
+biggest = max(len(s["strands"]) for s in d4["sections"])
+check(biggest < d4["count"] or any(s.get("note") for s in d4["sections"]),
+      f"no single section silently holds the whole member ({biggest} of {d4['count']})")
+
+# --- presentation-only: nothing here gates selection -----------------------
+check(all("strands" in s and s["strands"] for s in d4["sections"]),
+      "no section is empty — a grouping never removes material")
+
+sys.exit(1 if fail else 0)
+SUBSTRATE_EOF
+[ $? -eq 0 ] || fail=1
+
 [ "$fail" -eq 0 ] || { printf '\nFAILED.\n' >&2; exit 1; }
-printf '\nAll terrain-member checks passed (sectioning is a permutation).\n'
+printf '\nAll terrain-member checks passed (every Strand is covered).\n'
