@@ -766,7 +766,7 @@ AXES = ({"key": "tag", "noun": "tag"}, {"key": "topic", "noun": "topic"})
 # Detecting an *undeclared* new coinage is the same enumeration problem, and it
 # is the typed composition seam's job — deliberately still an open question in
 # the spec, with its own reopen trigger.
-OWNER_TERMS = ("brief", "Strand")
+OWNER_TERMS = ("brief", "Strand", "group claim")
 
 # Where the codebook lives, relative to the repository root. The surface points
 # at it rather than restating it: one definition, reachable, never N drifting

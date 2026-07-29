@@ -27,25 +27,29 @@
 set -u
 cd "$(dirname "$0")/.."
 fail=0
-TMP=$(mktemp); trap 'rm -f "$TMP"' EXIT
+TMP=$(mktemp); TERMS_FILE=$(mktemp); trap 'rm -f "$TMP" "$TERMS_FILE"' EXIT
 ok()   { echo "ok:   $1"; }
 bad()  { echo "FAIL: $1" >&2; fail=1; }
 
 DOC=$(python3 -c 'import importlib.util as u;s=u.spec_from_file_location("m","scripts/topic-map-directions.py");m=u.module_from_spec(s);s.loader.exec_module(m);print(m.OWNER_TERMS_DOC)')
-TERMS=$(python3 -c 'import importlib.util as u;s=u.spec_from_file_location("m","scripts/topic-map-directions.py");m=u.module_from_spec(s);s.loader.exec_module(m);print(" ".join(m.OWNER_TERMS))')
+# ONE TERM PER LINE, never a space-joined string: a ratified term may be a
+# compound ("group claim", #888), and word-splitting one would demand a
+# definition for each half — failing on a term nothing declares.
+python3 -c 'import importlib.util as u;s=u.spec_from_file_location("m","scripts/topic-map-directions.py");m=u.module_from_spec(s);s.loader.exec_module(m);print("\n".join(m.OWNER_TERMS))' > "$TERMS_FILE"
 
 [ -f "$DOC" ] && ok "the codebook exists at the declared path ($DOC)" \
               || { bad "the codebook is missing at the declared path ($DOC)"; exit 1; }
 
 # --- 1. every declared term is defined, with a body -------------------------
-for t in $TERMS; do
+while IFS= read -r t; do
+  [ -z "$t" ] && continue
   body=$(awk -v t="## $t" '$0==t{f=1;next} /^## /{f=0} f' "$DOC" | tr -d '[:space:]')
   if [ -n "$body" ]; then
     ok "declared term '$t' has a definition the owner can read"
   else
     bad "declared term '$t' has NO definition in $DOC — a term meant to reach the owner is defined where the owner reads it"
   fi
-done
+done < "$TERMS_FILE"
 
 # --- 2. no dead entry ------------------------------------------------------
 # Redirected from a FILE, never piped: a pipeline runs the loop in a subshell,
@@ -54,10 +58,11 @@ done
 grep '^## ' "$DOC" | sed 's/^## //' > "$TMP"
 while read -r entry; do
   [ -z "$entry" ] && continue
-  case " $TERMS " in
-    *" $entry "*) ok "codebook entry '$entry' is declared first-class vocabulary" ;;
-    *) bad "codebook entry '$entry' is declared nowhere — a definition for a term the surface never uses is drift" ;;
-  esac
+  if grep -Fxq "$entry" "$TERMS_FILE"; then
+    ok "codebook entry '$entry' is declared first-class vocabulary"
+  else
+    bad "codebook entry '$entry' is declared nowhere — a definition for a term the surface never uses is drift"
+  fi
 done < "$TMP"
 
 # --- 3. the surfaces are one step from the codebook ------------------------
