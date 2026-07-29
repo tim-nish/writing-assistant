@@ -406,5 +406,140 @@ sys.exit(1 if fail else 0)
 SUBSTRATE_EOF
 [ $? -eq 0 ] || fail=1
 
+
+# --- Story 20.37 (#891): a Journey-similarity substrate that groups but cannot
+# narrow — BUILT AND NOT OFFERED until one measurement run passes an owner
+# verdict (SPEC-terrain CAP-2's offering gate, #889).
+python3 - <<'JOURNEY_EOF'
+import importlib.util, json, subprocess, tempfile, sys
+
+D = "scripts/topic-map-directions.py"
+spec = importlib.util.spec_from_file_location("dv", D)
+m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+fail = 0
+
+
+def check(cond, msg):
+    global fail
+    if cond:
+        print(f"ok:   {msg}")
+    else:
+        print(f"FAIL: {msg}", file=sys.stderr)
+        fail = 1
+
+
+def mkmap(els):
+    d = {"kind": "topic-map", "topics": [], "coverage": {"pin": "h@abc1234"},
+         "elements": els}
+    f = tempfile.NamedTemporaryFile("w", suffix=".json", delete=False)
+    json.dump(d, f); f.close()
+    return f.name
+
+
+def member(path, tag, extra=()):
+    r = subprocess.run(["python3", D, "member", "--map", path, "--tag", tag,
+                        *extra], capture_output=True, text=True)
+    return json.loads(r.stdout)
+
+
+els = [{"kind": "lesson", "slug": f"a{n}", "title": f"A{n}", "gloss": f"g{n}",
+        "tags": ["agents", "cost"], "journey": f"arc {n}",
+        "journey_cite": f"gloss/journeys/agents.md:{n}@abc1234",
+        "evidence": [], "consumed": False} for n in range(6)]
+# Two Strands with NO served arc — distinguishable from "no arc exists".
+els += [{"kind": "lesson", "slug": f"n{n}", "title": f"N{n}", "gloss": "g",
+         "tags": ["agents"], "journey": None,
+         "journey_unavailable": "the journey shard was not served",
+         "evidence": [], "consumed": False} for n in range(2)]
+path = mkmap(els)
+
+# --- AC7: built but NOT OFFERED --------------------------------------------
+check(m.JOURNEY_SUBSTRATE not in m.SUBSTRATES,
+      "the judged substrate is absent from the OFFERED set (#889's gate)")
+check(m.JOURNEY_SUBSTRATE in m.SUBSTRATES_UNOFFERED,
+      "it is built and reachable — withheld, not missing")
+d_off = member(path, "agents")
+check(d_off["substrate"] == "co-tags" and d_off["substrate_offered"] is True,
+      f"the default substrate is the offered one ({d_off['substrate']})")
+
+# --- AC4: arcs come from the SERVED rendering ------------------------------
+r = subprocess.run(["python3", D, "journey-inputs", "--map", path,
+                    "--tag", "agents"], capture_output=True, text=True)
+ji = json.loads(r.stdout)
+check(ji["count"] == 8 and ji["served"] == 6,
+      f"inputs carry every Strand and count what is SERVED ({ji['served']}/{ji['count']})")
+check(ji["offered"] is False, "the inputs surface states the substrate is not offered")
+by = {x["slug"]: x for x in ji["inputs"]}
+check(by["a0"]["arc"] == "arc 0" and by["a0"]["arc_cite"].startswith("gloss/journeys/"),
+      "an arc is the served rendering, quoted with its cite")
+check(by["n0"]["arc"] is None and by["n0"]["served"] is False
+      and by["n0"]["not_served_reason"],
+      "a Strand with no served arc says NOT SERVED with its reason — never 'no arc exists'")
+
+# --- AC1/AC2: the composer PLACES; omission is re-attached, not accepted ----
+grouping = [{"in_common": "shared path X", "members": ["a0", "a1"]}]
+d = member(path, "agents", ["--substrate", "journey-similarity",
+                            "--grouping", json.dumps(grouping)])
+placed = [s for sec in d["sections"] for s in sec["strands"]]
+check(len(set(placed)) == 8 and d["covered"] is True,
+      f"every Strand is covered AFTER composition ({len(set(placed))} of {d['count']})")
+check(d["placements"] == len(placed),
+      "placements are counted on the composed output, not on the proposal")
+titles = {s["title"]: s for s in d["sections"]}
+check("shared path X" in titles, "the composer's own grouping is honoured")
+
+# --- AC6/AC3: residues are NAMED and distinguished -------------------------
+check(m.NO_SHARED_PATH_TITLE in titles
+      and sorted(titles[m.NO_SHARED_PATH_TITLE]["strands"]) == ["a2", "a3", "a4", "a5"],
+      f"arc-bearing Strands the composer left out land in an explicit 'no shared path' section ({sorted(titles)})")
+check(m.NO_ARC_TITLE in titles
+      and sorted(titles[m.NO_ARC_TITLE]["strands"]) == ["n0", "n1"],
+      "a Strand with no SERVED arc gets its own named section — not-served is not no-shared-path")
+
+# --- AC1: ranking, scoring and hiding are unreachable ----------------------
+# A proposal carrying an order and a score must not change what reaches the
+# owner: order is re-derived from a declared key and extra fields are ignored.
+ranked = [{"in_common": "zzz last alphabetically", "members": ["a0"], "score": 0.99, "rank": 1},
+          {"in_common": "aaa first alphabetically", "members": ["a1"], "score": 0.01, "rank": 2}]
+d2 = member(path, "agents", ["--substrate", "journey-similarity",
+                             "--grouping", json.dumps(ranked)])
+order = [s["title"] for s in d2["sections"] if s["title"] in
+         ("aaa first alphabetically", "zzz last alphabetically")]
+check(order == ["aaa first alphabetically", "zzz last alphabetically"],
+      f"a proposal's own ranking is IGNORED — order comes from a declared key ({order})")
+placed2 = {s for sec in d2["sections"] for s in sec["strands"]}
+check(len(placed2) == 8,
+      "a low-scored group is never hidden — scoring cannot remove a Strand")
+
+# --- an empty proposal is the honest empty state, never an invented grouping
+d3 = member(path, "agents", ["--substrate", "journey-similarity"])
+placed3 = {s for sec in d3["sections"] for s in sec["strands"]}
+check(len(placed3) == 8 and d3["covered"] is True,
+      "with no proposed grouping every Strand lands in a named residue, still covered")
+check(all(s["title"] in (m.NO_SHARED_PATH_TITLE, m.NO_ARC_TITLE)
+          for s in d3["sections"]),
+      "nothing is invented when the composer proposes nothing")
+
+# --- AC9: group ids are a DISPLAY kind -------------------------------------
+check(all(s["group_id"].startswith("G") for s in d["sections"]),
+      "every section carries a G display id")
+check(len({s["group_id"] for s in d["sections"]}) == len(d["sections"]),
+      "group ids are unique within the screen")
+# Selection stays by element id: the G namespace must not appear as a
+# selectable candidate index anywhere in the composed listing contract.
+check("group_id" not in json.dumps(d.get("background", {})),
+      "the group id confers no selection authority (it is not a selection key)")
+
+# --- a judged substrate is not subdivided on another substrate's key -------
+over = [s for s in d3["sections"] if s.get("note")]
+check(all("another substrate's key" in (s.get("note") or "") for s in over),
+      "an over-cap judged section DISCLOSES rather than borrowing the co-tag key")
+check(not any(" + " in s["title"] for s in d3["sections"]),
+      "no co-tag subdivision leaks into a judged substrate's titles")
+
+sys.exit(1 if fail else 0)
+JOURNEY_EOF
+[ $? -eq 0 ] || fail=1
+
 [ "$fail" -eq 0 ] || { printf '\nFAILED.\n' >&2; exit 1; }
 printf '\nAll terrain-member checks passed (every Strand is covered).\n'
