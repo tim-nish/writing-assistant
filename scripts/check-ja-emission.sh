@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
 # check-ja-emission.sh — verify Zenn emission from a JA canonical is PURE
 # PACKAGING (Story 18.59, #590; the emission half of #582, governed by the
 # shipped SPEC-platform-variants CAP-3/CAP-4 because a derived canonical is a

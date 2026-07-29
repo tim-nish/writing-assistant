@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
 # check-interview-items.sh — verify the interview-item schema validator
 # (Story 14.3, SPEC-policy-source-seam CAP-3; seam-formats.md §2).
 # POSIX shell + stdlib Python only.

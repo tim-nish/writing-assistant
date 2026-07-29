@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
 # check-derived-canonical.sh — verify the DERIVED CANONICAL is first-class and
 # records its ancestry (Story 18.57, #586; SPEC-canonical-adaptation CAP-2 +
 # CAP-4). POSIX sh + stdlib Python; every fixture write lands under mktemp -d.

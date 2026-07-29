@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
 # check-checkpoint-resume.sh — verify per-stage checkpoint + resume (Story 13.5).
 # POSIX shell + stdlib Python. A run that stops after stage N resumes from N+1
 # rather than restarting; the checkpoint is atomic, idempotent, and lives in the

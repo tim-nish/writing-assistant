@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
 # check-verify-provenance.sh — verify the independent verify-provenance check
 # (Story 11.2). POSIX shell + stdlib Python.
 #

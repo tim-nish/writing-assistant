@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
 # check-named-element-pin.sh — verify CAP-9 named-element pin (#431): a
 # `--element <name>` directive at stage 0 records the pin in run state, pinning
 # selection to one story element and scoping harvest to it without widening the

@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
 # check-policy-source-config.sh — verify the `policy_source` config block
 # (Story 14.1, SPEC-policy-source-seam CAP-1 as amended 2026-07-18, #366:
 # presence toggle, no filesystem path — Story 13.73). POSIX shell + stdlib

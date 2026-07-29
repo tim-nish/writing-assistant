@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
 # check-config-validation.sh — verify Stage-0 configuration validation (Story 7.4,
 # CAP-5): before any generation or review, a config carrying an example
 # placeholder, a malformed URL (double-slash canonical_url), or a missing required

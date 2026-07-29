@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
 # check-capabilities-manifest.sh — every CAPABILITIES.md row's evidence EXISTS
 # and PASSES (Story 20.6, #805). The carrier-check idiom applied to capability
 # claims: a manifest whose rows are prose rots exactly the way the status line

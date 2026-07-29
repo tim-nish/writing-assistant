@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
 # check-stage3-fill.sh — verify Stage 3 framework fill + the `[VERIFY]` marker
 # contract (Story 4.4). POSIX shell + stdlib Python.
 

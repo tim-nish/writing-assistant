@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
 # check-footprint-invariant.sh — verify the host-repo footprint invariant is
 # enforced end-to-end (Story 9.3). POSIX shell + stdlib Python only.
 #

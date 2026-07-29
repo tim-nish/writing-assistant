@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
 # check-fork-consult.sh — verify the fork-gate consult-first contract
 # (SPEC-policy-fork-consultation, #480, Stories 18.11/18.12). POSIX shell +
 # stdlib Python only. Carries the four acceptance criteria the sitting named

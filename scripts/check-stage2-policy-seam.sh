@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
 # check-stage2-policy-seam.sh — verify the Stage-2 policy-seam integration
 # (Story 14.4, SPEC-policy-source-seam FR45/FR47/FR48, CAP-2).
 # POSIX shell + stdlib Python only.

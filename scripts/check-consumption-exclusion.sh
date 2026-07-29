@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
 # check-consumption-exclusion.sh — verify CAP-9 consumption exclusion (#430):
 # consumed story-element ids recorded in the article plan (no new store), and
 # the consult-time `consumed_index` view regenerated from plans/*.md that a new

@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
 # check-delivered-basename.sh — verify the DELIVERED basename comes from the
 # profile's declared mapping, that every basename join still resolves, and that
 # an illegal delivered slug is a named publish blocker (Story 18.115, #715;

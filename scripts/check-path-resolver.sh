@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
 # check-path-resolver.sh — verify the path resolver is the single source of
 # storage paths (Story 9.1). POSIX shell + stdlib Python only.
 #

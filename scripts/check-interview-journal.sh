@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
 # check-interview-journal.sh — verify the interview journal as the boundary
 # diagnostic (Story 10.4). POSIX shell + stdlib Python.
 #
