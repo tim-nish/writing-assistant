@@ -193,6 +193,24 @@ for f in scripts/*.py; do
 done
 [ "$pyfound" -eq 1 ] || err "no scripts/*.py found — wrong root?"
 
+# --- check-suite slope (Story 20.48, #922; spec amendment #910/#913) --------
+# The check family joins the packaging budget on its SLOPE, not its level: a
+# count alone never fails the build — growth is what the instrument is for,
+# and it is REPORTED so the between-sittings delta is observable. The measured
+# defect this answers: 126 -> 132 -> 136 across two days, absorbed silently.
+# The baseline is re-recorded whenever the slope is deliberately reviewed —
+# never bumped just to quiet the warn line, which IS the instrument reading.
+CHECK_SUITE_BASELINE=138       # recorded 2026-07-30 (Story 20.48 adoption)
+CHECK_SUITE_BASELINE_DATE=2026-07-30
+suite_n=$(ls scripts/check-*.sh 2>/dev/null | wc -l | tr -d ' ')
+if [ "$suite_n" -gt "$CHECK_SUITE_BASELINE" ]; then
+  warn "check suite has grown: $suite_n checks, +$((suite_n - CHECK_SUITE_BASELINE)) since $CHECK_SUITE_BASELINE_DATE ($CHECK_SUITE_BASELINE) — slope is the instrument (never a failure); each new member declares its tier and removal signal (check-check-declarations.sh)"
+elif [ "$suite_n" -lt "$CHECK_SUITE_BASELINE" ]; then
+  ok "check suite: $suite_n checks, down $((CHECK_SUITE_BASELINE - suite_n)) since $CHECK_SUITE_BASELINE_DATE ($CHECK_SUITE_BASELINE) — consider re-recording the baseline to lock the reduction in"
+else
+  ok "check suite: $suite_n checks, flat since $CHECK_SUITE_BASELINE_DATE"
+fi
+
 if [ "$fail" -eq 0 ]; then
   printf '\nAll skill-budget checks passed.\n'; exit 0
 else
