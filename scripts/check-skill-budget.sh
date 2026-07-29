@@ -48,7 +48,7 @@ SPEC_HARD_BYTES=72000   # ~18k tokens
 # First offender at adoption (2026-07-27), RATCHETED — growth past
 # adoption+slack FAILS; shrinkage ratchets the entry down.
 # Format: "<path>:<bytes-at-adoption>", space-separated.
-SPEC_RATCHETED="specs/spec-article-draft-pipeline/SPEC.md:88474"
+SPEC_RATCHETED="specs/spec-article-draft-pipeline/SPEC.md:45056"
 
 # --- Script-surface family (Story 20.1, #759) --------------------------------
 # Same cost-typed class, second family: scripts/*.py. Thresholds sized from
