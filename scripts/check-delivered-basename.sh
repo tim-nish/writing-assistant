@@ -250,7 +250,7 @@ fi
 
 # --- 8. both discovery sites union in the forward-resolved paths ---------
 python3 - "$root" <<'PY' || fail=1
-import ast, sys
+import ast, os, sys
 src = open(sys.argv[1] + "/scripts/draft-pipeline.py", encoding="utf-8").read()
 tree = ast.parse(src)
 lines = src.splitlines()
@@ -262,11 +262,20 @@ def check(cond, msg):
 # to a function that happens to sit near it.
 # `_staleness_report` is the shared discovery helper `cmd_variant_staleness`
 # calls; the join lives there, not in the command wrapper.
+# The review family moved to its own module (Story 20.45, #919), so the search
+# follows the code rather than assuming one file. Borrowed helpers read as
+# `_host.<name>` there, which the substring test still matches.
 want = {"_staleness_report": False, "cmd_review_reentry": False}
-for node in tree.body:
-    if isinstance(node, ast.FunctionDef) and node.name in want:
-        body = "\n".join(lines[node.lineno - 1:node.end_lineno])
-        want[node.name] = "_delivered_variant_paths" in body
+sources = [(tree, lines)]
+_rev = sys.argv[1] + "/scripts/draft_review.py"
+if os.path.exists(_rev):
+    _rsrc = open(_rev, encoding="utf-8").read()
+    sources.append((ast.parse(_rsrc), _rsrc.splitlines()))
+for _tree, _lines in sources:
+    for node in _tree.body:
+        if isinstance(node, ast.FunctionDef) and node.name in want and not want[node.name]:
+            body = "\n".join(_lines[node.lineno - 1:node.end_lineno])
+            want[node.name] = "_delivered_variant_paths" in body
 for name, found in want.items():
     check(found, f"{name} unions in the forward-resolved delivered paths")
 sys.exit(1 if bad else 0)
