@@ -487,3 +487,29 @@ the blocks.
 > member's Strands (Story 20.23 implements the subdivision; the existing
 > co-tag grouping rule stays free to change — the contract is the bound, not
 > the grouping).
+
+> **Amended 2026-07-29 (spec sitting, #884)** per tsurezure-gateway#76 (ratified
+> 2026-07-29; gateway PR #77 merged, hub manifest product-lab#112 closed — the
+> served element manifest carries 117 lesson, 109 journey, and 87 decision
+> records). **CAP-1's hub-gloss family acquires Strand MEMBERSHIP from the
+> served element manifest** (`element_survey` through the seam's new `elements`
+> subcommand): which Strands exist, their tags, and which carry a Journey arc
+> are read from labelled record fields — the tier-1 `GLOSS_LINE` markdown parse
+> is **retired as the enumeration source** and retained solely as the
+> headline-TEXT join (by slug; the ratified rendering is still quoted verbatim,
+> and the manifest deliberately embeds no bodies). The tier-1 journey *marker*
+> hands its discovery role to the journey records' kind-qualified rendering
+> pointers; the tagged `journeys/<tag>` read itself is unchanged (#871: arcs
+> attach to their lessons, never independently selectable — record-kind
+> `journey` does not create a selectable unit). **Three invariants become
+> mechanically checkable and are CHECKED per run:** composed-Strand count
+> equals lesson-record count (count-in = count-out against a served
+> denominator); journey attachment equals journey-record count; and a record
+> with no tier-1 line or a tier-1 line with no record is a **finding in the
+> disclosure, never silently resolved in either direction** (hub rule,
+> product-lab#98). Decisions are NOT widened: the per-topic thread-line join
+> (Story 20.22) stands, and the manifest's decision records are not enumerated
+> by this amendment — Strand is the selection unit. Records unavailable (older
+> gateway, undeclared manifest) degrades to the tier-1 acquisition **with the
+> substitution disclosed at the point it happens** (rule 1 above), never
+> silently.
