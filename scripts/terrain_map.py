@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""topic-map.py — the topic map as a DERIVED, READ-ONLY view (Story 18.61, #585;
+"""terrain_map.py — the topic map as a DERIVED, READ-ONLY view (Story 18.61, #585;
 SPEC-terrain CAP-1 + CAP-4).
 
 The topic map is an overview of what the owner *could* write about, assembled

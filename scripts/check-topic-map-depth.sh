@@ -30,7 +30,7 @@ fail=0
 err() { printf 'FAIL: %s\n' "$1" >&2; fail=1; }
 ok()  { printf 'ok:   %s\n' "$1"; }
 
-M="scripts/topic-map.py"
+M="scripts/terrain_map.py"
 D="scripts/topic-map-directions.py"
 
 # 1. The estimator and its inputs are deleted from the assembler.
@@ -44,7 +44,7 @@ present = [g for g in gone if g in src]
 assert not present, f"still present: {present}"
 PYEOF
 then ok "assembler: the estimator, its thresholds and the glance bar are deleted"
-else err "depth machinery survives in topic-map.py"
+else err "depth machinery survives in terrain_map.py"
 fi
 
 # 2. ...and from the rendering side.

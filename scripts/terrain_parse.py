@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """terrain_parse — served-artifact parsing (Story 20.41, #904).
 
-Extracted from `topic-map.py` per the packaging invariant's scripts-family
+Extracted from `terrain_map.py` per the packaging invariant's scripts-family
 clause (`specs/spec-writing-assistant/SPEC.md`, amended 2026-07-29, #900), one
 seam along from `terrain_seam`: that module owns the served ENVELOPE, this one
 decodes the lines inside it.

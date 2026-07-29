@@ -23,7 +23,7 @@ fail=0
 err() { printf 'FAIL: %s\n' "$1" >&2; fail=1; }
 ok()  { printf 'ok:   %s\n' "$1"; }
 
-python3 - "scripts/topic-map.py" "scripts/topic-map-directions.py" <<'PYEOF' || fail=1
+python3 - "scripts/terrain_map.py" "scripts/topic-map-directions.py" <<'PYEOF' || fail=1
 import importlib.util, sys
 
 def load(name, path):
@@ -104,13 +104,13 @@ PYEOF
 
 # The accumulator must never drop a served surface (#873): two files resolving
 # to one topic key extend, they do not assign.
-grep -q 'by_topic.setdefault(current, \[\]).extend(' scripts/topic-map.py \
+grep -q 'by_topic.setdefault(current, \[\]).extend(' scripts/terrain_map.py \
   && ok "two served surfaces under one topic key EXTEND, never clobber" \
   || err "read_topic_elements assigns by_topic[current] — an earlier set is dropped silently"
 
 # Detection is the consumer's own: no code path may gate it on an upstream
 # version, flag, or claim that a fix has landed.
-if grep -nE 'substitut' scripts/topic-map.py scripts/topic-map-directions.py \
+if grep -nE 'substitut' scripts/terrain_map.py scripts/topic-map-directions.py \
      | grep -qiE 'gateway_version|if .*fixed|upstream_ok'; then
   err "substitution detection is gated on an upstream claim — the failure it catches IS the false claim"
 else

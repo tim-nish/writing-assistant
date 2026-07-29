@@ -3,7 +3,7 @@
 (Story 18.63, #591; SPEC-terrain CAP-3).
 
 The map ends in a BRIEF, not in a second proposer. This script reads an
-assembled map (`topic-map.py assemble`) and composes exactly two things:
+assembled map (`terrain_map.py assemble`) and composes exactly two things:
 
   * `candidates` — machine-proposed candidate DIRECTIONS, each a subject the
     owner might cover, derived from the map's own depth signals. At least one is
@@ -22,7 +22,7 @@ with selection by stable index rather than by matching a direction string —
 because 20+ directions collapsed into a handful of options hides exactly what
 the map exists to show.
 
-The View is a RENDERING of one invocation, at the same status as topic-map.py's
+The View is a RENDERING of one invocation, at the same status as terrain_map.py's
 `--emit-debug`: a fixed filename in the run workspace, fully regenerated every
 invocation, and **never read back by any code path** (grep-asserted). Deleting
 it loses nothing — the map is derived, and the View is recomposed from it.
@@ -622,7 +622,7 @@ def compose_view(map_data, cands):
     itself: a second derivation here would be a second proposer, and the
     directions on the View must be the same ones the screen was built from.
 
-    A RENDERING, at the same status as topic-map.py's --emit-debug: fully
+    A RENDERING, at the same status as terrain_map.py's --emit-debug: fully
     regenerated every invocation and NEVER read back by any code path. Deleting
     it loses nothing — the map is recomputed, and this is recomposed from it.
     """
@@ -811,7 +811,7 @@ def axis_members(map_data):
 
     Before this story the decision corpus had no axis and its Strands fell into
     that disclosure wholesale (the shard join, Story 20.22, attaches renderings
-    but the served entries carry no per-entry tags — `topic-map.py`
+    but the served entries carry no per-entry tags — `terrain_map.py`
     `decision_shard_entries`). They are reachable now, so the count they
     inflated is a real residue again rather than a standing 54% of the corpus.
     """

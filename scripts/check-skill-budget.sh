@@ -52,7 +52,7 @@ SPEC_RATCHETED="specs/spec-article-draft-pipeline/SPEC.md:45056"
 
 # --- Script-surface family (Story 20.1, #759) --------------------------------
 # Same cost-typed class, second family: scripts/*.py. Thresholds sized from
-# the 2026-07-26 distribution (next-largest after the outlier: topic-map.py
+# the 2026-07-26 distribution (next-largest after the outlier: terrain_map.py
 # 1,612; the long tail <= ~1,300) so only genuine outliers trip.
 PY_WARN_LINES=1400
 PY_HARD_LINES=2000
