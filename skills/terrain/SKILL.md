@@ -64,7 +64,7 @@ wrote its intermediates into a harness scratchpad (#611).
 ## Step 1 — assemble the map
 
 ```
-python3 ${CLAUDE_PLUGIN_ROOT}/scripts/topic-map.py assemble --root <host-repo> > "$WS/map.json"
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/terrain_map.py assemble --root <host-repo> > "$WS/map.json"
 ```
 
 The map is **derived, never stored**: it is recomputed from the articles repo

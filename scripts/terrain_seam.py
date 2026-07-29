@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """terrain_seam — the policy-seam I/O layer (Story 20.40, #903).
 
-Extracted from `topic-map.py` per the packaging invariant's scripts-family
+Extracted from `terrain_map.py` per the packaging invariant's scripts-family
 clause (`specs/spec-writing-assistant/SPEC.md`, amended 2026-07-29, #900). Of
 the four concerns that file interleaved, this is the one with an **external**
 boundary: its contract is owned by another repository, reached only through

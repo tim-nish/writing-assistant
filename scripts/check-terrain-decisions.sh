@@ -23,7 +23,7 @@ fail=0
 err() { printf 'FAIL: %s\n' "$1" >&2; fail=1; }
 ok()  { printf 'ok:   %s\n' "$1"; }
 
-M="scripts/topic-map.py"
+M="scripts/terrain_map.py"
 D="scripts/topic-map-directions.py"
 
 python3 - "$M" "$D" <<'PYEOF' || fail=1

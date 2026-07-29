@@ -30,7 +30,7 @@ root=$(git rev-parse --show-toplevel 2>/dev/null) || {
 }
 cd "$root"
 
-M="scripts/topic-map.py"
+M="scripts/terrain_map.py"
 D="scripts/topic-map-directions.py"
 DP="scripts/draft-pipeline.py"
 VP="scripts/validate-proposal-payload.py"
@@ -159,7 +159,7 @@ check(c, "the map proposes candidate directions")
 # WITH ITS REASON, never deleted silently. CAP-3 still promises the move; what
 # does not exist is evidence that could support one, because a Strand's only
 # pointer is the surface it was read from ("Its own index line is its evidence
-# pointer", scripts/topic-map.py lesson_item). Pairing on that made every
+# pointer", scripts/terrain_map.py lesson_item). Pairing on that made every
 # cross-topic pair share `LESSONS.md`.
 combos = [x for x in c if x["kind"] == "combination"]
 check(not combos,
@@ -996,7 +996,7 @@ done
 # member, then brief. The pre-pivot `payload --view` invocation left the
 # skill with that story; the View survives on the size switch's over-budget
 # branch via the `view` subcommand.
-for token in 'topic-map.py assemble' 'topic-map-directions.py axis' \
+for token in 'terrain_map.py assemble' 'topic-map-directions.py axis' \
              'topic-map-directions.py member' \
              'topic-map-directions.py brief' 'validate-proposal-payload.py' \
              'stage0' '--brief' 'free-form' 'every time' \

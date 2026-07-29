@@ -739,7 +739,7 @@ flows into the existing brief/structures path unchanged.**
     shipped and the code did not (amended 2026-07-29, #886).** The clause
     was written 2026-07-28 and the axis still enumerated from
     `policy_source.track_topics` bounded by `ELEMENT_TOPIC_BOUND=2`
-    (`scripts/topic-map.py:1071-1078, 1155-1156, 1273-1275`), so on every
+    (`scripts/terrain_map.py:1071-1078, 1155-1156, 1273-1275`), so on every
     repo declaring no mapping — the default — the axis offered **0 members**
     while the hub served 4 topics and 87 decisions. A promise whose
     implementation is unwritten reads exactly like a promise being kept:
@@ -904,7 +904,7 @@ flows into the existing brief/structures path unchanged.**
   and is budgeted); **the unit itself was not**, for a reason that is a fact
   about the substrate rather than a preference:
   - CAP-4's declared families are exactly `articles-items`, `hub-lessons` and
-    `host-sources` (`scripts/topic-map.py:153-155`), and `hub-lessons` is one
+    `host-sources` (`scripts/terrain_map.py:153-155`), and `hub-lessons` is one
     seed per `LESSONS.md` **index line** (`:328-335`). Nothing this repository
     can read records a **reversal**, a **decision with its why**, or
     **thinking-at-the-time** as a typed record. Three of the five proposed

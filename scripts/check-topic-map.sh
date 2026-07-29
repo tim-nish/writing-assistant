@@ -26,7 +26,7 @@ root=$(git rev-parse --show-toplevel 2>/dev/null) || {
 }
 cd "$root"
 
-M="scripts/topic-map.py"
+M="scripts/terrain_map.py"
 fail=0
 err() { printf 'FAIL: %s\n' "$1" >&2; fail=1; }
 ok()  { printf 'ok:   %s\n' "$1"; }
@@ -229,7 +229,7 @@ fi
 
 # Source-level: nothing in the implementation reads a map back.
 grep -nE 'json\.load\(|read_map|load_map|cached_map|--from-cache|--map-file' "$M" \
-  && err "topic-map.py contains a map-reading code path" \
+  && err "terrain_map.py contains a map-reading code path" \
   || ok "CAP-1: no map-reading code path exists in the implementation"
 
 # --- 5. CAP-4: an over-bound invocation NAMES what it skipped -------------------
@@ -650,7 +650,7 @@ PYEOF
 # It was derived PER SUBTOPIC and has no carrier once the unit is gone. The
 # threshold declaration goes with it — a declaration nothing reads is exactly
 # the assembly cost this removal exists to stop.
-python3 - "$root/scripts/topic-map.py" <<'PYEOF' && ok "no depth estimator, no threshold plumbing, no --thresholds flag" || err "depth estimator survives"
+python3 - "$root/scripts/terrain_map.py" <<'PYEOF' && ok "no depth estimator, no threshold plumbing, no --thresholds flag" || err "depth estimator survives"
 import sys
 src = open(sys.argv[1], encoding="utf-8").read()
 for gone in ("estimate_depth", "load_thresholds", "--thresholds", "depth_thresholds"):
@@ -665,7 +665,7 @@ PYEOF
 # malformed-declaration lint all existed to NAME a cluster. The cluster unit is
 # abandoned, so they are asserted absent rather than re-pointed: a lint on a
 # key nothing reads reports a defect with no consequence.
-python3 - "$root/scripts/topic-map.py" <<'PYEOF' && ok "clustering, its naming and its declaration lint are deleted, not merely unreferenced" || err "cluster machinery survives"
+python3 - "$root/scripts/terrain_map.py" <<'PYEOF' && ok "clustering, its naming and its declaration lint are deleted, not merely unreferenced" || err "cluster machinery survives"
 import sys
 src = open(sys.argv[1], encoding="utf-8").read()
 for gone in ("def cluster_subtopics(", "def subtopic_key(", "def subtopic_defect(",
@@ -814,36 +814,36 @@ PYEOF
 CODE="$work/code.py"
 # The invariant is that the PREDICATE is not re-derived here. Story 18.62 marks
 # items against the shipped index (a lookup, not a second rule), so the check
-# targets re-derivation directly, over the comment-stripped code: topic-map.py
+# targets re-derivation directly, over the comment-stripped code: terrain_map.py
 # must never read `plans/` itself, and the view must come from
 # `write-article-plan.py consult`.
 grep -qE "plans" "$CODE" \
-  && err "topic-map.py reads plans/ itself (the consumption view must come from consult)" \
-  || ok "consumption: topic-map.py never reads plans/ — no second derivation of the predicate"
+  && err "terrain_map.py reads plans/ itself (the consumption view must come from consult)" \
+  || ok "consumption: terrain_map.py never reads plans/ — no second derivation of the predicate"
 grep -q 'PLAN_WRITER' "$M" \
   && ok "consumption: the view is read from the shipped write-article-plan.py consult" \
-  || err "topic-map.py does not read the shipped consumption view"
+  || err "terrain_map.py does not read the shipped consumption view"
 # CAP-2 (depth signals) SHIPPED with Story 18.62 (#588) and has its own harness
 # (check-topic-map-depth.sh). What must stay true here is that no depth boundary
 # is hardcoded in stage code: the numbers live in the declaration file alone.
 grep -qiE 'seed-only|short note|article series' "$CODE" \
-  && err "topic-map.py hardcodes a depth level name (the levels are declared data)" \
+  && err "terrain_map.py hardcodes a depth level name (the levels are declared data)" \
   || ok "scope: no depth level is hardcoded (the boundaries stay declared)"
 grep -qE 'min_evidence_pointers *= *[0-9]|min_live_items *= *[0-9]' "$CODE" \
-  && err "topic-map.py hardcodes a threshold value (it must read the declaration)" \
+  && err "terrain_map.py hardcodes a threshold value (it must read the declaration)" \
   || ok "scope: no threshold value is hardcoded in stage code"
 grep -qiE 'approve/modify|proposal contract|candidate direction|screen' "$CODE" \
-  && err "topic-map.py builds a presentation screen (CAP-3 belongs to a sibling story)" \
+  && err "terrain_map.py builds a presentation screen (CAP-3 belongs to a sibling story)" \
   || ok "scope: no presentation screen is built (CAP-3 left to its own story)"
 grep -qiE 'narrative structure|structure candidate|compose.*structure' "$CODE" \
-  && err "topic-map.py composes narrative structures (18.45 single-proposer invariant)" \
+  && err "terrain_map.py composes narrative structures (18.45 single-proposer invariant)" \
   || ok "scope: the map composes no narrative structures (single-proposer invariant intact)"
 # CAP-4's cost promise as amended: widening the corpus must NOT pull in
 # harvest's per-source budgeted extraction. The map stays index-scale. The
 # check is a CLOSED SET of sibling scripts the map may reach for — adding one
 # is a reviewed decision, not a drive-by import, and no fact-sheet reader or
 # harvest cache is on it.
-python3 - "$M" <<'PYEOF' && ok "CAP-4: the map reaches only for its declared resolvers/seams — no harvest pass, no fact-sheet extractor (cost stays index-scale)" || err "topic-map.py reaches for a script outside its allowed set (an extraction pass would make the map corpus-scale)"
+python3 - "$M" <<'PYEOF' && ok "CAP-4: the map reaches only for its declared resolvers/seams — no harvest pass, no fact-sheet extractor (cost stays index-scale)" || err "terrain_map.py reaches for a script outside its allowed set (an extraction pass would make the map corpus-scale)"
 import re, sys
 src = open(sys.argv[1], encoding="utf-8").read()
 named = set(re.findall(r'os\.path\.join\(SCRIPT_DIR,\s*"([^"]+\.py)"\)', src))
@@ -867,7 +867,7 @@ PYEOF
 # builder. That builder went with the family (Story 20.7, #809), so the
 # strongest form of CAP-4's cost promise now holds: the map does not reach for
 # harvest's budgeting AT ALL.
-python3 - "$M" <<'PYEOF' && ok "CAP-4: the map no longer reaches for harvest's budgeting at all (the host-sources item builder went with the family)" || err "topic-map.py still reaches into harvest's budgeting"
+python3 - "$M" <<'PYEOF' && ok "CAP-4: the map no longer reaches for harvest's budgeting at all (the host-sources item builder went with the family)" || err "terrain_map.py still reaches into harvest's budgeting"
 import re, sys
 src = open(sys.argv[1], encoding="utf-8").read()
 used = set(re.findall(r'_budget\(\)\.(\w+)', src))
@@ -875,7 +875,7 @@ assert not used, f"harvest-budget attributes still used: {sorted(used)}"
 PYEOF
 # The hub-lessons family goes through the SHIPPED seam — never a second reader.
 # Since the seam split (Story 20.40, #903) the reader is owned by ONE module,
-# which is a stronger form of the same property: `topic-map.py` cannot reach
+# which is a stronger form of the same property: `terrain_map.py` cannot reach
 # the policy source except through it, so "one reader" is structural rather
 # than a convention this grep polices.
 SEAM="scripts/terrain_seam.py"
@@ -884,14 +884,14 @@ grep -q 'POLICY_READER' "$SEAM" \
   || err "$SEAM does not invoke the shipped policy reader"
 grep -q 'terrain_seam' "$M" \
   && ok "hub-lessons: the family is served through the seam module" \
-  || err "topic-map.py does not reach the policy source through the seam module"
+  || err "terrain_map.py does not reach the policy source through the seam module"
 # INVOCATION SHAPES, never prose (#834's rule): the docstrings still name the
 # reader, and should — what must not survive is a call to it.
 grep -qE 'POLICY_READER|subprocess\.run\(\[sys\.executable, *[A-Z_]*READER' "$M" \
-  && err "topic-map.py invokes the policy reader directly — the seam layer is bypassed (#903)" \
-  || ok "no seam invocation remains in topic-map.py (the split holds)"
+  && err "terrain_map.py invokes the policy reader directly — the seam layer is bypassed (#903)" \
+  || ok "no seam invocation remains in terrain_map.py (the split holds)"
 grep -qE 'lessons_index|LESSONS\.md.*open\(|policy_lookup' "$CODE" \
-  && err "topic-map.py talks to the gateway itself (the seam is the only reader)" \
+  && err "terrain_map.py talks to the gateway itself (the seam is the only reader)" \
   || ok "hub-lessons: no second policy reader exists in the implementation"
 
 # --- 9. an unresolvable articles repo is a disclosed refusal, not a silent map ---
@@ -1084,7 +1084,7 @@ AXIS_ASSERT
 # AC7 — a reintroduced consumer-side gate is caught mechanically, asserted on
 # the shipped source rather than on a mocked boolean.
 python3 - <<'AXIS_GUARD' && ok "#886: no consumer-declared gate stands between the manifest and the axis (regression guard)" || err "a consumer-side gate is reachable from the record-authoritative axis path"
-src = open("scripts/topic-map.py").read()
+src = open("scripts/terrain_map.py").read()
 axis = src.split("def element_axis(", 1)[1].split("\ndef ", 1)[0]
 body = axis.split('"""', 2)[2]
 # The record-authoritative branch must not consult the declared mapping or the
