@@ -80,6 +80,24 @@ DEN_RE = re.compile(r"^den:(?P<ledger>[A-Za-z0-9._-]+)@(?P<run>[A-Za-z0-9._-]+)$
 # (§"Harvest coverage disclosure").
 COVERAGE_HEADING_RE = re.compile(r"^#+\s*Coverage\b", re.I)
 COV_PIN_RE = re.compile(r"^pin:\s*(?P<pin>\S+)\s*$")
+# The HARVEST PIN (Story 20.44, #907): the determinism triple — which repo was
+# harvested, at which commit, by which extractor version. The pin IS the
+# version, so no separate version number is stored: a stored number beside the
+# pins it duplicates is a conformance copy, and it drifts exactly when it
+# matters. A partial triple is a DEFECT, not a partial record — a sheet whose
+# provenance cannot be reconstructed is not a lesser sheet, it is an
+# unverifiable one.
+COV_HARVEST_RE = re.compile(
+    r"^harvest:\s*repo=(?P<repo>\S+)\s+commit=(?P<commit>\S+)\s+"
+    r"extractor=(?P<extractor>\S+)\s*$")
+# A contributing repository, named so a reader maps a source path to its repo
+# WITHOUT inferring it from the path. Emitted per repo when the pool spans more
+# than one; the entry grammar is untouched, which is the point — repo
+# qualification is a manifest fact, not a new field on every entry.
+COV_REPO_RE = re.compile(r"^repo:\s*(?P<name>\S+)\s+(?P<root>\S+)\s*$")
+# Rejected explicitly so a near-miss reads as the defect it is rather than as
+# an unrecognized line: a `harvest:` line missing any of the three fields.
+COV_HARVEST_PARTIAL_RE = re.compile(r"^harvest:\s*(?P<rest>.*)$")
 COV_MATCHED_RE = re.compile(r"^matched:\s*(?P<n>\d+)\s*$")
 COV_READ_RE = re.compile(r"^read:\s*(?P<file>.+?)\s*\((?P<n>\d+)\)\s*$")
 COV_SKIPPED_NONE_RE = re.compile(r"^skipped:\s*none\s*$", re.I)
@@ -124,6 +142,7 @@ def validate_coverage(text):
         return None
     pins, matched = [], []
     reads, skips = [], []
+    harvests, repos = [], []
     skipped_none = False
     for ln in body:
         s = ln.strip()
@@ -132,6 +151,19 @@ def validate_coverage(text):
         m = COV_PIN_RE.match(s)
         if m:
             pins.append(m["pin"]); continue
+        m = COV_HARVEST_RE.match(s)
+        if m:
+            harvests.append((m["repo"], m["commit"], m["extractor"])); continue
+        m = COV_REPO_RE.match(s)
+        if m:
+            repos.append((m["name"], m["root"])); continue
+        m = COV_HARVEST_PARTIAL_RE.match(s)
+        if m:
+            return ("coverage manifest: `harvest:` needs all three fields — "
+                    "`harvest: repo=<repo> commit=<sha> extractor=<version>`; "
+                    f"got {s!r}. A partial triple is a defect, not a partial "
+                    "record: provenance that cannot be reconstructed is "
+                    "unverifiable rather than merely incomplete")
         m = COV_MATCHED_RE.match(s)
         if m:
             matched.append(int(m["n"])); continue
@@ -144,12 +176,27 @@ def validate_coverage(text):
         if m:
             skips.append((m["file"], m["reason"])); continue
         return (f"coverage manifest: unrecognized line {s!r} — allowed lines are "
-                "`pin: <ref>`, `matched: <int>`, `read: <file> (<count>)`, and "
-                "`skipped: <file> (<reason>)` or `skipped: none`")
+                "`pin: <ref>`, `harvest: repo=<repo> commit=<sha> "
+                "extractor=<version>`, `repo: <name> <root>`, `matched: <int>`, "
+                "`read: <file> (<count>)`, and `skipped: <file> (<reason>)` or "
+                "`skipped: none`")
     if len(pins) != 1:
         return f"coverage manifest: expected exactly one `pin:` line, found {len(pins)}"
     if len(matched) != 1:
         return f"coverage manifest: expected exactly one `matched: <int>` line, found {len(matched)}"
+    if len(harvests) > 1:
+        return (f"coverage manifest: expected at most one `harvest:` line, "
+                f"found {len(harvests)} — one sheet is one harvest")
+    if len(repos) > 1 and not harvests:
+        return ("coverage manifest: a pool spanning repositories must carry a "
+                "`harvest:` line — otherwise which repo the sheet was harvested "
+                "from is inferred rather than stated")
+    seen = set()
+    for name, _root in repos:
+        if name in seen:
+            return (f"coverage manifest: repository {name!r} is declared twice — "
+                    "a repo maps to one root or the mapping is ambiguous")
+        seen.add(name)
     if skipped_none and skips:
         return ("coverage manifest: `skipped: none` cannot coexist with a "
                 "`skipped: <file>` line — list every skipped file or state none")
@@ -454,6 +501,13 @@ def main(argv=None):
     p.add_argument("factsheet", nargs="?", default="-", help="fact-sheet file, or - for stdin")
     p.add_argument("--root", help="host-repo root (default: git top-level of cwd; errors outside a git repo)")
     p.add_argument("--rejected", action="store_true", help="print only rejected entries (for the needs-owner list)")
+    p.add_argument("--require-harvest-pin", action="store_true",
+                   help="reject a sheet whose coverage manifest carries no "
+                        "`harvest: repo=… commit=… extractor=…` line. The "
+                        "determinism triple is what makes a pointer that stops "
+                        "resolving diagnosable rather than merely broken; the "
+                        "flag exists so the requirement binds new sheets "
+                        "without retroactively failing old ones.")
     p.add_argument("--require-coverage", action="store_true",
                    help="require a well-formed `## Coverage` manifest header (#514) — "
                         "the pipeline/harvest invocation passes this so a sheet with no "
@@ -500,6 +554,16 @@ def main(argv=None):
               "header (#514): disclose pin, matched count, per-file read counts, and "
               "skipped files (or `skipped: none`)")
         return 1
+    if args.require_harvest_pin:
+        body = _coverage_section(text) or []
+        if not any(COV_HARVEST_RE.match(ln.strip()) for ln in body):
+            print("REJECT  coverage manifest\n        -> missing `harvest: "
+                  "repo=<repo> commit=<sha> extractor=<version>` (Story 20.44, "
+                  "#907): the determinism triple is what lets a pointer that "
+                  "stops resolving be diagnosed rather than merely observed "
+                  "broken. The pin IS the version — no separate version number "
+                  "is stored.")
+            return 1
 
     # Cache-population compliance (#534, Story 18.37): a completed harvest whose
     # coverage manifest lists `read:` files must have populated the CAP-10
