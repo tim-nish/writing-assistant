@@ -949,40 +949,75 @@ def _axis_strands(map_data, member, axis):
             if member in [str(t).strip() for t in (el.get("tags") or [])]]
 
 
-def member_sections(map_data, tag, axis="tag"):
+# --- grouping substrates (Story 20.36, #890) ---------------------------------
+# A substrate is a NAMED function from a member's Strands to named sections.
+# Each returns `(sections, placements)`: `{title: [strand, ...]}` and the total
+# number of placements, which is the counting unit for the cap — computing it
+# against distinct Strands silently under-reports on any multi-valued
+# substrate. Adding a substrate here is the whole extension point; nothing
+# else in this module knows how many there are.
+NO_RELATION_TITLE = "no shared co-tag"
+
+
+def _substrate_co_tags(strands, tag, axis):
+    """Co-tags — the served `tags` field, 100% covered, and MULTI-VALUED: a
+    Strand appears under every co-tag it carries, not just its first.
+
+    The single-valued predecessor keyed each Strand on its alphabetically-first
+    co-tag, which hid every other relationship it had. A Strand with no co-tag
+    lands in an explicitly NAMED section rather than being dropped or folded
+    into the member's own name, so "shares nothing here" is legible as itself.
+    """
+    if axis == "topic":
+        # The topic axis's Strands carry no co-tags, so the substrate degrades
+        # to the one classification they do carry. Single-valued, so the
+        # stronger exactly-once form holds for it.
+        sections = {}
+        for el in strands:
+            sections.setdefault("decisions", []).append(el)
+        return sections, sum(len(v) for v in sections.values())
+    sections, placements = {}, 0
+    for el in strands:
+        others = sorted({str(t).strip() for t in (el.get("tags") or [])
+                         if str(t).strip() and str(t).strip() != tag})
+        if not others:
+            sections.setdefault(NO_RELATION_TITLE, []).append(el)
+            placements += 1
+            continue
+        for other in others:
+            sections.setdefault(f"also {other}", []).append(el)
+            placements += 1
+    return sections, placements
+
+
+SUBSTRATES = {"co-tags": _substrate_co_tags}
+SUBSTRATE_DEFAULT = "co-tags"
+
+
+def member_sections(map_data, tag, axis="tag", substrate=SUBSTRATE_DEFAULT):
     """Screen 2's sections for one axis member (Story 20.9, #811; a member of
     either axis since Story 20.25, #860 — Screen 2 itself is unchanged, and no
     third screen exists).
 
-    SECTIONING IS A PERMUTATION: every Strand of the member appears in exactly
-    one section, count-in == count-out, asserted by check-terrain-member.sh —
-    information loss is structurally impossible and the worst case is a badly
-    grouped but complete list.
+    GROUPING RUNS ON A NAMED SUBSTRATE, and completeness is a COVER counted
+    in PLACEMENTS (Story 20.36, #890; SPEC-terrain CAP-2 as amended
+    2026-07-29). A substrate is a named function from the member's Strands to
+    named sections. Every Strand appears in AT LEAST ONE section — the
+    exactly-once wording it replaces was written for a single-valued key and
+    is false for a multi-valued one: a Strand carrying four tags belongs in
+    four co-tag sections, and forcing it into one needs a tie-break, which is
+    a machine deciding which relationship the owner may see. Where a substrate
+    IS single-valued, exactly-once still holds and is the stronger check.
 
     Sections carry NO SELECTION AUTHORITY (the invariant as re-worded upstream
     2026-07-27): a title and a count are presentation; nothing here gates,
-    filters, or ranks what is selectable. The grouping rule is DELIBERATELY
-    deterministic — a Strand's alphabetically-first co-tag names its section,
-    Strands with no co-tag gather under the member's own name — because a
-    wrong grouping costs nothing (presentation-only) while a model in this
-    loop would cost every invocation. If dogfooding shows the groups are too
-    crude, the rule can change freely: no contract points at it.
+    filters, or ranks what is selectable. Section ORDER is a declared
+    deterministic key — never a quality judgment — because ranking sections is
+    the far side of the second-proposer boundary.
     """
     tag = str(tag).strip()
     strands = _axis_strands(map_data, tag, axis)
-    sections = {}
-    for el in strands:
-        if axis == "topic":
-            # The topic axis's Strands carry no co-tags to group by, so the
-            # deterministic key is the kind the map already records. Same
-            # freedom as the co-tag rule below: no contract points at it.
-            key = "reversal" if el.get("kind") == "reversal" else "decision"
-            sections.setdefault(key, []).append(el)
-            continue
-        others = sorted(str(t).strip() for t in (el.get("tags") or [])
-                        if str(t).strip() and str(t).strip() != tag)
-        key = others[0] if others else tag
-        sections.setdefault(key, []).append(el)
+    sections, placements = SUBSTRATES[substrate](strands, tag, axis)
     # THE SECTIONING CONTRACT (owner ruling, #850 D4; Story 20.23, #852): no
     # direct parent section holds more than 20% of the member's Strands —
     # subdivide, deterministically, until every one is under the bound. The
@@ -991,19 +1026,34 @@ def member_sections(map_data, tag, axis="tag"):
     # section that cannot subdivide further (no additional shared label
     # distinguishes its Strands) keeps its size and DISCLOSES the bound on
     # its title line — the contract is violated visibly, never silently.
+    #
+    # THE CAP IS COMPUTED AGAINST PLACEMENTS (Story 20.36, #890), not against
+    # distinct Strands: under a multi-valued substrate the placement total
+    # exceeds the member count, and capping on the smaller number would demand
+    # subdivisions the material cannot support — silently under-reporting the
+    # bound it claims to enforce.
     total = len(strands)
-    cap = max(SECTION_FLOOR, int(total * SECTION_SHARE_CAP))
+    cap = max(SECTION_FLOOR, int(placements * SECTION_SHARE_CAP))
     ordered = []
-    for key in sorted(sections):
-        if axis == "topic":
-            title = "reversals" if key == "reversal" else "decisions"
-        else:
-            title = (f"also {key}" if key != tag else f"{tag} alone")
+    # Sorted by title — a DECLARED deterministic key. The no-relation section
+    # sorts last by construction so the screen ends with what shares nothing,
+    # rather than opening on it; that is ordering, never ranking.
+    for key in sorted(sections, key=lambda k: (k == NO_RELATION_TITLE, k)):
+        used = {tag} | ({key[5:]} if key.startswith("also ") else set())
         for sub_title, group, note in _subdivide_section(
-                title, sections[key], {tag, key}, cap):
+                key, sections[key], used, cap):
             ordered.append({"title": sub_title, "strands": group,
                             "note": note})
-    return {"member": tag, "count": total, "axis": axis, "sections": ordered}
+    return {"member": tag, "count": total, "axis": axis, "sections": ordered,
+            # The acquisition disclosure: which substrate grouped this, how
+            # many placements it made, and whether every Strand is covered.
+            # `covered` is the mechanical assertion the contract names — it is
+            # computed here rather than trusted, so a substrate that drops a
+            # Strand is caught at the point it happens.
+            "substrate": substrate,
+            "placements": placements,
+            "covered": len({id(e) for g in sections.values() for e in g})
+                       == total}
 
 
 # The sectioning contract's constants (Story 20.23, #852): the 20% bound is
@@ -1221,6 +1271,12 @@ def cmd_member(args):
     listing = compose_member_listing(m, args.tag, cands, axis)
     out = {"kind": "terrain-member", "member": ms["member"], "axis": axis,
            "count": ms["count"],
+           # The grouping disclosure (Story 20.36, #890): which substrate
+           # produced these sections, how many placements it made — the unit
+           # the cap is computed against — and its own coverage assertion.
+           "substrate": ms["substrate"],
+           "placements": ms["placements"],
+           "covered": ms["covered"],
            "sections": [{"title": s["title"],
                          "strands": [e.get("slug") for e in s["strands"]],
                          "note": s.get("note")}
