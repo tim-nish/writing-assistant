@@ -1052,6 +1052,9 @@ els.append({"kind": "decision", "slug": "d1", "title": "D1", "tags": [],
             "topic": "workflow", "evidence": [], "consumed": False})
 els.append({"kind": "decision", "slug": "d2", "title": "D2", "tags": [],
             "topic": "articles", "evidence": [], "consumed": False})
+# `reversal` is NOT a served element kind (#893). Kept in the fixture on
+# purpose: it must NOT reach the topic axis, and must fall to the
+# outside-every-axis disclosure rather than being silently counted.
 els.append({"kind": "reversal", "slug": "r1", "title": "R1", "tags": [],
             "topic": "workflow", "evidence": [], "consumed": False})
 m = {"kind": "topic-map", "topics": [], "coverage": {"pin": "h@abc1234"},
@@ -1069,14 +1072,14 @@ tags = {x["member"]: x["strands"] for x in axes["tag"]["members"]}
 topics = {x["member"]: x["strands"] for x in axes["topic"]["members"]}
 check(tags == {"workflow": 54, "agents": 2},
       f"tag-axis members are exactly the element tags with correct counts ({tags})")
-check(topics == {"workflow": 2, "articles": 1},
+check(topics == {"workflow": 1, "articles": 1},
       f"topic-axis members are exactly the decision topics with correct counts ({topics})")
 # The collision case: one name, two axes, different material. Neither member
 # absorbs the other's Strands — which is why a merged listing was refused.
-check(tags["workflow"] == 54 and topics["workflow"] == 2,
+check(tags["workflow"] == 54 and topics["workflow"] == 1,
       "a name served by BOTH vocabularies stays two distinct members")
-check(d["axis"]["unreachable_strands"] == 1,
-      "a Strand outside EVERY axis is counted, and decisions no longer are")
+check(d["axis"]["unreachable_strands"] == 2,
+      "a Strand outside EVERY axis is counted (incl. the unserved `reversal` kind, #893), and decisions no longer are")
 
 # PER-AXIS COMPLETENESS (Story 20.25): count in == count out, on each axis
 # independently, recomputed here rather than trusted from the payload.
@@ -1085,7 +1088,7 @@ for el in els:
     hit = False
     for t in el.get("tags") or []:
         want_tag[t] = want_tag.get(t, 0) + 1; hit = True
-    if el["kind"] in ("decision", "reversal") and el.get("topic"):
+    if el["kind"] == "decision" and el.get("topic"):
         want_topic[el["topic"]] = want_topic.get(el["topic"], 0) + 1; hit = True
     if not hit: want_out += 1
 check(tags == want_tag and topics == want_topic
@@ -1098,7 +1101,7 @@ check(labels[0] == "by tag — agents (2 Strands)"
       and labels[1] == "by tag — workflow (54 Strands)",
       f"every member is offered with its count — 54 entries included, no cap ({labels[:2]})")
 check(labels[2] == "by topic — articles (1 Strand)"
-      and labels[3] == "by topic — workflow (2 Strands)",
+      and labels[3] == "by topic — workflow (1 Strand)",
       f"the topic axis's members are offered too, kind-labelled ({labels[2:4]})")
 check(labels[-2:] == ["name your own direction or combination axis", "stop here"],
       "free-form is offered and stop stays last")

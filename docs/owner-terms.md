@@ -31,9 +31,13 @@ can always write your own instead; free text wins over any offered choice.
 ## Strand
 
 **One selectable piece of recorded material.** A Strand is a single item you
-can pick and have written about — a Lesson (a rule distilled from experience),
-a Journey (how a position changed over time), or a decision or reversal from
-the record.
+can pick and have written about — a Lesson (a rule distilled from experience)
+or a Journey (how a position changed over time).
+
+Decisions from the record are **not** Strands. They are a separate population
+with their own listing, reached by topic rather than by tag. The two are kept
+apart deliberately: one word covering both would let a count taken over one be
+read as a statement about the other.
 
 Strands are the unit of choice: listings show them whole and never rank or cap
 them, and picking one is what produces a [brief](#brief). A count of Strands is

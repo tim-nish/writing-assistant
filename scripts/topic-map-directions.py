@@ -457,8 +457,8 @@ def _element_coverage_line(map_data):
     read = cov.get("element_topics_read") or []
     skipped = cov.get("element_topics_skipped") or []
     if not read and not skipped:
-        return ("No hub topic is declared for this repo, so no decisions or "
-                "reversals were projected.")
+        return ("The policy source served no decision topics, so no "
+                "decisions were projected.")
     line = f"From: {', '.join(read) if read else 'no topic'}."
     if skipped:
         line += (f" NOT covered: {', '.join(skipped)} — past the seam's read "
@@ -641,8 +641,8 @@ def compose_view(map_data, cands):
         "index (for example T1.2) and a short note about the angle you want.",
         "What each row IS, before what covering it would mean: L rows are",
         "Lessons (a rule distilled from experience), J rows are Journeys (how",
-        "a position changed over time), and E rows are decisions or reversals",
-        "from the record. A row's 'cover the ...' wording names what an",
+        "a position changed over time), and E rows are decisions from the",
+        "record. A row's 'cover the ...' wording names what an",
         "article picking it would be about.",
         "Free text always wins. Each element is its own Strand, and its",
         "writability verdict is a disclosure, never a gate: an element whose",
@@ -777,13 +777,18 @@ OWNER_TERMS_DOC = "docs/owner-terms.md"
 # corpus only: lesson elements also carry a `topic` field, but their axis is the
 # tag — putting them on both would double-count the denominator and silently
 # revive the Lesson→Topic join OQ8 declined.
-DECISION_KINDS = ("decision", "reversal")
+#
+# `reversal` is NOT here (#893): it is not a served element kind — the served
+# vocabulary is decision/journey/lesson — so enumerating it named something the
+# recall surface does not carry. Re-adding reversals is a hub-side manifest
+# extension, never a consumer-side inference from rendering prose.
+DECISION_KINDS = ("decision",)
 
 
 def axis_members(map_data):
     """Screen 1's TWO axes (Story 20.25, #860/#859; SPEC-terrain CAP-2 as
     amended 2026-07-28) — the served tag vocabulary over Lessons and Journeys,
-    and the served decision topic over decisions and reversals.
+    and the served decision topic over decisions.
 
     Deterministic by construction — no model decides what appears: every tag on
     any Strand is a member of the tag axis, every topic carrying a decision or
@@ -1166,7 +1171,7 @@ def compose_member_listing(map_data, tag, cands, axis="tag"):
              "about the angle you want. Free text always wins.",
              "What each row IS: L rows are Lessons (a rule distilled from",
              "experience), J rows are Journeys (how a position changed over",
-             "time), and E rows are decisions or reversals from the record.",
+             "time), and E rows are decisions from the record.",
              # The codebook pointer (Story 20.26, #861): the words this screen
              # asks the owner to think in are defined one step away, on a page
              # they can read. A pointer, never a restatement — one definition
