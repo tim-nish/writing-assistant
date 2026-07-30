@@ -1,0 +1,185 @@
+{
+  "kind": "topic-map",
+  "derived": true,
+  "stored": false,
+  "articles_repo": "/tmp/tmp.NbyWNyYzFm/articles",
+  "host_root": "/tmp/tmp.NbyWNyYzFm/host",
+  "track_topics": {},
+  "unmapped_tracks": [],
+  "stale_mapping_tracks": [],
+  "subtopic_defects": [],
+  "topics": [],
+  "needs_recording": [],
+  "recording_target": {
+    "repo": "host",
+    "file": "/tmp/tmp.NbyWNyYzFm/host/docs/journey.md"
+  },
+  "gloss": {
+    "served": true,
+    "reason": null,
+    "lesson_renderings": 2,
+    "journey_renderings": 1,
+    "journeys_requested": [
+      "journeys/engineering"
+    ],
+    "journey_misses": {},
+    "strands": {
+      "source": "element manifest (records)",
+      "lesson_records": 2,
+      "journey_records": 1,
+      "composed": 2,
+      "complete": true,
+      "conflicts": [],
+      "headline_source_reason": "the served gloss index at product-lab@1111111111111111111111111111111111111111 lists no renderings",
+      "journeys_attached": 1,
+      "journeys_attached_complete": true
+    },
+    "decision_renderings": 0,
+    "decision_misses": {}
+  },
+  "coverage": {
+    "pin": "d09ad896693a",
+    "destination_pin": "unpinned",
+    "hub_pin": "1111111111111111111111111111111111111111",
+    "substitutions": [],
+    "bound": 400,
+    "matched": 2,
+    "read": [
+      {
+        "family": "articles-items",
+        "surface": "INDEX.md",
+        "entries": 0
+      },
+      {
+        "family": "hub-gloss",
+        "surface": "gloss/ELEMENTS.jsonl",
+        "entries": 2
+      }
+    ],
+    "skipped": [],
+    "complete": true,
+    "accounting_closes": true,
+    "families": [
+      {
+        "family": "articles-items",
+        "declared": true,
+        "enumerated": true,
+        "reason": null,
+        "matched": 1,
+        "read": 1,
+        "skipped": 0,
+        "complete": true,
+        "accounting_closes": true
+      },
+      {
+        "family": "hub-lessons",
+        "declared": true,
+        "enumerated": false,
+        "reason": "the policy source served a miss for LESSONS.md at product-lab@1111111111111111111111111111111111111111",
+        "matched": 0,
+        "read": 0,
+        "skipped": 0,
+        "complete": true,
+        "accounting_closes": true
+      },
+      {
+        "family": "host-sources",
+        "declared": true,
+        "enumerated": false,
+        "reason": "host source files are not article material (Story 20.7, #809): Strands are Lessons and Journeys",
+        "matched": 0,
+        "read": 0,
+        "skipped": 0,
+        "complete": true,
+        "accounting_closes": true
+      },
+      {
+        "family": "hub-elements",
+        "declared": true,
+        "enumerated": false,
+        "reason": "the policy source serves no decision topics",
+        "axis": {
+          "source": "element manifest (records)",
+          "topics": [],
+          "records_per_topic": {},
+          "decision_records": 0,
+          "bounded_by_consumer_config": false,
+          "served_kinds": [
+            "journey",
+            "lesson"
+          ],
+          "reversal_served": false
+        },
+        "matched": 0,
+        "read": 0,
+        "skipped": 0,
+        "complete": true,
+        "accounting_closes": true
+      },
+      {
+        "family": "hub-gloss",
+        "declared": true,
+        "enumerated": true,
+        "reason": null,
+        "strands": {
+          "source": "element manifest (records)",
+          "lesson_records": 2,
+          "journey_records": 1,
+          "composed": 2,
+          "complete": true,
+          "conflicts": [],
+          "headline_source_reason": "the served gloss index at product-lab@1111111111111111111111111111111111111111 lists no renderings"
+        },
+        "matched": 1,
+        "read": 1,
+        "skipped": 0,
+        "complete": true,
+        "accounting_closes": true
+      }
+    ],
+    "families_enumerated": [
+      "articles-items",
+      "hub-gloss"
+    ],
+    "families_not_enumerated": [
+      {
+        "family": "hub-lessons",
+        "reason": "the policy source served a miss for LESSONS.md at product-lab@1111111111111111111111111111111111111111"
+      },
+      {
+        "family": "host-sources",
+        "reason": "host source files are not article material (Story 20.7, #809): Strands are Lessons and Journeys"
+      },
+      {
+        "family": "hub-elements",
+        "reason": "the policy source serves no decision topics"
+      }
+    ],
+    "surfaces_read": "index and frontmatter only — item bodies are never read; a declared source is read at heading level, never as prose",
+    "element_topics_read": [],
+    "element_topics_skipped": [],
+    "element_axis": {
+      "source": "element manifest (records)",
+      "topics": [],
+      "records_per_topic": {},
+      "decision_records": 0,
+      "bounded_by_consumer_config": false,
+      "served_kinds": [
+        "journey",
+        "lesson"
+      ],
+      "reversal_served": false
+    }
+  },
+  "consumption": {
+    "available": true,
+    "source": "write-article-plan.py consult",
+    "derived_not_stored": true,
+    "project": "host",
+    "scanned": "plans/*.md",
+    "consumed_index": {},
+    "project_consumed_index": {},
+    "degraded": "no plans/ directory in the articles repo"
+  },
+  "elements": []
+}

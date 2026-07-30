@@ -12,11 +12,31 @@ answering the question, so prose answered it, and prose was wrong.
 
 **What makes it different from a status line in a README.** Every row names a
 **check script**, and a lint asserts that the script *exists* and *passes*. A
-row cannot rot into a stale claim the way a hand-maintained status line does: if
-the capability breaks, its evidence fails, and the manifest fails with it.
+row cannot rot into a stale claim the way a hand-maintained status line does the
+moment the capability breaks — **at the granularity its evidence actually
+observes**, which is the part this file used to overstate.
+
+**What that granularity is, stated because it was once wrong.** The sentence
+here previously promised, without qualification, that a broken capability fails
+its evidence. #933 falsified it: Terrain's Journey material rendered nothing for
+days while the `terrain` row stayed `implemented` and its evidence check kept
+passing. The cause was not a missing assertion but an unexercised corpus — the
+committed fixture carried `journey_renderings: 0`, so a journey assertion would
+have been **vacuous even if written**. The promise now rests on a named
+instrument: `scripts/check-capability-fixture-coverage.sh` asserts that the
+fixture corpus **exercises** the served capabilities, so a capability whose path
+goes dead fails rather than passing over material that was never there. Coverage
+is **capability-level**; a feature below that granularity (a marker, a row kind)
+is reached only insofar as the fixture expresses it, and the capabilities this
+instrument does not yet exercise are printed by that check as a **named gap**
+rather than left silently uncovered.
+
 Mechanical existence evidence is not a standing claim — a passing check says the
 capability *runs*, never that it is the right capability. `status` is the
 standing half and is owner-maintained.
+
+Governing contract: `specs/spec-writing-assistant/SPEC.md` §"Capability evidence
+is OBSERVED, and the fixture corpus is the coverage instrument" (#940).
 
 **Precedence.** This manifest is authoritative for *what is implemented here*.
 It is not authoritative for what any upstream surface records, and it never
