@@ -1,6 +1,7 @@
 #!/usr/bin/env sh
 # parallel-safe
 # tier: inner — a header scan over scripts/check-*.sh, no execution
+# covers: scripts/check-*
 # removal-signal: the #910 retrospective classification pass runs (its reopen
 #   trigger is recorded in specs/spec-writing-assistant/SPEC.md — a climbing
 #   slope under the forward binding, or a check provably subsumed by the

@@ -54,7 +54,35 @@
 # Adoption is declare-as-verified and incremental, per check, on its own
 # verified isolation.
 #
-# Usage: run-checks.sh [--tier inner|full] [-P N] [GLOB]
+# The per-edit selector is a UNION of two selectors, not one (#998). The
+# name-prefix family (#944) finds every check NAMED AFTER the thing being
+# edited and no check that asserts a repo-wide property ABOUT it. Measured over
+# one sitting, the scoped run was green three separate times and the full tier
+# then failed on checks the prefix could never have selected —
+# check-check-declarations, check-skill-budget, check-article-plan,
+# check-resolved-default-inner — at ~110s a rerun. So a check may DECLARE the
+# paths it asserts over, beside its `# tier:` and `# parallel-safe` headers:
+#
+#   # covers: <space-separated path globs>
+#
+# and `--changed PATHS` adds every check whose declaration matches any changed
+# path to whatever the GLOB already selected. The declaration lives IN the
+# check for the same reason the other two do: the person who knows what a check
+# asserts is the person writing it, and a central map owes a precedence rule
+# and a mismatch check it cannot promise.
+#
+# THE DEFAULT POLARITY MATCHES `parallel-safe`, NOT `tier:`: an UNDECLARED
+# check COVERS NOTHING. It is selected by name-prefix only, never by coverage.
+# That makes the map incomplete-but-HONEST while it is populated rather than
+# authoritative-and-wrong, and nothing becomes unreachable — the full tier is
+# still the single pre-PR gate and still runs everything. The incompleteness is
+# REPORTED on every run (the `coverage-map:` line) so it is observable rather
+# than silent. A `# covers:` line with no globs after it is an ERROR naming the
+# file: an empty declaration is the one shape that reads as a claim and makes
+# none. Globs are matched with `case`, so `*` crosses `/` — `skills/**` and
+# `skills/*` both mean everything under `skills/`.
+#
+# Usage: run-checks.sh [--tier inner|full] [-P N] [--changed PATHS] [--list] [GLOB]
 #   --tier inner   (default) the per-edit loop
 #   --tier full    everything, once before gh pr create
 #   -P N           FULL TIER ONLY: run declared-parallel-safe checks with at
@@ -62,6 +90,12 @@
 #                  Ignored for the inner tier — the per-edit remedy is scoping
 #                  (#944), never concurrency. Without -P the full tier runs
 #                  serially exactly as it always has.
+#   --changed PATHS  space- or comma-separated changed paths (repeatable). Adds
+#                  every check whose `# covers:` globs match one of them to the
+#                  GLOB selection. Omit it and selection is EXACTLY the
+#                  name-prefix family it has always been.
+#   --list         print the selected checks and the coverage-map line, run
+#                  nothing, exit 0. The selector is inspectable on its own.
 #   GLOB           optional filter, e.g. 'scripts/check-terrain*' — the
 #                  per-edit default should be the blast-radius family, not
 #                  the whole suite (#944)
@@ -110,10 +144,14 @@ run_t0=$(date +%s%N)
 
 TIER=inner
 PARALLEL=0
+CHANGED=''
+LIST=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --tier) TIER="$2"; shift 2 ;;
     -P) PARALLEL="$2"; shift 2 ;;
+    --changed) CHANGED="$CHANGED $(printf '%s' "$2" | tr ',' ' ')"; shift 2 ;;
+    --list) LIST=1; shift ;;
     *) break ;;
   esac
 done
@@ -125,6 +163,82 @@ case "$TIER" in inner|full) ;; *) echo "run-checks: unknown tier '$TIER'" >&2; e
 case "$PARALLEL" in ''|*[!0-9]*) echo "run-checks: -P wants a non-negative integer" >&2; exit 2 ;; esac
 # AC3: -P has no effect on the inner tier, with or without a GLOB.
 [ "$TIER" = "full" ] || PARALLEL=0
+
+# --- coverage declarations (#998) --------------------------------------------
+# covers_of FILE — the declared globs, or empty. The line must begin `# covers:`
+# at column 0, the same greppable shape as `# tier:` and `# parallel-safe`; the
+# first such line wins. `## covers:` and `# covers :` are not declarations.
+covers_of() {
+  grep -m1 -E '^# covers:' "$1" 2>/dev/null | sed -E 's/^# covers:[[:space:]]*//; s/[[:space:]]+$//'
+}
+
+# The universe the coverage selector draws from, and the undeclared count the
+# runner discloses. Both are computed over the whole suite, never over GLOB —
+# a coverage hit is exactly the case the name-prefix family missed.
+undeclared=0; declared_n=0
+for cov_f in scripts/check-*; do
+  [ -f "$cov_f" ] || continue
+  case "$cov_f" in *run-checks.sh) continue ;; esac
+  if grep -m1 -E '^# covers:' "$cov_f" >/dev/null 2>&1; then
+    if [ -z "$(covers_of "$cov_f")" ]; then
+      echo "run-checks: $cov_f: malformed '# covers:' declaration — the header carries no path glob; name at least one, or delete the line (#998)" >&2
+      exit 2
+    fi
+    declared_n=$((declared_n + 1))
+  else
+    undeclared=$((undeclared + 1))
+  fi
+done
+
+# covers_match FILE — true when one of FILE's declared globs matches one of the
+# changed paths. An undeclared check never matches: covers_of is empty, the
+# loop body never runs, and the function returns false.
+# `set -f` is load-bearing, not tidiness: without it the shell PATHNAME-EXPANDS
+# the declared globs and the changed paths while splitting them into the `for`
+# lists, so `# covers: scripts/check-*` would arrive as 152 literal filenames
+# and match nothing. Globbing is restored before returning, because the
+# selection loops below rely on it.
+covers_match() {
+  set -f
+  for cov_g in $(covers_of "$1"); do
+    for cov_p in $CHANGED; do
+      case "$cov_p" in $cov_g) set +f; return 0 ;; esac
+    done
+  done
+  set +f
+  return 1
+}
+
+# The selection: the GLOB expansion in its existing order (selector (a)), then
+# every coverage hit not already in it (selector (b)). With no --changed, FILES
+# is byte-for-byte the list the runner has always built.
+FILES=''
+for f in $GLOB; do
+  [ -f "$f" ] || continue
+  case "$f" in *run-checks.sh) continue ;; esac
+  FILES="$FILES $f"
+done
+UNION_ADDED=0
+if [ -n "$CHANGED" ]; then
+  for f in scripts/check-*; do
+    [ -f "$f" ] || continue
+    case "$f" in *run-checks.sh) continue ;; esac
+    case " $FILES " in *" $f "*) continue ;; esac
+    if covers_match "$f"; then
+      FILES="$FILES $f"
+      UNION_ADDED=$((UNION_ADDED + 1))
+    fi
+  done
+fi
+
+coverage_line="run-checks: coverage-map: ${declared_n} check(s) declare '# covers:', ${undeclared} undeclared (selected by name-prefix only) (#998)"
+
+if [ "$LIST" -eq 1 ]; then
+  for f in $FILES; do echo "$f"; done
+  echo "$coverage_line"
+  echo "run-checks: selected=$(set -- $FILES; echo $#) union-added=${UNION_ADDED}"
+  exit 0
+fi
 
 fails=0; ran=0; skipped=0; total_ms=0
 
@@ -156,9 +270,7 @@ is_parallel_safe() {
 if [ "$PARALLEL" -gt 0 ]; then
   # --- full tier, parallel wave + serial remainder -------------------------
   wave=''; rest=''
-  for f in $GLOB; do
-    [ -f "$f" ] || continue
-    case "$f" in *run-checks.sh) continue ;; esac
+  for f in $FILES; do
     if is_parallel_safe "$f"; then wave="$wave $f"; else rest="$rest $f"; fi
   done
 
@@ -209,9 +321,7 @@ if [ "$PARALLEL" -gt 0 ]; then
     report "$f" "$(( (t1 - t0) / 1000000 ))" "$rc"
   done
 else
-  for f in $GLOB; do
-    [ -f "$f" ] || continue
-    case "$f" in *run-checks.sh) continue ;; esac
+  for f in $FILES; do
     declared=$(grep -m1 -E '^# tier: full' "$f" >/dev/null 2>&1 && echo full || echo inner)
     if [ "$TIER" = "inner" ] && [ "$declared" = "full" ]; then
       skipped=$((skipped+1)); continue
@@ -224,16 +334,26 @@ else
   done
 fi
 
-if [ "$TIER" = "inner" ] && [ "$SCOPED" = "no" ] && [ "$total_ms" -gt "$INNER_TOTAL_MS" ]; then
-  echo "run-checks: FAMILY-VIOLATION: unscoped inner run ${total_ms}ms > ${INNER_TOTAL_MS}ms (#944)" >&2
+# The family ceiling binds an unscoped run, and it binds a UNION run too
+# (#998). The scoped exemption above rests on a blast-radius run being bounded
+# by its family SIZE; coverage-selected members are not in the family and are
+# bounded by nothing but the declared globs, so the ceiling is what keeps a
+# too-broad glob visible. A union that routinely breaches it means the globs
+# are too broad — that is a finding, never a reason to raise the ceiling.
+if [ "$TIER" = "inner" ] && { [ "$SCOPED" = "no" ] || [ "$UNION_ADDED" -gt 0 ]; } && [ "$total_ms" -gt "$INNER_TOTAL_MS" ]; then
+  echo "run-checks: FAMILY-VIOLATION: inner run ${total_ms}ms > ${INNER_TOTAL_MS}ms (#944)" >&2
   echo "  — scope the per-edit run to the blast-radius family (e.g. run-checks.sh 'scripts/check-terrain*')," >&2
+  echo "    narrow a too-broad '# covers:' glob (#998) — never raise the ceiling," >&2
   echo "    declare slow members '# tier: full', or make their assertions fixture-based." >&2
   echo "    The full suite still runs unscoped once, pre-PR: run-checks.sh --tier full" >&2
   fails=$((fails+1))
 fi
 par_note=''
 [ "$PARALLEL" -gt 0 ] && par_note=" parallel=$PARALLEL"
-echo "run-checks: tier=$TIER ran=$ran skipped=$skipped fails=$fails total=${total_ms}ms$par_note"
+union_note=''
+[ "$UNION_ADDED" -gt 0 ] && union_note=" union-added=$UNION_ADDED"
+echo "run-checks: tier=$TIER ran=$ran skipped=$skipped fails=$fails total=${total_ms}ms$par_note$union_note"
+echo "$coverage_line"
 
 # Full-tier budget disclosure (#961). Unconditional on a full run, and it never
 # touches `fails` — a breach is a finding, not a red suite.

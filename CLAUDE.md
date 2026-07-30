@@ -128,7 +128,9 @@ slowness. Declare a check only after verifying *that file's* isolation.
 declares `# covers: <globs>` — the paths it asserts over — beside its
 `# tier:` and `# parallel-safe` headers, and the per-edit invocation runs the
 UNION of the name-prefix family and every check whose declaration matches a
-changed path. The prefix alone finds only checks *named after* what you
+changed path — pass them: `scripts/run-checks.sh --changed "$(git diff
+--name-only HEAD)" 'scripts/check-terrain*'` (`--list` shows the selection
+without running it). The prefix alone finds only checks *named after* what you
 edited, never one asserting a repo-wide property *about* it, which is why a
 green scoped run kept being followed by a failing full tier. An undeclared
 check covers nothing and is selected only by prefix — incomplete-but-honest
