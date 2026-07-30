@@ -88,7 +88,8 @@ import sys
 # two budgets come back with it: each is still declared in exactly one place,
 # now beside the function that reads it.
 sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
-from terrain_text import (  # noqa: E402
+from terrain_text import (
+    row_type_legend,  # noqa: E402
     BUDGETS,
     VIEW_LINE_CHARS,
     _clip_line,
@@ -216,11 +217,10 @@ def compose_view(map_data, cands):
         "",
         "Answer with an element's index (for example L3) or a subtopic's",
         "index (for example T1.2) and a short note about the angle you want.",
-        "What each row IS, before what covering it would mean: L rows are",
-        "Lessons (a rule distilled from experience), J rows are Journeys (how",
-        "a position changed over time), and E rows are decisions from the",
-        "record. A row's 'cover the ...' wording names what an",
-        "article picking it would be about.",
+        # Composed from the row types actually present (#978).
+        row_type_legend(map_data.get("elements", []),
+                        " A row's 'cover the ...' wording names what an "
+                        "article picking it would be about."),
         "Free text always wins. Each element is its own Strand, and its",
         "writability verdict is a disclosure, never a gate: an element whose",
         "evidence is not yet recorded is as pickable as a matched one —",

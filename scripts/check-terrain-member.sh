@@ -298,9 +298,21 @@ PYEOF
 [ $? -eq 0 ] || fail=1
 
 # --- the row-kind legend is on both reading surfaces ------------------------
-grep -q "What each row IS" "$D" \
-  && ok "the row-kind legend is composed for the reading surfaces" \
-  || err "the row-kind legend is missing"
+# Story 20.66 (#978): the legend is COMPOSED from the row types present, so
+# the sentence lives in terrain_text.py and each surface calls it. Asserting
+# the call rather than the literal is what keeps a screen from re-acquiring a
+# hard-coded row type the id-minting path never emits.
+grep -q "def row_type_legend" scripts/terrain_text.py \
+  && grep -q "row_type_legend(" "$D" \
+  && grep -q "row_type_legend(" scripts/terrain_members.py \
+  && ok "the row-kind legend is composed for both reading surfaces" \
+  || err "the row-kind legend is missing from a reading surface"
+
+# It must never name `J` rows: the namespace was retired with the Journey id
+# (#871/#933), so a legend mentioning it describes a row that cannot exist.
+grep -q "J rows are Journeys" scripts/terrain_text.py scripts/terrain_members.py "$D" \
+  && err "a reading surface still names J rows — the namespace is retired (#933)" \
+  || ok "no reading surface names the retired J row type"
 
 # --- the Journey shortfall is DISCLOSED, detection-based (Story 20.10, #812) --
 python3 - "$D" "scripts/terrain_text.py" "scripts/terrain_members.py" <<'PYEOF' || fail=1

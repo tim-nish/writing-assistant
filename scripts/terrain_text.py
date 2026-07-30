@@ -84,6 +84,37 @@ def _clip_line(line):
     return indent + _elide(line.strip(), VIEW_LINE_CHARS - len(indent))
 
 
+def row_type_legend(elements, suffix=""):
+    """"What each row IS", composed from the row types ACTUALLY present.
+
+    A legend is a reading aid, and one that names row types the screen does not
+    contain primes the reader to look for something that never appears (#978).
+    The screen is composed at render time from the served elements, so the row
+    types on it are known — there is no reason to state them from a constant.
+
+    Only TWO row types exist. `J<n>` was retired with the Journey namespace
+    (#871, its minting code removed in #933): a Journey is an arc on its
+    lesson's row, so it is never a row of its own. `terrain_directions.py`
+    records that keeping the dead prefix alive is exactly why a screen could be
+    written as though `J` rows might appear — this composes the sentence from
+    what mints ids instead, so the two cannot drift again.
+    """
+    kinds = {("lesson" if e.get("kind") == "lesson" else "decision")
+             for e in elements}
+    parts = []
+    if "lesson" in kinds:
+        parts.append("L rows are Lessons (a rule distilled from experience)")
+    if "decision" in kinds:
+        parts.append("E rows are decisions from the record")
+    if not parts:
+        return ""
+    if len(parts) == 1:
+        body = parts[0]
+    else:
+        body = ", and ".join([parts[0], parts[1]])
+    return f"What each row IS: {body}.{suffix}"
+
+
 def _verdict_phrase(cand):
     """A candidate's writability verdict as one short owner-readable phrase
     (#799). The three-valued verdict SURFACES on every element — matched /

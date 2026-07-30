@@ -43,7 +43,8 @@ sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
 from terrain_directions import (  # noqa: E402
     candidates,
 )
-from terrain_text import (  # noqa: E402
+from terrain_text import (
+    row_type_legend,  # noqa: E402
     _clip_line,
     _journey_coverage_line,
     _journey_disclosure_line,
@@ -520,9 +521,11 @@ def compose_member_listing(map_data, tag, cands, axis="tag", claims=None):
              f"Pin: {_pin_display(map_data)}",
              "Answer with a Strand's index (for example L3) and a short note",
              "about the angle you want. Free text always wins.",
-             "What each row IS: L rows are Lessons (a rule distilled from",
-             "experience), J rows are Journeys (how a position changed over",
-             "time), and E rows are decisions from the record.",
+             # Composed from the row types actually on this screen (#978):
+             # a legend naming types the screen does not contain primes the
+             # reader to look for rows that never appear.
+             row_type_legend([e for sec in ms["sections"]
+                              for e in sec["strands"]]),
              # The codebook pointer (Story 20.26, #861): the words this screen
              # asks the owner to think in are defined one step away, on a page
              # they can read. A pointer, never a restatement — one definition
