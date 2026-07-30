@@ -66,15 +66,47 @@
 #                  per-edit default should be the blast-radius family, not
 #                  the whole suite (#944)
 #
+# The FULL tier declares TWO ceilings of its own, FULL_TOTAL_MS and
+# FULL_WALL_MS (#961), and they REPORT on every full run rather than failing
+# it. The runtime-budget family had bounded exactly one level of aggregation at
+# a time and left the next one up unwatched twice in a week: INNER_MS bounded
+# the member and the family total broke, INNER_TOTAL_MS bounded the family and
+# the tier — the once-per-PR gate — was bounded by nothing. The two measure
+# different things and neither alone is sufficient:
+#   FULL_TOTAL_MS  the SUM of per-check work. Concurrency- and core-count
+#                  independent, so it means the same number on any machine at
+#                  any -P: the GROWTH instrument.
+#   FULL_WALL_MS   real ELAPSED wall clock for the whole run. The cost actually
+#                  paid once per PR: the EXPERIENCE instrument.
+# Wall clock alone goes blind under parallelism (after #957 a new check filling
+# an idle slot moves it by ~zero while the suite grows); summed work alone never
+# reflects what anyone waits for and would not have registered #957's 3x win.
+# NEITHER FAILS THE RUN, unlike the inner tier: a full-tier ceiling is a soft
+# budget whose job is to make overage VISIBLE, and a failing one would block
+# every PR the moment the suite drifted. Do not "make the tiers consistent" —
+# report-not-fail is the load-bearing half here, as fail-on-breach is there.
+#
 # Exit: non-zero if any executed check fails, any inner-tier check breaks
 # the per-check ceiling, or an unscoped inner run breaks the family total.
+# A full-tier ceiling breach NEVER contributes to the exit status.
 # Per-check runtime is printed always — disclosure is unconditional, not
-# only on violation. Under -P each check's line is buffered and printed by the
-# parent in glob order, so concurrent runs never interleave into one line.
+# only on violation, and the two full-tier figures are disclosed the same way:
+# on every full run, whether or not the ceiling is exceeded. Under -P each
+# check's line is buffered and printed by the parent in glob order, so
+# concurrent runs never interleave into one line.
 
 INNER_MS=2000          # inner-tier per-check runtime ceiling (ms)
 INNER_TOTAL_MS=15000   # inner-tier FAMILY ceiling for an unscoped run (ms) — #944
 FULL_TIMEOUT_S=120     # hard stop for any single check, either tier
+FULL_TOTAL_MS=480000   # full-tier ceiling on SUMMED per-check work (ms) — #961, REPORTS ONLY
+FULL_WALL_MS=120000    # full-tier ceiling on ELAPSED wall clock (ms) — #961, REPORTS ONLY
+
+# Wall clock starts HERE, and the reported figure is the difference against a
+# second real timestamp taken at the end (#961). It is never derived from
+# total_ms: under -P the two diverge — 425,421ms of summed work against 1m44s
+# elapsed, measured at -P 8 — and a "wall" computed from the sum would be blind
+# to concurrency, which is the whole defect FULL_WALL_MS exists to catch.
+run_t0=$(date +%s%N)
 
 TIER=inner
 PARALLEL=0
@@ -202,4 +234,24 @@ fi
 par_note=''
 [ "$PARALLEL" -gt 0 ] && par_note=" parallel=$PARALLEL"
 echo "run-checks: tier=$TIER ran=$ran skipped=$skipped fails=$fails total=${total_ms}ms$par_note"
+
+# Full-tier budget disclosure (#961). Unconditional on a full run, and it never
+# touches `fails` — a breach is a finding, not a red suite.
+if [ "$TIER" = "full" ]; then
+  run_t1=$(date +%s%N)
+  wall_ms=$(( (run_t1 - run_t0) / 1000000 ))
+  if [ "$total_ms" -gt "$FULL_TOTAL_MS" ]; then
+    work_verdict="OVER by $((total_ms - FULL_TOTAL_MS))ms — reported, not failing"
+  else
+    work_verdict="within, $((FULL_TOTAL_MS - total_ms))ms to spare"
+  fi
+  if [ "$wall_ms" -gt "$FULL_WALL_MS" ]; then
+    wall_verdict="OVER by $((wall_ms - FULL_WALL_MS))ms — reported, not failing"
+  else
+    wall_verdict="within, $((FULL_WALL_MS - wall_ms))ms to spare"
+  fi
+  echo "run-checks: FULL-TIER BUDGET work=${total_ms}ms / FULL_TOTAL_MS=${FULL_TOTAL_MS}ms — ${work_verdict} (#961)"
+  echo "run-checks: FULL-TIER BUDGET wall=${wall_ms}ms / FULL_WALL_MS=${FULL_WALL_MS}ms — ${wall_verdict} (#961)"
+fi
+
 [ "$fails" -eq 0 ]
