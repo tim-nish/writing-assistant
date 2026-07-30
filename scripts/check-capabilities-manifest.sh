@@ -1,5 +1,7 @@
 #!/usr/bin/env sh
-# tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
+# tier: full — binds the manifest to the pre-PR gate run that executes the
+#   suite-resident evidence (#949); measured ~1s after the re-execution class
+#   was removed (was 81.7s — evidence re-run per row)
 # check-capabilities-manifest.sh — every CAPABILITIES.md row's evidence EXISTS
 # and PASSES (Story 20.6, #805). The carrier-check idiom applied to capability
 # claims: a manifest whose rows are prose rots exactly the way the status line
@@ -121,6 +123,19 @@ done < "$rowfile"
 # 3. Every row's evidence script EXISTS and PASSES. A `spec-only` or `retired`
 #    row is exempt from the passing half by definition — it claims no running
 #    implementation — but an `implemented` or `partial` row is not.
+#
+#    HOW the passing half is established depends on where the evidence lives
+#    (#949). Evidence at `scripts/check-*.sh` is SUITE-RESIDENT: the full tier
+#    executes every such file in the same pre-PR run, so a failing evidence
+#    check already fails the gate on its own line, and re-running it here
+#    charged the tier twice for the same information — measured 2026-07-30 at
+#    ~80s of an 81.7s check (check-topic-map.sh re-run at 23.6s per citing
+#    row, twice). For those rows this check asserts the BINDING — the evidence
+#    exists inside the executed set — and the tier supplies the execution.
+#    Evidence OUTSIDE the suite has no other executor, so it is still run
+#    here: that is the generic-seam half of #805, where an adopting repo may
+#    cite any script it likes. The rot incident stays caught either way — a
+#    manifest row cannot claim a green check the same gate run shows red.
 while IFS="$(printf '\t')" read -r cap status ev spec; do
   case "$status" in
     spec-only|retired)
@@ -130,11 +145,16 @@ while IFS="$(printf '\t')" read -r cap status ev spec; do
     err "$cap: claims '$status' but its evidence does not exist ($ev)"
     continue
   fi
-  if sh "$ev" </dev/null >/dev/null 2>&1; then
-    ok "$cap: $status, evidenced by a passing $ev"
-  else
-    err "$cap: claims '$status' but $ev FAILS"
-  fi
+  case "$ev" in
+    scripts/check-*.sh)
+      ok "$cap: $status, evidence suite-resident ($ev — executed by this tier run)";;
+    *)
+      if sh "$ev" </dev/null >/dev/null 2>&1; then
+        ok "$cap: $status, evidenced by a passing $ev"
+      else
+        err "$cap: claims '$status' but $ev FAILS"
+      fi;;
+  esac
 done < "$rowfile"
 
 # 4. NEGATIVE TEST: a row claiming `implemented` with a non-existent evidence
