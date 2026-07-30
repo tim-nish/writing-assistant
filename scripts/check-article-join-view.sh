@@ -99,6 +99,14 @@ print("$work/ws")
 PY
 cp "$VIEW" "$work/bin/inspect-article-join.py"
 
+# Footprint snapshot BEFORE the view runs (#931): file list + content hashes.
+# The old `find -newer plans/fx.md` compared mtimes, and the fixture files are
+# all created within the same second as the sentinel — under load, timestamp
+# jitter produced false positives on an assertion about WRITES. Content
+# hashes detect exactly writes, with no clock in the loop.
+footprint() { find "$1" -type f | sort | xargs -r sha256sum; }
+before_fp=$(footprint "$work/repo")
+
 out="$work/report.md"
 python3 "$work/bin/inspect-article-join.py" --slug fx \
   --articles-repo "$work/repo" --host-root "$work/repo" --out "$out" >/dev/null 2>&1 \
@@ -142,10 +150,12 @@ grep -qF 'paragraphs whose evidence maps to no element' "$out" \
   || err "evidence-with-no-element is not surfaced"
 
 # --- AC6: read-only — the fixture repo is untouched. -------------------------
-if find "$work/repo" -newer "$work/repo/plans/fx.md" -type f | grep -q .; then
-  err "the view wrote into the articles repo (footprint invariant)"
-else
+# Compared by file list + content hash against the pre-run snapshot (#931):
+# a write is a changed/added/removed file, never an mtime.
+if [ "$before_fp" = "$(footprint "$work/repo")" ]; then
   ok "the view wrote nothing into the articles repo"
+else
+  err "the view wrote into the articles repo (footprint invariant)"
 fi
 
 # --- AC5: the findings write-up exists and traces each divergence. -----------
