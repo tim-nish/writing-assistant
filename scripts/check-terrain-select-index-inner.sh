@@ -1,14 +1,16 @@
 #!/usr/bin/env sh
-# tier: inner — selection and brief-composition assertions against the
-#   committed fixture map; no seam, no corpus, no assembly. Measured
-#   2026-07-30 at adoption: ~1.8s.
+# tier: inner — indexed-selection assertions against a derived over-budget
+#   fixture map; no seam, no corpus, no assembly. Split from
+#   check-terrain-select-inner.sh (#948) — see its sibling
+#   check-terrain-select-brief-inner.sh for the split's rationale. Assertion
+#   content is unchanged. Measured 2026-07-30 at split: ~1.2s (ceiling 2s).
 # removal-signal: the terrain checks are retired or re-shaped under the #910
 #   retention sweep (a check provably subsumed by the #857/#858 seam, or the
 #   full-tier terrain harnesses rebuilt fixture-based), which re-places these
 #   assertions; removed with that pass.
-# check-terrain-select-inner.sh — brief composition and indexed selection,
-# split from check-topic-map-screen.sh (Story 20.49, #923). The stage-0
-# hand-off assertions stay in the full check: they run the real pipeline.
+# check-terrain-select-index-inner.sh — indexed selection {index, note}
+# against the View's pin, through the real CLI: adoption, free-text
+# precedence, stale-pin and no-pin refusals, stop, and ID stability.
 set -eu
 
 root=$(git rev-parse --show-toplevel 2>/dev/null) || {
@@ -16,10 +18,7 @@ root=$(git rev-parse --show-toplevel 2>/dev/null) || {
 }
 cd "$root"
 
-M="scripts/terrain_map.py"
 D="scripts/topic-map-directions.py"
-VP="scripts/validate-proposal-payload.py"
-SKILL="skills/terrain/SKILL.md"
 FIX="scripts/fixtures/terrain/screen-map.json"
 
 fail=0
@@ -27,14 +26,12 @@ err() { printf 'FAIL: %s\n' "$1" >&2; fail=1; }
 ok()  { printf 'ok:   %s\n' "$1"; }
 
 work=$(mktemp -d); trap 'rm -rf "$work"' EXIT
-mkdir -p "$work/ws"
-cp "$FIX" "$work/map.json"
 
-# Fixture prep (the derivations the source check used).
-python3 "$D" candidates --map "$work/map.json" > "$work/cands.json"
-python3 - "$work/map.json" > "$work/big-map.json" <<'PYEOF'
+# One prep run builds the over-budget map (#950 batching: the big-map builder
+# and the static stop answer share an interpreter).
+python3 - "$FIX" "$work" <<'PYEOF'
 import json, sys
-d = json.load(open(sys.argv[1]))
+d = json.load(open(sys.argv[1])); w = sys.argv[2]
 # An OVER-BUDGET terrain, built from STRANDS (Story 20.7, #809). It used to be
 # built by cloning subtopics; subtopics no longer exist, and a Strand is now
 # the only thing that counts toward the screen budget.
@@ -65,47 +62,13 @@ d["elements"] = strands
 d["coverage"] = dict(d.get("coverage", {}),
                      element_topics_read=["delivery", "engineering", "people", "nowhere"],
                      element_topics_skipped=["zeta"])
-print(json.dumps(d))
+json.dump(d, open(w + "/big-map.json", "w"))
+json.dump({"selection": "stop here", "index": "T1.1", "free_text": ""},
+          open(w + "/answer-idx-stop.json", "w"))
 PYEOF
+
 python3 "$D" candidates --map "$work/big-map.json" > "$work/big-cands.json"
 
-# --- the outcome is a brief IN THE OWNER'S WORDS -----------------------------
-printf '%s' '{"selection":"name your own direction or combination axis","free_text":"connect the retry storm to on-call load, through the retro"}' \
-  > "$work/answer-free.json"
-python3 "$D" brief --answer "$work/answer-free.json" --map "$work/map.json" \
-  > "$work/brief-free.json"
-python3 -c "
-import json
-b=json.load(open('$work/brief-free.json'))
-assert b['brief']=='connect the retry storm to on-call load, through the retro', b
-assert b['provenance']=='owner-authored' and b['origin']=='free-form', b
-" && ok "free-form wording becomes the brief verbatim, owner-authored" \
-  || err "free-form wording was not carried through"
-
-sel=$(python3 -c "import json;print(json.load(open('$work/cands.json'))['candidates'][0]['direction'])")
-python3 -c "
-import json,sys
-json.dump({'selection':sys.argv[1],'free_text':''},open('$work/answer-sel.json','w'))
-" "$sel"
-python3 "$D" brief --answer "$work/answer-sel.json" --map "$work/map.json" \
-  > "$work/brief-sel.json"
-python3 -c "
-import json
-b=json.load(open('$work/brief-sel.json'))
-assert b['origin']=='adopted-candidate', b
-assert b['provenance']=='owner-authored', b
-" && ok "machine-proposed text the owner accepts becomes OWNER-ADOPTED wording" \
-  || err "an adopted candidate did not become an owner-authored brief"
-
-printf '%s' '{"selection":"stop here","free_text":""}' > "$work/answer-stop.json"
-python3 "$D" brief --answer "$work/answer-stop.json" --map "$work/map.json" \
-  > "$work/brief-stop.json" 2>&1 \
-  && err "stopping produced a brief" \
-  || grep -q 'first-class outcome' "$work/brief-stop.json" \
-     && ok "stopping produces no brief and no run, and says so" \
-     || err "wrong stop behaviour: $(cat "$work/brief-stop.json")"
-
-# --- INDEXED SELECTION: {index, note} against the View's pin -----------------
 # One prep call writes every answer fixture and reports the pin and first
 # element index (merged from the source check's per-file writers so the check
 # clears the inner-tier runtime ceiling — same data, fewer interpreter starts).
@@ -128,42 +91,14 @@ print(pin, idx)
 PYEOF
 )
 bigpin=${pinidx% *}
-idx=${pinidx#* }
+
 python3 "$D" brief --answer "$work/answer-idx.json" --map "$work/big-map.json" \
   > "$work/brief-idx.json" 2>"$work/brief-idx.err" \
   && ok "indexed selection: an index plus a note composes a brief" \
   || err "indexed selection failed: $(cat "$work/brief-idx.err")"
-python3 - "$work/brief-idx.json" "$work/big-cands.json" <<'PYEOF' || fail=1
-import json, sys
-b = json.load(open(sys.argv[1]))
-cands = json.load(open(sys.argv[2]))["candidates"]
-fail = []
-def check(cond, msg):
-    print(("ok:   " if cond else "FAIL: ") + msg, file=sys.stdout if cond else sys.stderr)
-    if not cond: fail.append(msg)
 
-note = "through the on-call retro, not the metrics"
-check(note in b["brief"], "the owner's note is carried into the brief VERBATIM")
-wording = next(c["direction"] for c in cands if c["id"] == b["index"])
-check(b["brief"].startswith(wording),
-      "the brief is the subtopic's coverage wording plus the note")
-check(b["provenance"] == "owner-authored", "an adopted index is owner-adopted wording")
-check(b["origin"] == "adopted-index", "the origin records that an index was adopted")
-check(isinstance(b["brief"], str), "the outcome is one plain brief string")
-sys.exit(1 if fail else 0)
-PYEOF
-[ $? -eq 0 ] || fail=1
-
-# Free text ALWAYS wins — even when an index is also present.
 python3 "$D" brief --answer "$work/answer-idx-free.json" --map "$work/big-map.json" \
   > "$work/brief-idx-free.json" 2>/dev/null
-python3 -c "
-import json
-b=json.load(open('$work/brief-idx-free.json'))
-assert b['brief']=='my own direction, in my own words', b
-assert b['origin']=='free-form', b
-" && ok "indexed selection: free text still always wins over an index" \
-  || err "an index overrode the owner's free text"
 
 # A STALE index is refused with the pin mismatch NAMED — never re-resolved.
 if python3 "$D" brief --answer "$work/answer-stale.json" --map "$work/big-map.json" \
@@ -187,25 +122,52 @@ fi
 python3 "$D" brief --answer "$work/answer-nopin.json" --map "$work/big-map.json" \
   > /dev/null 2>"$work/brief-nopin.err" \
   && err "an index without a pin was silently resolved" \
-  || grep -q 'no pin' "$work/brief-nopin.err" \
-     && ok "indexed selection: an index without a pin is refused, and says why" \
-     || err "wrong no-pin behaviour: $(cat "$work/brief-nopin.err")"
+  || { grep -q 'no pin' "$work/brief-nopin.err" \
+       && ok "indexed selection: an index without a pin is refused, and says why" \
+       || err "wrong no-pin behaviour: $(cat "$work/brief-nopin.err")"; }
 
 # Stopping stays first-class even from the View branch.
-printf '%s' '{"selection":"stop here","index":"T1.1","free_text":""}' \
-  > "$work/answer-idx-stop.json"
 python3 "$D" brief --answer "$work/answer-idx-stop.json" --map "$work/big-map.json" \
   >"$work/idx-stop.out" 2>&1 \
   && err "stopping from the View branch produced a brief" \
-  || grep -q 'first-class outcome' "$work/idx-stop.out" \
-     && ok "indexed selection: stop here still produces no brief and no run" \
-     || err "wrong stop behaviour from the View branch"
+  || { grep -q 'first-class outcome' "$work/idx-stop.out" \
+       && ok "indexed selection: stop here still produces no brief and no run" \
+       || err "wrong stop behaviour from the View branch"; }
 
 # ID STABILITY within a pin: two invocations produce identical IDs.
 python3 "$D" candidates --map "$work/big-map.json" > "$work/big-cands2.json"
 cmp -s "$work/big-cands.json" "$work/big-cands2.json" \
   && ok "indexed selection: IDs are identical across invocations at one pin" \
   || err "the IDs are not stable within a pin"
+
+# --- one assertion run over the produced files (#950 batching) --------------
+python3 - "$work" <<'PYEOF' || fail=1
+import json, sys
+w = sys.argv[1]
+fail = []
+def check(cond, msg):
+    print(("ok:   " if cond else "FAIL: ") + msg,
+          file=sys.stdout if cond else sys.stderr)
+    if not cond: fail.append(msg)
+
+b = json.load(open(w + "/brief-idx.json"))
+cands = json.load(open(w + "/big-cands.json"))["candidates"]
+note = "through the on-call retro, not the metrics"
+check(note in b["brief"], "the owner's note is carried into the brief VERBATIM")
+wording = next(c["direction"] for c in cands if c["id"] == b["index"])
+check(b["brief"].startswith(wording),
+      "the brief is the subtopic's coverage wording plus the note")
+check(b["provenance"] == "owner-authored", "an adopted index is owner-adopted wording")
+check(b["origin"] == "adopted-index", "the origin records that an index was adopted")
+check(isinstance(b["brief"], str), "the outcome is one plain brief string")
+
+b = json.load(open(w + "/brief-idx-free.json"))
+check(b["brief"] == "my own direction, in my own words",
+      "indexed selection: free text still always wins over an index")
+check(b["origin"] == "free-form", "free text over an index records origin free-form")
+sys.exit(1 if fail else 0)
+PYEOF
+[ $? -eq 0 ] || fail=1
 
 [ "$fail" -eq 0 ] && printf '\nAll %s checks passed.\n' "$0" \
   || { printf '\n%s FAILED.\n' "$0" >&2; exit 1; }

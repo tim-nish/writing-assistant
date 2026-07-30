@@ -9,7 +9,8 @@
 # that only need a map JSON run per edit in the inner tier instead:
 #   scripts/check-terrain-compose-inner.sh   (candidates, ONE screen, size switch)
 #   scripts/check-terrain-view-inner.sh      (View content, wording, write-only, owner language)
-#   scripts/check-terrain-select-inner.sh    (brief composition, indexed selection)
+#   scripts/check-terrain-select-brief-inner.sh (brief composition)
+#   scripts/check-terrain-select-index-inner.sh (indexed selection)
 #   scripts/check-terrain-code-inner.sh      (source-level absences, SKILL lockstep, axes)
 # Those run against the committed fixture map
 # (scripts/fixtures/terrain/screen-map.json); the DRIFT GUARD below re-derives
@@ -209,7 +210,7 @@ print(json.dumps(d))
 PYEOF
 
 # --- the hand-off is the EXISTING stage-0 --brief path -----------------------
-# (brief composition itself is asserted in check-terrain-select-inner.sh; here
+# (brief composition itself is asserted in check-terrain-select-brief-inner.sh; here
 # a brief is composed only as the input to the REAL stage-0 run.)
 printf '%s' '{"selection":"name your own direction or combination axis","free_text":"connect the retry storm to on-call load, through the retro"}' \
   > "$work/answer-free.json"
