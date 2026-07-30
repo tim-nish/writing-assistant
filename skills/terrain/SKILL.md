@@ -234,14 +234,29 @@ Selection is by
 Strand index (`L3`, `E2.1`) plus a short note about the angle; free-form
 and **stop here** stay on the table exactly as on Screen 1. There is no `J`
 index: a Journey is an arc on its lesson's row, so selecting the Lesson carries
-the arc with it (#871, and its minting code was removed in #933). Record the answer
-against the `ask_id` the validator returned, with the **pin the listing
-shows**:
+the arc with it (#871, and its minting code was removed in #933).
+
+**Selection is a SET (SPEC-terrain CAP-3, added 2026-07-30, #937).** The owner
+may name **several** Strand indexes, and the brief is composed from exactly
+that set — exploring is how they decide what to write about, not a detour
+ending in free text. Pass them as a list or as one comma-separated string; no
+named index is dropped or collapsed to the first, and an index that resolves
+to nothing refuses the whole selection rather than quietly shrinking it.
+Sections stay **presentation-only**: the set is per-Strand multi-select, never
+group-select. Naming a group id (`G2`) as a *selection* is refused with the
+distinction stated — `G` addresses **inspection**, selection is by Strand
+index — because a selectable group would make grouping a gate.
+
+Record the answer against the `ask_id` the validator returned, with the **pin
+the listing shows**:
 
 ```
 printf '%s' '{"index":"L3","note":"<the owner'\''s angle, their words>","pin":"<the listing'\''s pin>"}' \
   | python3 ${CLAUDE_PLUGIN_ROOT}/scripts/validate-proposal-payload.py --ws "$WS" --answer <ask_id>
 ```
+
+For a set, `index` carries them all — `{"index":["L3","L7","E2.1"], …}` or
+`{"index":"L3, L7, E2.1", …}`.
 
 The pin is not bookkeeping. Indexes are **stable within a pin**, not across
 repo states, so an index chosen against a stale listing is
@@ -326,10 +341,27 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/topic-map-directions.py brief \
 The outcome is a **brief in the owner's words**. Free text always wins;
 machine-proposed wording becomes the brief only when the owner selected it —
 by naming a Strand's **index** — and then it is **owner-adopted wording**,
-never a tool-invented scope. For an indexed selection the brief is the
+never a tool-invented scope. For a single indexed selection the brief is the
 Strand's served wording **plus the owner's note verbatim**; from here it is
 one ordinary brief string and nothing downstream can tell it from one the
 owner typed.
+
+**For a SET, the claim is recomposed over exactly the selected members**
+(#937). The command returns `recomposition.claims` — the served claims of
+those members and **nothing else**, so the scope cannot widen past what the
+owner pointed at — together with `members` (each member's served gloss and
+cite) and `pins` (the terrain invocation and the hub commit). Compose the
+in-common claim from those inputs and present it as a **machine-composed
+proposal beside free-form override**, marked per the once-per-surface rule.
+The owner's wording, if they supply any, **is** the brief and the proposal is
+discarded. To record an adopted claim instead of the deterministic wording,
+pass it back as `claim` in the answer.
+
+The recorded brief carries its **member set**, and that is not bookkeeping:
+the completeness invariant follows the set into drafting — every selected
+Strand placed or its omission disclosed — so a brief with no members recorded
+would make omission silent. Every member's writability gap is disclosed in
+`gaps`, not just the first one's.
 
 Hand it to the **existing** stage-0 `--brief` path — the one shipped in Story
 18.24 (#505), unchanged:
