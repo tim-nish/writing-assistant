@@ -419,45 +419,10 @@ grep -nE 'no-journey' "$D" | grep -qE 'journey_shard|\["journey"\]' \
   && err "the no-journey marker is derived from a pointer or the kind discriminator, not the record (#933)" \
   || ok "the no-journey marker is not derived from a pointer or the kind flag"
 
-# --- AC7: the lessons/journeys split has a guard, because it had none --------
-# All four terrain checks passed while a change moved 109 of 117 served lesson
-# renderings out of the lessons lookup: nothing exercised the split. This
-# asserts count-in == count-out over it — the shape the suite already uses for
-# composed Strands — so the trap cannot be re-armed silently.
-python3 - "$M" <<'PYEOF' || fail=1
-import importlib.util, sys
-fail = []
-def check(cond, msg):
-    print(("ok:   " if cond else "FAIL: ") + msg, file=sys.stdout if cond else sys.stderr)
-    if not cond: fail.append(msg)
-spec = importlib.util.spec_from_file_location("tm", sys.argv[1])
-tm = importlib.util.module_from_spec(spec)
-try:
-    spec.loader.exec_module(tm)
-except SystemExit:
-    pass
-by_file, strands, reason = tm.strand_entries(".")
-entries = [e for _rel, parsed in by_file for e in parsed]
-if not entries:
-    check(True, f"no records served here — split guard not exercised ({reason})")
-else:
-    # The routing the gloss read performs, reproduced exactly.
-    lessons = [e for e in entries if not e["journey"]]
-    arcs = [e for e in entries if e["journey"]]
-    check(len(lessons) == len(entries) and not arcs,
-          f"every served lesson rendering lands in the lessons lookup — "
-          f"count-in == count-out ({len(lessons)}/{len(entries)}, {len(arcs)} misrouted)")
-    # And presence is carried, separately from that discriminator.
-    rec = sum(1 for e in entries if e.get("journey_recorded"))
-    ptr = sum(1 for e in entries if e.get("journey_shard") is not None)
-    check(any(e.get("journey_recorded") for e in entries),
-          f"journey presence reaches the composed entries ({rec} of {len(entries)})")
-    check(rec >= ptr,
-          f"presence is record-based, never narrower than pointer resolution "
-          f"({rec} recorded vs {ptr} resolving)")
-sys.exit(1 if fail else 0)
-PYEOF
-
+# AC7's split guard is NOT here: it reads the served corpus, and this file's
+# declared tier is "no seam, no corpus, no map assembly". It lives in
+# scripts/check-terrain-split.sh (tier: full) until the committed fixture map
+# carries journey material — see that file's removal signal.
 
 [ "$fail" -eq 0 ] && printf '\nAll %s checks passed.\n' "$0" \
   || { printf '\n%s FAILED.\n' "$0" >&2; exit 1; }
