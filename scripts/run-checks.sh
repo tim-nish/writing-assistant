@@ -107,9 +107,18 @@
 # the member and the family total broke, INNER_TOTAL_MS bounded the family and
 # the tier — the once-per-PR gate — was bounded by nothing. The two measure
 # different things and neither alone is sufficient:
-#   FULL_TOTAL_MS  the SUM of per-check work. Concurrency- and core-count
-#                  independent, so it means the same number on any machine at
-#                  any -P: the GROWTH instrument.
+#   FULL_TOTAL_MS  the SUM of per-check ELAPSED work, DECLARED AT A STATED
+#                  CONCURRENCY (#1001). It is NOT concurrency-independent —
+#                  that claim shipped here and was false: identical suite,
+#                  452,419ms at -P 8 against 570,296ms at -P 14, a 26% move on
+#                  the flag alone plus a breach that did not exist. Checks
+#                  contend, so every member's elapsed inflates with -P. Summing
+#                  CPU instead was tested and rejected: check-harvest measured
+#                  5.35s CPU alone against 7.78s (+45%) under ten rivals, so
+#                  NOTHING time-based is concurrency-independent here. It stays
+#                  the GROWTH instrument, but only compared LIKE FOR LIKE: a
+#                  run at another -P reports NOT COMPARABLE and is not checked.
+#                  Changing FULL_TOTAL_P obliges re-measuring FULL_TOTAL_MS.
 #   FULL_WALL_MS   real ELAPSED wall clock for the whole run. The cost actually
 #                  paid once per PR: the EXPERIENCE instrument.
 # Wall clock alone goes blind under parallelism (after #957 a new check filling
@@ -133,6 +142,10 @@ INNER_MS=2000          # inner-tier per-check runtime ceiling (ms)
 INNER_TOTAL_MS=15000   # inner-tier FAMILY ceiling for an unscoped run (ms) — #944
 FULL_TIMEOUT_S=120     # hard stop for any single check, either tier
 FULL_TOTAL_MS=480000   # full-tier ceiling on SUMMED per-check work (ms) — #961, REPORTS ONLY
+FULL_TOTAL_P=8         # the -P this ceiling was measured at (#1001). Summed
+                       # elapsed inflates with concurrency, so the figure is
+                       # comparable only at this value; any other -P reports
+                       # NOT COMPARABLE. Re-measure if this changes.
 FULL_WALL_MS=120000    # full-tier ceiling on ELAPSED wall clock (ms) — #961, REPORTS ONLY
 
 # Wall clock starts HERE, and the reported figure is the difference against a
@@ -360,7 +373,12 @@ echo "$coverage_line"
 if [ "$TIER" = "full" ]; then
   run_t1=$(date +%s%N)
   wall_ms=$(( (run_t1 - run_t0) / 1000000 ))
-  if [ "$total_ms" -gt "$FULL_TOTAL_MS" ]; then
+  # The summed figure is comparable only at the concurrency it was declared
+  # at (#1001). Serial runs (-P absent) are treated as -P 1.
+  run_p=$PARALLEL; [ "$run_p" -gt 0 ] || run_p=1
+  if [ "$run_p" -ne "$FULL_TOTAL_P" ]; then
+    work_verdict="NOT COMPARABLE — ceiling is declared at -P ${FULL_TOTAL_P}, this run used -P ${run_p}; summed elapsed inflates with concurrency, so it is not checked"
+  elif [ "$total_ms" -gt "$FULL_TOTAL_MS" ]; then
     work_verdict="OVER by $((total_ms - FULL_TOTAL_MS))ms — reported, not failing"
   else
     work_verdict="within, $((FULL_TOTAL_MS - total_ms))ms to spare"
@@ -370,7 +388,7 @@ if [ "$TIER" = "full" ]; then
   else
     wall_verdict="within, $((FULL_WALL_MS - wall_ms))ms to spare"
   fi
-  echo "run-checks: FULL-TIER BUDGET work=${total_ms}ms / FULL_TOTAL_MS=${FULL_TOTAL_MS}ms — ${work_verdict} (#961)"
+  echo "run-checks: FULL-TIER BUDGET work=${total_ms}ms at -P ${run_p} / FULL_TOTAL_MS=${FULL_TOTAL_MS}ms at -P ${FULL_TOTAL_P} — ${work_verdict} (#961, #1001)"
   echo "run-checks: FULL-TIER BUDGET wall=${wall_ms}ms / FULL_WALL_MS=${FULL_WALL_MS}ms — ${wall_verdict} (#961)"
 fi
 
