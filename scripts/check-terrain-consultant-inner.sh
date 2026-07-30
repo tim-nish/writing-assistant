@@ -26,7 +26,12 @@ root=$(git rev-parse --show-toplevel 2>/dev/null) || {
 cd "$root"
 
 D="scripts/topic-map-directions.py"
-SKILL="skills/terrain/SKILL.md"
+SKILL=$(mktemp)
+cat skills/terrain/SKILL.md skills/terrain/steps/map.md \
+    skills/terrain/steps/screens.md skills/terrain/steps/brief.md \
+    skills/terrain/steps/gap.md > "$SKILL"
+# ^ story 20.64 (#962): the skill is now a dispatcher + step companions; checks
+#   assert over the concatenation, whose order matches the pre-split file.
 FIX="scripts/fixtures/terrain/screen-map.json"
 
 fail=0
