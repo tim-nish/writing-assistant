@@ -1,29 +1,28 @@
 #!/usr/bin/env sh
 # tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
-# check-topic-map-screen.sh — verify the map ends in a BRIEF, not in a second
-# proposer (Story 18.63, #591; SPEC-topic-map CAP-3). POSIX sh + stdlib Python;
-# every fixture write lands under mktemp -d.
+# removal-signal: the terrain area's harnesses are retired or subsumed by the
+#   #857/#858 seam under the #910 retention sweep; removed with that pass.
+# check-topic-map-screen.sh — the END-TO-END half of the screen harness
+# (Story 20.49, #923 split): everything here needs the real pipeline — the
+# fixture repos, resolve-writing-sources, a live `terrain_map.py assemble`,
+# and `draft-pipeline.py stage0`. The composition/selection/view assertions
+# that only need a map JSON run per edit in the inner tier instead:
+#   scripts/check-terrain-compose-inner.sh   (candidates, ONE screen, size switch)
+#   scripts/check-terrain-view-inner.sh      (View content, wording, write-only, owner language)
+#   scripts/check-terrain-select-inner.sh    (brief composition, indexed selection)
+#   scripts/check-terrain-code-inner.sh      (source-level absences, SKILL lockstep, axes)
+# Those run against the committed fixture map
+# (scripts/fixtures/terrain/screen-map.json); the DRIFT GUARD below re-derives
+# that map from this file's fixture repos on every run and fails if the
+# committed copy no longer matches, so the inner tier can never silently test
+# a stale shape. The sibling-harness re-run this file used to carry
+# (check-topic-map.sh / check-topic-map-depth.sh "pass unchanged") is gone:
+# the tiered runner executes every check in the same full-tier run, so the
+# re-run asserted nothing the suite does not already assert, at double cost.
 #
-# Covers:
-#   CAP-3  ONE in-conversation screen carrying the map, machine-proposed
-#          candidate directions, and a FREE-FORM response offered every time
-#          (not only on rejection); at least one candidate is a cross-topic
-#          COMBINATION when the evidence supports one; the outcome is a brief in
-#          the owner's words handed to the EXISTING stage-0 `--brief` path; the
-#          map composes NO narrative structures (grep-asserted); a sitting that
-#          starts at the map ends in a normal brief-carrying run.
-#   CAP-3  (Story 18.66) the SIZE SWITCH: a map at or under the screen budget
-#          composes a byte-identical payload and writes no View; a map above it
-#          renders a View file the owner opens and summarises on the screen.
-#          The View is write-only, fully regenerated, and losing it loses
-#          nothing.
-#   CAP-3  (Story 18.67) STABLE per-pin subtopic indexes and INDEXED SELECTION:
-#          {index, note} composes the subtopic's coverage wording plus the
-#          owner's note VERBATIM; free text still always wins; an index chosen
-#          against a different pin is REFUSED with the mismatch named; stopping
-#          stays first-class; downstream cannot tell an indexed selection from
-#          a typed brief.
-
+# Original contract coverage (CAP-3 and its amendments) is unchanged in
+# SUBSTANCE and split in PLACE — every assertion the pre-split file carried
+# runs either here or in the named inner checks (Story 20.49 AC3).
 set -eu
 
 root=$(git rev-parse --show-toplevel 2>/dev/null) || {
@@ -145,107 +144,34 @@ print(json.dumps(d))
 PYEOF
 ok "fixture: the map assembles"
 
-# --- candidate directions -----------------------------------------------------
-python3 "$D" candidates --map "$work/map.json" > "$work/cands.json"
-python3 - "$work/cands.json" <<'PYEOF' || fail=1
-import json, sys
-c = json.load(open(sys.argv[1]))["candidates"]
-fail = []
-def check(cond, msg):
-    print(("ok:   " if cond else "FAIL: ") + msg, file=sys.stdout if cond else sys.stderr)
-    if not cond: fail.append(msg)
-
-check(c, "the map proposes candidate directions")
-# CROSS-TOPIC COMBINATIONS ARE DEFERRED (Story 20.7, #809) — asserted absent
-# WITH ITS REASON, never deleted silently. CAP-3 still promises the move; what
-# does not exist is evidence that could support one, because a Strand's only
-# pointer is the surface it was read from ("Its own index line is its evidence
-# pointer", scripts/terrain_map.py lesson_item). Pairing on that made every
-# cross-topic pair share `LESSONS.md`.
-combos = [x for x in c if x["kind"] == "combination"]
-check(not combos,
-      f"no combination is derived while the move is deferred behind OQ3 ({combos[:1]})")
-# The DEFERRAL IS RECORDED IN THE CODE, so a future reader meets the reason
-# rather than an unexplained gap — this is what distinguishes a deferral from
-# a silent retirement.
-src = open("scripts/topic-map-directions.py", encoding="utf-8").read()
-check("DEFERRED, not derived" in src and "OQ3" in src,
-      "the deferral and its reopen trigger are stated where the move used to be")
-# Every candidate names WHAT to cover, never HOW to tell it.
-for x in c:
-    check(set(x) & {"structure", "sections", "outline", "arc"} == set(),
-          f"candidate {x['direction']!r} carries no narrative shape")
-sys.exit(1 if fail else 0)
-PYEOF
-[ $? -eq 0 ] || fail=1
-
 # --- ONE screen, presentable, free-form every time ---------------------------
 python3 "$D" payload --map "$work/map.json" > "$work/payload.json"
 python3 "$VP" --ws "$work/ws" --surface topic-map "$work/payload.json" > "$work/ask.json" \
   && ok "the screen passes validate-proposal-payload.py before presentation" \
   || err "the screen is not presentable: $(cat "$work/ask.json")"
-python3 - "$work/payload.json" <<'PYEOF' || fail=1
+
+# --- DRIFT GUARD: the committed inner-tier fixture is this map ---------------
+# Compare the freshly assembled map (paths and pin are per-run values and are
+# excluded) against scripts/fixtures/terrain/screen-map.json. A real change to
+# the map's shape lands here first: update the committed fixture in the same
+# change, and the inner checks follow.
+python3 - "$work/map.json" "scripts/fixtures/terrain/screen-map.json" <<'PYEOF' \
+  && ok "drift guard: the committed inner-tier fixture matches a fresh assembly" \
+  || err "the committed fixture has drifted from a fresh assembly — regenerate scripts/fixtures/terrain/screen-map.json (Story 20.49)"
 import json, sys
-p = json.load(open(sys.argv[1]))
-fail = []
-def check(cond, msg):
-    print(("ok:   " if cond else "FAIL: ") + msg, file=sys.stdout if cond else sys.stderr)
-    if not cond: fail.append(msg)
-
-check(len(p["items"]) == 1, "it is ONE screen, not a sequence of them")
-item = p["items"][0]
-labels = [c["label"] for c in item["choices"]]
-check(any("name your own" in l for l in labels),
-      "a free-form response is offered")
-check(labels[-1] == "stop here", "stopping is offered and stays first-class")
-# The combination candidate is DEFERRED (Story 20.7, #809), so no "connect …"
-# label reaches the screen. Asserted absent rather than dropped: a screen that
-# silently stopped offering the move would be indistinguishable from one where
-# the evidence simply did not support one that run.
-check(not any(l.startswith("connect ") for l in labels),
-      f"no combination candidate is offered while the move is deferred ({labels[:2]})")
-check("signal for your judgment, never a gate" in item["why"],
-      "the screen states that depth is a signal, never a gate")
-check("selectable" in item["where"],
-      "the screen states consumed material remains selectable")
-sys.exit(1 if fail else 0)
+def norm(p):
+    d = json.load(open(p))
+    for k in ("articles_repo", "host_root", "recording_target"):
+        d.pop(k, None)
+    d.get("coverage", {}).pop("pin", None)
+    return d
+a, b = norm(sys.argv[1]), norm(sys.argv[2])
+if a != b:
+    ka = {k for k in a if a[k] != b.get(k)} | {k for k in b if k not in a}
+    print("drift in keys: %s" % sorted(ka), file=sys.stderr)
+    sys.exit(1)
 PYEOF
-[ $? -eq 0 ] || fail=1
 
-# Free-form is offered EVERY time — including on a map with a single candidate.
-python3 - "$work/map.json" > "$work/thin-map.json" <<'PYEOF'
-import json, sys
-d = json.load(open(sys.argv[1]))
-d["topics"] = d["topics"][:1]
-for t in d["topics"]:
-    t["subtopics"] = t["subtopics"][:1]
-print(json.dumps(d))
-PYEOF
-python3 "$D" payload --map "$work/thin-map.json" > "$work/thin-payload.json"
-python3 -c "
-import json
-labels=[c['label'] for c in json.load(open('$work/thin-payload.json'))['items'][0]['choices']]
-assert any('name your own' in l for l in labels), labels
-assert 'stop here' in labels, labels
-" && ok "free-form is offered every time, not only on rejection" \
-  || err "free-form is conditional"
-
-# --- the SIZE SWITCH: a large map gets a View file, a small one does not -----
-# At or under the screen budget the shipped flow must not move at all: passing
-# --view to a small map changes nothing and writes nothing.
-python3 "$D" payload --map "$work/map.json" --view "$work/small-view.md" \
-  > "$work/payload-view.json" 2>/dev/null
-cmp -s "$work/payload.json" "$work/payload-view.json" \
-  && ok "size switch: a map at or under the budget composes a BYTE-IDENTICAL payload, --view or not" \
-  || err "the small-map screen changed"
-[ -e "$work/small-view.md" ] \
-  && err "a View file was written for a map under the screen budget" \
-  || ok "size switch: no View file exists for a map under the budget"
-grep -q 'View' "$work/payload.json" \
-  && err "a View path leaked onto the small-map screen" \
-  || ok "size switch: no View path appears on the small-map screen"
-
-# A map ABOVE the budget: the terrain moves to the View, the screen summarises.
 python3 - "$work/map.json" > "$work/big-map.json" <<'PYEOF'
 import json, sys
 d = json.load(open(sys.argv[1]))
@@ -281,601 +207,14 @@ d["coverage"] = dict(d.get("coverage", {}),
                      element_topics_skipped=["zeta"])
 print(json.dumps(d))
 PYEOF
-python3 "$D" payload --map "$work/big-map.json" --view "$work/view.md" \
-  > "$work/big-payload.json" 2>/dev/null
-[ -s "$work/view.md" ] \
-  && ok "size switch: a map above the budget renders a View file" \
-  || err "no View file was rendered for an over-budget map"
-python3 "$VP" --ws "$work/ws" --surface topic-map "$work/big-payload.json" \
-  > "$work/big-ask.json" \
-  && ok "size switch: the summary screen still passes validate-proposal-payload.py" \
-  || err "the summary screen is not presentable: $(cat "$work/big-ask.json")"
-python3 - "$work/big-payload.json" "$work/view.md" <<'PYEOF' || fail=1
-import json, sys
-p = json.load(open(sys.argv[1]))
-fail = []
-def check(cond, msg):
-    print(("ok:   " if cond else "FAIL: ") + msg, file=sys.stdout if cond else sys.stderr)
-    if not cond: fail.append(msg)
 
-check(len(p["items"]) == 1, "the over-budget screen is still ONE screen")
-item = p["items"][0]
-check(sys.argv[2] in item["where"],
-      "the summary carries the View file's path, whole and unclipped")
-check(len(item["where"]) <= 240, "the summary stays inside the display budget")
-labels = [c["label"] for c in item["choices"]]
-check(any("index" in l for l in labels), "selection by index is offered")
-check(any("name your own" in l for l in labels),
-      "free-form is still offered every time")
-check(labels[-1] == "stop here", "stopping is still offered last, first-class")
-check("signal for your judgment, never a gate" in item["why"],
-      "the depth-is-a-signal line is intact on the summary screen")
-sys.exit(1 if fail else 0)
-PYEOF
-[ $? -eq 0 ] || fail=1
-
-python3 - "$work/big-map.json" "$work/view.md" "$D" <<'PYEOF' || fail=1
-import importlib.util, json, re, sys
-d = json.load(open(sys.argv[1]))
-view = open(sys.argv[2], encoding="utf-8").read()
-fail = []
-def check(cond, msg):
-    print(("ok:   " if cond else "FAIL: ") + msg, file=sys.stdout if cond else sys.stderr)
-    if not cond: fail.append(msg)
-
-# STORY 20.5 (#802): the View is the header plus Candidate Directions, and
-# NOTHING ELSE. ~2,300 of a 2,511-line view served no function the owner could
-# identify, so this asserts the ABSENCE of the three deleted sections — a
-# regression that re-adds one fails here rather than being noticed by token
-# cost months later.
-heads = re.findall(r"^## (.+)$", view, re.M)
-check(heads == ["Candidate directions"],
-      f"the View carries exactly ONE section: Candidate directions ({heads})")
-for gone in ("Subtopic clusters", "Maintenance", "Diagnostics"):
-    check(not any(h.startswith(gone) for h in heads),
-          f"the {gone!r} section is gone from the View")
-check(not re.search(r"^#### T\d+\.\d+ — ", view, re.M),
-      "no per-subtopic detail block survives")
-check("- glance:" not in view and "- evidence pointers (" not in view,
-      "the per-subtopic diagnostics fields are gone")
-
-# CAP-4's duty is discharged by a LINE, and dropping these would be a real
-# regression rather than more cleanup (SPEC-terrain, amended 2026-07-27).
-# Compared against the emitters themselves, not against guessed wording: a
-# substring test would keep passing if the line silently changed shape.
-spec = importlib.util.spec_from_file_location("dv", sys.argv[3])
-mod = importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)
-cov_line = mod._element_coverage_line(d)
-gloss_line = mod._gloss_disclosure_line(d)
-check(cov_line in view,
-      "the one-line element coverage disclosure still sits under the directions")
-check(gloss_line in view,
-      "the one-line gloss disclosure still sits under the directions")
-# The disclosure must reach the surface WHOLE. `_clip_line` would otherwise
-# truncate the reason — the actionable half — mid-word, leaving a disclosure
-# that names a gap without naming its remedy (Story 20.5, #802).
-check(len(gloss_line) <= mod.VIEW_LINE_CHARS,
-      f"the gloss disclosure fits the View line budget uncut ({len(gloss_line)})")
-check(len(cov_line) <= mod.VIEW_LINE_CHARS,
-      f"the coverage disclosure fits the View line budget uncut ({len(cov_line)})")
-check("below" not in gloss_line and "maintenance" not in gloss_line.lower(),
-      "no disclosure line points at a section this story deleted")
-
-# The header survives whole: it is what the amended CAP-2 points at.
-check(d["coverage"]["pin"] in view, "the View header carries the map's pin")
-check(re.search(r"\d+ topic", view), "the header carries the terrain-size line")
-sys.exit(1 if fail else 0)
-PYEOF
-[ $? -eq 0 ] || fail=1
-
-# The caps stop being fixed constants above the budget.
-python3 "$D" candidates --map "$work/big-map.json" > "$work/big-cands.json"
-python3 -c "
-import json
-c=json.load(open('$work/big-cands.json'))['candidates']
-strands=[x for x in c if x['kind']=='element']
-assert len(strands) > 3, len(strands)
-" && ok "size switch: above the budget the fixed candidate caps no longer apply" \
-  || err "the over-budget branch is still capped at the screen constants"
-
-# --- the View LEADS WITH THE CANDIDATE DIRECTIONS (Story 18.76, #632) --------
-# The size switch moves the terrain, never the proposing: the above-budget
-# branch must offer no less guidance than the one-screen branch.
-python3 - "$work/big-cands.json" "$work/view.md" <<'PYEOF' || fail=1
-import json, re, sys
-cands = json.load(open(sys.argv[1]))["candidates"]
-view = open(sys.argv[2], encoding="utf-8").read()
-fail = []
-def check(cond, msg):
-    print(("ok:   " if cond else "FAIL: ") + msg, file=sys.stdout if cond else sys.stderr)
-    if not cond: fail.append(msg)
-
-heads = re.findall(r"^#{2,4} (.+)$", view, re.M)
-check(heads and heads[0] == "Candidate directions",
-      f"the View's FIRST section is the candidate directions (got {heads[:1]})")
-# Story 20.5 (#802): the cluster summary and the per-subtopic detail that used
-# to follow the directions are GONE, so "leads with the directions" is now the
-# stronger claim that they are the only section there is.
-check(heads == ["Candidate directions"],
-      f"the directions are the View's only section ({heads})")
-
-# Every derived direction reaches the View, with the index selection uses.
-block = view
-# Since Story 18.81 (#647) elements are presented HERE, among the directions,
-# rather than in a section of their own — so every candidate is covered.
-directional = list(cands)
-missing = [c["id"] for c in directional if f"**{c['id']}**" not in block]
-check(not missing, f"every derived direction appears in the section ({missing[:3]})")
-check(len(directional) > 7, f"the fixture derives an over-budget candidate set ({len(directional)})")
-
-# ELEMENTS OPEN THE LIST (the stance-3 pivot, #799): the typed elements are
-# the primary selection units. The combination move stays visible right after
-# them, before the demoted cluster singles.
-rows = re.findall(r"^- \*\*(\S+)\*\* — (.+)$", block, re.M)
-elem_ids = {c["id"] for c in cands if c["kind"] == "element"}
-combo_ids = {c["id"] for c in cands if c["kind"] == "combination"}
-check(not combo_ids, "no combination reaches the View while the move is deferred")
-check(elem_ids, "the fixture carries Strands to fill the list")
-epos = [i for i, (rid, _) in enumerate(rows) if rid in elem_ids]
-check(epos and max(epos) < len(elem_ids),
-      "the Strands — the only units since the cluster removal — fill the candidate list")
-
-# Roughly ten pickable candidates in the first screenful — the whole point of
-# the section. Counted over the first 40 lines, header included.
-head = "\n".join(view.splitlines()[:40])
-check(len(re.findall(r"^- \*\*", head, re.M)) >= 10,
-      "about ten pickable candidates are visible without scrolling")
-
-# The summary is ONE LINE per subtopic. Since Story 18.81 (#647) the line
-# carries the material's own claim where there is one, and the subject alone
-# where there is not — the glance (`[bar] level - N ptr`) is a description of
-# the corpus and now lives in the subtopic's own block.
-# The per-subtopic summary section is gone (Story 20.5, #802); the glance-bar
-# and raw-counter ban now applies to the surviving surface, which is the whole
-# View.
-check("[#" not in view and " ptr," not in view,
-      "no line carries the glance bar or raw counters (CAP-3 substance-led)")
-
-# SUBSTANCE-LED (CAP-3, amended #647): a ranked line is what the material
-# says, never subject-plus-counts. Every direction and terrain row must carry
-# something beyond an index, a subject and a number.
-COUNTS_ONLY = re.compile(r"^- \*\*\S+\*\* — [^—]+ \(\d+ evidence pointer\(s\)\)$")
-bad_rows = [l for l in block.splitlines()
-            if COUNTS_ONLY.match(l.strip())]
-check(not bad_rows,
-      f"no direction or terrain line is a subject plus counts ({bad_rows[:2]})")
-# The depth-word duplication check went with the summary section it guarded
-# (Story 20.5, #802): with no glance on the surface there is no beside-the-
-# glance position for a word to be repeated in.
-sys.exit(1 if fail else 0)
-PYEOF
-[ $? -eq 0 ] || fail=1
-
-# --- coverage wording never carries a placeholder (18.78, #637) -------------
-# The wording IS the brief on adoption, so this is asserted at the composed
-# brief and not only at the surface.
-python3 - "$work/big-map.json" "$work/big-cands.json" "$D" <<'PYEOF' || fail=1
-import importlib.util, json, sys
-d = json.load(open(sys.argv[1]))
-cands = json.load(open(sys.argv[2]))["candidates"]
-fail = []
-def check(cond, msg):
-    print(("ok:   " if cond else "FAIL: ") + msg, file=sys.stdout if cond else sys.stderr)
-    if not cond: fail.append(msg)
-
-# The #637 rule survives the cluster removal in the half that still applies:
-# no candidate direction and no composed brief may carry an internal
-# placeholder enum. GONE is the cluster-NAMING half — placeholders were the
-# assembler's enums for "nothing named this cluster", and there are no
-# clusters (Story 20.7, #809). A Strand is named by the material itself.
-PLACEHOLDERS = ("(unclustered)", "(untracked)", "(unnamed)")
-
-bad = [c["direction"] for c in cands
-       if any(p in c["direction"] for p in PLACEHOLDERS)]
-check(not bad, f"no candidate direction carries a placeholder enum ({bad[:2]})")
-check(not any(c["direction"].strip() in ("cover", "cover ") for c in cands),
-      "no candidate direction is left with an empty subject")
-
-# The same rule at the BRIEF: adopting any index must never hand the owner an
-# enum as their own wording.
-spec = importlib.util.spec_from_file_location("d", sys.argv[3])
-mod = importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)
-pin = d["coverage"]["pin"]
-briefs = [mod.brief_from_answer(
-              {"index": c["id"], "note": "an angle", "pin": pin}, cands, pin)["brief"]
-          for c in cands]
-badb = [b for b in briefs if any(p in b for p in PLACEHOLDERS)]
-check(not badb, f"no composed brief carries a placeholder enum ({badb[:2]})")
-check(all(b.endswith("— an angle") for b in briefs),
-      "the owner's note is still carried verbatim onto every composed brief")
-
-sys.exit(1 if fail else 0)
-PYEOF
-[ $? -eq 0 ] || fail=1
-
-# --- #651: the direction clip is RENDER-ONLY; the brief carries the full claim
-python3 - "$D" <<'PYEOF' || fail=1
-import importlib.util, sys
-spec = importlib.util.spec_from_file_location("d", sys.argv[1])
-mod = importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)
-fail = []
-def check(cond, msg):
-    print(("ok:   " if cond else "FAIL: ") + msg, file=sys.stdout if cond else sys.stderr)
-    if not cond: fail.append(msg)
-
-# A claim-bearing Strand whose Lesson rendering runs well past the old 120-char
-# derivation clip and ends on a whole word. (Re-based from the subtopic path,
-# which is gone — Story 20.7, #809. The rule itself is unchanged: clipping is
-# RENDER-only, and the derivation carries the material's full claim.)
-claim = ("Absence-based verification is three valued not two because "
-         "absent with evidence requires both the run count and the corroborating "
-         "signal before the regression may be recorded as genuinely resolved")
-assert len(claim) > 120 and len(claim.split()) >= 5
-strand = {"kind": "lesson", "slug": "verification", "title": claim,
-          "gloss": claim, "topic": "engineering", "date": "2026-07-23",
-          "evidence": ["LESSONS.md:9@abc1234"]}
-direction = mod._element_direction(strand)
-check(claim in direction,
-      "the full claim is carried into the DERIVATION, not clipped at 120 chars")
-
-# The brief composed from the index carries the whole claim, ending on the
-# source's own last word before the owner's note — never a mid-word cut.
-cands = [dict(strand, id="L9", direction=direction, kind="element")]
-brief = mod.brief_from_answer(
-    {"index": "L9", "note": "my angle", "pin": "p@1"}, cands, "p@1")["brief"]
-check(claim in brief and brief.endswith("resolved — my angle"),
-      "the composed brief carries the full claim and ends on a source word, never mid-word")
-
-# A served decision/reversal rendering is carried whole for the same reason
-# (Story 20.20, #843: the direction quotes the SERVED rendering; the raw
-# topic-line summary is never presented as one, so the no-clip property now
-# attaches to the gloss).
-ed = mod._element_direction({"kind": "reversal", "gloss": claim,
-                             "summary": "raw line", "date": "2026-07-23"})
-check(claim in ed, "a served element rendering is carried whole into its direction too")
-bare = mod._element_direction({"kind": "reversal", "summary": claim,
-                               "date": "2026-07-23"})
-check(claim not in bare and "not being served" in bare,
-      "an un-served element discloses instead of quoting the raw topic line")
-sys.exit(1 if fail else 0)
-PYEOF
-[ $? -eq 0 ] || fail=1
-
-# --- elements reach the surface and are pickable (18.80, #641) --------------
-python3 - "$work/big-cands.json" "$work/view.md" "$work/big-map.json" "$D" <<'PYEOF' || fail=1
-import importlib.util, json, re, sys
-cands = json.load(open(sys.argv[1]))["candidates"]
-view = open(sys.argv[2], encoding="utf-8").read()
-d = json.load(open(sys.argv[3]))
-fail = []
-def check(cond, msg):
-    print(("ok:   " if cond else "FAIL: ") + msg, file=sys.stdout if cond else sys.stderr)
-    if not cond: fail.append(msg)
-
-els = [c for c in cands if c.get("kind") == "element"]
-check(len(els) == len(d["elements"]), f"every element reaches the candidate list ({len(els)})")
-# Own namespace, no collision with the subtopic scheme.
-eids = [c["id"] for c in els]
-tids = [c["id"] for c in cands if c.get("kind") != "element"]
-check(all(re.fullmatch(r"(?:E\d+\.\d+|L\d+|J\d+)", i) for i in eids),
-      f"Strand ids use the declared namespaces L<n>/J<n>/E<topic>.<n> ({eids})")
-check(not (set(eids) & set(tids)), "element ids never collide with subtopic ids")
-check(len(set(eids)) == len(eids), "element ids are unique")
-
-# AMONG THE DIRECTIONS since Story 18.81 (#647): two lists split by internal
-# derivation kind is an implementation detail on the owner surface, so the
-# elements are pickable where every other candidate is.
-heads = re.findall(r"^#{2,4} (.+)$", view, re.M)
-check("What you decided" not in heads,
-      f"elements have no section of their own ({heads[:4]})")
-block = view.split("## Subtopic clusters — a derived, secondary grouping")[0]
-check(all(f"**{i}**" in block for i in eids),
-      "every element appears among the candidate directions, with its index")
-check(any(k in block for k in ("lesson", "journey", "decision", "reversal")),
-      "each Strand's kind is shown")
-check("already consumed" in block, "a consumed element is MARKED, not hidden")
-# The bound is never silent: the projection's coverage disclosure survives the
-# section's removal — a bounded projection read as the whole record is what it
-# guards against.
-check("delivery" in block and "zeta" in block and "NOT covered" in block,
-      "the directions state which topics the elements came from, and which they did not")
-
-# Wording carries no internal marker and becomes the brief on adoption (#637).
-PLACEHOLDERS = ("(unclustered)", "(untracked)", "(unnamed)")
-check(not any(p in c["direction"] for c in els for p in PLACEHOLDERS),
-      "element wording carries no placeholder enum")
-spec = importlib.util.spec_from_file_location("dd", sys.argv[4])
-mod = importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)
-pin = d["coverage"]["pin"]
-out = mod.brief_from_answer({"index": eids[0], "note": "the angle I want", "pin": pin},
-                            cands, pin)
-check(out["brief"].endswith("— the angle I want"),
-      f"an element index composes an ordinary brief with the note VERBATIM ({out['brief'][:60]}…)")
-check(out["provenance"] == "owner-authored" and out["origin"] == "adopted-index",
-      "an adopted element is owner-adopted wording, like any other index")
-# A stale pin is refused for an element exactly as for a subtopic.
-try:
-    mod.brief_from_answer({"index": eids[0], "note": "x", "pin": "other@dead"}, cands, pin)
-    check(False, "a stale-pin element selection is refused with the mismatch named")
-except SystemExit:
-    check(True, "a stale-pin element selection is refused with the mismatch named")
-sys.exit(1 if fail else 0)
-PYEOF
-[ $? -eq 0 ] || fail=1
-
-# Elements reach the IN-CONVERSATION screen too — the size switch moves where
-# the terrain is presented, never what the map proposes.
-python3 - "$work/map.json" "$D" "$work/small-el.json" <<'PYEOF'
-import json, sys
-d = json.load(open(sys.argv[1]))
-d["elements"] = [{"kind": "decision", "summary": "A small-map decision",
-                  "topic": "delivery", "date": "2026-07-20",
-                  "situation": "topics/delivery.md:3@abc1234",
-                  "evidence": ["topics/delivery.md:3@abc1234"], "consumed": False}]
-d["coverage"] = dict(d.get("coverage", {}), element_topics_read=["delivery"],
-                     element_topics_skipped=[])
-json.dump(d, open(sys.argv[3], "w"))
-PYEOF
-python3 "$D" payload --map "$work/small-el.json" > "$work/small-el-payload.json" 2>/dev/null
-python3 - "$work/small-el-payload.json" <<'PYEOF' && ok "elements are offered on the in-conversation screen, not only in the View" || err "elements never reach the small-map screen"
-import json, sys
-labels = [c["label"] for c in json.load(open(sys.argv[1]))["items"][0]["choices"]]
-# The decision row reaches the screen as a DISCLOSURE-shaped direction (Story
-# 20.20, #843): identified by kind, date and record — its raw topic line is
-# not the label any more.
-assert any("cover the decision" in l and "2026-07-20" in l for l in labels), labels
-assert any("name your own" in l for l in labels) and labels[-1] == "stop here", labels
-PYEOF
-[ $? -eq 0 ] || fail=1
-
-# --- the depth ESTIMATOR is GONE (Story 20.7, #809) -------------------------
-# This block asserted that the View showed the estimate but not the
-# estimator's promotion rule. There is no estimator: it was derived per
-# subtopic and retired with the unit. What survives is the stronger claim —
-# nothing depth-shaped reaches the owner surface at all — plus the absence of
-# the machinery, so a reader meets the removal rather than a silent gap.
-python3 - "$work/view.md" "$D" <<'PYEOF' || fail=1
-import re, sys
-view = open(sys.argv[1], encoding="utf-8").read()
-src = open(sys.argv[2], encoding="utf-8").read()
-fail = []
-def check(cond, msg):
-    print(("ok:   " if cond else "FAIL: ") + msg, file=sys.stdout if cond else sys.stderr)
-    if not cond: fail.append(msg)
-
-check(not re.search(r"^- depth: ", view, re.M),
-      "no depth line reaches the View (the estimate is not an owner surface)")
-check("the next level needs" not in view,
-      "the estimator's promotion rule appears nowhere on the owner surface")
-for gone in ("_depth_line", "DEPTH_PREDICATE_MARKER"):
-    check(gone not in src, f"{gone} is deleted, not merely unreferenced")
-sys.exit(1 if fail else 0)
-PYEOF
-[ $? -eq 0 ] || fail=1
-
-# NO SECOND PROPOSER: the View renders the directions it is GIVEN. A
-# `candidates()` call inside compose_view would be a second derivation, and the
-# screen and the View could then silently disagree about what was offered.
-python3 - "$D" <<'PYEOF' && ok "the View reuses the derived directions and derives none of its own" || err "compose_view derives its own directions (second proposer)"
-import ast, sys
-src = open(sys.argv[1], encoding="utf-8").read()
-fn = next(n for n in ast.parse(src).body
-          if isinstance(n, ast.FunctionDef) and n.name == "compose_view")
-calls = {n.func.id for n in ast.walk(fn)
-         if isinstance(n, ast.Call) and isinstance(n.func, ast.Name)}
-sys.exit(1 if "candidates" in calls else 0)
-PYEOF
-
-# Fully regenerated per invocation, for an unchanged pin.
-cp "$work/view.md" "$work/view-1.md"
-python3 "$D" payload --map "$work/big-map.json" --view "$work/view.md" >/dev/null 2>&1
-cmp -s "$work/view-1.md" "$work/view.md" \
-  && ok "size switch: two invocations regenerate the View identically at one pin" \
-  || err "the View is not deterministic at an unchanged pin"
-
-# WRITE-ONLY: poison it, and nothing downstream changes. Delete it, and nothing
-# is lost — it is a rendering, never a record.
-printf 'POISON-VIEW\n' > "$work/view.md"
-python3 "$D" payload --map "$work/big-map.json" --view "$work/view.md" \
-  > "$work/big-payload2.json" 2>/dev/null
-grep -q 'POISON-VIEW' "$work/big-payload2.json" \
-  && err "the composer read the View back (a stored index)" \
-  || ok "size switch: a poisoned View does not influence the next screen (write-only)"
-cmp -s "$work/big-payload.json" "$work/big-payload2.json" \
-  && ok "size switch: the screen is unchanged after the View was overwritten" \
-  || err "overwriting the View changed the screen"
-rm -f "$work/view.md"
-python3 "$D" payload --map "$work/big-map.json" --view "$work/view.md" \
-  > "$work/big-payload3.json" 2>/dev/null
-cmp -s "$work/big-payload.json" "$work/big-payload3.json" \
-  && cmp -s "$work/view-1.md" "$work/view.md" \
-  && ok "size switch: deleting the View loses nothing (map and View both regenerate)" \
-  || err "deleting the View lost something"
-
-# Source-level: the View path is written, never read (the --emit-debug rule).
-python3 - "$D" <<'PYEOF' && ok "size switch: no code path reads a View file back" || err "topic-map-directions.py contains a View-reading code path"
-import re, sys
-src = open(sys.argv[1], encoding="utf-8").read()
-reads = re.findall(r'open\((?![^)]*"w")[^)]*\)', src)
-for r in reads:
-    assert "view" not in r.lower(), f"a View file is opened for reading: {r}"
-assert 'def write_view' in src and 'open(path, "w"' in src, "the View is not write-only"
-PYEOF
-
-# --- the outcome is a brief IN THE OWNER'S WORDS -----------------------------
+# --- the hand-off is the EXISTING stage-0 --brief path -----------------------
+# (brief composition itself is asserted in check-terrain-select-inner.sh; here
+# a brief is composed only as the input to the REAL stage-0 run.)
 printf '%s' '{"selection":"name your own direction or combination axis","free_text":"connect the retry storm to on-call load, through the retro"}' \
   > "$work/answer-free.json"
 python3 "$D" brief --answer "$work/answer-free.json" --map "$work/map.json" \
-  > "$work/brief-free.json"
-python3 -c "
-import json
-b=json.load(open('$work/brief-free.json'))
-assert b['brief']=='connect the retry storm to on-call load, through the retro', b
-assert b['provenance']=='owner-authored' and b['origin']=='free-form', b
-" && ok "free-form wording becomes the brief verbatim, owner-authored" \
-  || err "free-form wording was not carried through"
-
-sel=$(python3 -c "import json;print(json.load(open('$work/cands.json'))['candidates'][0]['direction'])")
-python3 -c "
-import json,sys
-json.dump({'selection':sys.argv[1],'free_text':''},open('$work/answer-sel.json','w'))
-" "$sel"
-python3 "$D" brief --answer "$work/answer-sel.json" --map "$work/map.json" \
-  > "$work/brief-sel.json"
-python3 -c "
-import json
-b=json.load(open('$work/brief-sel.json'))
-assert b['origin']=='adopted-candidate', b
-assert b['provenance']=='owner-authored', b
-" && ok "machine-proposed text the owner accepts becomes OWNER-ADOPTED wording" \
-  || err "an adopted candidate did not become an owner-authored brief"
-
-printf '%s' '{"selection":"stop here","free_text":""}' > "$work/answer-stop.json"
-python3 "$D" brief --answer "$work/answer-stop.json" --map "$work/map.json" \
-  > "$work/brief-stop.json" 2>&1 \
-  && err "stopping produced a brief" \
-  || grep -q 'first-class outcome' "$work/brief-stop.json" \
-     && ok "stopping produces no brief and no run, and says so" \
-     || err "wrong stop behaviour: $(cat "$work/brief-stop.json")"
-
-# --- INDEXED SELECTION: {index, note} against the View's pin -----------------
-bigpin=$(python3 -c "import json;print(json.load(open('$work/big-map.json'))['coverage']['pin'])")
-idx=$(python3 -c "
-import json
-c=[x for x in json.load(open('$work/big-cands.json'))['candidates'] if x['kind']=='element']
-print(c[0]['id'])")
-python3 -c "
-import json,sys
-json.dump({'index':sys.argv[1],'note':'through the on-call retro, not the metrics',
-           'pin':sys.argv[2]}, open('$work/answer-idx.json','w'))
-" "$idx" "$bigpin"
-python3 "$D" brief --answer "$work/answer-idx.json" --map "$work/big-map.json" \
-  > "$work/brief-idx.json" 2>"$work/brief-idx.err" \
-  && ok "indexed selection: an index plus a note composes a brief" \
-  || err "indexed selection failed: $(cat "$work/brief-idx.err")"
-python3 - "$work/brief-idx.json" "$work/big-cands.json" <<'PYEOF' || fail=1
-import json, sys
-b = json.load(open(sys.argv[1]))
-cands = json.load(open(sys.argv[2]))["candidates"]
-fail = []
-def check(cond, msg):
-    print(("ok:   " if cond else "FAIL: ") + msg, file=sys.stdout if cond else sys.stderr)
-    if not cond: fail.append(msg)
-
-note = "through the on-call retro, not the metrics"
-check(note in b["brief"], "the owner's note is carried into the brief VERBATIM")
-wording = next(c["direction"] for c in cands if c["id"] == b["index"])
-check(b["brief"].startswith(wording),
-      "the brief is the subtopic's coverage wording plus the note")
-check(b["provenance"] == "owner-authored", "an adopted index is owner-adopted wording")
-check(b["origin"] == "adopted-index", "the origin records that an index was adopted")
-check(isinstance(b["brief"], str), "the outcome is one plain brief string")
-sys.exit(1 if fail else 0)
-PYEOF
-[ $? -eq 0 ] || fail=1
-
-# Free text ALWAYS wins — even when an index is also present.
-python3 -c "
-import json,sys
-json.dump({'index':sys.argv[1],'note':'ignored','pin':sys.argv[2],
-           'free_text':'my own direction, in my own words'},
-          open('$work/answer-idx-free.json','w'))
-" "$idx" "$bigpin"
-python3 "$D" brief --answer "$work/answer-idx-free.json" --map "$work/big-map.json" \
-  > "$work/brief-idx-free.json" 2>/dev/null
-python3 -c "
-import json
-b=json.load(open('$work/brief-idx-free.json'))
-assert b['brief']=='my own direction, in my own words', b
-assert b['origin']=='free-form', b
-" && ok "indexed selection: free text still always wins over an index" \
-  || err "an index overrode the owner's free text"
-
-# A STALE index is refused with the pin mismatch NAMED — never re-resolved.
-python3 -c "
-import json,sys
-json.dump({'index':sys.argv[1],'note':'x','pin':'deadbeef'},
-          open('$work/answer-stale.json','w'))
-" "$idx"
-if python3 "$D" brief --answer "$work/answer-stale.json" --map "$work/big-map.json" \
-     > "$work/brief-stale.out" 2>"$work/brief-stale.err"; then
-  err "a stale-pin index produced a brief instead of a refusal"
-else
-  rc=$?
-  [ "$rc" -eq 1 ] && ok "indexed selection: a stale-pin index is refused (exit 1)" \
-    || err "stale-pin refusal used exit $rc, not the documented refusal exit"
-  grep -q 'pin mismatch' "$work/brief-stale.err" \
-    && grep -q 'deadbeef' "$work/brief-stale.err" \
-    && grep -q "$bigpin" "$work/brief-stale.err" \
-    && ok "indexed selection: the refusal NAMES both pins" \
-    || err "the refusal does not name the mismatch: $(cat "$work/brief-stale.err")"
-  [ -s "$work/brief-stale.out" ] \
-    && err "a refused selection still emitted a brief" \
-    || ok "indexed selection: a refused selection emits no brief"
-fi
-
-# An index with no pin at all cannot be proven current, so it is refused too.
-python3 -c "
-import json,sys
-json.dump({'index':sys.argv[1],'note':'x'},open('$work/answer-nopin.json','w'))
-" "$idx"
-python3 "$D" brief --answer "$work/answer-nopin.json" --map "$work/big-map.json" \
-  > /dev/null 2>"$work/brief-nopin.err" \
-  && err "an index without a pin was silently resolved" \
-  || grep -q 'no pin' "$work/brief-nopin.err" \
-     && ok "indexed selection: an index without a pin is refused, and says why" \
-     || err "wrong no-pin behaviour: $(cat "$work/brief-nopin.err")"
-
-# Stopping stays first-class even from the View branch.
-printf '%s' '{"selection":"stop here","index":"T1.1","free_text":""}' \
-  > "$work/answer-idx-stop.json"
-python3 "$D" brief --answer "$work/answer-idx-stop.json" --map "$work/big-map.json" \
-  >"$work/idx-stop.out" 2>&1 \
-  && err "stopping from the View branch produced a brief" \
-  || grep -q 'first-class outcome' "$work/idx-stop.out" \
-     && ok "indexed selection: stop here still produces no brief and no run" \
-     || err "wrong stop behaviour from the View branch"
-
-# ID STABILITY within a pin: two invocations produce identical IDs.
-python3 "$D" candidates --map "$work/big-map.json" > "$work/big-cands2.json"
-cmp -s "$work/big-cands.json" "$work/big-cands2.json" \
-  && ok "indexed selection: IDs are identical across invocations at one pin" \
-  || err "the IDs are not stable within a pin"
-python3 - "$work/view-1.md" "$work/big-cands.json" <<'PYEOF' && ok "indexed selection: the View's IDs and the composer's IDs are the same identifiers" || err "the View and the composer disagree about indexes"
-import json, re, sys
-# Story 20.5 (#802): the per-subtopic detail headings are gone, so the View's
-# identifiers are read where they now live — the candidate direction rows,
-# which is the surface the owner actually answers from.
-# Story 20.7 (#809): the identifiers are Strand ids now (L<n>/J<n>/E<t>.<n>),
-# subtopic T-ids having gone with the cluster unit.
-view_ids = set(re.findall(r"^- \*\*((?:L|J)\d+|E\d+\.\d+)\*\* — ",
-                          open(sys.argv[1], encoding="utf-8").read(), re.M))
-cand_ids = {c["id"] for c in json.load(open(sys.argv[2]))["candidates"]
-            if c["kind"] == "element"}
-assert cand_ids <= view_ids, cand_ids - view_ids
-PYEOF
-
-# No new entry pipeline: an indexed brief reaches stage 0 exactly like a typed one.
-idxbrief=$(python3 -c "import json;print(json.load(open('$work/brief-idx.json'))['brief'])")
-python3 "$DP" stage0 "share engineering lessons" "$h" --brief "$idxbrief" --root "$h" \
-  > "$work/stage0-idx.json" 2>"$work/e-idx" \
-  || err "an indexed brief did not start a normal run: $(cat "$work/e-idx")"
-python3 "$DP" stage0 "share engineering lessons" "$h" --brief "$idxbrief" --root "$h" \
-  > "$work/stage0-idx-typed.json" 2>/dev/null
-python3 -c "
-import json
-b=(json.load(open('$work/stage0-idx.json')).get('run_state') or {}).get('brief') or {}
-t=(json.load(open('$work/stage0-idx-typed.json')).get('run_state') or {}).get('brief') or {}
-assert b.get('text')=='''$idxbrief''', b
-assert b.get('provenance')=='owner-authored', b
-# byte-for-byte the same record the SAME string typed unaided produces: the
-# index, the note and the pin exist only in the composer's output, never here
-assert b==t, (b,t)
-assert 'index' not in b and 'pin' not in b and 'note' not in b, b
-" && ok "indexed selection: downstream cannot distinguish an indexed selection from a typed brief" \
-  || err "an indexed selection left a downstream trace"
-
-# --- the hand-off is the EXISTING stage-0 --brief path -----------------------
+  > "$work/brief-free.json" || err "brief composition failed"
 brief=$(python3 -c "import json;print(json.load(open('$work/brief-free.json'))['brief'])")
 mkdir -p "$work/ws2"
 python3 "$DP" stage0 "share engineering lessons" "$h" --brief "$brief" --root "$h" \
@@ -902,24 +241,39 @@ assert a==b, (a,b)
 " && ok "a map-started run is indistinguishable downstream from a hand-typed brief" \
   || err "the map leaves a downstream trace the brief path does not"
 
-# --- NO structure composition anywhere in the map path -----------------------
-# Scope is a property of the CODE, not the prose documenting it.
-for src in "$D" "$M"; do
-  python3 - "$src" > "$work/code.py" <<'PYEOF'
-import io, sys, tokenize
-src = open(sys.argv[1], encoding="utf-8").read()
-out = []
-for tok in tokenize.generate_tokens(io.StringIO(src).readline):
-    if tok.type in (tokenize.COMMENT, tokenize.STRING):
-        continue
-    out.append(tok.string)
-print(" ".join(out))
+
+# --- an indexed brief reaches stage 0 exactly like a typed one ---------------
+python3 "$D" candidates --map "$work/big-map.json" > "$work/big-cands.json"
+python3 - "$work" <<'PYEOF' || err "indexed-answer prep failed"
+import json, sys
+w = sys.argv[1]
+pin = json.load(open(w + "/big-map.json"))["coverage"]["pin"]
+c = [x for x in json.load(open(w + "/big-cands.json"))["candidates"]
+     if x["kind"] == "element"]
+json.dump({"index": c[0]["id"], "note": "through the on-call retro, not the metrics",
+           "pin": pin}, open(w + "/answer-idx.json", "w"))
 PYEOF
-  grep -qiE 'narrative structure|structure candidate|compose.*structure|section_plan|outline' \
-    "$work/code.py" \
-    && err "$src composes narrative structures (18.45 single-proposer invariant)" \
-    || ok "$src composes no narrative structures"
-done
+python3 "$D" brief --answer "$work/answer-idx.json" --map "$work/big-map.json" \
+  > "$work/brief-idx.json" 2>/dev/null || err "indexed brief composition failed"
+# No new entry pipeline: an indexed brief reaches stage 0 exactly like a typed one.
+idxbrief=$(python3 -c "import json;print(json.load(open('$work/brief-idx.json'))['brief'])")
+python3 "$DP" stage0 "share engineering lessons" "$h" --brief "$idxbrief" --root "$h" \
+  > "$work/stage0-idx.json" 2>"$work/e-idx" \
+  || err "an indexed brief did not start a normal run: $(cat "$work/e-idx")"
+python3 "$DP" stage0 "share engineering lessons" "$h" --brief "$idxbrief" --root "$h" \
+  > "$work/stage0-idx-typed.json" 2>/dev/null
+python3 -c "
+import json
+b=(json.load(open('$work/stage0-idx.json')).get('run_state') or {}).get('brief') or {}
+t=(json.load(open('$work/stage0-idx-typed.json')).get('run_state') or {}).get('brief') or {}
+assert b.get('text')=='''$idxbrief''', b
+assert b.get('provenance')=='owner-authored', b
+# byte-for-byte the same record the SAME string typed unaided produces: the
+# index, the note and the pin exist only in the composer's output, never here
+assert b==t, (b,t)
+assert 'index' not in b and 'pin' not in b and 'note' not in b, b
+" && ok "indexed selection: downstream cannot distinguish an indexed selection from a typed brief" \
+  || err "an indexed selection left a downstream trace"
 
 # --- the map path writes nothing into the host or articles tree --------------
 before=$(find "$a" -type f | sort)
@@ -929,244 +283,6 @@ python3 "$D" candidates --map "$work/map.json" >/dev/null
   && ok "composing the screen writes nothing into the articles repo" \
   || err "the screen composer wrote into the articles repo"
 
-# --- the owner surface carries owner language only (18.82, #646) -------------
-# The reading path is everything above the maintenance section: what the owner
-# reads to choose. Counters, cluster/depth enums and remediation prompts belong
-# below it, in sections labeled for what they are.
-python3 - "$work/view.md" "$work/big-map.json" "$D" <<'PYEOF' || fail=1
-import importlib.util, json, re, sys
-view = open(sys.argv[1], encoding="utf-8").read()
-d = json.load(open(sys.argv[2]))
-spec = importlib.util.spec_from_file_location("dv", sys.argv[3])
-mod = importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)
-fail = []
-def check(cond, msg):
-    print(("ok:   " if cond else "FAIL: ") + msg, file=sys.stdout if cond else sys.stderr)
-    if not cond: fail.append(msg)
 
-# Story 20.5 (#802): with the maintenance and diagnostics sections deleted,
-# the reading path is THE WHOLE VIEW. The #646 boundary is not weakened by
-# this — it is satisfied trivially, because there is no longer a
-# non-owner-facing tail for internal vocabulary to hide in. The lint below is
-# therefore now the ONLY thing standing between a derivation defect and the
-# owner surface, which makes it more load-bearing than before, not less.
-reading = view
-
-# The lint's own contract: it FLAGS the pre-#646 line shape and passes the
-# shipped one — a lint that never fires would be a clean bill nobody earned.
-offender = "- **T1.1** — not yet clustered · [##..] seed-only - 4 ptr, 0 unconsumed"
-check(mod.lint_owner_lines([offender]), "the render-boundary lint flags an internal-vocabulary line")
-hits = mod.lint_owner_lines(reading.splitlines())
-check(not hits, f"the reading path carries no internal vocabulary ({hits[:2]})")
-
-# Registration is a contract, not a convenience list: a depth level or source
-# family the assembler grows and nobody registers would silently stop being
-# gated (the check-internal-vocabulary.sh pattern, applied to the map).
-levels = {s.get("depth", {}).get("level") for t in d["topics"] for s in t["subtopics"]}
-families = {i.get("family") for t in d["topics"] for s in t["subtopics"]
-            for i in s.get("items", [])}
-vocab = {v.lower() for v in mod.INTERNAL_VOCAB}
-unregistered = [x for x in (levels | families) if x
-                and x.lower().replace(" ", "-") not in vocab and x.lower() not in vocab]
-check(not unregistered,
-      f"every depth level and source family is registered in INTERNAL_VOCAB ({unregistered})")
-
-# The remediation prompt and the counters were DELETED with their sections,
-# not relocated — and that is the story's point: they were ~2,300 lines nobody
-# could find a use for. What must survive is that the owner surface still
-# carries no remediation prompt inside a terrain or direction line.
-check("declare `subtopic:`" not in reading,
-      "no remediation prompt sits inside a terrain or direction line")
-check("[#" not in reading,
-      "no depth bar reaches the owner surface")
-# IDs stay — they are the ratified selection mechanism.
-check(re.search(r"^- \*\*((?:L|J)\d+|E\d+\.\d+)\*\* — ", reading, re.M),
-      "terrain lines still carry their Strand index for selection")
-sys.exit(1 if fail else 0)
-PYEOF
-[ $? -eq 0 ] || fail=1
-
-# --- the shipped map harnesses keep passing verbatim -------------------------
-for c in check-topic-map.sh check-topic-map-depth.sh; do
-  sh "scripts/$c" >/dev/null 2>&1 && ok "$c passes unchanged" || err "$c regressed"
-done
-
-# --- lockstep: the SKILL states the shipped mechanics ------------------------
-[ -f "$SKILL" ] && ok "the topic-map skill exists" || err "$SKILL missing"
-# The owner path is the two-screen flow (Story 20.19, #841): axis, then
-# member, then brief. The pre-pivot `payload --view` invocation left the
-# skill with that story; the View survives on the size switch's over-budget
-# branch via the `view` subcommand.
-for token in 'terrain_map.py assemble' 'topic-map-directions.py axis' \
-             'topic-map-directions.py member' \
-             'topic-map-directions.py brief' 'validate-proposal-payload.py' \
-             'stage0' '--brief' 'free-form' 'every time' \
-             'never composes narrative structures' 'single proposer' \
-             'topic-map-directions.py view' '--out' 'size switch' \
-             'never read back' \
-             'resolve-paths.py topic-map-view' 'destination repository' \
-             'stable within a pin' 'refused with the mismatch named' \
-             'note verbatim' 'machine-composed'; do
-  grep -q -- "$token" "$SKILL" && ok "SKILL carries the contract text: $token" \
-    || err "SKILL is missing contract text: $token"
-done
-
-
-# --- SCREEN 1: the two served axes (Story 20.8, #810; Story 20.25, #860) -----
-# Screen 1 offers TWO axes (SPEC-terrain CAP-2 as amended 2026-07-28): the
-# served TAG vocabulary over Lessons and Journeys, and the served decision
-# TOPIC over decisions and reversals. Both keys are already shard keys, so
-# neither axis joins anything. Deterministic; no cap; per-axis denominators,
-# never pooled; Strands outside EVERY axis disclosed as a line.
-#
-# The word "topic" is legitimate on this screen for the topic axis and its
-# members. What the 2026-07-27 retirement forbids is the TAG axis calling its
-# members topics — the collision with `topics/*.md` — and that is what the
-# assertion below tests, rather than the blanket absence it used to.
-#
-# Asserted on a fixture that exercises every clause: a 53-entry member so
-# serve-whole is tested at the measured worst case, a NAME COLLIDING across
-# both vocabularies, decisions and reversals carrying no tags, and one Strand
-# outside both axes.
-python3 - "$D" <<'PYEOF' || fail=1
-import json, subprocess, sys, tempfile
-D = sys.argv[1]
-fail = []
-def check(cond, msg):
-    print(("ok:   " if cond else "FAIL: ") + msg, file=sys.stdout if cond else sys.stderr)
-    if not cond: fail.append(msg)
-
-els = []
-for n in range(53):                    # the measured largest member is 40-53
-    els.append({"kind": "lesson", "slug": f"w{n}", "title": f"W{n}",
-                "tags": ["workflow"], "evidence": [], "consumed": False})
-els.append({"kind": "lesson", "slug": "a1", "title": "A1",
-            "tags": ["agents", "workflow"], "evidence": [], "consumed": False})
-els.append({"kind": "journey", "slug": "j1", "title": "J1",
-            "tags": ["agents"], "evidence": [], "consumed": True})
-els.append({"kind": "lesson", "slug": "untagged", "title": "U",
-            "tags": [], "evidence": [], "consumed": False})
-# The topic axis's corpus: decisions and reversals carry NO tags (the served
-# shard entries have none), and their topic IS their shard key. `workflow`
-# deliberately collides with a tag-axis member name.
-els.append({"kind": "decision", "slug": "d1", "title": "D1", "tags": [],
-            "topic": "workflow", "evidence": [], "consumed": False})
-els.append({"kind": "decision", "slug": "d2", "title": "D2", "tags": [],
-            "topic": "articles", "evidence": [], "consumed": False})
-# `reversal` is NOT a served element kind (#893). Kept in the fixture on
-# purpose: it must NOT reach the topic axis, and must fall to the
-# outside-every-axis disclosure rather than being silently counted.
-els.append({"kind": "reversal", "slug": "r1", "title": "R1", "tags": [],
-            "topic": "workflow", "evidence": [], "consumed": False})
-m = {"kind": "topic-map", "topics": [], "coverage": {"pin": "h@abc1234"},
-     "elements": els}
-f = tempfile.NamedTemporaryFile("w", suffix=".json", delete=False)
-json.dump(m, f); f.close()
-run = lambda: subprocess.run(
-    ["python3", D, "axis", "--map", f.name], capture_output=True, text=True)
-out = run()
-check(out.returncode == 0, f"axis composes (rc={out.returncode})")
-d = json.loads(out.stdout)
-axes = {a["key"]: a for a in d["axis"]["axes"]}
-check(sorted(axes) == ["tag", "topic"], f"Screen 1 offers two axes ({sorted(axes)})")
-tags = {x["member"]: x["strands"] for x in axes["tag"]["members"]}
-topics = {x["member"]: x["strands"] for x in axes["topic"]["members"]}
-check(tags == {"workflow": 54, "agents": 2},
-      f"tag-axis members are exactly the element tags with correct counts ({tags})")
-check(topics == {"workflow": 1, "articles": 1},
-      f"topic-axis members are exactly the decision topics with correct counts ({topics})")
-# The collision case: one name, two axes, different material. Neither member
-# absorbs the other's Strands — which is why a merged listing was refused.
-check(tags["workflow"] == 54 and topics["workflow"] == 1,
-      "a name served by BOTH vocabularies stays two distinct members")
-check(d["axis"]["unreachable_strands"] == 2,
-      "a Strand outside EVERY axis is counted (incl. the unserved `reversal` kind, #893), and decisions no longer are")
-
-# PER-AXIS COMPLETENESS (Story 20.25): count in == count out, on each axis
-# independently, recomputed here rather than trusted from the payload.
-want_tag, want_topic, want_out = {}, {}, 0
-for el in els:
-    hit = False
-    for t in el.get("tags") or []:
-        want_tag[t] = want_tag.get(t, 0) + 1; hit = True
-    if el["kind"] == "decision" and el.get("topic"):
-        want_topic[el["topic"]] = want_topic.get(el["topic"], 0) + 1; hit = True
-    if not hit: want_out += 1
-check(tags == want_tag and topics == want_topic
-      and d["axis"]["unreachable_strands"] == want_out,
-      "each axis reconciles independently against a recount of the elements")
-
-item = d["payload"]["items"][0]
-labels = [c["label"] for c in item["choices"]]
-check(labels[0] == "by tag — agents (2 Strands)"
-      and labels[1] == "by tag — workflow (54 Strands)",
-      f"every member is offered with its count — 54 entries included, no cap ({labels[:2]})")
-check(labels[2] == "by topic — articles (1 Strand)"
-      and labels[3] == "by topic — workflow (1 Strand)",
-      f"the topic axis's members are offered too, kind-labelled ({labels[2:4]})")
-check(labels[-2:] == ["name your own direction or combination axis", "stop here"],
-      "free-form is offered and stop stays last")
-check("outside both listings" in item["where"],
-      "the outside-every-axis disclosure is a line on the screen")
-check("no served tag" not in item["where"],
-      "the retired untagged-strand line is gone, not reworded")
-check("tag(s) and" in item["where"] and "topic(s)" in item["where"],
-      f"the denominator is stated per axis, never pooled ({item['where'][:70]})")
-tag_labels = [x for x in labels if x.startswith("by tag")]
-check(all("topic" not in x for x in tag_labels),
-      "the tag axis never calls its members topics (the retired UI word)")
-check(out.stdout == run().stdout, "the axis listing is byte-identical across invocations")
-v = subprocess.run(["python3", "scripts/validate-proposal-payload.py",
-                    "--surface", "topic-map", "/dev/stdin"],
-                   input=json.dumps(d["payload"]), capture_output=True, text=True)
-check(v.returncode == 0, f"the axis screen passes the proposal validator ({v.stderr.strip()[:80]})")
-sys.exit(1 if fail else 0)
-PYEOF
-[ $? -eq 0 ] || fail=1
-
-# --- owner-surface text fits by authorship, never by clipping (#832) ---------
-# The slice-plus-fake-period idiom is gone for good: a truncation that ends in
-# "." masquerades as a sentence ("Too many to f."), which the owner reads as a
-# complete statement saying something else. Grep-asserted like the other
-# absences in this file.
-if grep -nE '\[:(budget|room) *- *1\]' scripts/topic-map-directions.py >/dev/null; then
-  err "the mid-word slice idiom is back in topic-map-directions.py (#832)"
-else
-  ok "no mid-word slice-plus-period idiom in the composer"
-fi
-python3 - scripts/topic-map-directions.py <<'PYEOF' || fail=1
-import importlib.util, sys
-fail = []
-def check(cond, msg):
-    print(("ok:   " if cond else "FAIL: ") + msg, file=sys.stdout if cond else sys.stderr)
-    if not cond: fail.append(msg)
-spec = importlib.util.spec_from_file_location("tmd", sys.argv[1])
-tmd = importlib.util.module_from_spec(spec); spec.loader.exec_module(tmd)
-# Static template text fits its budget BY CONSTRUCTION — measured here, at
-# authoring time, per the owner-facing proposal contract clause (e).
-check(len(tmd.WHY_TEXT) <= tmd.BUDGETS["why"],
-      f"WHY_TEXT is authored inside BUDGETS['why'] ({len(tmd.WHY_TEXT)}/{tmd.BUDGETS['why']})")
-# The summary `where` picks an authored variant beside the path — never slices.
-long_path = "/home/owner/work/some-articles-repo/drafts/topic-map/topic-map-view.md"
-where = tmd._fit_with_path(
-    ["Terrain at deadbeef: 61 element(s) — each its own Strand — and 3 "
-     "topic(s), 61 strand(s); 0 already consumed and still selectable.",
-     "Terrain at deadbeef: 61 Strands, 3 topic(s); 0 consumed.",
-     "Terrain: 61 Strands."], long_path, tmd.BUDGETS["where"])
-check(where.endswith(long_path), "the View path is never clipped")
-check(len(where) <= tmd.BUDGETS["where"],
-      f"an authored variant fits beside a realistic path ({len(where)}/{tmd.BUDGETS['where']})")
-prefix = where[: -len(" Open the View: " + long_path)]
-check(not __import__("re").search(r"\b\w\.$", prefix),
-      "the summary prefix is a whole authored wording, not a cut wearing a period")
-# View-line elision is visible and lands on a word boundary.
-e = tmd._elide("Too many to fit on one screen indeed", 20)
-check(e.endswith("…") and not e.endswith(" …") and "fit" not in e.split("…")[0].split()[-1][:1],
-      f"View elision is marked and word-bounded ({e!r})")
-check(tmd._elide("short", 20) == "short", "under-budget View value is untouched")
-sys.exit(1 if fail else 0)
-PYEOF
-[ $? -eq 0 ] || fail=1
 
 [ "$fail" -eq 0 ] && printf '\nAll topic-map screen checks passed.\n' \
-  || { printf '\nFAILED.\n' >&2; exit 1; }
