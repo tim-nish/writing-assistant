@@ -357,6 +357,37 @@ The owner's wording, if they supply any, **is** the brief and the proposal is
 discarded. To record an adopted claim instead of the deterministic wording,
 pass it back as `claim` in the answer.
 
+**The brief gate may carry a coherence CONSULTANT (SPEC-terrain CAP-3, added
+2026-07-30, #939).** When a set of two or more is selected the command returns
+a `consultant` block: the `subject` (the selected members with their cites),
+the **complete, unranked** `substitution_candidates` pool (every unselected
+Strand at this pin), and `rules` — four rules that bind you and that you may
+not trade against each other:
+
+1. **Nothing is adopted silently.** Whatever you produce reaches the owner as
+   a proposal with free-form override. They decide; nothing enters the brief
+   without them adopting it.
+2. **Every claim cites served material at the pin.** Naming a Strand or a
+   group means citing its served rendering or claim at this pin. Introduce
+   nothing that is not in the served corpus there.
+3. **Incoherence and uncertainty are both stated.** If the set cannot support
+   one thesis, say so plainly instead of composing around it. If you are
+   unsure, disclose the uncertainty rather than emitting a confident
+   structure.
+4. **Substitutions enumerate their candidates.** Proposing to replace a
+   Strand means listing the candidates you considered — never reducing them
+   to one best swap, and never ranking them and surfacing only the strongest.
+   Adding unselected material is admissible **only** because nothing is
+   hidden; ranking would narrow the set, which is what the owner's having
+   selected does and you do not.
+
+The assessment itself is deliberately **not a fixed procedure** — a narrow
+mechanism would keep reporting success for satisfying its own steps while
+failing what the owner wanted. Judge freely; the four rules are what is
+frozen. The consultant **never runs before a selection**: with nothing
+selected it has no subject, and running early would make it a scope
+originator rather than a consultant.
+
 The recorded brief carries its **member set**, and that is not bookkeeping:
 the completeness invariant follows the set into drafting — every selected
 Strand placed or its omission disclosed — so a brief with no members recorded

@@ -1470,6 +1470,72 @@ def _refuse_group_ids(indexes):
         "you want, and the claim is recomposed over exactly those."))
 
 
+# THE COHERENCE CONSULTANT'S BINDING RULES (Story 20.55, #939; SPEC-terrain
+# CAP-3 §"the brief gate may carry a coherence CONSULTANT").
+#
+# What is frozen here is the gate SHAPE, the grounding rule, the honesty rule
+# and the no-hiding rule — never the assessment itself. That is deliberate and
+# is the whole reason this capability is bounded rather than open: the failure
+# being avoided is a narrow deterministic procedure that keeps reporting
+# success because it satisfied its own constrained steps while failing what
+# the owner actually wanted. An instrument over the judgment would be that
+# failure, encoded.
+#
+# The asymmetry in the fourth rule is the second-proposer boundary, applied: a
+# combination becomes a proposal exactly when something other than the owner
+# NARROWS the candidate set, and the test is whether what reached the owner is
+# smaller than what exists. A substitution proposal ADDS, so it is admissible.
+# RANKING narrows, so it is not — and adding unselected material is admissible
+# ONLY because nothing is hidden.
+CONSULTANT_RULES = [
+    "nothing is adopted silently — every assessment and every proposal "
+    "reaches the owner as a proposal with free-form override, the owner "
+    "decides, and nothing enters the brief without the owner adopting it",
+    "every claim cites served material at the pin — naming a Strand or a "
+    "group means citing that Strand's served rendering or the group's claim "
+    "at this pin, and no proposal introduces material outside the served "
+    "corpus at that pin",
+    "incoherence and uncertainty are both stated — a set that cannot support "
+    "a single thesis is said so plainly rather than composed around, and an "
+    "unsure consultant discloses the uncertainty rather than emitting a "
+    "confident structure",
+    "substitutions enumerate their candidates — a proposal to replace a "
+    "Strand lists the candidates considered rather than reducing them to one "
+    "best swap, and never ranks them and surfaces only the strongest; "
+    "ranking is the narrowing the second-proposer boundary bars",
+]
+
+
+def _consultant_block(matches, cands, map_data):
+    """The coherence consultant's subject and its unnarrowed candidate pool.
+
+    NEVER RUNS UPSTREAM OF A SELECTION (AC5): this is reached only from the
+    brief path, which by construction has one. The owner's having selected is
+    what discharges the second-proposer bar, so a consultant running before a
+    selection would be a scope originator, not a consultant.
+
+    The substitution pool is EVERY unselected Strand at this pin, enumerated
+    and unranked. Trimming it to a promising few would be exactly the
+    narrowing the fourth rule bars — the pool is what makes adding material
+    admissible at all.
+    """
+    chosen = {m.get("id") for m in matches}
+    return {
+        "rules": CONSULTANT_RULES,
+        # The subject: what the owner actually selected, with the cites every
+        # claim about it has to be grounded in.
+        "subject": [_member_record(m) for m in matches],
+        # Unranked and complete. The order is the map's own, which is
+        # deterministic within a pin; it is not a ranking and must not be
+        # relayed as one.
+        "substitution_candidates": [
+            _member_record(c) for c in cands
+            if c.get("kind") == "element" and c.get("id") not in chosen],
+        "ranked": False,
+        "pin": (map_data or {}).get("coverage", {}).get("pin"),
+    }
+
+
 def _member_record(match):
     """One selected Strand, as the brief records it (Story 20.54 AC4)."""
     return {"index": match.get("id"), "slug": match.get("slug"),
@@ -1574,6 +1640,12 @@ def _brief_from_index(answer, cands, map_pin, map_data=None):
                 "over": [m.get("id") for m in matches],
                 "claims": [m.get("gloss") or m.get("direction")
                            for m in matches]},
+            # THE COHERENCE CONSULTANT (Story 20.55, #939), carried only where
+            # it has a subject: a set of two or more. One Strand cannot fail to
+            # cohere with itself, and a consultant with nothing to assess would
+            # be shape without content.
+            **({"consultant": _consultant_block(matches, cands, map_data)}
+               if len(matches) > 1 else {}),
             "candidate": matches[0]}
 
 
