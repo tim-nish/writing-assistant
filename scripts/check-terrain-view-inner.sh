@@ -1,7 +1,11 @@
 #!/usr/bin/env sh
 # tier: inner — View-content and owner-language assertions against the
 #   committed fixture map; no seam, no corpus, no assembly. Measured
-#   2026-07-30 at adoption: ~1.4s.
+#   2026-07-30 after the #950 interpreter batching: ~1.0s (was ~1.7s — the
+#   check ran at ~85% of INNER_MS, the flap zone #948 named). Assertion
+#   content unchanged; the eight inline assertion fragments now share two
+#   interpreter runs (one fixture prep, one assertion pass over the files the
+#   CLI calls produced), because per-spawn startup (~75ms) was the margin.
 # removal-signal: the terrain checks are retired or re-shaped under the #910
 #   retention sweep (a check provably subsumed by the #857/#858 seam, or the
 #   full-tier terrain harnesses rebuilt fixture-based), which re-places these
@@ -17,10 +21,7 @@ root=$(git rev-parse --show-toplevel 2>/dev/null) || {
 }
 cd "$root"
 
-M="scripts/terrain_map.py"
 D="scripts/topic-map-directions.py"
-VP="scripts/validate-proposal-payload.py"
-SKILL="skills/terrain/SKILL.md"
 FIX="scripts/fixtures/terrain/screen-map.json"
 
 fail=0
@@ -28,14 +29,13 @@ err() { printf 'FAIL: %s\n' "$1" >&2; fail=1; }
 ok()  { printf 'ok:   %s\n' "$1"; }
 
 work=$(mktemp -d); trap 'rm -rf "$work"' EXIT
-mkdir -p "$work/ws"
 cp "$FIX" "$work/map.json"
 
-# Fixture prep (the derivations the source check used): the over-budget map,
-# its View, and its candidate set.
-python3 - "$work/map.json" > "$work/big-map.json" <<'PYEOF'
+# Fixture prep — ONE run builds both derived maps (#950): the over-budget map
+# and the small map that carries one element.
+python3 - "$work/map.json" "$work" <<'PYEOF'
 import json, sys
-d = json.load(open(sys.argv[1]))
+d = json.load(open(sys.argv[1])); w = sys.argv[2]
 # An OVER-BUDGET terrain, built from STRANDS (Story 20.7, #809). It used to be
 # built by cloning subtopics; subtopics no longer exist, and a Strand is now
 # the only thing that counts toward the screen budget.
@@ -62,29 +62,78 @@ strands.append({
     "situation": "LESSONS.md:40@abc1234",
     "evidence": ["LESSONS.md:40@abc1234"], "consumed": False,
 })
-d["elements"] = strands
-d["coverage"] = dict(d.get("coverage", {}),
-                     element_topics_read=["delivery", "engineering", "people", "nowhere"],
-                     element_topics_skipped=["zeta"])
-print(json.dumps(d))
+big = dict(d)
+big["elements"] = strands
+big["coverage"] = dict(d.get("coverage", {}),
+                       element_topics_read=["delivery", "engineering", "people", "nowhere"],
+                       element_topics_skipped=["zeta"])
+json.dump(big, open(w + "/big-map.json", "w"))
+
+# The small map with one element, for the in-conversation screen.
+small = json.load(open(sys.argv[1]))
+small["elements"] = [{"kind": "decision", "summary": "A small-map decision",
+                      "topic": "delivery", "date": "2026-07-20",
+                      "situation": "topics/delivery.md:3@abc1234",
+                      "evidence": ["topics/delivery.md:3@abc1234"], "consumed": False}]
+small["coverage"] = dict(small.get("coverage", {}),
+                         element_topics_read=["delivery"],
+                         element_topics_skipped=[])
+json.dump(small, open(w + "/small-el.json", "w"))
 PYEOF
+
+# --- the CLI under test: candidates and the three payload renders -----------
 python3 "$D" candidates --map "$work/big-map.json" > "$work/big-cands.json"
 python3 "$D" payload --map "$work/big-map.json" --view "$work/view.md" \
   > "$work/big-payload.json" 2>/dev/null
 [ -s "$work/view.md" ] || { err "no View rendered from the fixture map"; }
+cp "$work/view.md" "$work/view-1.md"     # the pristine copy every assert reads
+python3 "$D" payload --map "$work/small-el.json" > "$work/small-el-payload.json" 2>/dev/null
 
-# --- the View LEADS WITH THE CANDIDATE DIRECTIONS (Story 18.76, #632) --------
-# The size switch moves the terrain, never the proposing: the above-budget
-# branch must offer no less guidance than the one-screen branch.
-python3 - "$work/big-cands.json" "$work/view.md" <<'PYEOF' || fail=1
-import json, re, sys
-cands = json.load(open(sys.argv[1]))["candidates"]
-view = open(sys.argv[2], encoding="utf-8").read()
+# Fully regenerated per invocation, for an unchanged pin.
+python3 "$D" payload --map "$work/big-map.json" --view "$work/view.md" >/dev/null 2>&1
+cmp -s "$work/view-1.md" "$work/view.md" \
+  && ok "size switch: two invocations regenerate the View identically at one pin" \
+  || err "the View is not deterministic at an unchanged pin"
+
+# WRITE-ONLY: poison it, and nothing downstream changes. Delete it, and nothing
+# is lost — it is a rendering, never a record.
+printf 'POISON-VIEW\n' > "$work/view.md"
+python3 "$D" payload --map "$work/big-map.json" --view "$work/view.md" \
+  > "$work/big-payload2.json" 2>/dev/null
+grep -q 'POISON-VIEW' "$work/big-payload2.json" \
+  && err "the composer read the View back (a stored index)" \
+  || ok "size switch: a poisoned View does not influence the next screen (write-only)"
+cmp -s "$work/big-payload.json" "$work/big-payload2.json" \
+  && ok "size switch: the screen is unchanged after the View was overwritten" \
+  || err "overwriting the View changed the screen"
+rm -f "$work/view.md"
+python3 "$D" payload --map "$work/big-map.json" --view "$work/view.md" \
+  > "$work/big-payload3.json" 2>/dev/null
+cmp -s "$work/big-payload.json" "$work/big-payload3.json" \
+  && cmp -s "$work/view-1.md" "$work/view.md" \
+  && ok "size switch: deleting the View loses nothing (map and View both regenerate)" \
+  || err "deleting the View lost something"
+
+# --- ONE assertion pass over everything the CLI produced (#950) --------------
+# Sections and messages are unchanged from the pre-batching check; they read
+# the pristine view-1.md so the poison sequence above cannot leak into them.
+python3 - "$work" "$D" <<'PYEOF' || fail=1
+import importlib.util, json, re, sys
+w, dpath = sys.argv[1], sys.argv[2]
+cands = json.load(open(w + "/big-cands.json"))["candidates"]
+view = open(w + "/view-1.md", encoding="utf-8").read()
+d = json.load(open(w + "/big-map.json"))
+src = open(dpath, encoding="utf-8").read()
+spec = importlib.util.spec_from_file_location("d", dpath)
+mod = importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)
 fail = []
 def check(cond, msg):
     print(("ok:   " if cond else "FAIL: ") + msg, file=sys.stdout if cond else sys.stderr)
     if not cond: fail.append(msg)
 
+# --- the View LEADS WITH THE CANDIDATE DIRECTIONS (Story 18.76, #632) --------
+# The size switch moves the terrain, never the proposing: the above-budget
+# branch must offer no less guidance than the one-screen branch.
 heads = re.findall(r"^#{2,4} (.+)$", view, re.M)
 check(heads and heads[0] == "Candidate directions",
       f"the View's FIRST section is the candidate directions (got {heads[:1]})")
@@ -142,22 +191,10 @@ check(not bad_rows,
 # The depth-word duplication check went with the summary section it guarded
 # (Story 20.5, #802): with no glance on the surface there is no beside-the-
 # glance position for a word to be repeated in.
-sys.exit(1 if fail else 0)
-PYEOF
-[ $? -eq 0 ] || fail=1
 
 # --- coverage wording never carries a placeholder (18.78, #637) -------------
 # The wording IS the brief on adoption, so this is asserted at the composed
 # brief and not only at the surface.
-python3 - "$work/big-map.json" "$work/big-cands.json" "$D" <<'PYEOF' || fail=1
-import importlib.util, json, sys
-d = json.load(open(sys.argv[1]))
-cands = json.load(open(sys.argv[2]))["candidates"]
-fail = []
-def check(cond, msg):
-    print(("ok:   " if cond else "FAIL: ") + msg, file=sys.stdout if cond else sys.stderr)
-    if not cond: fail.append(msg)
-
 # The #637 rule survives the cluster removal in the half that still applies:
 # no candidate direction and no composed brief may carry an internal
 # placeholder enum. GONE is the cluster-NAMING half — placeholders were the
@@ -173,8 +210,6 @@ check(not any(c["direction"].strip() in ("cover", "cover ") for c in cands),
 
 # The same rule at the BRIEF: adopting any index must never hand the owner an
 # enum as their own wording.
-spec = importlib.util.spec_from_file_location("d", sys.argv[3])
-mod = importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)
 pin = d["coverage"]["pin"]
 briefs = [mod.brief_from_answer(
               {"index": c["id"], "note": "an angle", "pin": pin}, cands, pin)["brief"]
@@ -184,20 +219,7 @@ check(not badb, f"no composed brief carries a placeholder enum ({badb[:2]})")
 check(all(b.endswith("— an angle") for b in briefs),
       "the owner's note is still carried verbatim onto every composed brief")
 
-sys.exit(1 if fail else 0)
-PYEOF
-[ $? -eq 0 ] || fail=1
-
 # --- #651: the direction clip is RENDER-ONLY; the brief carries the full claim
-python3 - "$D" <<'PYEOF' || fail=1
-import importlib.util, sys
-spec = importlib.util.spec_from_file_location("d", sys.argv[1])
-mod = importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)
-fail = []
-def check(cond, msg):
-    print(("ok:   " if cond else "FAIL: ") + msg, file=sys.stdout if cond else sys.stderr)
-    if not cond: fail.append(msg)
-
 # A claim-bearing Strand whose Lesson rendering runs well past the old 120-char
 # derivation clip and ends on a whole word. (Re-based from the subtopic path,
 # which is gone — Story 20.7, #809. The rule itself is unchanged: clipping is
@@ -215,9 +237,9 @@ check(claim in direction,
 
 # The brief composed from the index carries the whole claim, ending on the
 # source's own last word before the owner's note — never a mid-word cut.
-cands = [dict(strand, id="L9", direction=direction, kind="element")]
+clip_cands = [dict(strand, id="L9", direction=direction, kind="element")]
 brief = mod.brief_from_answer(
-    {"index": "L9", "note": "my angle", "pin": "p@1"}, cands, "p@1")["brief"]
+    {"index": "L9", "note": "my angle", "pin": "p@1"}, clip_cands, "p@1")["brief"]
 check(claim in brief and brief.endswith("resolved — my angle"),
       "the composed brief carries the full claim and ends on a source word, never mid-word")
 
@@ -232,21 +254,8 @@ bare = mod._element_direction({"kind": "reversal", "summary": claim,
                                "date": "2026-07-23"})
 check(claim not in bare and "not being served" in bare,
       "an un-served element discloses instead of quoting the raw topic line")
-sys.exit(1 if fail else 0)
-PYEOF
-[ $? -eq 0 ] || fail=1
 
 # --- elements reach the surface and are pickable (18.80, #641) --------------
-python3 - "$work/big-cands.json" "$work/view.md" "$work/big-map.json" "$D" <<'PYEOF' || fail=1
-import importlib.util, json, re, sys
-cands = json.load(open(sys.argv[1]))["candidates"]
-view = open(sys.argv[2], encoding="utf-8").read()
-d = json.load(open(sys.argv[3]))
-fail = []
-def check(cond, msg):
-    print(("ok:   " if cond else "FAIL: ") + msg, file=sys.stdout if cond else sys.stderr)
-    if not cond: fail.append(msg)
-
 els = [c for c in cands if c.get("kind") == "element"]
 check(len(els) == len(d["elements"]), f"every element reaches the candidate list ({len(els)})")
 # Own namespace, no collision with the subtopic scheme.
@@ -260,7 +269,6 @@ check(len(set(eids)) == len(eids), "element ids are unique")
 # AMONG THE DIRECTIONS since Story 18.81 (#647): two lists split by internal
 # derivation kind is an implementation detail on the owner surface, so the
 # elements are pickable where every other candidate is.
-heads = re.findall(r"^#{2,4} (.+)$", view, re.M)
 check("What you decided" not in heads,
       f"elements have no section of their own ({heads[:4]})")
 block = view.split("## Subtopic clusters — a derived, secondary grouping")[0]
@@ -276,12 +284,8 @@ check("delivery" in block and "zeta" in block and "NOT covered" in block,
       "the directions state which topics the elements came from, and which they did not")
 
 # Wording carries no internal marker and becomes the brief on adoption (#637).
-PLACEHOLDERS = ("(unclustered)", "(untracked)", "(unnamed)")
 check(not any(p in c["direction"] for c in els for p in PLACEHOLDERS),
       "element wording carries no placeholder enum")
-spec = importlib.util.spec_from_file_location("dd", sys.argv[4])
-mod = importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)
-pin = d["coverage"]["pin"]
 out = mod.brief_from_answer({"index": eids[0], "note": "the angle I want", "pin": pin},
                             cands, pin)
 check(out["brief"].endswith("— the angle I want"),
@@ -294,34 +298,20 @@ try:
     check(False, "a stale-pin element selection is refused with the mismatch named")
 except SystemExit:
     check(True, "a stale-pin element selection is refused with the mismatch named")
-sys.exit(1 if fail else 0)
-PYEOF
-[ $? -eq 0 ] || fail=1
 
 # Elements reach the IN-CONVERSATION screen too — the size switch moves where
 # the terrain is presented, never what the map proposes.
-python3 - "$work/map.json" "$D" "$work/small-el.json" <<'PYEOF'
-import json, sys
-d = json.load(open(sys.argv[1]))
-d["elements"] = [{"kind": "decision", "summary": "A small-map decision",
-                  "topic": "delivery", "date": "2026-07-20",
-                  "situation": "topics/delivery.md:3@abc1234",
-                  "evidence": ["topics/delivery.md:3@abc1234"], "consumed": False}]
-d["coverage"] = dict(d.get("coverage", {}), element_topics_read=["delivery"],
-                     element_topics_skipped=[])
-json.dump(d, open(sys.argv[3], "w"))
-PYEOF
-python3 "$D" payload --map "$work/small-el.json" > "$work/small-el-payload.json" 2>/dev/null
-python3 - "$work/small-el-payload.json" <<'PYEOF' && ok "elements are offered on the in-conversation screen, not only in the View" || err "elements never reach the small-map screen"
-import json, sys
-labels = [c["label"] for c in json.load(open(sys.argv[1]))["items"][0]["choices"]]
-# The decision row reaches the screen as a DISCLOSURE-shaped direction (Story
-# 20.20, #843): identified by kind, date and record — its raw topic line is
-# not the label any more.
-assert any("cover the decision" in l and "2026-07-20" in l for l in labels), labels
-assert any("name your own" in l for l in labels) and labels[-1] == "stop here", labels
-PYEOF
-[ $? -eq 0 ] || fail=1
+try:
+    labels = [c["label"] for c in
+              json.load(open(w + "/small-el-payload.json"))["items"][0]["choices"]]
+    # The decision row reaches the screen as a DISCLOSURE-shaped direction (Story
+    # 20.20, #843): identified by kind, date and record — its raw topic line is
+    # not the label any more.
+    assert any("cover the decision" in l and "2026-07-20" in l for l in labels), labels
+    assert any("name your own" in l for l in labels) and labels[-1] == "stop here", labels
+    check(True, "elements are offered on the in-conversation screen, not only in the View")
+except (AssertionError, KeyError, IndexError):
+    check(False, "elements never reach the small-map screen")
 
 # --- the depth ESTIMATOR is GONE (Story 20.7, #809) -------------------------
 # This block asserted that the View showed the estimate but not the
@@ -329,80 +319,28 @@ PYEOF
 # subtopic and retired with the unit. What survives is the stronger claim —
 # nothing depth-shaped reaches the owner surface at all — plus the absence of
 # the machinery, so a reader meets the removal rather than a silent gap.
-python3 - "$work/view.md" "$D" <<'PYEOF' || fail=1
-import re, sys
-view = open(sys.argv[1], encoding="utf-8").read()
-src = open(sys.argv[2], encoding="utf-8").read()
-fail = []
-def check(cond, msg):
-    print(("ok:   " if cond else "FAIL: ") + msg, file=sys.stdout if cond else sys.stderr)
-    if not cond: fail.append(msg)
-
 check(not re.search(r"^- depth: ", view, re.M),
       "no depth line reaches the View (the estimate is not an owner surface)")
 check("the next level needs" not in view,
       "the estimator's promotion rule appears nowhere on the owner surface")
 for gone in ("_depth_line", "DEPTH_PREDICATE_MARKER"):
     check(gone not in src, f"{gone} is deleted, not merely unreferenced")
-sys.exit(1 if fail else 0)
-PYEOF
-[ $? -eq 0 ] || fail=1
 
-# Fully regenerated per invocation, for an unchanged pin.
-cp "$work/view.md" "$work/view-1.md"
-python3 "$D" payload --map "$work/big-map.json" --view "$work/view.md" >/dev/null 2>&1
-cmp -s "$work/view-1.md" "$work/view.md" \
-  && ok "size switch: two invocations regenerate the View identically at one pin" \
-  || err "the View is not deterministic at an unchanged pin"
-
-# WRITE-ONLY: poison it, and nothing downstream changes. Delete it, and nothing
-# is lost — it is a rendering, never a record.
-printf 'POISON-VIEW\n' > "$work/view.md"
-python3 "$D" payload --map "$work/big-map.json" --view "$work/view.md" \
-  > "$work/big-payload2.json" 2>/dev/null
-grep -q 'POISON-VIEW' "$work/big-payload2.json" \
-  && err "the composer read the View back (a stored index)" \
-  || ok "size switch: a poisoned View does not influence the next screen (write-only)"
-cmp -s "$work/big-payload.json" "$work/big-payload2.json" \
-  && ok "size switch: the screen is unchanged after the View was overwritten" \
-  || err "overwriting the View changed the screen"
-rm -f "$work/view.md"
-python3 "$D" payload --map "$work/big-map.json" --view "$work/view.md" \
-  > "$work/big-payload3.json" 2>/dev/null
-cmp -s "$work/big-payload.json" "$work/big-payload3.json" \
-  && cmp -s "$work/view-1.md" "$work/view.md" \
-  && ok "size switch: deleting the View loses nothing (map and View both regenerate)" \
-  || err "deleting the View lost something"
-
-python3 - "$work/view-1.md" "$work/big-cands.json" <<'PYEOF' && ok "indexed selection: the View's IDs and the composer's IDs are the same identifiers" || err "the View and the composer disagree about indexes"
-import json, re, sys
+# The View's IDs and the composer's IDs are the same identifiers.
 # Story 20.5 (#802): the per-subtopic detail headings are gone, so the View's
 # identifiers are read where they now live — the candidate direction rows,
 # which is the surface the owner actually answers from.
 # Story 20.7 (#809): the identifiers are Strand ids now (L<n>/J<n>/E<t>.<n>),
 # subtopic T-ids having gone with the cluster unit.
-view_ids = set(re.findall(r"^- \*\*((?:L|J)\d+|E\d+\.\d+)\*\* — ",
-                          open(sys.argv[1], encoding="utf-8").read(), re.M))
-cand_ids = {c["id"] for c in json.load(open(sys.argv[2]))["candidates"]
-            if c["kind"] == "element"}
-assert cand_ids <= view_ids, cand_ids - view_ids
-PYEOF
+view_ids = set(re.findall(r"^- \*\*((?:L|J)\d+|E\d+\.\d+)\*\* — ", view, re.M))
+cand_ids = {c["id"] for c in cands if c["kind"] == "element"}
+check(cand_ids <= view_ids,
+      "indexed selection: the View's IDs and the composer's IDs are the same identifiers")
 
 # --- the owner surface carries owner language only (18.82, #646) -------------
 # The reading path is everything above the maintenance section: what the owner
 # reads to choose. Counters, cluster/depth enums and remediation prompts belong
 # below it, in sections labeled for what they are.
-python3 - "$work/view.md" "$work/big-map.json" "$D" <<'PYEOF' || fail=1
-import importlib.util, json, re, sys
-view = open(sys.argv[1], encoding="utf-8").read()
-d = json.load(open(sys.argv[2]))
-spec = importlib.util.spec_from_file_location("dv", sys.argv[3])
-mod = importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)
-fail = []
-def check(cond, msg):
-    print(("ok:   " if cond else "FAIL: ") + msg, file=sys.stdout if cond else sys.stderr)
-    if not cond: fail.append(msg)
-
 # Story 20.5 (#802): with the maintenance and diagnostics sections deleted,
 # the reading path is THE WHOLE VIEW. The #646 boundary is not weakened by
 # this — it is satisfied trivially, because there is no longer a
@@ -444,7 +382,6 @@ check(re.search(r"^- \*\*((?:L|J)\d+|E\d+\.\d+)\*\* — ", reading, re.M),
 sys.exit(1 if fail else 0)
 PYEOF
 [ $? -eq 0 ] || fail=1
-
 
 [ "$fail" -eq 0 ] && printf '\nAll %s checks passed.\n' "$0" \
   || { printf '\n%s FAILED.\n' "$0" >&2; exit 1; }
