@@ -82,7 +82,23 @@ The instruction to relay faithfully had nothing standing at the layer where it
 breaks, so composition moved into the script instead. `check-terrain-relay-fidelity.sh`
 asserts the property over the script'"'"'s own output.
 
-A claim you do not pass is stated as absent for that group — never invented.
+**If a group has no single commonality you can state, pass `null` for it**
+(`{"G12": null}`). The screen then says so plainly — that the composer looked
+and found no one denominator — and the group renders exactly as placed.
+This is a **self-report**, not a judgement the machine makes about your
+sentence, and it changes nothing about the grouping: no Strand is moved,
+reordered or dropped because of it. Reach for it instead of stretching a
+claim into an enumeration; a list of things the members separately are is not
+a commonality, and saying so is more use to the owner than a sentence that
+trails off (#980).
+
+A group you omit entirely is stated as absent — never invented. That is a
+different state from `null`: omitted means you did not compose one, `null`
+means you did and there was none.
+
+**Do not resize a group to make its claim easier to write.** Group sizes come
+from the ratified 20%-of-placements bound; a member cap was proposed and
+declined on measurement (#980).
 
 **The group claim (machine-composed, marked — SPEC-terrain CAP-2 as
 amended 2026-07-29, #888).** Before relaying, compose for each section one or

@@ -566,8 +566,22 @@ def compose_member_listing(map_data, tag, cands, axis="tag", claims=None):
         lines.append(head)
         lines.append("")
         if claims is not None:
+            # THREE states, not two (Story 20.67, #979/#980). A composer that
+            # TRIED and found no commonality is not the same as one that was
+            # never asked, and collapsing them would hide the signal #980
+            # actually found: a claim degenerating into an enumeration is the
+            # composer reporting that the group has no single common
+            # denominator. It is a SELF-REPORT — `{"G12": null}` — never a
+            # machine judgment about the quality of a produced sentence, and
+            # it changes NOTHING about membership (see the note below).
             claim = str(claims.get(gid) or "").strip()
-            if claim:
+            if gid in claims and not claim:
+                lines.append(
+                    "in common: no single commonality found — the composer "
+                    "reports these Strands share no one denominator it could "
+                    "state. They are grouped as placed; nothing here has been "
+                    "regrouped, reordered or dropped on account of it.")
+            elif claim:
                 # VERBATIM, as composed. Not re-derived, not shortened, and
                 # deliberately NOT clipped: the claim is the composer's own
                 # sentence and clipping it would re-create #976 one layer up.
@@ -576,6 +590,11 @@ def compose_member_listing(map_data, tag, cands, axis="tag", claims=None):
                 lines.append("in common: not composed for this group — "
                              "stated as absent rather than invented here.")
             lines.append("")
+            # AC3: the disclosure above is rendering ONLY. Section membership,
+            # order and counts are fixed by `member_sections` before any prose
+            # exists, and no branch here touches them — a machine judgment
+            # about prose must never move a Strand, or grouping stops being
+            # navigation and becomes a gate.
         for el in sec["strands"]:
             c = by_slug.get(el.get("slug"))
             ident = c["id"] if c else el.get("slug", "?")
