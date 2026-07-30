@@ -303,7 +303,7 @@ grep -q "What each row IS" "$D" \
   || err "the row-kind legend is missing"
 
 # --- the Journey shortfall is DISCLOSED, detection-based (Story 20.10, #812) --
-python3 - "$D" "scripts/terrain_text.py" <<'PYEOF' || fail=1
+python3 - "$D" "scripts/terrain_text.py" "scripts/terrain_members.py" <<'PYEOF' || fail=1
 import importlib.util, sys
 spec = importlib.util.spec_from_file_location("dv", sys.argv[1])
 m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
@@ -311,7 +311,10 @@ m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
 # Loaded from THAT path, never through the composer's re-export: deleting it
 # where it now lives has to fail here.
 tspec = importlib.util.spec_from_file_location("dvtext", sys.argv[2])
+# Story 20.65 (#974): the member surface moved to terrain_members.py.
+mmspec = importlib.util.spec_from_file_location("dvmem", sys.argv[3])
 t = importlib.util.module_from_spec(tspec); tspec.loader.exec_module(t)
+mm = importlib.util.module_from_spec(mmspec); mmspec.loader.exec_module(mm)
 fail = []
 def check(cond, msg):
     print(("ok:   " if cond else "FAIL: ") + msg, file=sys.stdout if cond else sys.stderr)
@@ -339,7 +342,7 @@ check("\n" not in line and "##" not in line,
 check("requested" in m.compose_axis_payload(gap)["items"][0]["where"].lower(),
       "the shortfall is named on the axis screen")
 check("requested" in
-      m.compose_member_listing(gap, "workflow", m.candidates(gap)).lower(),
+      mm.compose_member_listing(gap, "workflow", m.candidates(gap)).lower(),
       "the shortfall is named on the member listing")
 # REQUESTED AND MISSING: a different fact, and an abnormal condition to fix.
 missing = dict(base, gloss={"served": True, "lesson_renderings": 3,
@@ -464,7 +467,10 @@ python3 - <<'JOURNEY_EOF'
 import importlib.util, json, subprocess, tempfile, sys
 
 D = "scripts/topic-map-directions.py"
-spec = importlib.util.spec_from_file_location("dv", D)
+# Story 20.65 (#974): the member surface now lives in terrain_members.py.
+# D stays the CLI entry point; the module inspected is where the code is.
+M = "scripts/terrain_members.py"
+spec = importlib.util.spec_from_file_location("dv", M)
 m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
 fail = 0
 

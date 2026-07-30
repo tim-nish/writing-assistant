@@ -32,11 +32,11 @@ TMP=$(mktemp); TERMS_FILE=$(mktemp); trap 'rm -f "$TMP" "$TERMS_FILE"' EXIT
 ok()   { echo "ok:   $1"; }
 bad()  { echo "FAIL: $1" >&2; fail=1; }
 
-DOC=$(python3 -c 'import importlib.util as u;s=u.spec_from_file_location("m","scripts/topic-map-directions.py");m=u.module_from_spec(s);s.loader.exec_module(m);print(m.OWNER_TERMS_DOC)')
+DOC=$(python3 -c 'import importlib.util as u;s=u.spec_from_file_location("m","scripts/terrain_members.py");m=u.module_from_spec(s);s.loader.exec_module(m);print(m.OWNER_TERMS_DOC)')
 # ONE TERM PER LINE, never a space-joined string: a ratified term may be a
 # compound ("group claim", #888), and word-splitting one would demand a
 # definition for each half — failing on a term nothing declares.
-python3 -c 'import importlib.util as u;s=u.spec_from_file_location("m","scripts/topic-map-directions.py");m=u.module_from_spec(s);s.loader.exec_module(m);print("\n".join(m.OWNER_TERMS))' > "$TERMS_FILE"
+python3 -c 'import importlib.util as u;s=u.spec_from_file_location("m","scripts/terrain_members.py");m=u.module_from_spec(s);s.loader.exec_module(m);print("\n".join(m.OWNER_TERMS))' > "$TERMS_FILE"
 
 [ -f "$DOC" ] && ok "the codebook exists at the declared path ($DOC)" \
               || { bad "the codebook is missing at the declared path ($DOC)"; exit 1; }
@@ -72,7 +72,7 @@ done < "$TMP"
 # the presenter is its carrier.
 listing=$(python3 - "$DOC" <<'PYEOF'
 import importlib.util as u, json, sys, tempfile
-s = u.spec_from_file_location("m", "scripts/topic-map-directions.py")
+s = u.spec_from_file_location("m", "scripts/terrain_members.py")
 m = u.module_from_spec(s); s.loader.exec_module(m)
 md = {"kind": "topic-map", "topics": [], "coverage": {"pin": "h@abc1234"},
       "elements": [{"kind": "lesson", "slug": "l1", "title": "L1",

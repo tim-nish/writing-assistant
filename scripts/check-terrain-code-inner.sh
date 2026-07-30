@@ -23,6 +23,9 @@ cd "$root"
 M="scripts/terrain_map.py"
 D="scripts/topic-map-directions.py"
 T="scripts/terrain_text.py"
+# Story 20.65 (#974): the member surface moved to its own module. Renderer
+# assertions grep the FAMILY, so a later move cannot silently satisfy them.
+MEM="scripts/terrain_members.py"
 VP="scripts/validate-proposal-payload.py"
 SKILL=$(mktemp)
 cat skills/terrain/SKILL.md skills/terrain/steps/map.md \
@@ -437,7 +440,7 @@ grep -qE '"journey": *0|prefix *= *"L" if|f"\{prefix\}\{counters' "$D" \
 # `journey` KIND discriminator (doing so misroutes 109 of 117 lesson
 # renderings). Both wrong sources are named so a future edit cannot pick them
 # by accident.
-grep -qE 'journey_recorded' "$D" \
+grep -qE 'journey_recorded' "$D" "$MEM" \
   && ok "the renderer reads journey presence from the paired record" \
   || err "the renderer no longer reads journey_recorded — presence has lost its carrier (#933)"
 grep -nE 'no-journey' "$D" | grep -qE 'journey_shard|\["journey"\]' \
