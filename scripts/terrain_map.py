@@ -603,7 +603,22 @@ def strand_entries(root):
             "gloss": (text or {}).get("gloss") or None,
             "tags": [str(t) for t in (r.get("tags") or [])],
             "cite": (text or {}).get("cite") or r["cite"],
+            # KIND DISCRIMINATOR — "this entry IS an arc rendering" — and the
+            # literal is CORRECT here: on the record path every composed entry
+            # is a lesson, and the split at the gloss read routes on this.
+            # Do not derive presence from it (Story 20.51, #933): doing so
+            # moves 109 of 117 lesson renderings out of the lessons lookup.
             "journey": False,
+            # PRESENCE, read from the paired RECORD rather than from whether
+            # its arc rendering was addressable (SPEC-terrain CAP-2 as
+            # corrected 2026-07-30, #933). Distinct from `journey_shard`: a
+            # record whose renderings carry no `journeys/`-prefixed path is
+            # paired with no resolvable pointer, and a row marked no-journey
+            # for a lesson that has one is the wrong-kind claim this exists to
+            # stop. Measured 2026-07-30: 109 paired, 109 resolving — the two
+            # coincide today, which is why the distinction is carried in the
+            # data rather than left to a reader to notice later.
+            "journey_recorded": arc is not None,
             "journey_shard": shard,
             "record_cite": r["cite"],
         })
@@ -1318,6 +1333,10 @@ def lesson_elements(topics, gloss_info, consumption):
                     (gloss_info["reason"] if not gloss_info["served"] else
                      "the served gloss index carries no rendering for this lesson")),
                 "tags": entry["tags"] if entry else [],
+                # Presence travels with the Strand so the row can mark its
+                # ABSENCE (#933/#934). Read from the paired record upstream,
+                # never re-derived here from the rendering or the pointer.
+                "journey_recorded": bool(entry.get("journey_recorded")) if entry else False,
                 "journey_shard": entry.get("journey_shard") if entry else None,
                 # The lesson's ARC, on the lesson's own row (CAP-2 as amended
                 # 2026-07-28, #871). A Journey is not a Strand of its own:

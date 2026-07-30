@@ -232,6 +232,40 @@ def _journey_disclosure_line(map_data, terse=False):
             "different fact from a shard nobody asked for.")
 
 
+def _journey_coverage_line(elements):
+    """The coverage denominator for one screen's Strand rows (#933/#934).
+
+    LOAD-BEARING, not decoration: absence-marking is correct only while
+    coverage stays high, so the denominator is what makes the next inversion
+    visible on the screen rather than discovered late. A screen that renders
+    the marker without this line is incomplete.
+
+    Counted over the Lessons on THIS screen — a denominator borrowed from the
+    corpus would describe a set the reader is not looking at.
+
+    DE-DUPLICATED BY SLUG, and that is not a detail: sections are a COVER
+    counted in placements, so a Strand carrying four co-tags appears on four
+    section lists. Counting placements here would report "103 of 107 Strands"
+    for a member holding 51 — a figure that is arithmetically true of
+    placements and false of the noun it names. A count owes its enumeration at
+    the point of measurement, so this one enumerates Strands.
+    """
+    by_slug = {}
+    for e in elements:
+        if e.get("kind") == "lesson":
+            by_slug.setdefault(e.get("slug") or id(e), e)
+    lessons = list(by_slug.values())
+    if not lessons:
+        return None
+    n = sum(1 for e in lessons if e.get("journey_recorded"))
+    m = len(lessons)
+    line = (f"{n} of {m} Strand{'' if m == 1 else 's'} carry journey "
+            f"material (how the position changed)")
+    if n == m:
+        return line + " — every row on this screen has it."
+    return line + f" — the {m - n} without it are marked `no-journey`."
+
+
 def _fit_with_path(prefixes, path, budget):
     """Prefix then `path`, inside `budget` — shortening the PREFIX, never the
     path. A clipped path is an unopenable View, which would make the whole

@@ -397,6 +397,32 @@ grep -qE 'lessons_index|LESSONS\.md.*open\(|policy_lookup' "$CODE" \
   && err "terrain_map.py talks to the gateway itself (the seam is the only reader)" \
   || ok "hub-lessons: no second policy reader exists in the implementation"
 
+# --- the retired `J<n>` namespace has no minting code (Story 20.51, #933) ----
+# The namespace was retired in spec text on 2026-07-28 (#871) and its code
+# stayed for two days — reachable only on a kind the record path never emits,
+# and therefore invisible to every test while still teaching a reader that `J`
+# rows might appear. Grep-asserted like the other absences in this file.
+grep -qE '"journey": *0|prefix *= *"L" if|f"\{prefix\}\{counters' "$D" \
+  && err "the J<n> minting code is back in topic-map-directions.py (#933/#871)" \
+  || ok "no J<n> minting code remains — an arc is carried by its lesson's row"
+
+# --- journey presence is read from the RECORD, not from a pointer (#933) -----
+# The correction this story exists for: presence must not be inferred from
+# whether an arc rendering was addressable, and must never be read off the
+# `journey` KIND discriminator (doing so misroutes 109 of 117 lesson
+# renderings). Both wrong sources are named so a future edit cannot pick them
+# by accident.
+grep -qE 'journey_recorded' "$D" \
+  && ok "the renderer reads journey presence from the paired record" \
+  || err "the renderer no longer reads journey_recorded — presence has lost its carrier (#933)"
+grep -nE 'no-journey' "$D" | grep -qE 'journey_shard|\["journey"\]' \
+  && err "the no-journey marker is derived from a pointer or the kind discriminator, not the record (#933)" \
+  || ok "the no-journey marker is not derived from a pointer or the kind flag"
+
+# AC7's split guard is NOT here: it reads the served corpus, and this file's
+# declared tier is "no seam, no corpus, no map assembly". It lives in
+# scripts/check-terrain-split.sh (tier: full) until the committed fixture map
+# carries journey material — see that file's removal signal.
 
 [ "$fail" -eq 0 ] && printf '\nAll %s checks passed.\n' "$0" \
   || { printf '\n%s FAILED.\n' "$0" >&2; exit 1; }
