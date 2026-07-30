@@ -514,3 +514,185 @@ the blocks.
 > gateway, undeclared manifest) degrades to the tier-1 acquisition **with the
 > substitution disclosed at the point it happens** (rule 1 above), never
 > silently.
+
+> **Amended 2026-07-30 (triage, #933/#934)** per /triage-gh. Journey presence
+> on a Strand row is **derived and marked by absence**, with the coverage
+> denominator stated on every Strand-row screen. Three facts drove it. The
+> flag never reached the renderer: the record-authoritative path composed a
+> literal `False` on every entry while holding the shard pointer that answers
+> the question, so a screen asserted that no Journey material fell under a tag
+> carrying 49 paired journey records — a wrong-kind claim logged as success.
+> Coverage inverted the marker's information content: the marker was designed
+> against ~50% and the served manifest carries 109 journeys against 117
+> lessons, so marking presence decorates nearly every row while the thin
+> Strands are the actionable set the writability verdict already treats as
+> such. And the retirement of the `J<n>` namespace (2026-07-28, #871) left the
+> code that mints it standing — a `journey` counter and a `J` prefix branch
+> reachable only on a kind the record path never emits, which is why a screen
+> could be written as though `J` rows might appear. The denominator is the
+> **load-bearing half**, not decoration: absence-marking is correct only while
+> coverage stays high, so the denominator is what makes the next inversion
+> visible on the screen rather than discovered late. Rejected: threshold-
+> conditional presence marking (a magic number in the spec, and a marker that
+> appears and disappears makes two screens non-comparable and every check over
+> it conditional); dropping the marker entirely in favour of the writability
+> verdict (smallest surface and no rot, but the owner then finds the thin rows
+> by noticing the count is 49 rather than 51 and hunting — the glance signal
+> is the marker's whole purpose).
+
+> **Amended 2026-07-30 (triage, #935)** per /triage-gh. The 2026-07-28 #874
+> location ruling is **narrowed to Terrain's owner-facing output**. The View
+> stays in this repository, guarded by the committed ignore entry and the
+> staged-artifact check; **run workspaces and debug artifacts resolve back to
+> the machine state root**. Ground: the portfolio-wide class split places
+> human-facing artifacts in the working repo and machine-readable
+> intermediates, caches and resumable state in machine-state dirs (owner
+> decision record — 2026-07-16 (artifacts live where the human works)), and
+> #874 reached one clause past the deliverable. Observed cost of the wider
+> form: roughly forty repo-key directories accumulated in a working tree with
+> no GC, most of them `-tmp-*` leftovers from test and dogfood runs, deleted
+> by hand. The split is drawn at the resolver, which already drew one — the
+> draft pipeline's caches and checkpoints never moved — so a boundary
+> relocates and no caller changes. #874's owed retention rule is discharged
+> **by relocation rather than by GC**: growth was non-deferrable because the
+> runs sat in a working tree. Two things stay undischarged and are named
+> rather than assumed: the accumulation already on disk (a one-time deletion
+> no code owns) and, until this lands, test runs keying a real repository.
+> Rejected: keeping the location and writing the retention rule #874 owed (it
+> discharges an existing obligation with a smaller spec surface, but leaves
+> verbatim hub renderings and pins in a public tree defended by a guard rather
+> than by absence, and contradicts the served class split); relocating the
+> View too (publication risk to zero and two mechanisms deleted, but it loses
+> the immediate-inspection affordance the owner stated, and a printed path is
+> not a file already open in the tree).
+
+> **Amended 2026-07-30 (triage, #936)** per /triage-gh. The composed group
+> line's provenance is **declared once per surface, not once per line**. Where
+> every line of a visual class is composed, the preamble's declaration
+> discharges the obligation; a per-line marker is owed again when a screen
+> mixes composed and quoted lines of the same visual class, and then it marks
+> the **minority** class. The obligation is unchanged in force — only its
+> carrier is bounded, and the no-silent-fallback rule (#850 D1) is untouched.
+> Observed: the parenthetical appeared on all twenty group summary lines of a
+> screen whose preamble had already declared the class, carrying zero
+> information per line while costing attention on every one. The
+> violation-layer rule is **satisfied, not weakened** (owner decision record —
+> 2026-07-26 (carry a rule at its violation layer)): it requires the carrier
+> to sit where the human acts, which the preamble does — same screen, same
+> read — not one carrier per line. Rejected: keeping a per-line carrier in a
+> shorter form (honours the violation-layer rule with no interpretive step and
+> keeps the check unconditional, but a shorter constant is still zero bits per
+> line, so it leaves the reported defect in place in a smaller font);
+> inverting the polarity to mark quoted lines by their citations (the signal
+> would then carry information and be verifiable, but an unmarked composed
+> line is close to what the no-silent-fallback rule was written against, and
+> that failure is silent rather than loud).
+
+> **Amended 2026-07-30 (triage, #937/#939)** per /triage-gh. **Selection
+> accepts a SET of Strand indexes, and the in-common claim is recomposed over
+> exactly that set** at the brief gate, as a machine-composed proposal beside
+> free-form override; the brief records the adopted claim, its member set,
+> each member's served gloss and cite, and the pins. Single-Strand selection
+> becomes the degenerate case rather than the only structured path. Observed
+> divergence: an owner who had explored a tag and pointed at four co-tag
+> sections (19 distinct Strands) was offered exactly two exits — free text, or
+> one Strand as a spine with "the other 18 stay available as harvest material"
+> — so no path composed from the selection, and the gate asked for a
+> one-sentence summary in the owner's own words, which is raw-artifact
+> homework. The ratified model says otherwise (owner decision record —
+> 2026-07-29 (terrain draft handoff)): a claim composed over a member set is
+> pinned to that set, a subset selection recomposes and re-offers it, and the
+> brief records the adopted claim together with its members. **The
+> no-second-proposer boundary is untouched, by its own test** — a combination
+> becomes a proposal exactly when something other than the owner narrows the
+> candidate set, and the owner did the narrowing here; the map still composes
+> no narrative structures. Recording the member set is not bookkeeping: the
+> completeness invariant follows the selected set into drafting, and with no
+> members recorded, omission becomes silent — which is what that invariant was
+> corrected to prevent. **The brief gate may additionally carry a coherence
+> CONSULTANT (#939), bound by four rules and deliberately not by a
+> procedure:** gate shape (proposals plus free-form override, nothing adopted
+> silently); grounding (assessments and substitutions cite served renderings
+> and group claims at the pin, never invented material); honesty (say plainly
+> when a set does not cohere, disclose uncertainty rather than emitting a
+> confident structure); and **no hiding** — a substitution proposal enumerates
+> its candidates, because offering the best swap while discarding weaker ones
+> is ranking, which falls on the far side of the boundary while merely adding
+> unselected material does not. The consultant is diagnostic over an
+> owner-selected set and never runs upstream of a selection. Rejected:
+> shipping the selection half now and routing the substitution boundary to a
+> hub conversation (the issue itself invites that, and the consultant would be
+> specified against an observed failure instead of an imagined one — but the
+> brief gate would ship with no coherence assessment, so an incoherent set
+> freezes into a brief and the cost lands in drafting); recomposing at the
+> gate while leaving the brief a plain string (much the smallest change and
+> nothing downstream learns a new shape, but the completeness invariant then
+> has no member set to follow and omission becomes silent).
+
+> **Amended 2026-07-30 (triage, #938)** per /triage-gh. The owner may pull a
+> **Full Report for named group ids**, rendering per group, in the order
+> asked: the group's existing composed claim verbatim, then every member
+> Strand's full served rendering — gloss, deterministic context line, journey
+> arc — in prose. The compact all-groups form shows member ids plus a claim,
+> which is enough to navigate and not enough to judge whether a grouping makes
+> sense; the ratified form anticipated the report (owner decision record —
+> 2026-07-29 (terrain draft handoff)). Four constraints fix what it is not: it
+> **preserves** claims and never recomposes (the claim renders over the
+> unchanged full member set it was composed from, so it stays true to its pin;
+> recomposition belongs to subset selection, and inspection and selection stay
+> different acts); it **selects nothing**; it renders from **held state**,
+> never by reading the written rendering back; and it **restates the pin and
+> the group definitions**, since group ids are per-screen, per-pin identifiers
+> that do not survive a re-run. It **relays whole**, a stated exception to the
+> size switch rather than an oversight — reading each group entire is the
+> report's purpose — bounded by the owner's own pointers, covering the groups
+> named and never the whole member. Rejected: extending the per-invocation
+> View file (reuses a ratified artifact and has no screen-budget question, but
+> answers a mid-conversation request by rewriting a file and handing over a
+> path, moving the reading outside the interaction where the judgment
+> happens); a relay obligation in prose with no code path (cheapest, and the
+> material is already in the payload — but prose binding a model is advisory
+> at the layer where it breaks, and the reported defect *was* a relay doing
+> its best, flattening nineteen Strands into headline one-liners).
+
+> **Amended 2026-07-30 (triage, #941)** per /triage-gh. **CAP-3 is relocated
+> verbatim to the companion `presentation.md`**; `SPEC.md` carries a pointer
+> that *names* what moved rather than deferring to a lookup, and this record
+> stays the single dated history for the whole spec — one spec, one amendment
+> file, including for CAP-3's own clauses. Trigger: the byte ceiling fired
+> (80,902 against 72,000) after five amendments landed in one sitting on a file
+> that had been 71,264 bytes — 736 bytes under the ceiling — so the next
+> normative clause of any size was going to trip it. **The growth was measured
+> before anything moved**, which is the ordering the standing rule requires:
+> ship the ceiling, hold restructure until the ceiling produces a breakdown of
+> which content classes dominate, because restructure claims the organisation
+> is wrong while a ceiling only measures size (owner decision record —
+> 2026-07-26 (ship the ceiling, hold restructure on its own evidence)). The
+> breakdown: CAP-2 26,432 bytes (33%), CAP-3 24,587 (30%), open questions
+> 13,937 (17%), CAP-4 6,149 (8%), preamble 3,044 (4%), CAP-1 2,426 (3%). Two
+> capabilities were 63% of the file, and no large block of superseded prose
+> existed to pointer-ify (six occurrences of historical/superseded markers
+> corpus-wide in the file). **Nothing was compacted** — ratified text never is,
+> and a projection may relocate text but never re-express it, so the move
+> changed no clause. Blast radius verified rather than assumed: six inbound
+> citations across four files, exactly one of them line-ranged
+> (`spec-policy-editorial-direction/SPEC.md:50` → the preamble, unaffected),
+> and **no check reads this spec's content at all**. Result: `SPEC.md` 57,560
+> bytes, `presentation.md` 25,848, both under the ceiling. **Two alternatives
+> rejected**, and one dismissed on arithmetic: splitting the open questions out
+> as well (durable headroom at ~42 KB, but three companions for one spec is the
+> larger restructure the ordering rule says to hold until measurement supports
+> *how much* to move, which it does not); splitting into two peer specs at the
+> assembly↔presentation seam (a peer spec states independence a companion only
+> implies, and the citation cost was verified small — rejected because CAP-2
+> already contains screen-level rules, so a spec boundary drawn there runs
+> through a seam the existing text crosses, and every future amendment would
+> face a which-file question whose wrong answer splits one contract silently);
+> and relocating *only* the open questions, which leaves 5,035 bytes of
+> headroom against ~9,600 bytes of amendments observed in a single sitting —
+> a deferral wearing a fix's clothes. **Never available:** raising the ceiling
+> or adding this file to the ratchet list. The check's own text forbids raising
+> a ratchet to absorb growth, and an exemption minted for another file cannot
+> be inherited unless the new member states the original justification in its
+> own terms, which "five amendments landed at once" is not (owner decision
+> record — 2026-07-27 (an inherited exemption signals nothing)).

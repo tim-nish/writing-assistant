@@ -2,6 +2,7 @@
 id: SPEC-terrain
 companions:
   - amendments.md
+  - presentation.md   # CAP-3, the presentation surface (relocated verbatim 2026-07-30, #941)
 sources:
   - ../spec-article-draft-pipeline/SPEC.md   # CAP-9 / the coverage brief and structure proposer this map feeds
   - ../spec-article-plan/SPEC.md             # plan/backlog surfaces the map reads
@@ -26,10 +27,17 @@ sources:
 > for what this map must contain: it exists to *feed* the brief, not to replace
 > it.
 
-> **Ratified amendments** (2026-07-24 → 2026-07-27, six to date) live in the
+> **Ratified amendments** (2026-07-24 → 2026-07-30, eleven to date) live in the
 > companion `amendments.md` — relocated verbatim per the amendment-history
 > companion decision (#829, spec sitting 2026-07-27). New amendments are
-> appended there, newest-last, never here.
+> appended there, newest-last, never here — **including amendments to CAP-3**,
+> whose clause text now lives in `presentation.md`. The amendment history is
+> deliberately not split alongside it: one spec, one dated record.
+>
+> **CAP-3's clauses live in the companion `presentation.md`** (relocated
+> verbatim 2026-07-30, #941, when this file passed its byte ceiling). The
+> pointer under CAP-3 below names what is there, so a reader learns the
+> contents without opening it.
 
 # Terrain
 
@@ -139,6 +147,26 @@ flows into the existing brief/structures path unchanged.**
       belongs to beyond the member's own, where it originated, and whether it
       carries both a claim and its reasoning — every field **read** from the
       served artifacts or the map, never composed at render time;
+      **Journey presence is one of those read fields, and it is marked by
+      ABSENCE (amended 2026-07-30, #933/#934).** Three clauses, which bind
+      together:
+      - the entry's `journey` field is **derived** — a paired journey record
+        exists, i.e. the shard pointer is not null — and is never a literal;
+      - a Strand row carries **no marker where an arc is present** and an
+        explicit **`no-journey` marker where none is**. Presence-marking was
+        designed against ~50% coverage and inverts at 109/117: it decorates
+        nearly every row, while the thin Strands are the actionable set the
+        writability verdict already treats as such;
+      - every screen rendering Strand rows **states the coverage
+        denominator** — *n of m Strands carry journey material*. This half is
+        load-bearing: absence-marking is correct only while coverage stays
+        high, so the denominator is what makes the next inversion visible on
+        the screen rather than discovered late. Marker without denominator is
+        incomplete.
+      **No screen may assert that no Journey material falls under a member**
+      unless the served records say so — the corrected failure was a
+      wrong-kind claim logged as success, and an unrenderable signal is
+      indistinguishable from an absent one.
     - **section background prose may be machine-composed at render time
       (amended 2026-07-27, #850 — supersedes the same-day pre-ratified-or-
       absent hold, whose activation condition the hub answered differently):**
@@ -147,10 +175,26 @@ flows into the existing brief/structures path unchanged.**
       composition reopen admissible; invariants bind harder)). The clause
       binds the composer, not just the renderer:
       - composed prose asserts **only what the members of the group have in
-        common**, and is **marked as machine-composed** on the surface; a
+        common**, and its authoring class is **declared on the surface**; a
         Strand's own text still quotes **only** its served rendering or the
         not-served disclosure — a composer's paraphrase never substitutes for
         either (the no-silent-fallback rule, #850 D1);
+        **the declaration is once per surface, not once per line (amended
+        2026-07-30, #936).** Where every line of a visual class is composed,
+        the preamble's declaration discharges the obligation and the per-line
+        parenthetical is dropped. A **per-line marker is owed again** the
+        moment a screen mixes composed and quoted lines of the **same visual
+        class** — and then it marks the **minority** class, because that is
+        where the reader's default is wrong. The obligation is unchanged in
+        force; only its carrier is bounded: a constant repeated on every line
+        of a declared class carries zero information per line while costing
+        attention on each (unverified — the supporting 2026-07-27 owner ruling
+        is cited from the issue body, with no served line returned for it).
+        **This does not weaken the violation-layer rule** (owner decision
+        record — 2026-07-26 (carry a rule at its violation layer)): the
+        preamble sits on the same screen, at the render layer, where the
+        reader acts — that rule requires the carrier be where the human looks,
+        not one carrier per line;
         **"background" is retired here, and the retirement is a correction of
         meaning rather than of taste (amended 2026-07-29, #888).** For a
         co-tag group the composed sentence states the group's *reason for
@@ -332,6 +376,14 @@ flows into the existing brief/structures path unchanged.**
       therefore a **hub-side conversation**, never a quiet consumer change.
       Nothing is withheld by this: every served arc appears, on the row the
       owner reaches it from.
+      **The retirement owes a consumer-side cleanup (amended 2026-07-30,
+      #933).** Retiring a namespace in spec text left the code that mints it
+      standing — a `journey` counter and a `J` prefix branch, reachable only
+      on a kind the record path never emits. Dead code implementing a retired
+      contract is not inert: it is why a screen could be written as though `J`
+      rows might appear. The branch **goes**, and what a Journey arc's
+      presence means on a row is carried by the absence-marking clause under
+      Screen 2, not by an id.
     - **The by-topic axis's members are the served `decisions/<topic>`
       shards** — enumerated, never consumer-declared (see CAP-4's amended
       denominator clause). The E Strands under a member are built from that
@@ -420,258 +472,23 @@ flows into the existing brief/structures path unchanged.**
     amendment retires the question itself, because the estimator that raised
     it is gone.)*
 
-- **CAP-3 (presentation and the combination move)**
-  - **intent:** The map is presented **in-conversation** under the owner-facing
-    proposal contract — one screen, the map plus machine-proposed candidate
-    directions (including at least one cross-topic combination when the
-    evidence supports one) plus a free-form response where the owner names
-    their own direction or combination axis. The outcome is a **brief**: the
-    owner's chosen direction, in the owner's words (machine-proposed text the
-    owner accepts becomes owner-adopted wording), handed to the existing
-    stage-0 `--brief` path. **No second proposer:** the map never composes
-    narrative structures — structure candidates remain the shipped proposer's
-    job downstream.
-  - **presentation is two screens (amended 2026-07-27, #803).** The map is
-    presented as **Screen 1** (the deterministic axis listing — served gloss
-    tags with element counts) and **Screen 2** (the selected member's complete,
-    sectioned material). Free-form is offered on both, and the outcome is the
-    same brief handed to the same stage-0 `--brief` path. Navigation replaces
-    filtering: no LLM decides what appears on Screen 1, and nothing is withheld
-    on Screen 2.
-  - **navigation is in-invocation, over held state (added 2026-07-29,
-    #887).** Screen 2's substrates are only usable if the owner can move
-    between them — tag → co-tags → Journey similarity, and *back* when a
-    grouping turns out to be a dead end. Two constraints make this
-    structural rather than cosmetic: the surface has no back button, and a
-    member holding ~50 Strands can neither be reprinted into the
-    conversation per view nor live only in a file, which would make it
-    uninspectable at the moment of selection. So:
-    - **one invocation = one corpus load.** Every deterministic substrate
-      join is computed once at the start; similarity is computed lazily on
-      first use of the view that needs it, then **held for the invocation**.
-      "Back" and "switch substrate" **re-present held state** — never
-      recompute, never re-invoke `/terrain`. Recomputation is not merely
-      slow here: a second computation of a model-judged substrate can
-      return a different grouping, so re-deriving on "back" would make the
-      owner's own history unstable.
-    - **the screen shows summaries; the path holds the whole.** Each view
-      prints compact section summaries (derived title, member ids, counts,
-      per the label rule above); the complete rendering of the **current**
-      view is written to a per-invocation path the owner may open.
-    - **this is the CAP-3 supersession's own shape, not an exception to
-      it.** That ruling admits a file as *"a rendering of one invocation
-      addressed by path — never a named entity … regenerate per invocation,
-      never read back (grep-assertable), no identity the rest of the system
-      can refer to"*. In-invocation memory is fine because it is not
-      storage; a **cross-invocation view cache is forbidden**, and so is
-      reading the written rendering back as an input.
-    - **every screen carries the standing exits:** switch substrate, back
-      to the member list, free-form direction, stop. An exit missing from
-      one screen is the dead end this clause exists to prevent.
-  - **size switch (amended 2026-07-23; re-based per axis member 2026-07-27,
-    #803).** One screen does not scale: past a **screen budget** (~7
-    candidates) a large terrain collapses into a handful of options and the map
-    stops showing what it exists to show. **The budget is now measured over one
-    axis member's Screen 2, not over the whole terrain** — two-screen
-    navigation shrinks the overload condition without removing it, because a
-    single tag can still hold many elements. The branches below are otherwise
-    unchanged, and the #802 scoping of what the View contains stands.
-    - **At or under the budget:** the flow above, unchanged. This branch is
-      the shipped behaviour and must not regress.
-    - **Above the budget:** the screen becomes a short **summary** plus the
-      path of a **View file** the owner opens, and selection happens by
-      **index** rather than by matching a proposed direction string.
-    - **The above-budget branch proposes no less than the small one (amended
-      2026-07-23, #632).** The size switch changes *where* the terrain is
-      presented, never *whether* the map proposes. So the View **leads with
-      candidate directions** — the same derived directions and cross-topic
-      combinations CAP-3's intent declares, which the large branch already
-      derives unbounded (every subtopic a candidate, the strongest combination
-      per distinct axis) — before any terrain detail. A branch that shows the
-      terrain and hides the directions inverts the switch's purpose, and it
-      would put the owner in front of a raw machine artifact to answer from,
-      which the human-gate presentation contract forbids. The directions are
-      the ones already derived: the View **reuses** them and derives nothing
-      of its own, so the no-second-proposer boundary is untouched — directions
-      name what to cover and along which axis, never narrative structure.
-  - **the View file.** A *rendering* of one invocation, at the same status as
-    `--emit-debug`: written to a fixed path, fully regenerated on every
-    invocation, and **never read back as an input** — grep-assertable, like
-    the existing derived-never-stored check. It carries, in this order: the
-    **candidate directions** above (with the subtopic indexes each names), a
-    compact **one-line-per-subtopic summary**, and only then per-subtopic
-    detail — stable ID, topic, depth glance, an **evidence summary**,
-    lesson-seed names, and consumed marks — enough to distinguish 20+
-    directions and to answer CAP-2's "why this depth?" from the same counts.
-    Deleting it loses nothing.
-  - **the View is a human surface, so it is budgeted (amended 2026-07-23,
-    #633/#634).** The View is written for the owner to read, and the
-    machine-readable form of everything on it already exists in the run's
-    `map.json`. Duplicating that form into the human artifact is what turns
-    the View into a log file, so:
-    - **Evidence renders as a summary:** the count of distinct pointers, plus
-      the pointers **aggregated per source file** (`path ×N`) and capped at a
-      declared constant, with the remainder disclosed as a count — never
-      silently truncated. Line-granular pointers are machine provenance: the
-      full enumeration, with line numbers and per-line shas, stays in
-      `map.json`; the View header already carries the pin, which is what
-      reproducibility needs.
-    - **Depth renders as the level plus the counts it was derived from** —
-      "full article: 24 evidence pointer(s), 3 unconsumed lesson(s), 2 live
-      item(s)" — because CAP-2's success clause promises exactly that the
-      owner can ask "why this depth?" and be answered from those counts. What
-      does **not** reach the surface is the **unmet-threshold predicate**
-      ("the next level needs `evidence_pointers` 24 < 25"): that is the
-      estimator's promotion rule, meaningful to the estimator and not to an
-      owner choosing what to write. It stays in `map.json`, where the depth
-      harness asserts it — so this is a rendering rule, and the estimate's
-      explainability as recorded is unchanged.
-    - **Every View line carries a display budget**, and each per-subtopic
-      block a line cap, the same convention the screen payload's fields
-      already follow: a list renders one item per line, clipped, capped, with
-      an explicit `+N more` remainder. A fallback or placeholder state is
-      named to the owner as **prose that states the remedy**, never as a bare
-      internal enum value in a headline position.
-  - **where the View lives (amended 2026-07-23, #611).** "A fixed path" is
-    **the `output.drafts` destination repository**, at a resolver-owned,
-    host-qualified path — not a per-run workspace directory. The View is
-    written for the owner to *open and read*, and a human-facing artifact
-    belongs in the repository the human works in, while machine
-    intermediates, caches and resumable state stay in machine-state
-    directories. A per-run path is not a fixed path: it moves every
-    invocation, so nothing the owner opened during a sitting can be reopened
-    later.
-    - It joins the destination repo's write surface as the **second
-      regenerated NON-GATING view**, beside `INDEX.md` — the same class, on
-      the same terms: fully regenerated per invocation, never read back,
-      never gating any decision, and **named exhaustively** in the footprint
-      check (`docs/storage-architecture.md` D1). The class is stated
-      narrowly on purpose: "human-facing" is not a general exemption from the
-      footprint invariant, and each member of the surface is enumerated.
-    - The path resolves through the path resolver like every other plugin
-      storage path; no skill, script or prompt composes it.
-    - CAP-1's properties are unchanged and remain the binding constraints:
-      deleting the View loses nothing, no code path reads it back, and no
-      stored index comes into existence. Only the location moves.
-    - **The location moved again (owner ruling — 2026-07-28, #874).** The
-      View is **not** written into the `output.drafts` destination
-      repository: Terrain is a writing-assistant feature, so its outputs —
-      and its debug artifacts — belong in the writing-assistant repository.
-      The destination repo's permitted surface shrinks back to `INDEX.md`
-      alone, and `docs/storage-architecture.md` D1/D2 carry the scheme; the
-      resolver still owns the path, so nothing that calls it changes.
-      Because this repository is public and a run's intermediates carry hub
-      renderings and pins, the relocation binds together with the ignore
-      entry and the staged-artifact guard D2 names — a relocated artifact
-      that can be committed is a publication-boundary defect, not a storage
-      one.
-  - **stable indexes and the indexed hand-off.** Every subtopic in the map
-    (and View) carries a stable ID (e.g. `T3.2`) from a deterministic ordering
-    (topics sorted, subtopics ranked as today), **stable within a pin**; the
-    View header carries the map's pin, so a selection made against a stale map
-    is **refused with the pin mismatch named**, never silently re-resolved.
-    **"The map's pin" is the COMPOSITE of the map's inputs (amended
-    2026-07-28, #872).** The clause above was written as though the map had
-    one source; it has two, and the guarded value was only ever the
-    destination repository's sha. Indexes over hub material — Lessons,
-    decisions, reversals, and the arcs beside them — move when the **hub**
-    moves, which the destination sha does not record, so the refusal passed
-    while the index it guarded had been re-pointed: exactly the silent
-    re-resolution this clause forbids, running inside the mechanism meant to
-    prevent it. The pin therefore carries **both** its inputs, each labelled
-    on the screen, and a mismatch in **either** refuses. The rule stated
-    once: **the guarded value must move whenever a guarded index can move.**
-    A single displayed sha also mis-taught its reader — it was read as a
-    statement about hub freshness, which it never was, and sent one triage
-    after a stale pin that did not exist.
-    **Publication boundary (binding on this clause):** the hub half is
-    `<hub>@<sha>`, so it is displayed **in-conversation** and never written
-    into tracked text; the View and any committed artifact carry the
-    destination pin plus a **generic** hub label, per
-    `specs/spec-writing-assistant/SPEC.md` §Publication boundary.
-    Cross-pin stability stays OQ1's escape hatch (promote cluster names to
-    recorded frontmatter on observed instability) — out of scope, but the ID
-    scheme must not preclude it. Selection is `{index, note}`: the composed
-    brief is the subtopic's coverage wording plus **the owner's note
-    verbatim**. **Free text always wins**, and an adopted index is
-    owner-adopted wording under the shipped rule. The composed brief goes into
-    the **existing** stage-0 `--brief` path — no new entry pipeline, and
-    downstream cannot tell an indexed selection from a typed brief. The note
-    reaches the structure proposer only as brief text, so the single-proposer
-    invariant is untouched.
-  - **coverage wording is owner-readable by construction (amended 2026-07-23,
-    #637).** A candidate's wording becomes the owner's brief the moment they
-    adopt it, so **no internal placeholder state may appear in a direction
-    string or in a composed brief** — not `(unclustered)`, not `(untracked)`,
-    not an empty name. Where a cluster carries no usable name, the wording
-    **describes what the cluster contains** rather than naming a subject the
-    repo never declared: "cover the not-yet-clustered items under
-    `<topic>`", not "cover `(unclustered)`". This is a constraint on the
-    *derivation*, not on the rendering: fixing it only where the View prints
-    would leave the adopted brief carrying the enum, which is the actual
-    defect. The articles repo still owns subject *names* (OQ1) — this governs
-    only the wording the tool composes when the repo named nothing.
-  - **substance-led rendering (amended 2026-07-23, #647).** A ranked slot is
-    filled by **the material's own words**, never by a description of how much
-    material exists. `cover docs/stories (163 evidence pointer(s))` describes
-    the corpus; a terrain shows it. So:
-    - **What fills a slot** is the claim the material makes — an element's own
-      summary or why, and for a subtopic a claim drawn from its strongest
-      element or Lesson line. The wording is **quoted or clipped from the
-      material, never composed about it**.
-    - **Clipping is render-only (amended 2026-07-24, #651).** Any length bound
-      (`ELEMENT_SUMMARY_CHARS`) is a *rendering* concern, applied where a line
-      is printed. The wording the **derivation** composes — the string the
-      brief is built from — carries the material's **full** claim, ending at a
-      boundary the source actually wrote, **never mid-word**. Clipping the
-      claim in the derivation hands the owner a fragment as adopted wording,
-      which seeds the thesis candidate and directs harvest as a sentence
-      fragment — the same derivation-vs-rendering leak the #637 rule above
-      fixes, inverted (a *display* concern leaking into the derivation instead
-      of a derivation concern fixed only at display).
-    - **Counts demote.** Evidence-pointer counts, unconsumed/live tallies and
-      depth arithmetic are map *metadata*: they may appear as a trailing
-      annotation at most, and never as the content of a direction or terrain
-      line. CAP-2's "why this depth?" was re-pointed at **the header's
-      terrain-size line** (amended 2026-07-27, #802; previously "from the
-      per-subtopic detail", which no longer exists on the view) and is
-      **retired outright** by the later #803 amendment the same day, which
-      removes the estimator that raised the question. The one count that
-      survives is the **per-member element count on Screen 1** — an affordance
-      for choosing where to look, which this clause's ban on count-only lines
-      does not reach, because it is not a direction.
-    - **Elements are directions.** The element projection (CAP-2, Story 18.80)
-      reaches the **same** candidate list the subtopics do and is presented
-      **inside** the candidate directions, not in a section of its own. Two
-      lists split by internal derivation kind is an implementation detail on
-      the owner surface.
-    - **No fabricated claim.** Where a subtopic carries no claim-bearing
-      material, the line falls back to coverage wording **explicitly** — the
-      #637 rule above governs that fallback. The tool never invents a claim a
-      source did not make, and never asserts substance it did not read.
-    - **The boundary is unmoved.** A substance-led line still names *what to
-      cover* and, for a combination, the *axis*; it is not a thesis, an
-      argument or an article shape. The no-second-proposer rule above stands
-      verbatim, and the brief contract is unchanged: adopted wording is the
-      candidate's own wording plus the owner's note.
-  - **success:** A sitting that starts at the map ends with a normal
-    brief-carrying run; grepping the map implementation for structure
-    composition finds none; **no direction or terrain line on a rendered View
-    consists only of a subject plus counts, and the elements appear among the
-    candidate directions rather than in a separate section**; the map screen offers free-form alongside its
-    options every time; a small map behaves exactly as shipped; a >budget map
-    produces the View plus summary, is byte-regenerated per invocation, and no
-    code path reads the View back. **A >budget View's first screenful presents
-    pickable candidate directions — not terrain detail — and no View line
-    exceeds its display budget**; grepping the View for a raw pointer
-    enumeration or for threshold arithmetic finds none.
-  - **provenance (2026-07-23, owner ruling):** this supersedes CAP-3's
-    original in-conversation-only reading — "never a path or artifact for the
-    owner to open" — for the >budget branch only, by direct owner demand after
-    a 20+-subtopic terrain was presented as a two-option screen. The
-    alternative that preserved the clause literally (full terrain as
-    conversation text, indexes typed into free-form) was offered and declined.
-    Mechanism public, provenance private, as with the 2026-07-22 override.
+- **CAP-3 (presentation and the combination move)** — **relocated to the
+  companion `presentation.md` (2026-07-30, #941).** The canonical file passed
+  its byte ceiling, and the growth was measured before anything moved: CAP-2
+  and CAP-3 together were 63% of it. CAP-3 moved **verbatim** — no clause was
+  compacted, reworded or re-ordered, because a projection may relocate text
+  and never re-express it.
+  **What is there, named rather than left to a lookup:** the two screens and
+  the standing exits; in-invocation navigation over held state (one corpus
+  load, back and switch-substrate re-present held state, no cross-invocation
+  cache); **set selection and claim recomposition** over an owner-selected
+  Strand set, with the brief recording its member set and pins; the
+  **coherence consultant** and its four bounding rules; the **Full Report**
+  over named group ids; the **size switch** and its budget; the **View file**
+  and its never-read-back rule; and the indexed hand-off with its composite
+  pin. The no-second-proposer boundary is stated there, with CAP-3's intent.
+  **The amendment history did not move** — every dated amendment for this
+  spec, including those amending CAP-3's clauses, stays in `amendments.md`.
 
 - **CAP-4 (bounded assembly, disclosed per family)**
   - **intent:** The map is assembled from **index and frontmatter surfaces**

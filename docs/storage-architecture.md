@@ -120,6 +120,38 @@ objections to it:
   is resolvable the state root remains the fallback rather than a clone
   nobody looks at.
 
+**Amended 2026-07-30 (#935): the 2026-07-28 ruling is narrowed to the
+owner-facing OUTPUT, and intermediates return here.** The ruling above is
+right about the deliverable and reached one clause too far past it. Two
+classes, split at the resolver:
+
+| class | where | why |
+|---|---|---|
+| Terrain's **View** (`topic-map-view.md`) — the owner-facing full report | the writing-assistant working tree | a human opens it to read; it is the deliverable |
+| **run workspaces** (`runs/<run-id>/`) and **debug artifacts** | the machine state root | machine-readable intermediates, caches and resumable state, which a human never opens by intent |
+
+The split is the one already stated portfolio-wide — human-facing artifacts in
+the working repo, intermediates and resumable state in machine-state dirs
+(owner decision record — 2026-07-16 (artifacts live where the human works)).
+The resolver already drew a boundary of exactly this kind (the draft
+pipeline's harvest caches, plan fallbacks and stage checkpoints never moved),
+so this **relocates** that boundary rather than inventing one, and per D1 no
+caller changes.
+
+What the amendment costs, stated rather than assumed:
+
+- **the ignore entry and the staged-artifact guard stay.** Their subject
+  shrinks to one file, and that file still carries verbatim hub renderings and
+  pins, so the publication boundary is as live as before over a smaller
+  surface.
+- **the retention rule owed above is discharged by relocation, not by GC.**
+  Growth became non-deferrable *because* runs sat inside a working tree; back
+  in the state root it is ordinary state growth, deferred as it always was.
+  Two things this does **not** discharge: the accumulation already on disk (a
+  one-time deletion, owned by no code), and test or dogfood runs keying a real
+  repository — the latter is structural once every run resolves through this
+  seam.
+
 Every pipeline invocation gets a workspace, resolved through D1's seam:
 
 ```
