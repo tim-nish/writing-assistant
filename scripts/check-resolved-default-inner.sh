@@ -44,6 +44,8 @@ plan() {  # $1 = the resolved_defaults line (may be empty), $2 = output path
     printf 'intent: introduce the project\nclaim: the plan shows what it defaulted\n'
     printf 'status: outlined\nrun_id: 20260730T000000\npin: host-repo@abc1234567890\n'
     printf 'arc: sibling-lessons over the selected clusters\n'
+    # Story 20.68 (#983): an accepted structure declares its visual slots.
+    printf 'visual_slots: []\n'
     printf 'structure_provenance: framework:F2\n'
     [ -n "$1" ] && printf 'resolved_defaults: %s\n' "$1"
     printf -- '---\n\n## Notes\n'

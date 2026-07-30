@@ -144,6 +144,21 @@ OPTIONAL_KEYS = ("audience", "audience_id", "policy_seeded", "seed", "relates",
                  # missing measurement, never an implicit pass. Plan-level;
                  # no new store.
                  "structure_provenance",
+                 # `visual_slots` (Story 20.68, #983; SPEC-article-visuals
+                 # amended 2026-07-30): the visual slots THIS accepted
+                 # structure declares — a list of slot names, possibly empty.
+                 # CAP-2a caps a visual-set plan at `declared slots + 2`, and
+                 # that operand used to come from framework identity (CAP-1).
+                 # #911 demoted F1-F5 to candidates and expects `bespoke` to
+                 # be common, so on the common case the arithmetic had no
+                 # operand at all. The anchor is the STRUCTURE, not the
+                 # framework: a framework-matched structure may copy CAP-1's
+                 # table, a bespoke one states its own, and the cap is always
+                 # defined. Recorded on EVERY accepted structure for the same
+                 # reason `structure_provenance` is — a plan with `arc` and no
+                 # field is a missing declaration, never an implicit pass.
+                 # Rides this record; no new store.
+                 "visual_slots",
                  # `brief_provenance` (Story 18.24, #505): records that this
                  # plan was shaped by a free-form OWNER coverage brief. The only
                  # accepted value is `owner-authored` — the brief is the owner's
@@ -213,6 +228,30 @@ def parse_id_list(raw):
     if s.startswith("[") and s.endswith("]"):
         s = s[1:-1]
     return [t.strip().strip('"').strip("'") for t in s.split(",") if t.strip()]
+
+
+def parse_visual_slots(raw):
+    """A `visual_slots:` frontmatter value → the list of slot names this
+    accepted structure declares (Story 20.68, #983). Same storage shape as
+    `sections`: a one-line JSON array, because the flat frontmatter parser
+    cannot read nested YAML. `[]` is a VALID declaration meaning the structure
+    declares no slots — distinct from the field being absent, which is a
+    missing declaration and refused. Raises ValueError on a malformed value."""
+    s = str(raw).strip()
+    if not s:
+        raise ValueError("empty value — use [] to declare no slots")
+    try:
+        data = json.loads(s)
+    except json.JSONDecodeError as e:
+        raise ValueError(f"not a one-line JSON array: {e}")
+    if not isinstance(data, list):
+        raise ValueError("must be a JSON array of slot names")
+    out = []
+    for i, item in enumerate(data, 1):
+        if not isinstance(item, str) or not item.strip():
+            raise ValueError(f"slot {i} is not a non-empty name")
+        out.append(item.strip())
+    return out
 
 
 def parse_sections(raw):
@@ -497,6 +536,37 @@ def validate_plan(text, path):
         yield ("structure_provenance",
                "names no accepted structure — the field rides `arc` (#911); "
                "drop it, or record the accepted structure in `arc`")
+
+    # Story 20.68 (#983): the visual-slot declaration rides `arc` on the same
+    # terms. An accepted structure with no declaration leaves CAP-2a's cap
+    # (`declared slots + 2`) without an operand, which is exactly the defect
+    # this field exists to close — so it is refused at write rather than
+    # defaulted, and an EMPTY LIST is a valid declaration meaning "no slots".
+    # The flat frontmatter parser stores this as a one-line JSON array, the
+    # same shape `sections` uses — nested YAML is not parseable here.
+    has_arc = bool((fields.get("arc") or "").strip())
+    if "visual_slots" in fields:
+        try:
+            slots = parse_visual_slots(fields["visual_slots"])
+        except ValueError as e:
+            yield ("visual_slots",
+                   f"{e}; the value is a one-line JSON array of slot names — "
+                   'for example ["overview diagram"], or [] when the '
+                   "structure declares none (SPEC-article-visuals, amended "
+                   "2026-07-30)")
+        else:
+            if not has_arc:
+                yield ("visual_slots",
+                       "names no accepted structure — the field rides `arc`; "
+                       "drop it, or record the accepted structure in `arc`")
+    elif has_arc:
+        yield ("visual_slots",
+               "required when the plan records an accepted structure (`arc`): "
+               "the visual slots this structure declares, `[]` when it "
+               "declares none. CAP-2a caps the visual set at declared slots "
+               "+ 2, and an accepted structure with no declaration leaves "
+               "that cap undefined — a missing declaration, never an "
+               "implicit pass (#983)")
 
     # `consumed` (CAP-9/#430): a list of well-formed story-element ids. Each id
     # is identity (18.8); a malformed or prose-bearing entry is refused so the
