@@ -104,6 +104,20 @@ for token in 'terrain_map.py assemble' 'topic-map-directions.py axis' \
     || err "SKILL is missing contract text: $token"
 done
 
+# The authoring declaration is ONCE PER SURFACE (Story 20.53, #936). The token
+# above still has to be present — it is not weakened — but it now has to live
+# in the PREAMBLE sentence rather than in a per-line prefix, so the retired
+# prefix is asserted absent the way this file's other absences are.
+grep -q 'in common:' "$SKILL" \
+  && ok "the group-claim prefix is the bare 'in common:' form" \
+  || err "SKILL no longer carries the 'in common:' group-claim prefix"
+grep -q 'in common (machine-composed):' "$SKILL" \
+  && err "the per-line authoring parenthetical is back on every group line (#936)" \
+  || ok "no per-line authoring parenthetical on the uniform-class screen"
+grep -q 'mixes' "$SKILL" \
+  && ok "the SKILL re-arms the per-line marker on a mixed screen" \
+  || err "SKILL drops the mixed-screen condition — the case the marker exists for"
+
 
 # --- owner-surface text fits by authorship, never by clipping (#832) ---------
 # The slice-plus-fake-period idiom is gone for good: a truncation that ends in

@@ -210,9 +210,18 @@ check(all(len(i["claims"]) == len(s["strands"])
           for i, s in zip(bg["inputs"], d["sections"])),
       "every Strand's claim is a composition input (count-in == count-in)")
 rules = " ".join(bg.get("rules") or [])
+# The authoring declaration is owed ONCE PER SURFACE, not once per line
+# (Story 20.53, #936). Both halves of the conditional are asserted — the
+# preamble discharge AND the minority re-arming — because a rule that stated
+# only the first would license dropping the marker on a mixed screen, which
+# is the case the marker exists for. "never silent" and "machine-composed"
+# stay in the list unweakened: the obligation's force is unchanged.
 for phrase in ("never omits, merges, ranks, or gates",
-               "machine-composed", "never silent"):
+               "machine-composed", "never silent",
+               "once on the surface", "mark the minority"):
     check(phrase in rules, f"the binding rules state: {phrase!r}")
+check("mark each background line as machine-composed" not in rules,
+      "the unconditional per-line rule is gone (#936)")
 
 # --- determinism + selection contract --------------------------------------
 check(out.stdout == run("workflow").stdout, "byte-identical across invocations")

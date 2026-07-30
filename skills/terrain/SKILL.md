@@ -199,7 +199,15 @@ two sentences stating **what its Strands have in common** from the returned
 `background.inputs` claims — the group's reason for existing, in plain
 language (Tsurezure may be consulted; record any consult per the provenance
 rule). Render it directly under the section title, prefixed
-`in common (machine-composed):`. Say what they share, not what sits behind
+`in common:`, and declare the authoring class **once for the screen** — a
+single preamble sentence above the sections, e.g. *"Every `in common:` line
+below is machine-composed at render time from the served claims."* Repeating
+`(machine-composed)` on each line carries nothing per line and costs attention
+on every one; the declaration is owed once per surface, not once per line
+(CAP-2 as amended 2026-07-30, #936). Mark a line individually only when a
+screen **mixes** composed and quoted lines of the same visual class — and then
+mark the **minority** class, because that is where the reader's default is
+wrong. Say what they share, not what sits behind
 them: this line is the germ of a Thesis, and "background" invited reading it
 as decoration. It is a **group claim** — never a fact-sheet claim, which is a
 different object with a provenance class (`docs/owner-terms.md`).

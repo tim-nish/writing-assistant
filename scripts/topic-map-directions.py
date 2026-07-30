@@ -1219,7 +1219,22 @@ def cmd_member(args):
                    "served rendering or its disclosure",
                    "every Strand stays exactly once and selectable — "
                    "composition never omits, merges, ranks, or gates",
-                   "mark each background line as machine-composed",
+                   # ONCE PER SURFACE, not once per line (CAP-2 as amended
+                   # 2026-07-30, #936). The obligation is unchanged in force;
+                   # only its carrier is bounded. A constant repeated on
+                   # every line of a declared class carries zero information
+                   # per line while costing attention on each — so where the
+                   # whole class is composed, one preamble declaration
+                   # discharges it. The marker is owed again the moment a
+                   # screen MIXES composed and quoted lines of the same
+                   # visual class, and then it marks the MINORITY, because
+                   # that is where the reader's default is wrong.
+                   "declare the authoring class once on the surface: where "
+                   "every line of a visual class is machine-composed, one "
+                   "preamble declaration discharges it and no per-line "
+                   "parenthetical is used; where a screen mixes composed "
+                   "and quoted lines of the same class, mark the minority "
+                   "class per line",
                    "gateway unavailable or composition skipped: say so and "
                    "relay the deterministic titles — never silent",
                ]},
