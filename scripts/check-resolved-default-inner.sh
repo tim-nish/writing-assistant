@@ -42,7 +42,7 @@ work=$(mktemp -d); trap 'rm -rf "$work"' EXIT
 plan() {  # $1 = the resolved_defaults line (may be empty), $2 = output path
   { printf -- '---\nkind: article-plan\nslug: demo-plan\n'
     printf 'intent: introduce the project\nclaim: the plan shows what it defaulted\n'
-    printf 'status: outlined\nrun_id: 20260730T000000\npin: host-repo@abcdef1234567\n'
+    printf 'status: outlined\nrun_id: 20260730T000000\npin: host-repo@abc1234567890\n'
     printf 'arc: sibling-lessons over the selected clusters\n'
     printf 'structure_provenance: framework:F2\n'
     [ -n "$1" ] && printf 'resolved_defaults: %s\n' "$1"
