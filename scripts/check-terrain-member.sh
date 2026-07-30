@@ -258,10 +258,15 @@ grep -q "What each row IS" "$D" \
   || err "the row-kind legend is missing"
 
 # --- the Journey shortfall is DISCLOSED, detection-based (Story 20.10, #812) --
-python3 - "$D" <<'PYEOF' || fail=1
+python3 - "$D" "scripts/terrain_text.py" <<'PYEOF' || fail=1
 import importlib.util, sys
 spec = importlib.util.spec_from_file_location("dv", sys.argv[1])
 m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+# The disclosure emitter moved to its own leaf module (Story 20.58, #942).
+# Loaded from THAT path, never through the composer's re-export: deleting it
+# where it now lives has to fail here.
+tspec = importlib.util.spec_from_file_location("dvtext", sys.argv[2])
+t = importlib.util.module_from_spec(tspec); tspec.loader.exec_module(t)
 fail = []
 def check(cond, msg):
     print(("ok:   " if cond else "FAIL: ") + msg, file=sys.stdout if cond else sys.stderr)
@@ -279,7 +284,7 @@ base = {"kind": "topic-map", "topics": [], "coverage": {"pin": "h@1"},
 gap = dict(base, gloss={"served": True, "lesson_renderings": 3,
                         "journey_renderings": 0, "journeys_requested": [],
                         "journey_misses": {}})
-line = m._journey_disclosure_line(gap)
+line = t._journey_disclosure_line(gap)
 check(line is not None and "requested" in line.lower(),
       "nothing requested yields the shortfall as a LINE, named as not-requested")
 check("served at this pin" not in line,
@@ -296,7 +301,7 @@ missing = dict(base, gloss={"served": True, "lesson_renderings": 3,
                             "journey_renderings": 0,
                             "journeys_requested": ["journeys/workflow"],
                             "journey_misses": {"journeys/workflow": "served a miss"}})
-mline = m._journey_disclosure_line(missing)
+mline = t._journey_disclosure_line(missing)
 check(mline is not None and "journeys/workflow" in mline
       and "abnormal condition" in mline,
       "a requested shard that did not arrive is named as the abnormal condition")
@@ -305,10 +310,10 @@ check(mline != line,
 ok_served = dict(base, gloss={"served": True, "lesson_renderings": 3,
                               "journey_renderings": 2,
                               "journeys_requested": ["journeys/workflow"]})
-check(m._journey_disclosure_line(ok_served) is None,
+check(t._journey_disclosure_line(ok_served) is None,
       "served journeys retire the disclosure BY DETECTION, no flag to flip")
 down = dict(base, gloss={"served": False, "reason": "gateway down"})
-check(m._journey_disclosure_line(down) is None,
+check(t._journey_disclosure_line(down) is None,
       "a whole-gloss outage is the gloss line's to name — no double disclosure")
 sys.exit(1 if fail else 0)
 PYEOF

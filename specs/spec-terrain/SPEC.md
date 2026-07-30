@@ -530,7 +530,7 @@ flows into the existing brief/structures path unchanged.**
     duty above is satisfied by the one-line coverage and gloss disclosures
     that already sit directly under the candidate directions
     (`_element_coverage_line`, `_gloss_disclosure_line` in
-    `scripts/topic-map-directions.py`), and by at most a one-line note in the
+    `scripts/terrain_text.py`), and by at most a one-line note in the
     header when the assembly was bounded. A disclosure that grows into its own
     section is **not** better disclosure: the observed failure is that ~2,300
     of a 2,511-line view served no purpose the owner could identify, so the

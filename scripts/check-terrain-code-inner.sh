@@ -21,6 +21,7 @@ cd "$root"
 
 M="scripts/terrain_map.py"
 D="scripts/topic-map-directions.py"
+T="scripts/terrain_text.py"
 VP="scripts/validate-proposal-payload.py"
 SKILL="skills/terrain/SKILL.md"
 FIX="scripts/fixtures/terrain/screen-map.json"
@@ -37,6 +38,8 @@ python3 -c "import py_compile; py_compile.compile('$M', doraise=True)" 2>/dev/nu
   && ok "terrain_map.py compiles" || err "terrain_map.py syntax error"
 python3 -c "import py_compile; py_compile.compile('$D', doraise=True)" 2>/dev/null \
   && ok "topic-map-directions compiles" || err "topic-map-directions syntax error"
+python3 -c "import py_compile; py_compile.compile('$T', doraise=True)" 2>/dev/null \
+  && ok "terrain_text.py compiles" || err "terrain_text.py syntax error"
 
 # NO SECOND PROPOSER: the View renders the directions it is GIVEN. A
 # `candidates()` call inside compose_view would be a second derivation, and the
@@ -107,12 +110,16 @@ done
 # "." masquerades as a sentence ("Too many to f."), which the owner reads as a
 # complete statement saying something else. Grep-asserted like the other
 # absences in this file.
-if grep -nE '\[:(budget|room) *- *1\]' scripts/topic-map-directions.py >/dev/null; then
-  err "the mid-word slice idiom is back in topic-map-directions.py (#832)"
+# Both files: the fitting primitives moved to `terrain_text.py` (Story 20.58,
+# #942), so the guard follows the code it guards rather than staying pointed at
+# the file the code left.
+if grep -nE '\[:(budget|room) *- *1\]' scripts/topic-map-directions.py \
+     scripts/terrain_text.py >/dev/null; then
+  err "the mid-word slice idiom is back in the terrain composer (#832)"
 else
   ok "no mid-word slice-plus-period idiom in the composer"
 fi
-python3 - scripts/topic-map-directions.py <<'PYEOF' || fail=1
+python3 - scripts/topic-map-directions.py scripts/terrain_text.py <<'PYEOF' || fail=1
 import importlib.util, sys
 fail = []
 def check(cond, msg):
@@ -120,13 +127,18 @@ def check(cond, msg):
     if not cond: fail.append(msg)
 spec = importlib.util.spec_from_file_location("tmd", sys.argv[1])
 tmd = importlib.util.module_from_spec(spec); spec.loader.exec_module(tmd)
+# The fitting primitives moved to their own leaf module (Story 20.58, #942) and
+# are exercised through THAT module's path — never through the composer's
+# re-export, so a symbol deleted where it now lives fails here.
+tspec = importlib.util.spec_from_file_location("ttext", sys.argv[2])
+txt = importlib.util.module_from_spec(tspec); tspec.loader.exec_module(txt)
 # Static template text fits its budget BY CONSTRUCTION — measured here, at
 # authoring time, per the owner-facing proposal contract clause (e).
 check(len(tmd.WHY_TEXT) <= tmd.BUDGETS["why"],
       f"WHY_TEXT is authored inside BUDGETS['why'] ({len(tmd.WHY_TEXT)}/{tmd.BUDGETS['why']})")
 # The summary `where` picks an authored variant beside the path — never slices.
 long_path = "/home/owner/work/some-articles-repo/drafts/topic-map/topic-map-view.md"
-where = tmd._fit_with_path(
+where = txt._fit_with_path(
     ["Terrain at deadbeef: 61 element(s) — each its own Strand — and 3 "
      "topic(s), 61 strand(s); 0 already consumed and still selectable.",
      "Terrain at deadbeef: 61 Strands, 3 topic(s); 0 consumed.",
@@ -138,10 +150,10 @@ prefix = where[: -len(" Open the View: " + long_path)]
 check(not __import__("re").search(r"\b\w\.$", prefix),
       "the summary prefix is a whole authored wording, not a cut wearing a period")
 # View-line elision is visible and lands on a word boundary.
-e = tmd._elide("Too many to fit on one screen indeed", 20)
+e = txt._elide("Too many to fit on one screen indeed", 20)
 check(e.endswith("…") and not e.endswith(" …") and "fit" not in e.split("…")[0].split()[-1][:1],
       f"View elision is marked and word-bounded ({e!r})")
-check(tmd._elide("short", 20) == "short", "under-budget View value is untouched")
+check(txt._elide("short", 20) == "short", "under-budget View value is untouched")
 sys.exit(1 if fail else 0)
 PYEOF
 [ $? -eq 0 ] || fail=1
