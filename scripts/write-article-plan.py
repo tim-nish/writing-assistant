@@ -27,7 +27,10 @@ Frontmatter contract (issue #310, owner-set 2026-07-17):
             policy_config_version (`[A-Za-z0-9._-]+`),
             policy_conformance (conformant|open|conflict|stale),
             arc (#440/#434: projected at completion from the run's argument-plan
-                 intermediate; thesis projects into `claim`)
+                 intermediate; thesis projects into `claim`),
+            structure_provenance (#911: framework:F<n> | bespoke, optional
+                 +owner-edited — REQUIRED iff `arc` is present; the F1-F5
+                 demotion instrument, recorded on every accepted structure)
             — the CAP-4 trio; ALL THREE required when policy_seeded is true
             (a policy-seeded plan without conformance data is refused: run
             the `conformance --write` gate to record them)
@@ -129,6 +132,18 @@ OPTIONAL_KEYS = ("audience", "audience_id", "policy_seeded", "seed", "relates",
                  # the owner's N-sections-vs-N-lessons review mechanical from
                  # one durable file.
                  "sections",
+                 # `structure_provenance` (#911, SPEC-article-frameworks
+                 # amended 2026-07-29): the F1-F5-demotion instrument. Every
+                 # ACCEPTED structure — a plan carrying `arc` — names whether
+                 # it was framework-matched (`framework:F<n>`) or `bespoke`,
+                 # with `+owner-edited` appended when the owner rewrote the
+                 # accepted shape, so "matched then rewritten" stays
+                 # distinguishable from "matched and kept". Recorded on EVERY
+                 # accepted structure so the instrument cannot fall silent: a
+                 # plan with `arc` and no field is refused at write — a
+                 # missing measurement, never an implicit pass. Plan-level;
+                 # no new store.
+                 "structure_provenance",
                  # `brief_provenance` (Story 18.24, #505): records that this
                  # plan was shaped by a free-form OWNER coverage brief. The only
                  # accepted value is `owner-authored` — the brief is the owner's
@@ -223,6 +238,10 @@ def parse_sections(raw):
 CONFORMANCE_KEYS = ("policy_pin", "policy_config_version", "policy_conformance")
 CONFORMANCE_STATUSES = ("conformant", "open", "conflict", "stale")
 CONFIG_VERSION_RE = re.compile(r"^[A-Za-z0-9._-]+$")
+# The #911 instrument's closed vocabulary — one definition; structure-record
+# (draft-pipeline.py) validates against THIS regex, never a second copy.
+STRUCTURE_PROVENANCE_RE = re.compile(
+    r"^(framework:F[1-5]|bespoke)(\+owner-edited)?$")
 
 # Fields the canonical draft or its variants own — a plan restating one forks
 # the source of truth.
@@ -395,6 +414,26 @@ def validate_plan(text, path):
                             "refused; run the `conformance --write` gate "
                             "(SPEC-article-plan CAP-4) to record the consulted "
                             "pin, configVersion, and status")
+
+    # #911 instrument: an accepted structure (`arc`) without its provenance
+    # field is a missing measurement — refused at write, never an implicit
+    # pass. The field without an accepted structure has nothing to measure.
+    sp = (fields.get("structure_provenance") or "").strip()
+    if sp and not STRUCTURE_PROVENANCE_RE.match(sp):
+        yield ("structure_provenance",
+               f"must be framework:F1..F5 or bespoke, optionally +owner-edited "
+               f"(got {sp!r}) — the #911 instrument's closed vocabulary")
+    if (fields.get("arc") or "").strip() and not sp:
+        yield ("structure_provenance",
+               "required when the plan records an accepted structure (`arc`): "
+               "framework:F<n> when the accepted structure is the framework's "
+               "own shape, `bespoke` otherwise, `+owner-edited` when the "
+               "owner rewrote it — an accepted structure with no field is a "
+               "missing measurement, never an implicit pass (#911)")
+    if sp and not (fields.get("arc") or "").strip():
+        yield ("structure_provenance",
+               "names no accepted structure — the field rides `arc` (#911); "
+               "drop it, or record the accepted structure in `arc`")
 
     # `consumed` (CAP-9/#430): a list of well-formed story-element ids. Each id
     # is identity (18.8); a malformed or prose-bearing entry is refused so the
@@ -599,6 +638,15 @@ def _read_plan_summary(path):
             "claim": fields.get("claim"), "status": fields.get("status"),
             "pin": fields.get("pin"), "relates": fields.get("relates"),
             "policy_seeded": fields.get("policy_seeded"),
+            # #911 instrument: surfaced at consultation so the demotion-window
+            # review reads measurements from the plans alone. A plan that
+            # records an accepted structure (`arc`) but predates the field is
+            # a MISSING measurement — surfaced as such, never an implicit pass.
+            "structure_provenance": fields.get("structure_provenance"),
+            "structure_measurement": (
+                "missing" if (fields.get("arc") or "").strip()
+                and not (fields.get("structure_provenance") or "").strip()
+                else ("recorded" if (fields.get("arc") or "").strip() else None)),
             # CAP-9/#430: the story-element ids this plan's draft consumed, so
             # consultation can exclude them from a new lesson-based selection.
             "consumed": parse_id_list(fields.get("consumed", ""))}

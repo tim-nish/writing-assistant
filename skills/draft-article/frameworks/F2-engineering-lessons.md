@@ -3,8 +3,12 @@
 **Use when:** sharing lessons, design decisions, failure findings from development.
 
 **GATE (entry) — a framework-selection precondition, not a fill-in slot:** at
-least one real surprise/failure with an artifact you can show (log excerpt, diff,
-measurement). No showable artifact → the lesson isn't ready to write.
+least one claim you can show an artifact for (log excerpt, diff, measurement).
+No showable artifact → the lesson isn't ready to write. *(The mandatory
+surprise/failure retired 2026-07-29, #911: a required surprise in every article
+is a publishability bar the material cannot always clear, and one produced to
+clear a bar is not a surprise. It remains one narrative kind among several,
+used when the material carries it.)*
 
 Slot syntax, the config-bound frontmatter, and the shared pointer block are
 defined once in [`CONVENTIONS.md`](CONVENTIONS.md) — F2 reuses them and does not
@@ -62,9 +66,11 @@ context to make the lesson intelligible — this is not the project intro.)}
 {(The reasonable-sounding assumption. Readers must recognize themselves in it.)}
 
 ## GATE {What actually happened}                    (~120 words + artifact) [SKIP: blocker] [EVIDENCE: episode|example|measurement]
-{(The surprise, WITH the artifact: log excerpt, diff, number, screenshot.
-This slot empty = article not publishable (AP-10). Each lesson needs its OWN
-artifact — the evidence gate is enforced once per lesson, not once per article.)}
+{(What actually happened, WITH the artifact: log excerpt, diff, number,
+screenshot — a surprise or reversal when the material holds one, never
+required (#911). This slot empty = article not publishable (AP-10).
+Each lesson needs its OWN artifact — the evidence gate is enforced once per
+lesson, not once per article.)}
 
 ## {Why — the mechanism}                            (~120 words) [SKIP: verify]
 {(Root cause, not symptom. This is the transferable part; be precise.)}

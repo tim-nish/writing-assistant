@@ -31,6 +31,17 @@ N-sections-vs-N-lessons review stays mechanical from one file:
   declared membership-rule one-liner**, so the grouping justification survives
   the workspace.
 
+- **Frontmatter `structure_provenance:`** (#911, the F1–F5 demotion
+  instrument) — **required beside `arc:`**: `framework:F2` when the accepted
+  structure is the framework's own skeleton (sibling-lessons — including the
+  no-choice default path), `bespoke` for any other accepted shape, with
+  `+owner-edited` appended when the owner rewrote the accepted structure
+  after adoption. The `structures` proposer already marks every candidate
+  with its provenance — **carry the accepted candidate's value; never
+  re-derive it here**. The writer refuses an `arc` with no
+  `structure_provenance`: an explicit `bespoke` is a measurement, and a
+  missing field surfaces as a missing measurement — never an implicit pass.
+
 `sections:` is **additive** — a plan without it validates exactly as before,
 `consumed:` stays the consumption-exclusion key, and downstream consumers are
 unchanged.
