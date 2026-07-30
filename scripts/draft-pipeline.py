@@ -3284,10 +3284,15 @@ def _narrative_structures(elements, brief=None):
                      "section per lesson (the current F2 default).")
     if emphasis:
         sib_rationale += emph_note
+    # #911 (F1-F5 demotion instrument): every candidate carries its provenance
+    # at proposal — sibling-lessons IS the F2 skeleton (framework-matched);
+    # every other shape is composed for this material (bespoke). The value is
+    # CARRIED into the plan's `structure_provenance`, never re-derived there.
     candidates = [{
         "structure": "sibling-lessons", "default": True,
         "composition": "sections", "sections": ordered,
         "rationale": sib_rationale,
+        "provenance": "framework:F2",
     }]
 
     # Candidate alternatives, in fixed preference order, each qualified by the
@@ -3343,7 +3348,7 @@ def _narrative_structures(elements, brief=None):
     alts.sort(key=lambda a: (0 if a[0] in cued else 1, -a[2], a[0]))
     for name, rationale, _score in alts[:2]:
         cand = {"structure": name, "default": False,
-                "composition": "beats",
+                "composition": "beats", "provenance": "bespoke",
                 "beats": _brief_ordered(ids, emphasis) if emphasis else ids,
                 "rationale": rationale}
         if informed:
@@ -3411,13 +3416,13 @@ STRUCTURE_NAMES = ("sibling-lessons", "chronological-journey",
                    "single-incident-deep-thread", "thematic-braid")
 
 
-def _plan_arc(path):
-    """The `arc` frontmatter value of a plan record, via the plan writer's own
-    frontmatter parser (one parser, never a second)."""
+def _plan_fields(path):
+    """A plan record's frontmatter, via the plan writer's own parser (one
+    parser, never a second). Returns (fields, writer_module)."""
     wap = _load("write-article-plan.py")
     fields, _body, _errs = wap.split_frontmatter(
         open(path, encoding="utf-8").read())
-    return (fields.get("arc") or "").strip()
+    return fields, wap
 
 
 def cmd_structure_record(args):
@@ -3431,8 +3436,40 @@ def cmd_structure_record(args):
     structure, and whether the choice was brief-informed) so the completion
     summary can state it. Exit 0 = conforming; 1 = a violation, named."""
     defects = []
-    arc = _plan_arc(args.plan) if args.plan else ""
+    fields, wap = _plan_fields(args.plan) if args.plan else ({}, None)
+    arc = (fields.get("arc") or "").strip()
     chosen = next((s for s in STRUCTURE_NAMES if s in arc), None)
+
+    # #911 (F1-F5 demotion instrument): a plan that records an accepted
+    # structure must carry its measurement, and the recorded value must agree
+    # with the proposer's own marking — sibling-lessons IS the F2 skeleton,
+    # every other shape is bespoke. Validated against the plan writer's
+    # vocabulary (one regex, never a second copy). `+owner-edited` is the
+    # owner's business and never contradicts the base value.
+    provenance = (fields.get("structure_provenance") or "").strip()
+    if args.plan and arc:
+        if not provenance:
+            defects.append(
+                "the plan records an accepted structure (`arc`) but no "
+                "structure_provenance — a MISSING MEASUREMENT (#911): record "
+                "framework:F<n> when the accepted structure is the framework's "
+                "own skeleton, `bespoke` otherwise, `+owner-edited` when the "
+                "owner rewrote it")
+        elif not wap.STRUCTURE_PROVENANCE_RE.match(provenance):
+            defects.append(
+                f"structure_provenance {provenance!r} is outside the #911 "
+                "vocabulary (framework:F1..F5 | bespoke, optional "
+                "+owner-edited)")
+        else:
+            base = provenance.split("+", 1)[0]
+            expected = "framework:F2" if (chosen in (None, "sibling-lessons")) \
+                else "bespoke"
+            if base != expected:
+                defects.append(
+                    f"structure_provenance {base!r} disagrees with the accepted "
+                    f"structure ({chosen or 'the sibling-lessons default'}): the "
+                    f"proposer marks it {expected!r} — the field is carried from "
+                    "the proposal, never re-derived (#911)")
 
     if args.plan and not chosen:
         # A run that never presented the choice has no structure to record —
@@ -3468,6 +3505,11 @@ def cmd_structure_record(args):
 
     out = {"structure": chosen, "recorded_in": "arc" if chosen else None,
            "editorial_anchor_clean": True}
+    if args.plan and arc:
+        # #911 disclosure: the measurement travels with the completion summary,
+        # so the demotion-window review reads it without opening the plan.
+        out["structure_provenance"] = provenance
+        out["owner_edited"] = provenance.endswith("+owner-edited")
     if chosen:
         # Disclosure (CAP-9): the run states that the structure choice was
         # brief-informed, consistent with the per-element disclosure.

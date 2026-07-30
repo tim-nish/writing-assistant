@@ -167,6 +167,28 @@ python3 "$W" write --slug interview-is-the-difference --root "$h" "$work/plan.md
 [ "$(find "$a/plans" -type f | wc -l)" -eq "$before" ] \
   && ok "fail-closed: a refused plan writes nothing" || err "refused plan still wrote"
 
+# --- #911: the structure-provenance instrument -----------------------------
+# An accepted structure (arc) without its measurement is refused — an explicit
+# bespoke is a measurement, a missing field is never an implicit pass.
+good; sed -i "s|^status: outlined$|status: outlined\narc: thematic-braid — the clusters share cost\nstructure_provenance: bespoke|" "$work/plan.md"
+V "$P" && ok "#911: arc plus structure_provenance validates" \
+  || err "a measured accepted structure was refused: $(reason "$P")"
+good; sed -i "s|^status: outlined$|status: outlined\narc: thematic-braid — the clusters share cost|" "$work/plan.md"
+reason "$P" | grep -q 'missing measurement' \
+  && ok "refuse: arc with no structure_provenance (#911 missing measurement)" \
+  || err "an accepted structure with no measurement was accepted"
+good; sed -i "s|^status: outlined$|status: outlined\narc: braided\nstructure_provenance: framework:F9|" "$work/plan.md"
+reason "$P" | grep -q 'closed vocabulary' \
+  && ok "refuse: structure_provenance outside the closed vocabulary" \
+  || err "out-of-vocabulary provenance accepted"
+good; sed -i "s|^status: outlined$|status: outlined\nstructure_provenance: bespoke|" "$work/plan.md"
+reason "$P" | grep -q 'names no accepted structure' \
+  && ok "refuse: structure_provenance with no arc (nothing to measure)" \
+  || err "a provenance with no accepted structure was accepted"
+good; sed -i "s|^status: outlined$|status: outlined\narc: sibling arcs\nstructure_provenance: framework:F2+owner-edited|" "$work/plan.md"
+V "$P" && ok "#911: +owner-edited is inside the vocabulary (matched-then-rewritten stays distinguishable)" \
+  || err "+owner-edited refused: $(reason "$P")"
+
 # --- Schema-less destination fallback -------------------------------------
 n="$work/notarepo"; mkdir -p "$n/out"       # no drafts/, no INDEX.md/backlog/
 h2="$work/host2"; mkdir -p "$h2"; git -C "$h2" init -q
@@ -215,6 +237,20 @@ post_snapshot=$(find "$a" -type f | sort; git -C "$a" status --porcelain)
 [ "$pre_snapshot" = "$post_snapshot" ] \
   && ok "CAP-3: consultation is read-only — nothing created or modified" \
   || err "consultation modified the articles repo"
+
+# #911: a legacy plan with an accepted structure but no provenance field
+# surfaces at consultation as a MISSING measurement — never an implicit pass.
+printf -- '---\nkind: article-plan\nslug: legacy-arc\nintent: F2\nclaim: c\nstatus: outlined\nrun_id: r\npin: repo@abc1234\narc: thematic-braid — braided\n---\n\nbody\n' \
+  > "$a/plans/legacy-arc.md"
+c=$(python3 "$W" consult --root "$h" 2>/dev/null)
+printf '%s' "$c" | python3 -c "
+import json, sys
+plans = {p['slug']: p for p in json.load(sys.stdin)['plans']}
+assert plans['legacy-arc']['structure_measurement'] == 'missing', plans['legacy-arc']
+assert plans['interview-is-the-difference']['structure_measurement'] is None
+" && ok "#911: consult surfaces an arc'd plan with no provenance as a missing measurement" \
+  || err "a legacy accepted structure passed implicitly at consultation"
+rm -f "$a/plans/legacy-arc.md"
 
 # Degrade silently: no plans/ directory -> empty list with a reason, no failure.
 a2="$work/articles2"; mkdir -p "$a2/drafts" "$a2/backlog"; : > "$a2/INDEX.md"

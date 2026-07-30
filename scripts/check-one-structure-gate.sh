@@ -25,11 +25,13 @@ python3 -c "import py_compile; py_compile.compile('$DP', doraise=True)" 2>/dev/n
 
 work=$(mktemp -d); trap 'rm -rf "$work"' EXIT
 
-plan() {   # $1 = arc value
-  printf -- '---\nkind: article-plan\nslug: s\nintent: F2\nclaim: c\nstatus: outlined\nrun_id: r\npin: repo@abc1234\narc: %s\n---\n\nbody\n' "$1"
+plan() {   # $1 = arc value, $2 = structure_provenance (#911; empty = omit the key)
+  printf -- '---\nkind: article-plan\nslug: s\nintent: F2\nclaim: c\nstatus: outlined\nrun_id: r\npin: repo@abc1234\narc: %s\n' "$1"
+  [ -n "${2:-}" ] && printf 'structure_provenance: %s\n' "$2"
+  printf -- '---\n\nbody\n'
 }
-plan 'thematic-braid — the clusters share cost, braided into one piece' > "$work/plan.md"
-plan 'a movement with no structure named' > "$work/plan-nochoice.md"
+plan 'thematic-braid — the clusters share cost, braided into one piece' bespoke > "$work/plan.md"
+plan 'a movement with no structure named' framework:F2 > "$work/plan-nochoice.md"
 printf '{"editorial_anchor":{"id":"q2","text":"the judge missed the retry storm","policy_seeded":false}}' > "$work/journal.json"
 
 # --- 1. conforming run: the choice is in `arc`, the anchor is clean ------------
@@ -97,6 +99,73 @@ python3 "$DP" structure-record --plan "$work/plan.md" --journal "$work/journal.j
 python3 - "$work/bi.json" <<'PYEOF' && ok "the disclosure states the structure choice was brief-informed (CAP-9 per-element disclosure, extended)" || err "brief-informed disclosure missing"
 import json, sys
 assert json.load(open(sys.argv[1]))["brief_informed"] is True
+PYEOF
+
+# --- 5b. the #911 instrument: provenance recorded, validated, disclosed -------
+# One interpreter, module loaded once, four guard invocations (the
+# check-framework-f5 idiom — keeps this check inside the inner-tier ceiling).
+plan 'thematic-braid — the clusters share cost' > "$work/plan-nofield.md"
+plan 'thematic-braid — braided' 'framework:F9' > "$work/plan-badvocab.md"
+plan 'thematic-braid — braided' 'framework:F2' > "$work/plan-disagree.md"
+plan 'thematic-braid — braided' 'bespoke+owner-edited' > "$work/plan-edited.md"
+python3 - "$DP" "$work" <<'PYEOF' || fail=1
+import contextlib, importlib.util, io, json, sys
+spec = importlib.util.spec_from_file_location("dp", sys.argv[1])
+dp = importlib.util.module_from_spec(spec); spec.loader.exec_module(dp)
+w = sys.argv[2]
+fail = []
+def check(cond, msg):
+    print(("ok:   " if cond else "FAIL: ") + msg, file=sys.stdout if cond else sys.stderr)
+    if not cond: fail.append(msg)
+
+class A:
+    journal = w + "/journal.json"
+    expect_choice = True
+    brief_informed = False
+def record(plan):
+    a = A(); a.plan = plan
+    out, errs = io.StringIO(), io.StringIO()
+    with contextlib.redirect_stdout(out), contextlib.redirect_stderr(errs):
+        rc = dp.cmd_structure_record(a)
+    return rc, out.getvalue(), errs.getvalue()
+
+# An accepted structure with no structure_provenance is a MISSING MEASUREMENT.
+rc, _o, e = record(w + "/plan-nofield.md")
+check(rc != 0, "an accepted structure with no structure_provenance is REFUSED (#911)")
+check("missing measurement" in e.lower(),
+      "the refusal names the missing measurement, not a generic error")
+# The vocabulary is closed, and it is the plan writer's regex — not a copy.
+rc, _o, _e = record(w + "/plan-badvocab.md")
+check(rc != 0, "an out-of-vocabulary structure_provenance is REFUSED")
+# The recorded value must agree with the proposer's marking: sibling-lessons IS
+# the F2 shape; any other accepted structure is bespoke.
+rc, _o, _e = record(w + "/plan-disagree.md")
+check(rc != 0, "a provenance disagreeing with the proposer's marking is REFUSED (carried, never re-derived)")
+# +owner-edited passes and is disclosed, so matched-then-rewritten is
+# distinguishable from matched-and-kept.
+rc, o, _e = record(w + "/plan-edited.md")
+check(rc == 0, "an owner-edited provenance passes the guard")
+d = json.loads(o)
+check(d.get("structure_provenance") == "bespoke+owner-edited"
+      and d.get("owner_edited") is True,
+      "the disclosure carries the provenance and the owner-edited flag (#911)")
+
+# The proposer marks every candidate at proposal time — silence is impossible.
+buf = io.StringIO()
+class S:
+    selected = w + "/sel.json"
+    brief = None
+json.dump({"elements": [{"id": "lesson:a", "kinds": ["chronology"]},
+                        {"id": "lesson:b", "kinds": ["chronology"]}]},
+          open(w + "/sel.json", "w"))
+with contextlib.redirect_stdout(buf):
+    dp.cmd_structures(S())
+c = json.loads(buf.getvalue())["candidates"]
+check(all("provenance" in x for x in c)
+      and next(x for x in c if x["structure"] == "sibling-lessons")["provenance"] == "framework:F2"
+      and all(x["provenance"] == "bespoke" for x in c if x["structure"] != "sibling-lessons"),
+      "every proposed candidate carries its provenance (framework:F2 for the F2 shape, bespoke otherwise)")
+sys.exit(1 if fail else 0)
 PYEOF
 
 # --- 6. exactly ONE gate in the entry path ------------------------------------

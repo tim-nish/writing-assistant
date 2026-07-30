@@ -114,9 +114,15 @@ mechanically before reporting completion:
 python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py structure-record --plan <plans/<slug>.md> --journal "$WS/interview-journal.json" [--expect-choice] [--brief-informed]
 ```
 
-Exit 0 prints the disclosure payload — which structure, that it is recorded in
-`arc`, and whether the choice was **brief-informed**. Exit 1 names the
-violation. When the choice was brief-informed, the **completion summary and the
+Exit 0 prints the disclosure payload — the structure, that it is recorded in
+`arc`, whether **brief-informed**, and (#911) the recorded
+`structure_provenance` with its `owner_edited` flag. Exit 1 names the violation.
+
+**The accepted structure carries its provenance (#911).** Every candidate is
+marked `provenance: framework:F2` (sibling-lessons) or `bespoke`; the accepted
+value is **carried** into the plan's `structure_provenance` (`+owner-edited`
+when the owner rewrote it) — recording contract in [complete.md](complete.md);
+`structure-record` refuses an absent or re-derived value. When the choice was brief-informed, the **completion summary and the
 interview journal say so**, consistent with the existing per-element CAP-9
 disclosure. When the owner makes **no** choice the shipped default
 (sibling-lessons) still applies and the run **never blocks** on the question —
