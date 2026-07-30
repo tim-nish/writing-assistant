@@ -582,15 +582,15 @@ rung that fits:
 
 1. **reuse a repo visual** — an existing diagram/image already in the sources;
 2. **Mermaid** source (Mermaid only; no PlantUML);
-3. **figure spec** — elements, relations, emphasis, and a caption;
-4. a **copy-paste-ready image-generation prompt** derived from the figure spec,
-   including **"no embedded text"** guidance and an **aspect ratio**;
-5. **ASCII** — **simple structures only**.
+3. **Vega-Lite spec** for a **quantitative** role — data rows are the pinned measurements (#983);
+4. **figure spec** — elements, relations, emphasis, and a caption;
+5. a **copy-paste-ready image-generation prompt** from the figure spec, with **"no embedded text"** and an **aspect ratio**;
+6. **ASCII** — **simple structures only**.
 
 Prefer a **markdown table over a diagram** whenever the content is comparative
 rather than topological. Every non-reused visual in a draft is therefore one of:
-Mermaid source, a figure spec, an image-generation prompt block, or ASCII —
-**never a bare `[Figure: …]` placeholder**.
+Mermaid source, a Vega-Lite spec, a figure spec, an image-generation prompt
+block, or ASCII — **never a bare `[Figure: …]` placeholder**.
 
 **No rendering (NFR9).** This step produces **source only**: it never invokes
 `mermaid-cli`, any image tooling, or an image-generation API — rendering is the

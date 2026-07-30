@@ -31,7 +31,9 @@ hasin() { printf '%s\n' "$1" | grep -qi -- "$2" && ok "$3" || err "$3 — missin
 # The strict ladder order (each rung present, in order).
 hasin "$sec" 'reuse a repo visual\|reuse.*repo'   "rung 1: reuse repo visual"
 hasin "$sec" 'Mermaid'                            "rung 2: Mermaid"
-hasin "$sec" 'figure spec'                        "rung 3: figure spec (elements, relations, emphasis, caption)"
+hasin "$sec" 'Vega-Lite'                          "rung 3: Vega-Lite spec for a quantitative role (#983)"
+hasin "$sec" 'pinned measurements\|measurements'   "rung 3: its data rows are the pinned measurements"
+hasin "$sec" 'figure spec'                        "rung 4: figure spec (elements, relations, emphasis, caption)"
 hasin "$sec" 'image-generation prompt\|image-gen' "rung 4: image-generation prompt"
 hasin "$sec" 'no embedded text'                   "rung 4: prompt includes 'no embedded text'"
 hasin "$sec" 'aspect ratio'                        "rung 4: prompt includes an aspect ratio"
@@ -39,16 +41,21 @@ hasin "$sec" 'ASCII'                              "rung 5: ASCII"
 hasin "$sec" 'simple structures only\|simple.*only' "rung 5: ASCII simple structures only"
 
 # Verify the order in the numbered list (reuse < mermaid < figure spec < prompt < ascii).
-order=$(printf '%s\n' "$sec" | grep -nEi 'reuse a repo|Mermaid|figure spec|image-generation prompt|ASCII' | head -20)
+order=$(printf '%s\n' "$sec" | grep -nEi 'reuse a repo|Mermaid|Vega-Lite|figure spec|image-generation prompt|ASCII' | head -20)
 lr=$(printf '%s\n' "$order" | grep -i 'reuse a repo'          | head -1 | cut -d: -f1)
 lm=$(printf '%s\n' "$order" | grep -i 'Mermaid'               | head -1 | cut -d: -f1)
 lf=$(printf '%s\n' "$order" | grep -i 'figure spec'           | head -1 | cut -d: -f1)
 lp=$(printf '%s\n' "$order" | grep -i 'image-generation prompt' | head -1 | cut -d: -f1)
 la=$(printf '%s\n' "$order" | grep -i 'ASCII'                 | head -1 | cut -d: -f1)
-if [ "$lr" -lt "$lm" ] && [ "$lm" -lt "$lf" ] && [ "$lf" -lt "$lp" ] && [ "$lp" -lt "$la" ]; then
-  ok "ladder is in the strict order reuse<Mermaid<figure spec<prompt<ASCII"
+# Story 20.69 (#983): the quantitative rung sits above the figure spec — the
+# ladder is ordered by fidelity, and a chart of measured results degrading to
+# an image prompt would invent the values it draws.
+lv=$(printf '%s\n' "$order" | grep -i 'Vega-Lite'             | head -1 | cut -d: -f1)
+if [ "$lr" -lt "$lm" ] && [ "$lm" -lt "$lv" ] && [ "$lv" -lt "$lf" ] \
+   && [ "$lf" -lt "$lp" ] && [ "$lp" -lt "$la" ]; then
+  ok "ladder order: reuse<Mermaid<Vega-Lite<figure spec<prompt<ASCII"
 else
-  err "ladder order wrong (reuse=$lr mermaid=$lm figspec=$lf prompt=$lp ascii=$la)"
+  err "ladder order wrong (reuse=$lr mermaid=$lm vega=$lv figspec=$lf prompt=$lp ascii=$la)"
 fi
 
 # Never a bare placeholder; no rendering / tooling invoked (NFR9).
