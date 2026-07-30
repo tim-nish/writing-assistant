@@ -97,8 +97,10 @@ def validate(plan, slot_count):
         fixes = {
             "role": "state the communicative role — the part of the "
                     "argument this visual carries",
-            "format": 'set "table" or "diagram" (the CAP-4 '
-                      "table-vs-diagram rule, applied per member)",
+            "format": 'set "table", "diagram", or "chart" for a '
+                      "QUANTITATIVE role — measured results, a trend — which "
+                      "takes the CAP-4 Vega-Lite rung, since Mermaid is "
+                      "topological and cannot carry magnitude (#983)",
             "placement": "name the framework slot or the section the "
                          "visual sits in",
         }
