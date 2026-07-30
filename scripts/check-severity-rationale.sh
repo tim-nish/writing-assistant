@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# parallel-safe
 # check-severity-rationale.sh — verify criterion-anchored severity with a
 # rationale field (Story 12.1). POSIX shell.
 #

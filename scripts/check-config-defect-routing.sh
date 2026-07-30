@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# parallel-safe
 # check-config-defect-routing.sh — verify review routes configuration defects to
 # the publish-blocker bucket, never into the capped article-quality findings, and
 # never reports a draft "publishable" while a configuration blocker is open

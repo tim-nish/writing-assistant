@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# parallel-safe
 # tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
 # check-cross-language-offer.sh — verify a cross-language target is offered as
 # "adapt first", never as a direct projection (Story 18.60, #587;

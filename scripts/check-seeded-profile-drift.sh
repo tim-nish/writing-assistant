@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# parallel-safe
 # Story 18.117 (#722, #719) — a seeded platform profile is a conformance copy
 # of the shipped example, so it carries a mechanical mismatch check.
 #

@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# parallel-safe
 # tier: full — binds the manifest to the pre-PR gate run that executes the
 #   suite-resident evidence (#949); measured ~1s after the re-execution class
 #   was removed (was 81.7s — evidence re-run per row)

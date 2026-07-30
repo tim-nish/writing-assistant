@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# parallel-safe
 # check-framework-f4.sh — verify the F4 research-survey framework (Story 2.5).
 # POSIX shell only.
 #

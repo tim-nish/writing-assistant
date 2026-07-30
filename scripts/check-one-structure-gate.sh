@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# parallel-safe
 # check-one-structure-gate.sh — verify Story 18.46 (#559, SPEC-article-draft-
 # pipeline CAP-9 #554 + CAP-3/CAP-4 `arc`; SPEC-policy-editorial-direction
 # CAP-2): widening the structure proposer's input (Story 18.45) grows NEITHER a

@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# parallel-safe
 # check-contract-draft-pipeline.sh — verify the draft pipeline applies the
 # owner-facing proposal contract (Story 7.2) at its two owner decision points:
 # the Stage 2 gap interview and the Stage 4 verification pass. Each must show

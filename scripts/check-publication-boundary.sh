@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# parallel-safe
 # check-publication-boundary.sh — reject private provenance in the public tree
 # (owner decision 2026-07-16; SPEC-writing-assistant "Publication boundary",
 # #211). This repo is public; the ratified boundary is "mechanism public,

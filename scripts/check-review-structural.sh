@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# parallel-safe
 # check-review-structural.sh — verify the structural pass rubric (Story 5.3):
 # the six-point rubric (hook, single idea, section relevance, missing
 # load-bearing content, reader-order, GATE-slot conformance), Sonnet-class +

@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# parallel-safe
 # check-generic-engine.sh — prove no owner identity is baked into shipped
 # skill/command/template files (CAP-6, Story 1.4). POSIX shell only.
 #

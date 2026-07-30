@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# parallel-safe
 # check-review-starter.sh — verify the review-article starter template (Story 13.16):
 # a copyable draft with schema-valid frontmatter + the mandatory pointer block that
 # passes lint-article UNCHANGED, and a skill that points readers at it. POSIX shell.

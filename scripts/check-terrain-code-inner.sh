@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# parallel-safe
 # tier: inner — source/skill-text assertions plus the self-contained screen-1
 #   axes fixture; no seam, no corpus, no map assembly. Measured 2026-07-30 at
 #   adoption: ~1.3s (the runner discloses the live number every run).

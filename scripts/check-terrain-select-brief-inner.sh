@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# parallel-safe
 # tier: inner — brief-composition assertions against the committed fixture
 #   map; no seam, no corpus, no assembly. Split from
 #   check-terrain-select-inner.sh (#948): that check carried two subjects its

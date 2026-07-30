@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# parallel-safe
 # check-rubric-mapped-gate.sh — verify rubric-mapped findings gate "publishable"
 # (Story 12.2). POSIX shell.
 #

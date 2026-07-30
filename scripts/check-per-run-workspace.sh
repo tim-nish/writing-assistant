@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# parallel-safe
 # check-per-run-workspace.sh — verify the per-run workspace for all
 # intermediates (Story 9.2). POSIX shell + stdlib Python only.
 #

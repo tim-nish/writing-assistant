@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# parallel-safe
 # check-denial-list-growth.sh — extending an enumerated denial list is REFUSED
 # as the response to a register leak (Story 20.27, #862;
 # SPEC-writing-assistant, owner-surface register, property (a)).

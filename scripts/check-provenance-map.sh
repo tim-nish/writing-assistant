@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# parallel-safe
 # tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
 # check-provenance-map.sh — verify the three provenance classes and the sidecar
 # provenance map (Story 11.1). POSIX shell + stdlib Python.

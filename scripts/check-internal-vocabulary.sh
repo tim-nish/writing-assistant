@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# parallel-safe
 # check-internal-vocabulary.sh — the dimension-3 inventory DRIFT check (#305).
 # POSIX shell + stdlib Python only.
 #

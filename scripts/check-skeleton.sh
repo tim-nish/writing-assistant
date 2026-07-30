@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# parallel-safe
 # check-skeleton.sh — verify the repository skeleton and the BMAD/hand-written
 # separation invariants (Story 1.1). Zero dependencies beyond POSIX shell + git;
 # no JavaScript/TypeScript, no venv. Run from anywhere inside the repo.

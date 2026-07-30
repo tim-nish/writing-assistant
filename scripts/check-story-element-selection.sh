@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# parallel-safe
 # check-story-element-selection.sh — verify CAP-9 story-element selection: the
 # element model (evidence cluster + stable id) and the #428 disclosure-only rule
 # (Story 18.8, SPEC-article-draft-pipeline CAP-9 added 2026-07-20, umbrella #428).

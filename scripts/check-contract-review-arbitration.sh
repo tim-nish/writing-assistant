@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# parallel-safe
 # check-contract-review-arbitration.sh — verify review arbitration presents each
 # finding under the owner-facing proposal contract (Story 7.3): location, why it
 # is raised, and accept/reject choices stating their concrete effect on the

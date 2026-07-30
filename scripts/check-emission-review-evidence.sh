@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# parallel-safe
 # tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
 # check-emission-review-evidence.sh — verify emission ASSERTS the "reviewed"
 # half of its own "persisted, reviewed canonical" promise, as a DISCLOSURE

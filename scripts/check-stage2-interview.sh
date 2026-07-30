@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# parallel-safe
 # tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
 # check-stage2-interview.sh — verify the bounded gap interview (Story 4.3).
 # POSIX shell + stdlib Python.

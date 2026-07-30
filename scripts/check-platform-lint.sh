@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# parallel-safe
 # check-platform-lint.sh — verify the profile-parameterized platform lint
 # (Story 16.6, SPEC-platform-variants CAP-5): a mechanical, zero-LLM lint of an
 # emitted variant against its platform profile, reporting each defect file/line;

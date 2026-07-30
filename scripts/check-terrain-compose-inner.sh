@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# parallel-safe
 # tier: inner — screen-composition assertions against the committed fixture
 #   map (scripts/fixtures/terrain/screen-map.json); no seam, no corpus, no
 #   assembly. Measured 2026-07-30 after the #950 interpreter batching: ~1.1s

@@ -1,4 +1,7 @@
 #!/usr/bin/env sh
+# NOT parallel-safe (#957/#964) — deliberately carries no `# parallel-safe`
+# header, so run-checks.sh -P leaves it in the serial remainder. Reason:
+# recorded as an intermittent in the full tier; concurrency is the wrong place to first diagnose a pre-existing flake. Re-verify it alone, then declare.
 # check-article-join-view.sh — the per-paragraph Evidence/Gloss/consumption
 # inspection view (Story 18.118, #725). POSIX shell + stdlib Python.
 #

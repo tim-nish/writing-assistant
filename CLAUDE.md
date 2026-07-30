@@ -99,7 +99,7 @@ Checks run through `scripts/run-checks.sh`, never as an ad-hoc full-suite
 sweep. Two tiers, declared per check (`# tier: full` header; headerless =
 inner): **`--tier inner`** is the per-edit loop — every check must clear the
 runtime ceiling the runner declares (`INNER_MS`), and a violation fails with
-the remedy named; **`--tier full`** runs everything once before `gh pr
+the remedy named; **`--tier full -P 8`** runs everything once before `gh pr
 create`. End-to-end pipeline reruns belong in the full tier only. This is
 ambient here, not only in a skill, for the reason the fork-gate section
 states: the rule is broken at the moment an agent runs a 30s check inside an
@@ -112,3 +112,14 @@ too (`INNER_TOTAL_MS`): an *unscoped* inner run over the whole suite fails
 its ceiling by design, because 91 individually-fast checks summed to 51s per
 edit iteration and per-member ceilings caught none of it. Unscoped stays
 correct for the full tier's single pre-PR run.
+
+**`-P N` is the FULL tier's remedy only (#957).** It runs the checks that
+*declare* `# parallel-safe` concurrently, at most N at once, then the
+undeclared remainder serially — `scripts/run-checks.sh --tier full -P 8`,
+measured 2026-07-30 at 288s serial → ~104s at N=8 with 138 of 147 checks
+declared. **It does not apply to the inner loop:** the per-edit remedy is
+scoping, above, and nothing here licenses `-P` inside an edit iteration.
+The declaration's default polarity is inverted against `# tier:` on purpose
+— an undeclared check is NOT parallel-safe and runs serially, because the
+failure mode being defended against is nondeterministic wrongness, not
+slowness. Declare a check only after verifying *that file's* isolation.

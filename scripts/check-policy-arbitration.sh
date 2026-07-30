@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# parallel-safe
 # check-policy-arbitration.sh — verify policy-finding arbitration routing
 # (Story 15.2, SPEC-policy-consistency-pass CAP-3). POSIX shell + stdlib Python.
 #

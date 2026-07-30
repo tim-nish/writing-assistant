@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# parallel-safe
 # tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
 # check-config-validation.sh — verify Stage-0 configuration validation (Story 7.4,
 # CAP-5): before any generation or review, a config carrying an example

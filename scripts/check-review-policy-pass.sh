@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# parallel-safe
 # check-review-policy-pass.sh — verify the policy-consistency review pass
 # (Story 15.1, SPEC-policy-consistency-pass CAP-1/CAP-2/CAP-5).
 # POSIX shell + stdlib Python only.

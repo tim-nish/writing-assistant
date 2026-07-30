@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# parallel-safe
 # check-quality-rubric.sh — verify the article-quality rubric asset (Story 11.3).
 # POSIX shell.
 #

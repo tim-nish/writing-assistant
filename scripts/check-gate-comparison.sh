@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# parallel-safe
 # check-gate-comparison.sh — the ranked-recommendation obligation has a carrier
 # at every layer that can carry it (Story 20.12, #808).
 #

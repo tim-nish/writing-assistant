@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# parallel-safe
 # tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
 # removal-signal: the terrain area's harnesses are retired or subsumed by the
 #   #857/#858 seam under the #910 retention sweep; removed with that pass.

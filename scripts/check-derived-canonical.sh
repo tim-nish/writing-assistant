@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# parallel-safe
 # tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
 # check-derived-canonical.sh — verify the DERIVED CANONICAL is first-class and
 # records its ancestry (Story 18.57, #586; SPEC-canonical-adaptation CAP-2 +

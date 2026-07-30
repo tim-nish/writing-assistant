@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# parallel-safe
 # tier: full — assembles a real map through the seam (gateway stub + fixture
 #   repos), so it is corpus/seam-dependent by construction. Measured 2026-07-30
 #   at adoption: ~1.5s, over the INNER_MS ceiling and correctly declared rather

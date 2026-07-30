@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# parallel-safe
 # tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
 # check-stage5-variants.sh — verify variant emission as a PROFILE-DRIVEN
 # projection (Story 16.3, SPEC-platform-variants CAP-4) and, since Story 13.69,

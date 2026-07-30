@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# parallel-safe
 # check-episode-candidates.sh — verify episode-candidate construction and
 # selection on the missing-input repair hop (Story 13.91, #417). POSIX shell +
 # stdlib Python.

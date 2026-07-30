@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# parallel-safe
 # check-review-diff.sh — verify review's owner-facing before/after comparison and
 # the pre-review checkpoint proposal (Story 18.25, #495; SPEC-article-review
 # CAP-6). Alt A: the review presents the before/after diff + applied change list

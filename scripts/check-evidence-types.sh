@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# parallel-safe
 # check-evidence-types.sh — verify per-section minimum evidence-type
 # declarations and the fail-closed gate check (Story 13.90, #416). POSIX shell
 # + stdlib Python.

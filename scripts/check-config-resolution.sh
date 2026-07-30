@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# parallel-safe
 # check-config-resolution.sh — verify the documented user-config resolution
 # order and the zero-edit identity guarantee (Story 1.4). POSIX shell + stdlib
 # Python only (no PyYAML).

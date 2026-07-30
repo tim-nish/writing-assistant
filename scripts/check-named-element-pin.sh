@@ -1,4 +1,7 @@
 #!/usr/bin/env sh
+# NOT parallel-safe (#957/#964) — deliberately carries no `# parallel-safe`
+# header, so run-checks.sh -P leaves it in the serial remainder. Reason:
+# measured 2026-07-30 to create a per-repo directory under the REAL machine state root (~/.local/state/writing-assistant/) rather than a mktemp jail.
 # tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
 # check-named-element-pin.sh — verify CAP-9 named-element pin (#431): a
 # `--element <name>` directive at stage 0 records the pin in run state, pinning

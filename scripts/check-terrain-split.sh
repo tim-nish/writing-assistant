@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# parallel-safe
 # tier: full — reads the SERVED CORPUS (terrain_map.strand_entries), so it is
 #   seam/corpus-dependent by construction. Measured 2026-07-30: ~1.0s, which
 #   alone pushed check-terrain-code-inner.sh from 1.25s to 2.2s and tripped the

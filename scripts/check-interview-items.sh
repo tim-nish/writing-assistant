@@ -1,4 +1,7 @@
 #!/usr/bin/env sh
+# NOT parallel-safe (#957/#964) — deliberately carries no `# parallel-safe`
+# header, so run-checks.sh -P leaves it in the serial remainder. Reason:
+# writes a FIXED-NAME file at the repository root ($root/.r1err) instead of inside its mktemp dir.
 # tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
 # check-interview-items.sh — verify the interview-item schema validator
 # (Story 14.3, SPEC-policy-source-seam CAP-3; seam-formats.md §2).

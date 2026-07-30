@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# parallel-safe
 # check-dev-harness.sh — verify the local-skill development harness (Story 1.5).
 # POSIX shell only.
 #

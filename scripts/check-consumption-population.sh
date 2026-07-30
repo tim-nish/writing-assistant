@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# parallel-safe
 # check-consumption-population.sh — a consumption statement names its population
 # (Story 18.121, #732). POSIX shell.
 #

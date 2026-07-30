@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# parallel-safe
 # check-rubric-dim-separation.sh — verify the dim4-vs-dim1/2 dimension
 # separation (Story 13.66, #349). POSIX shell + stdlib Python.
 #

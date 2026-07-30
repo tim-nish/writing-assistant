@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# parallel-safe
 # check-write-before-read.sh — verify the artifact-write precondition (Story
 # 13.78). POSIX shell only.
 #

@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# parallel-safe
 # tier: inner — consultant-contract assertions against a derived fixture map;
 #   no seam, no corpus, no assembly. Measured 2026-07-30 at adoption: ~0.8s
 #   (ceiling 2s).

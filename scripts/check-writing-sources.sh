@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# parallel-safe
 # tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
 # check-writing-sources.sh — verify the writing-sources schema/example and the
 # draft-location resolver (Story 1.3). POSIX shell + stdlib Python only.

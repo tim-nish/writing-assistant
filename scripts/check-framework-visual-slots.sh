@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# parallel-safe
 # check-framework-visual-slots.sh — verify each framework declares its visual
 # slot(s) (Story 8.1, SPEC-article-visuals CAP-1): F1 one overview diagram; F2
 # optional before/after or timeline; F3 one comparison table (required); F4 one

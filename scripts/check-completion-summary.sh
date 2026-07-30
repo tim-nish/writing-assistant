@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# parallel-safe
 # check-completion-summary.sh — verify the three-bucket completion summary
 # (Story 7.5, CAP-6): every run ends with exactly three labelled buckets
 # (informational notes / publish blockers / optional cleanup) + an explicit next

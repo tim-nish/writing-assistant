@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# parallel-safe
 # check-review-consulted.sh — verify the review-side consulted line and the
 # policy pass's degradation wiring (Story 15.3, SPEC-policy-consistency-pass
 # CAP-4). POSIX shell + stdlib Python only.

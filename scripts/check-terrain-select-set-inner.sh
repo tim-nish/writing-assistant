@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# parallel-safe
 # tier: inner — set-selection assertions against a derived over-budget fixture
 #   map; no seam, no corpus, no assembly. A THIRD sibling beside
 #   check-terrain-select-brief-inner.sh and check-terrain-select-index-inner.sh

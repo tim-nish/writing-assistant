@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# parallel-safe
 # check-terrain-member.sh — Screen 2's sectioning is a PERMUTATION, and its
 # sections carry NO SELECTION AUTHORITY (Story 20.9, #811; SPEC-terrain as
 # resolved 2026-07-27).

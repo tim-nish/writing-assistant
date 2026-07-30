@@ -1,4 +1,7 @@
 #!/usr/bin/env sh
+# NOT parallel-safe (#957/#964) — deliberately carries no `# parallel-safe`
+# header, so run-checks.sh -P leaves it in the serial remainder. Reason:
+# uses the FIXED shared paths /tmp/xdgstate and /tmp/xdgconf outside any mktemp dir.
 # tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
 # check-path-resolver.sh — verify the path resolver is the single source of
 # storage paths (Story 9.1). POSIX shell + stdlib Python only.

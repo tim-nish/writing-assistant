@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# parallel-safe
 # check-stage4-verify.sh — verify Stage 4 owner verification pass (Story 4.5):
 # the `[VERIFY]` worklist + zero-marker exit, and the >1-rewrite reroute rule.
 # POSIX shell + stdlib Python.

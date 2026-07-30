@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# parallel-safe
 # check-recommended-default-provenance.sh — end-to-end guards for the
 # recommended-default feature (Story 13.61, SPEC-policy-editorial-direction
 # CAP-6). POSIX shell + stdlib Python, real git fixtures.

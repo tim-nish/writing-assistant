@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# parallel-safe
 # check-terrain-decisions.sh — the decisions-shard join (Story 20.22, #851;
 # SPEC-terrain CAP-2 as amended 2026-07-27, #850).
 #
