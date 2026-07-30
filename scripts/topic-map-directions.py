@@ -1053,6 +1053,14 @@ def main(argv=None):
                     help="grouping substrate (default: %(default)s). Substrates "
                          "outside the offered set are reachable for measurement "
                          "only, until an owner verdict admits them.")
+    mb.add_argument("--claims", metavar="JSON",
+                    help='the `in common:` claims you composed, as {"G1": '
+                         '"..."}. Passing them returns the FINAL screen — ids, '
+                         "claims and rows together — which is what you relay: "
+                         "the rows are never retyped by hand (#976/#977). "
+                         "Carried VERBATIM, never recomposed; a group whose "
+                         "claim is absent says so. Omit for the pre-20.66 "
+                         "listing, byte-identical.")
     mb.add_argument("--grouping", metavar="JSON",
                     help="a model-proposed grouping for a judged substrate: "
                          "[{\"in_common\": str, \"members\": [slug, ...]}]. "

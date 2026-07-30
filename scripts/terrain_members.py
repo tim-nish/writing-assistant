@@ -491,7 +491,7 @@ def _journey_arc_line(el):
     return f"  how it changed: not shown — {absent}" if absent else None
 
 
-def compose_member_listing(map_data, tag, cands, axis="tag"):
+def compose_member_listing(map_data, tag, cands, axis="tag", claims=None):
     """Screen 2 as a LISTING: the member's Strands, WHOLE, in sections.
 
     Served whole with the count disclosed — no within-member cap, no
@@ -499,6 +499,17 @@ def compose_member_listing(map_data, tag, cands, axis="tag"):
     `- **<id>** — <claim>` convention so selection stays the shipped
     `{index, note, pin}` hand-off: ids here are the SAME ids `candidates()`
     assigns, so `brief` resolves a Screen-2 pick with no new entry pipeline.
+
+    COMPOSED MODE (Story 20.66, #976/#977). Passing `claims` returns the FINAL
+    screen — section ids, `in common:` lines and rows together — so the
+    presenting agent relays one block and never retypes a Strand row. The rows
+    were always deterministic; what was missing was any reason for them to
+    survive the relay intact, and a reworded headline (#976) or a dropped
+    `no-journey` mark (#977) is what a hand-relay produces. Claims are CARRIED
+    verbatim, never recomposed, exactly as `compose_full_report` carries them;
+    a section whose claim was not passed states the absence rather than having
+    one invented. With `claims=None` the output is byte-identical to the
+    pre-20.66 listing.
     """
     ms = member_sections(map_data, tag, axis)
     by_slug = {c.get("slug"): c for c in cands if c.get("kind") == "element"}
@@ -519,6 +530,12 @@ def compose_member_listing(map_data, tag, cands, axis="tag"):
              f"What the words mean: {OWNER_TERMS_DOC} defines "
              f"{' and '.join(OWNER_TERMS)}.",
              ""]
+    if claims is not None:
+        # The authoring class is declared ONCE for the screen, never per line
+        # (CAP-2 as amended 2026-07-30, #936): repeating it on every line
+        # carries nothing per line and costs attention on all of them.
+        lines += ["Every `in common:` line below is machine-composed at "
+                  "render time from the served claims.", ""]
     subbed = _substituted_paths(map_data)
     sline = _substitution_disclosure_line(map_data)
     if sline:
@@ -535,11 +552,30 @@ def compose_member_listing(map_data, tag, cands, axis="tag"):
     if cline:
         lines += [_clip_line(cline), ""]
     for sec in ms["sections"]:
-        head = f"## {sec['title']} ({len(sec['strands'])})"
+        gid = sec.get("group_id")
+        # In composed mode the id is rendered by the SCRIPT, in the shape the
+        # View and report paths already use: the owner names these ids to pull
+        # a full report, so an id typed by the relay is the same exposure as a
+        # row typed by the relay.
+        if claims is not None and gid:
+            head = f"## {gid} — {sec['title']} ({len(sec['strands'])})"
+        else:
+            head = f"## {sec['title']} ({len(sec['strands'])})"
         if sec.get("note"):
             head += f" — {sec['note']}"
         lines.append(head)
         lines.append("")
+        if claims is not None:
+            claim = str(claims.get(gid) or "").strip()
+            if claim:
+                # VERBATIM, as composed. Not re-derived, not shortened, and
+                # deliberately NOT clipped: the claim is the composer's own
+                # sentence and clipping it would re-create #976 one layer up.
+                lines.append(f"in common: {claim}")
+            else:
+                lines.append("in common: not composed for this group — "
+                             "stated as absent rather than invented here.")
+            lines.append("")
         for el in sec["strands"]:
             c = by_slug.get(el.get("slug"))
             ident = c["id"] if c else el.get("slug", "?")
@@ -680,8 +716,17 @@ def cmd_member(args):
         noun = "topic" if axis == "topic" else "tag"
         return _err(f"no Strand sits under the {noun} {args.tag!r} at this "
                     f"pin — re-run the axis and pick from the fresh listing")
+    claims = None
+    if getattr(args, "claims", None):
+        try:
+            claims = json.loads(args.claims)
+        except ValueError as exc:
+            return _err(f"--claims is not readable JSON: {exc}")
+        if not isinstance(claims, dict):
+            return _err("--claims must be an object keyed by group id, "
+                        'for example {"G1": "..."}')
     cands = candidates(m)
-    listing = compose_member_listing(m, args.tag, cands, axis)
+    listing = compose_member_listing(m, args.tag, cands, axis, claims)
     out = {"kind": "terrain-member", "member": ms["member"], "axis": axis,
            "count": ms["count"],
            # The grouping disclosure (Story 20.36, #890): which substrate

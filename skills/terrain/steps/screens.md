@@ -48,15 +48,41 @@ Screen 1 always also offers:
 **Screen 2 — the chosen member's complete material.** When the owner picks a
 member on Screen 1:
 
+Screen 2 is composed in **two calls**, and the SCRIPT emits the screen you
+relay (Story 20.66, #976/#977). The first call gives you the sections and the
+claim inputs; the second returns the finished screen.
+
 ```
 python3 ${CLAUDE_PLUGIN_ROOT}/scripts/topic-map-directions.py member \
   --map "$WS/map.json" --tag <member> --axis <tag|topic> \
   > "$WS/terrain-member.json"
 ```
 
-Relay the returned `listing` as given: **all** of the member's Strands, whole,
-in presentation-only sections, each Strand quoting its served rendering with
-its deterministic context line, and the count disclosed.
+Compose one `in common:` claim per section from `background.inputs`, exactly as
+described below. Then ask for the screen itself, passing those claims back:
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/topic-map-directions.py member \
+  --map "$WS/map.json" --tag <member> --axis <tag|topic> \
+  --claims '{"G1":"<your claim for G1>", ...}' \
+  > "$WS/terrain-screen.json"
+```
+
+**Relay the returned `listing` as one block, unchanged.** It already carries
+the group ids, your claims, every Strand's served rendering, its deterministic
+context line, any absence marks, and the count. **Do not retype, re-fit,
+shorten or re-quote an individual Strand row** — not to fit a line, not to
+read better, not for any reason. The rows are the script's output and yours to
+pass on, not to author.
+
+Why the flow is shaped this way rather than trusting a careful relay: rows
+were always deterministic, and a hand-relay still reworded a headline between
+two groups and dropped a `no-journey` mark from an expanded row (#976, #977).
+The instruction to relay faithfully had nothing standing at the layer where it
+breaks, so composition moved into the script instead. `check-terrain-relay-fidelity.sh`
+asserts the property over the script'"'"'s own output.
+
+A claim you do not pass is stated as absent for that group — never invented.
 
 **The group claim (machine-composed, marked — SPEC-terrain CAP-2 as
 amended 2026-07-29, #888).** Before relaying, compose for each section one or
