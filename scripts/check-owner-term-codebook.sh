@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# parallel-safe
 # check-owner-term-codebook.sh — a term meant to reach the owner is DEFINED
 # where the owner reads it (Story 20.26, #861; SPEC-writing-assistant,
 # owner-surface register, property (d)).

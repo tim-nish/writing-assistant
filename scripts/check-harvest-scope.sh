@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# parallel-safe
 # check-harvest-scope.sh — the term-derived scope PROPOSAL is deterministic,
 # explains itself, and never narrows by machine judgment (Story 20.43, #906;
 # SPEC-article-draft-pipeline, harvest-scope amendment 2026-07-29, #896).

@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# parallel-safe
 # tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
 # check-policy-divergence-detector.sh — verify the consumer-side
 # policy-divergence detector's mechanical core (SPEC-policy-divergence-detector,

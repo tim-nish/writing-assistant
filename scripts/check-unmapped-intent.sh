@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# parallel-safe
 # check-unmapped-intent.sh — graceful handling when an article intent maps to
 # no framework (Story 13.81). POSIX shell + stdlib Python.
 #

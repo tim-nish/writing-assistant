@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# parallel-safe
 # check-visual-fallback-ladder.sh — verify the visual fallback ladder (Story 8.4,
 # SPEC-article-visuals CAP-4): when no repo visual fits, produce source in the
 # strict order reuse -> Mermaid -> figure spec -> image-gen prompt (with

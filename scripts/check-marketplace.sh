@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# parallel-safe
 # check-marketplace.sh — verify the repo-as-marketplace manifest (Story 6.2):
 # .claude-plugin/marketplace.json is valid JSON with name/owner/plugins, the
 # single self-referential plugin entry points at this repo (source "./"), and it

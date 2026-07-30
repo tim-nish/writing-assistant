@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# parallel-safe
 # tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
 # check-stage1-consume.sh — verify Stage 1 consumes the harvest output into
 # pipeline state (Story 4.2). POSIX shell + stdlib Python.

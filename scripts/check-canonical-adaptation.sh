@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# parallel-safe
 # tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
 # check-canonical-adaptation.sh — verify canonical adaptation as a STANDALONE,
 # OWNER-GATED invocation (Story 18.56, SPEC-canonical-adaptation CAP-1 + CAP-3):

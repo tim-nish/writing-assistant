@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# parallel-safe
 # check-substrate-purity.sh — enforce that platforms live ONLY in profiles and
 # config, never in the platform-agnostic substrate (Story 16.8, FR54 success
 # criterion / SPEC-platform-variants CAP-1). Grepping stages 0–3 code and the

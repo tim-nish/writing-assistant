@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# parallel-safe
 # check-site-record.sh — verify the post-publish site external-record proposal
 # (Story 16.9, FR62): after the owner confirms the published URL, the pipeline
 # PROPOSES a ready-to-paste `mode: external` record conforming to the user-config

@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# parallel-safe
 # check-plugin-manifest.sh — verify the plugin manifest (Story 6.1):
 # .claude-plugin/plugin.json is valid JSON declaring name/version/description/
 # author, names the three exposed skills, and the packaging is additive — the

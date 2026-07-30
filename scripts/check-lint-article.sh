@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# parallel-safe
 # tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
 # check-lint-article.sh — verify the zero-token lint script (Story 5.1):
 # schema/title/pointer/heading-density/dead-link/[VERIFY] checks against the

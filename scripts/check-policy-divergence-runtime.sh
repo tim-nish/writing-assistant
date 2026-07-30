@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# parallel-safe
 # check-policy-divergence-runtime.sh — verify the divergence detector's RUNTIME
 # half (SPEC-policy-divergence-detector, #436, Story 13.99): the CAP-1 detection
 # pass and the CAP-3/CAP-4 disposition emit side, both driving the foundation

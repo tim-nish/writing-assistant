@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# parallel-safe
 # tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
 # check-plan-conformance.sh — verify the CAP-4 plan policy-conformance gate
 # (Story 13.76, SPEC-article-plan CAP-4 added 2026-07-18, umbrella #365).

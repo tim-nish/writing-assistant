@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# parallel-safe
 # check-review-arbitration.sh — verify owner arbitration & the second-cycle gate
 # (Story 5.6): a single top-down accept/reject round, no auto-applied edits, no
 # re-litigation of rejected findings, exactly one additional full cycle only when

@@ -1,4 +1,5 @@
 #!/bin/sh
+# parallel-safe
 # A served path that differs from the requested one is ANNOUNCED, never
 # re-cited (SPEC-terrain CAP-4, amended 2026-07-29; Story 20.29, #873).
 #

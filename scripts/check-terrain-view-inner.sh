@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# parallel-safe
 # tier: inner — View-content and owner-language assertions against the
 #   committed fixture map; no seam, no corpus, no assembly. Measured
 #   2026-07-30 after the #950 interpreter batching: ~1.0s (was ~1.7s — the

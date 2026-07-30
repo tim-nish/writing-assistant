@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# parallel-safe
 # check-visual-set-plan.sh — verify the visual-set planning proposal (Story
 # 13.58, SPEC-article-visuals CAP-2a). POSIX shell + stdlib Python.
 #

@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# parallel-safe
 # check-policy-influence-report.sh — verify the policy-influence report
 # convention (Story 13.40, SPEC-policy-editorial-direction CAP-4): a view over
 # recorded run state, on request only, no second draft / A/B run, record-only

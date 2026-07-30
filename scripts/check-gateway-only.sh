@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# parallel-safe
 # check-gateway-only.sh — gateway-only regression suite (Story 13.74,
 # SPEC-policy-source-seam CAP-2 success clause as amended 2026-07-18, #366).
 # POSIX shell + stdlib Python only.

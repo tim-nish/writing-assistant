@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# parallel-safe
 # check-release-strip.sh — verify the mechanical release-strip guarantee (Story
 # 6.4): release-strip.sh removes EXACTLY _bmad/, _bmad-output/, and
 # .claude/skills/bmad-*; leaves a complete, functioning plugin (specs/ + all

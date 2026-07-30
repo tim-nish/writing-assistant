@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# parallel-safe
 # check-readme.sh — verify the README install/usage guide (Story 6.3): documents
 # the marketplace-add/install flow, user-config.yaml and writing-sources.yaml
 # setup, the output.drafts behavior (no default), and the local-skill development

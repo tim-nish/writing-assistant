@@ -1,4 +1,7 @@
 #!/usr/bin/env sh
+# NOT parallel-safe (#957/#964) — deliberately carries no `# parallel-safe`
+# header, so run-checks.sh -P leaves it in the serial remainder. Reason:
+# path-keyed on ~/.config/writing-assistant/repos/<path>; named in the 2026-07-30 (#957) amendment as one of the two to leave undeclared.
 # tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
 # check-harvest.sh — verify the harvest skill scaffold, standalone invocation,
 # and source-scope enforcement (Story 3.1). POSIX shell + stdlib Python.

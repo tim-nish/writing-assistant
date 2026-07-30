@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# parallel-safe
 # check-framework-f5.sh — verify the F5 working-note framework and its slim
 # entry path (Story 13.89, #412). POSIX shell + stdlib Python.
 #

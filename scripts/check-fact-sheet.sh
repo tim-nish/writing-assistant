@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# parallel-safe
 # tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
 # check-fact-sheet.sh — verify source-pointed fact-sheet extraction (Story 3.2).
 # POSIX shell + stdlib Python. Builds a real git fixture so pointer resolution

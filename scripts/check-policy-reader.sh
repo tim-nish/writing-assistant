@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# parallel-safe
 # tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
 # check-policy-reader.sh — verify the gateway-backed policy reader (Story
 # 13.72, SPEC-policy-source-seam CAP-2 as amended 2026-07-18: served

@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# parallel-safe
 # tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
 # check-coverage-brief.sh — verify the free-form owner coverage brief (Story
 # 18.24, #505): an OPTIONAL stage-0 input (text or file) recorded in run state

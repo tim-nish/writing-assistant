@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# parallel-safe
 # check-topic-map-depth.sh — the depth ESTIMATOR IS GONE (Story 20.7, #809).
 #
 # This suite used to exercise the estimator end to end: clustering, the

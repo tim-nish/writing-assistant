@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# parallel-safe
 # check-reading-time-depth.sh — verify reading-time bands as a depth expression
 # (Story 18.27, SPEC-article-draft-pipeline CAP-8 clause, #506): the stage-0 /
 # stage-2 depth question MAY present suggested reading-time bands derived from

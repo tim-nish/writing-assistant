@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# parallel-safe
 # check-quality-gate-delta.sh — verify the Stage 3->4 second-cycle DELTA
 # re-check (Story 13.65, #349, SPEC-article-draft-pipeline CAP-7). POSIX shell.
 #

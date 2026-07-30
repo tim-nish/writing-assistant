@@ -1,4 +1,7 @@
 #!/bin/sh
+# NOT parallel-safe (#957/#964) — deliberately carries no `# parallel-safe`
+# header, so run-checks.sh -P leaves it in the serial remainder. Reason:
+# mutates this repository GIT INDEX (git add -f, then git reset) as its negative test — a shared resource with a lock, not a temp dir.
 # A relocated Terrain artifact cannot reach a commit (Story 20.33, #874).
 #
 # Story 20.32 moved this tool's outputs and debug artifacts INTO this

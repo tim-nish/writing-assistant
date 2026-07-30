@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# parallel-safe
 # check-user-config-example.sh — verify config/user-config.example.yaml declares
 # every identity value a skill needs (CAP-6, Story 1.2) and leaks no real
 # identity. Zero dependencies: POSIX shell + grep (no PyYAML — host repos

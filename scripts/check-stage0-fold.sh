@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# parallel-safe
 # tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
 # check-stage0-fold.sh — verify the folded Stage-0 command (Story 13.13):
 # config validation + framework check + workspace autostart in ONE invocation,

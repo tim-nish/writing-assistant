@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# parallel-safe
 # check-arbitration-events.sh — verify review-arbitration event emission
 # (SPEC-article-review CAP-5, Story 13.42): one raw event per finding
 # disposition (N in -> N out, five fields, reason required on reject, nothing

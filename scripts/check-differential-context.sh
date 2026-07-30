@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# parallel-safe
 # check-differential-context.sh — verify the differential-context prior-coverage
 # digest (Story 18.23, #504): when prior published/drafted articles share the
 # project (related.projects), the argument plan receives a prior-coverage digest

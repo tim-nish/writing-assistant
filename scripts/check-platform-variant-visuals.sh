@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# parallel-safe
 # check-platform-variant-visuals.sh — verify platform variants handle visual
 # rendering divergence as PROFILE-DRIVEN behavior (Story 16.8 rewrite of the
 # Story 8.5 check; SPEC-article-visuals CAP-5 amended 2026-07-16): the treatment

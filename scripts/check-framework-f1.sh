@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# parallel-safe
 # check-framework-f1.sh — verify the F1 project-introduction framework (Story
 # 2.2). POSIX shell only.
 #

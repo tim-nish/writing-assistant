@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# parallel-safe
 # check-proposal-contract.sh — verify the owner-facing proposal contract is
 # captured ONCE as a shared, referenceable convention (Story 7.1,
 # SPEC-writing-assistant). The asset must state its three required elements

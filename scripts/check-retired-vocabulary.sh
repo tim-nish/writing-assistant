@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# parallel-safe
 # check-retired-vocabulary.sh — the TOOL never calls a Strand anything else
 # (Story 20.11, #804).
 #

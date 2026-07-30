@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# parallel-safe
 # tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
 # check-brief-informed-structures.sh — verify Story 18.45 (#558, SPEC-article-
 # draft-pipeline CAP-9 2026-07-22 #554 amendment): the SHIPPED structure

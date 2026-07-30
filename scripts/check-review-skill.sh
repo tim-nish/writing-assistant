@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# parallel-safe
 # check-review-skill.sh — verify the review-article skill scaffold (Story 5.2):
 # the fixed pass order (lint → structure → prose → policy consistency → cold read), once-per-version
 # execution, the strict findings contract, the lint (pass-1) wiring, and model

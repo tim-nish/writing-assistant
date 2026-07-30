@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# parallel-safe
 # check-plan-boundary.sh — verify the article-plan boundary fences (Story 13.56,
 # SPEC-article-plan constraints). POSIX shell + stdlib Python, real git fixture.
 #

@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# parallel-safe
 # check-narrative-structure.sh — verify F2 plan-time narrative-structure choice
 # (Story 18.26, SPEC-article-frameworks CAP-4, #503): the argument-plan sub-step
 # proposes 2-3 candidate structures for the selected elements — sibling-lessons

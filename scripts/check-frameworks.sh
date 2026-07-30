@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# parallel-safe
 # check-frameworks.sh — verify the shared framework conventions, config-bound
 # frontmatter, and shared pointer block (Story 2.1). POSIX shell + stdlib Python.
 #

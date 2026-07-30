@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# parallel-safe
 # check-review-declared-register.sh — the review pass grades a derived
 # canonical against the register its language DECLARES (Story 20.4, #800).
 #

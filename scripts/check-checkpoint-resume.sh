@@ -1,4 +1,7 @@
 #!/usr/bin/env sh
+# NOT parallel-safe (#957/#964) — deliberately carries no `# parallel-safe`
+# header, so run-checks.sh -P leaves it in the serial remainder. Reason:
+# writes a TRACKED file in the working tree (skills/draft-article/stages/stage4.md) and restores it with git checkout; the window is invisible after the fact but real to a concurrent reader.
 # tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
 # check-checkpoint-resume.sh — verify per-stage checkpoint + resume (Story 13.5).
 # POSIX shell + stdlib Python. A run that stops after stage N resumes from N+1

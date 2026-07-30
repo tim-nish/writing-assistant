@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# parallel-safe
 # check-review-findings-class.sh — verify the review finding-class contract
 # (Story 13.62, SPEC-article-review). POSIX shell + stdlib Python.
 #

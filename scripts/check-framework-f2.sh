@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# parallel-safe
 # check-framework-f2.sh — verify the F2 engineering-lessons framework (Story
 # 2.3). POSIX shell only.
 #
