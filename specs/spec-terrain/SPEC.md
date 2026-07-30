@@ -150,8 +150,28 @@ flows into the existing brief/structures path unchanged.**
       **Journey presence is one of those read fields, and it is marked by
       ABSENCE (amended 2026-07-30, #933/#934).** Three clauses, which bind
       together:
-      - the entry's `journey` field is **derived** — a paired journey record
-        exists, i.e. the shard pointer is not null — and is never a literal;
+      - a Strand's journey presence is **read from the paired journey record**
+        in the served element manifest — never asserted from a literal, and
+        never inferred from whether that record's arc rendering happened to be
+        addressable. The two are different facts: a journey record whose
+        renderings carry no `journeys/`-prefixed path exists while its pointer
+        does not resolve, and a row marked *no-journey* for a lesson that has
+        one is the same wrong-kind claim this amendment exists to stop.
+        Measured 2026-07-30: 117 lessons, 109 journey records, 109 paired, 109
+        pointers resolving — **divergence 0**, so this is stated as an
+        invariant before it can bite rather than after.
+        **Which internal field carries the bit is not this spec's business
+        (corrected 2026-07-30, #933).** The clause first written here named a
+        consumer dict key, and named it with `journey` — a word this spec
+        already binds to one of the three served record *kinds*. Two questions
+        collapsed into one token: *is this entry an arc?* (the kind
+        discriminator, whose literal `False` on the record-authoritative path
+        is **correct**) and *does this lesson have an arc?* (presence). A story
+        then implemented the clause faithfully, which would have rerouted 109
+        of 117 served lesson renderings out of the lessons lookup. **The
+        convention that broke, stated so it holds:** this spec names
+        served-side and config vocabulary; a consumer's private field names
+        are the implementation's, fixed by its own checks;
       - a Strand row carries **no marker where an arc is present** and an
         explicit **`no-journey` marker where none is**. Presence-marking was
         designed against ~50% coverage and inverts at 109/117: it decorates

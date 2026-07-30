@@ -696,3 +696,40 @@ the blocks.
 > be inherited unless the new member states the original justification in its
 > own terms, which "five amendments landed at once" is not (owner decision
 > record — 2026-07-27 (an inherited exemption signals nothing)).
+
+> **Corrected 2026-07-30 (triage, #933)** per /triage-gh — a same-day
+> correction of the #933/#934 amendment above, not a new decision. That
+> amendment's first clause read *"the entry's `journey` field is **derived** —
+> a paired journey record exists, i.e. the shard pointer is not null — and is
+> never a literal"*, and it is **not implementable**: on the
+> record-authoritative path `journey` is a **kind discriminator** ("this entry
+> IS an arc rendering"), set from the served file path and consumed to split
+> served renderings into the lessons and journeys lookups. Measured on the live
+> corpus: deriving it from presence moves **109 of 117** lesson renderings out
+> of the lessons lookup, which breaks the journey-shard enumeration (it
+> iterates that lookup) and collapses the attachment count. The literal `False`
+> there is correct. **Presence was never dropped in composition** — the paired
+> record's pointer is set on every composed entry — so #933's mechanical claim
+> is right about the symptom and wrong about the site: the gap is at the
+> renderer, which never consumes it. The clause now binds **the observable and
+> its source of truth**: presence is read from the paired journey *record*,
+> never from a literal, and never inferred from a rendering path's
+> addressability (117 lessons, 109 journey records, 109 paired, 109 pointers
+> resolving — divergence 0 today, so the invariant is stated before it bites).
+> Bullets two and three — absence-marking and the coverage denominator — are
+> #934's decision and are **unchanged**. **The transferable half:** this spec
+> names served-side and config vocabulary, and the failed clause named a
+> consumer's private dict key using a word the spec already binds to a served
+> record kind, so two questions collapsed into one token and a story
+> implemented the wrong one faithfully. A spec clause that names an internal
+> field can be wrong in a way no reader of the spec can detect and no check
+> catches — **all four terrain checks passed with the misrouting change in
+> place**, because none exercises the lessons/journeys split. Rejected:
+> declaring a separate `has_journey` field in spec text (one carrier named
+> once, and the name would document the distinction — but it re-commits the
+> spec to naming internal shapes, which is the category of statement that just
+> failed, and it adds redundant state a reader must arbitrate between); naming
+> the shard pointer instead (smallest diff and correct today, but it conflates
+> "a journey exists" with "its rendering was addressable", which is the same
+> wrong-kind-claim class as the bug being fixed, silently wrong the first time
+> the two diverge).
