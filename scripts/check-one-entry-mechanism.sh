@@ -1,7 +1,10 @@
 #!/usr/bin/env sh
-# NOT parallel-safe (#957/#964) — deliberately carries no `# parallel-safe`
-# header, so run-checks.sh -P leaves it in the serial remainder. Reason:
-# measured 2026-07-30 to create a per-repo directory under the REAL machine state root (~/.local/state/writing-assistant/) rather than a mktemp jail.
+# parallel-safe
+# parallel-verified 2026-07-31 (#999) — same finding as check-named-element-pin
+# (they share the stage-0 fixture shape): the per-repo directory it leaves
+# under the REAL state root is keyed on its own `mktemp -d` host path
+# (observed `-tmp-tmp-<random>-host/`), so it is unique per run, and nothing
+# declared parallel-safe reads the real state root. Residue, not a race.
 # tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
 # check-one-entry-mechanism.sh — verify Story 18.47 (#560, SPEC-article-draft-
 # pipeline CAP-9 2026-07-22 #554 amendment): the #431 named-element pin is the

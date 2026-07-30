@@ -1,7 +1,14 @@
 #!/usr/bin/env sh
+# serial-reason: it MUTATES A TRACKED FILE in the shared working tree —
+#   `printf '\n' >> skills/draft-article/stages/stage4.md`, then `git checkout
+#   -q --` to restore it (the #743 skill-contract-mismatch case needs a real
+#   mid-run edit). Re-verified 2026-07-31 (#999): the window is invisible after
+#   the fact but real to a concurrent reader, and the suite has many — every
+#   check that greps the draft-article stages, and check-skill-budget, which
+#   COUNTS LINES against a ratchet a one-line append could flip. Making this
+#   one safe means removing the tracked-file edit, not declaring it.
 # NOT parallel-safe (#957/#964) — deliberately carries no `# parallel-safe`
-# header, so run-checks.sh -P leaves it in the serial remainder. Reason:
-# writes a TRACKED file in the working tree (skills/draft-article/stages/stage4.md) and restores it with git checkout; the window is invisible after the fact but real to a concurrent reader.
+# header, so run-checks.sh -P leaves it in the serial remainder.
 # tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
 # check-checkpoint-resume.sh — verify per-stage checkpoint + resume (Story 13.5).
 # POSIX shell + stdlib Python. A run that stops after stage N resumes from N+1

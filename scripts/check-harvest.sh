@@ -1,7 +1,15 @@
 #!/usr/bin/env sh
-# NOT parallel-safe (#957/#964) — deliberately carries no `# parallel-safe`
-# header, so run-checks.sh -P leaves it in the serial remainder. Reason:
-# path-keyed on ~/.config/writing-assistant/repos/<path>; named in the 2026-07-30 (#957) amendment as one of the two to leave undeclared.
+# parallel-safe
+# parallel-verified 2026-07-31 (#999) — it IS path-keyed on the real
+# ~/.config/writing-assistant/repos/<repo-key> (the #907 section resolves this
+# repo's own writing-sources.yaml), but that is a READ, and no check declared
+# parallel-safe writes there: every set-draft-location caller in the suite
+# exports an isolated XDG_CONFIG_HOME first (checked across all of them).
+# Its own writes are a `mktemp -d` work tree, a second `mktemp -d` for the pin
+# fixture (its git init/commit happen in a subshell inside it), an isolated
+# XDG_STATE_HOME for the harvest cache, and /tmp/pin_out.$$ + /tmp/emit_out.$$,
+# which are unique per check process. Verified by running it alone and diffing
+# the real state root, config home, $HOME, and this repo's git status/index.
 # tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
 # check-harvest.sh — verify the harvest skill scaffold, standalone invocation,
 # and source-scope enforcement (Story 3.1). POSIX shell + stdlib Python.

@@ -1,7 +1,17 @@
 #!/usr/bin/env sh
-# NOT parallel-safe (#957/#964) — deliberately carries no `# parallel-safe`
-# header, so run-checks.sh -P leaves it in the serial remainder. Reason:
-# path-keyed on ~/.config/writing-assistant/repos/<path>; named in the 2026-07-30 (#957) amendment as one of the two to leave undeclared.
+# parallel-safe
+# parallel-verified 2026-07-31 (#999) — the earlier "path-keyed on
+# ~/.config/writing-assistant/repos/<path>" reason was STALE: Story 18.102
+# (#689) added `export XDG_CONFIG_HOME="$work/config"` below, so the real
+# config home is no longer touched, and XDG_STATE_HOME is isolated the same
+# way. Everything else lives under one `mktemp -d`. The two writes outside it
+# ($HOME/.writing-assistant-check-573 and -689) are UNIQUE fixed names that no
+# other check reads or writes — the same shape check-platform-profiles.sh
+# already carries under a parallel-safe declaration. It shells out to
+# check-stage5-variants.sh, which is itself mktemp-isolated, so a second
+# concurrent instance of it collides with nothing. Verified by running it
+# alone and diffing the real state root, the real config home, $HOME, and this
+# repo's git status/index: no shared write.
 # tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
 # check-footprint-invariant.sh — verify the host-repo footprint invariant is
 # enforced end-to-end (Story 9.3). POSIX shell + stdlib Python only.

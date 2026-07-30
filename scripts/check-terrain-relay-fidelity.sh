@@ -1,4 +1,12 @@
 #!/bin/sh
+# parallel-safe
+# parallel-verified 2026-07-31 (#999) — one of the two checks added 2026-07-30
+# that never declared either way, which is the omission #999's prevention half
+# now turns into an error. Verified: a single `mktemp -d` holds the fixture map
+# and every output; the repo is only read. It relies on cwd being the repo root
+# (it names `scripts/topic-map-directions.py` relatively rather than resolving
+# `git rev-parse`), and that is concurrency-neutral: run-checks.sh never `cd`s,
+# and each check is a separate `sh` process inheriting the same cwd.
 # check-terrain-relay-fidelity.sh — Story 20.66 (#976/#977).
 #
 # A Strand placed in more than one section renders the SAME ROW in every one of

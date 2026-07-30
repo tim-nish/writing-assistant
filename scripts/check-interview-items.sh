@@ -1,7 +1,13 @@
 #!/usr/bin/env sh
+# serial-reason: it writes a FIXED-NAME file INTO THE SHARED WORKING TREE —
+#   `2>"$root/.r1err"`, read back and removed. Re-verified 2026-07-31 (#999):
+#   no check currently declared parallel-safe runs `git status` over this repo,
+#   so the untracked-file window is not observable TODAY — but that is an
+#   undeclared coupling between two files, not an isolation property, and the
+#   default polarity exists precisely so a latent one is not cashed in for
+#   3.5s. Declaring it means moving the capture into the mktemp dir first.
 # NOT parallel-safe (#957/#964) — deliberately carries no `# parallel-safe`
-# header, so run-checks.sh -P leaves it in the serial remainder. Reason:
-# writes a FIXED-NAME file at the repository root ($root/.r1err) instead of inside its mktemp dir.
+# header, so run-checks.sh -P leaves it in the serial remainder.
 # tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
 # check-interview-items.sh — verify the interview-item schema validator
 # (Story 14.3, SPEC-policy-source-seam CAP-3; seam-formats.md §2).

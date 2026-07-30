@@ -1,7 +1,13 @@
 #!/bin/sh
+# serial-reason: it mutates THIS REPOSITORY'S GIT INDEX (`git add -f`, then
+#   `git reset`) as its negative test — a shared resource behind index.lock,
+#   not a temp dir. Re-verified 2026-07-31 (#999): check-skeleton,
+#   check-dev-harness and check-release-strip all read that index with `git
+#   ls-files` and ARE declared parallel-safe, so a concurrent run could both
+#   see the force-added path and contend on the lock. 119ms; there is nothing
+#   to buy here and a real race to avoid.
 # NOT parallel-safe (#957/#964) — deliberately carries no `# parallel-safe`
-# header, so run-checks.sh -P leaves it in the serial remainder. Reason:
-# mutates this repository GIT INDEX (git add -f, then git reset) as its negative test — a shared resource with a lock, not a temp dir.
+# header, so run-checks.sh -P leaves it in the serial remainder.
 # A relocated Terrain artifact cannot reach a commit (Story 20.33, #874).
 #
 # Story 20.32 moved this tool's outputs and debug artifacts INTO this
