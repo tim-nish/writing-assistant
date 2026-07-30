@@ -42,6 +42,30 @@ N-sections-vs-N-lessons review stays mechanical from one file:
   `structure_provenance`: an explicit `bespoke` is a measurement, and a
   missing field surfaces as a missing measurement — never an implicit pass.
 
+- **Frontmatter `resolved_defaults:`** (Story 20.62, #945;
+  SPEC-article-draft-pipeline CAP-3, second clause) — every choice the run
+  resolved by a **declared default**, recorded **in the plan** so it is
+  **visible and overridable there**. A **journal or log entry does not
+  satisfy this**: "merely logged" is the failure the clause names. A one-line
+  JSON array, one item per resolved choice:
+  `resolved_defaults: [{"choice": "audience", "value": "practitioners", "default": "practitioners", "declared_in": "config:article.audience", "axes": 1}]`.
+  - **The axis count is the test**, never how important, confident or severe
+    the choice looks — that test degrades under time pressure while an axis
+    count does not. `axes` must be **1**; a **multi-outcome choice with no
+    policy basis fires the gate** instead of being defaulted, and the writer
+    refuses a record claiming otherwise.
+  - **An undeclared default is not a default.** `declared_in` names where the
+    default is declared (config key, policy line, framework template); with
+    none, the choice is **asked**, never silently resolved.
+  - **Overridable where shown:** `value` is what composition proceeds on.
+    The owner changes it **in the plan** — no brief-gate re-run, no
+    re-selection of the Strand set. `structure-record` prints
+    `resolved_choices` (the effective values) and flags each `overridden`
+    entry.
+  - **Ideal path unchanged:** a brief whose choices are all single-axis with
+    declared defaults asks **zero additional questions**, and a plan
+    recording no resolution validates exactly as before.
+
 `sections:` is **additive** — a plan without it validates exactly as before,
 `consumed:` stays the consumption-exclusion key, and downstream consumers are
 unchanged.

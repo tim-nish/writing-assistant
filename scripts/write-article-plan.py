@@ -149,7 +149,18 @@ OPTIONAL_KEYS = ("audience", "audience_id", "policy_seeded", "seed", "relates",
                  # accepted value is `owner-authored` — the brief is the owner's
                  # own words (like an interview answer), never a tool-invented
                  # scope, so a non-owner provenance is refused.
-                 "brief_provenance")
+                 "brief_provenance",
+                 # `resolved_defaults` (Story 20.62, #945; SPEC-article-draft-
+                 # pipeline CAP-3, second clause): every choice the run
+                 # resolved by a DECLARED DEFAULT, recorded HERE — visible in
+                 # the plan and overridable there — because "merely logged" is
+                 # the failure the clause names. A one-line JSON array of
+                 # {choice, value, default, declared_in, axes}; `axes` must be
+                 # 1, since the discriminator is the choice's AXIS COUNT and a
+                 # multi-outcome choice fires the gate instead. `value` is what
+                 # composition proceeds on: the owner overrides by editing it
+                 # here, with no brief-gate re-run and no re-selection.
+                 "resolved_defaults")
 PLAN_STATUSES = ("outlined", "drafted", "superseded")
 
 # A story-element id (CAP-9/#428): identity for an evidence cluster. The
@@ -232,6 +243,58 @@ def parse_sections(raw):
         out.append({"title": title.strip(),
                     "elements": [str(e).strip() for e in elements]})
     return out
+
+RESOLVED_DEFAULT_KEYS = ("choice", "value", "default", "declared_in", "axes")
+
+
+def parse_resolved_defaults(raw):
+    """A `resolved_defaults:` value → the recorded resolutions (Story 20.62,
+    #945). One-line JSON array (the flat frontmatter parses no nested YAML),
+    each item `{"choice": <str>, "value": <str>, "default": <str>,
+    "declared_in": <str>, "axes": 1}`.
+
+    Refuses, by raising ValueError: a missing key; an empty `declared_in` (an
+    UNDECLARED default is not a default); a non-integer or multi-axis `axes`
+    (the axis count is the test, and a multi-outcome choice fires the gate
+    rather than being defaulted). An empty/absent value → []."""
+    s = str(raw).strip()
+    if not s:
+        return []
+    try:
+        data = json.loads(s)
+    except json.JSONDecodeError as e:
+        raise ValueError(f"not a one-line JSON array: {e}")
+    if not isinstance(data, list):
+        raise ValueError("must be a JSON array of {choice, value, default, "
+                         "declared_in, axes} objects")
+    out = []
+    for i, item in enumerate(data, 1):
+        if not isinstance(item, dict):
+            raise ValueError(f"entry {i} is not an object")
+        for key in RESOLVED_DEFAULT_KEYS:
+            if key not in item:
+                raise ValueError(f"entry {i} is missing {key!r}")
+        name = str(item["choice"]).strip()
+        if not name:
+            raise ValueError(f"entry {i} names no choice")
+        if not str(item["declared_in"]).strip():
+            raise ValueError(
+                f"entry {i} ({name}) declares no source for its default — an "
+                "undeclared default is not a default, so the choice is asked, "
+                "never silently resolved")
+        axes = item["axes"]
+        if not isinstance(axes, int) or isinstance(axes, bool) or axes != 1:
+            raise ValueError(
+                f"entry {i} ({name}) records axes={item['axes']!r}: only a "
+                "SINGLE-axis choice may be resolved by a declared default — a "
+                "multi-outcome choice with no policy basis fires the gate. The "
+                "axis count is the test, never how important the choice looks")
+        out.append({"choice": name, "value": str(item["value"]).strip(),
+                    "default": str(item["default"]).strip(),
+                    "declared_in": str(item["declared_in"]).strip(),
+                    "axes": axes})
+    return out
+
 
 # The CAP-4 conformance trio (Story 13.76): optional in general, required as a
 # set when the plan is policy-seeded — recorded by `conformance --write`.
@@ -479,6 +542,21 @@ def validate_plan(text, path):
                                        "`consumed` — the section map cannot "
                                        "reference an element the draft never "
                                        "consumed")
+
+    # `resolved_defaults` (Story 20.62/#945): additive and optional — a plan
+    # without it validates exactly as before, and the ideal path records none.
+    # When present, each entry is refused unless it is a SINGLE-axis choice
+    # with a DECLARED default: the plan is where a defaulted resolution
+    # becomes visible and overridable, so a record that cannot be one is a
+    # schema violation rather than a silently accepted line.
+    if "resolved_defaults" in fields:
+        try:
+            parse_resolved_defaults(fields["resolved_defaults"])
+        except ValueError as e:
+            yield ("resolved_defaults",
+                   f"malformed resolved-default record — {e}; the value is a "
+                   'one-line JSON array of {"choice": <str>, "value": <str>, '
+                   '"default": <str>, "declared_in": <str>, "axes": 1}')
 
     # `brief_provenance` (Story 18.24/#505): the owner coverage brief is the
     # owner's own words — the only accepted provenance is owner-authored.
