@@ -123,3 +123,13 @@ The declaration's default polarity is inverted against `# tier:` on purpose
 — an undeclared check is NOT parallel-safe and runs serially, because the
 failure mode being defended against is nondeterministic wrongness, not
 slowness. Declare a check only after verifying *that file's* isolation.
+
+**The FULL tier REPORTS against two ceilings of its own (#961), and neither
+fails the run.** Every full run discloses its *summed per-check work* against
+`FULL_TOTAL_MS` — concurrency-independent, so it is the growth instrument —
+and its *real elapsed wall clock* against `FULL_WALL_MS`, the cost actually
+paid once per PR. Both are declared in `scripts/run-checks.sh`, which is the
+single enforcement copy: do not restate the values here or in any spec or
+check. A breach is a finding to act on (re-tier, fixture-ise, or raise the
+concurrency), never a red suite — the inner tier's ceilings fail, these do
+not, and that asymmetry is deliberate.
