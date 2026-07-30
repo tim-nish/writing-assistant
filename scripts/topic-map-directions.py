@@ -78,6 +78,7 @@ Exit codes: 0 ok · 1 refusal (no usable map / no owner wording) · 2 usage.
 
 import argparse
 import json
+import os
 import re
 import sys
 
@@ -691,10 +692,40 @@ def compose_view(map_data, cands):
     return "\n".join(_clip_line(x) for x in lines).rstrip() + "\n"
 
 
+def _ensure_view_dir(path):
+    """Create the View's directory and its self-ignoring `.gitignore`.
+
+    Lives HERE, at the write, and not in the path resolver (#935): resolving a
+    path is a query, and a query that created a directory left a repo-key
+    directory behind for every host repo whose View path was merely ASKED for —
+    including the check suite's temporary ones. That was the accumulation's
+    second source, invisible beside the run workspaces.
+
+    Kept out of `write_view` deliberately: that function's body is grep-asserted
+    to contain no `open(` other than its own write (`check-terrain-member.sh`,
+    CAP-3's never-read-back rule), and preparing a directory is not writing the
+    View. The guard keeps its exact strength.
+    """
+    d = os.path.dirname(path)
+    if not d:
+        return
+    os.makedirs(d, exist_ok=True)
+    # The View is regenerated every invocation and belongs to nobody's history,
+    # so the tree must never report it as untracked. A self-ignoring directory
+    # (`*` matches this file too) keeps the tree clean without asking the owner
+    # to maintain an ignore rule for a tool-owned path.
+    ignore = os.path.join(d, ".gitignore")
+    if not os.path.exists(ignore):
+        with open(ignore, "w", encoding="utf-8") as fh:
+            fh.write("# Regenerated per invocation by the terrain skill;\n"
+                     "# never read back, safe to delete. Ignores itself too.\n*\n")
+
+
 def write_view(path, text):
     """Write the View. WRITE-ONLY BY CONTRACT (CAP-3/CAP-1): no code path in
     this script — or any flag it accepts — ever reads it back, so it can never
     become a stored index."""
+    _ensure_view_dir(path)
     with open(path, "w", encoding="utf-8") as fh:
         fh.write(text)
 
