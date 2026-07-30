@@ -78,7 +78,7 @@ python3 "$D" report --map "$work/map.json" --tag workflow --groups "G9" \
 
 # AC5 — it renders from held state; the written View is never read back. This
 # is asserted the same way the existing never-read-back check is written.
-python3 - "$D" <<'PYEOF' \
+python3 - "scripts/terrain_members.py" <<'PYEOF' \
   && ok "the report path opens no View file for reading" \
   || err "a View-reading code path exists in the report path"
 import ast, re, sys

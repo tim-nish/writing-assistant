@@ -24,7 +24,7 @@ fail=0
 err() { printf 'FAIL: %s\n' "$1" >&2; fail=1; }
 ok()  { printf 'ok:   %s\n' "$1"; }
 
-python3 - "scripts/terrain_map.py" "scripts/topic-map-directions.py" \
+python3 - "scripts/terrain_map.py" "scripts/terrain_members.py" \
          "scripts/terrain_text.py" <<'PYEOF' || fail=1
 import importlib.util, sys
 
@@ -116,7 +116,7 @@ grep -q 'by_topic.setdefault(current, \[\]).extend(' scripts/terrain_map.py \
 
 # Detection is the consumer's own: no code path may gate it on an upstream
 # version, flag, or claim that a fix has landed.
-if grep -nE 'substitut' scripts/terrain_map.py scripts/topic-map-directions.py \
+if grep -nE 'substitut' scripts/terrain_map.py scripts/topic-map-directions.py scripts/terrain_members.py \
      | grep -qiE 'gateway_version|if .*fixed|upstream_ok'; then
   err "substitution detection is gated on an upstream claim — the failure it catches IS the false claim"
 else
