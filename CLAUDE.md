@@ -104,3 +104,11 @@ create`. End-to-end pipeline reruns belong in the full tier only. This is
 ambient here, not only in a skill, for the reason the fork-gate section
 states: the rule is broken at the moment an agent runs a 30s check inside an
 edit loop, in any sitting.
+
+**The per-edit run is SCOPED to the blast-radius family (#944):** pass the
+GLOB — `scripts/run-checks.sh 'scripts/check-terrain*'` — for the files you
+are editing; families are the check-name prefixes. The family SUM is budgeted
+too (`INNER_TOTAL_MS`): an *unscoped* inner run over the whole suite fails
+its ceiling by design, because 91 individually-fast checks summed to 51s per
+edit iteration and per-member ceilings caught none of it. Unscoped stays
+correct for the full tier's single pre-PR run.
