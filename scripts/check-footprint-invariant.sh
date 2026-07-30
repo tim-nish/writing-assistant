@@ -260,30 +260,53 @@ case "$vpath" in
 esac
 # Writing the View must not dirty the DESTINATION tree — it is not written
 # there at all now, so the surface stays exactly the products plus INDEX.md.
-# The View now lands under the terrain output root, and a Terrain run
-# workspace goes with it (#874) — asserted here so the scoped move cannot
-# silently revert to the destination repo.
+# The View lands under the terrain output root (#874) — asserted here so the
+# scoped move cannot silently revert to the destination repo.
 troot=$($PY terrain-output-root)
 case "$vpath" in
   "$troot"/*) ok "View lands under the terrain output root" ;;
   *) err "View is not under the terrain output root ($vpath, root=$troot)" ;;
 esac
+# THE CLASS SPLIT (#935, narrowing #874): output stays in a tree, per-run
+# intermediates go back to the machine state root. Asserted from both sides —
+# a workspace under the output root is the accumulation defect (roughly forty
+# repo-key directories, mostly test leftovers), and only the View may resolve
+# into a repository.
+sroot=$($PY state-root)
 tws=$(cd "$HOST" && $PY new-run --terrain --root "$HOST")
 case "$tws" in
-  "$troot"/*) ok "a Terrain run workspace lands under the terrain output root" ;;
-  *) err "Terrain run workspace not under the terrain output root ($tws)" ;;
+  "$sroot"/*) ok "a Terrain run workspace lands under the machine state root" ;;
+  *) err "Terrain run workspace not under the state root ($tws, root=$sroot)" ;;
+esac
+case "$tws" in
+  "$troot"/*) err "Terrain run workspace is under the OUTPUT root ($tws) — #935 moved intermediates out of the working tree; only the View stays" ;;
+  *) ok "Terrain run workspace is not under the terrain output root" ;;
 esac
 case "$tws" in
   "$HOST"/*) err "Terrain run workspace is INSIDE the host tree ($tws)" ;;
   *) ok "Terrain run workspace is outside the host tree" ;;
 esac
-mkdir -p "$(dirname "$vpath")"
+# AC6: and not inside the plugin's own working tree either. That tree is where
+# the accumulation actually happened, and `terrain_output_root` resolves to it
+# for a git checkout — so "outside the host" alone never caught this.
+case "$tws" in
+  "$root"/*) err "Terrain run workspace is INSIDE the plugin working tree ($tws)" ;;
+  *) ok "Terrain run workspace is outside the plugin working tree" ;;
+esac
+vdir=$(dirname "$vpath")
+mkdir -p "$vdir"
 printf '# probe view\n' > "$vpath"
 after=$(dsurface)
 [ "$after" = "$expected" ] \
   && ok "writing the View leaves the destination tree clean (it lands elsewhere)" \
   || err "the View dirtied the destination tree: got [$after], expected [$expected]"
 rm -f "$vpath"
+# This check probes a TEMPORARY host repo, so its View directory is keyed to a
+# path that will never exist again. Removing the file and leaving the directory
+# is how the repo-key accumulation kept growing one entry per suite run (#935
+# AC5) — the residue was the check's own, not the product's.
+rm -f "$vdir/.gitignore"
+rmdir "$vdir" 2>/dev/null || true
 # The View is never read back — CAP-1's derived-never-stored property, at the
 # same strength it held when the file lived in a run workspace.
 if grep -nE '(open|read_text|json\.load|cat)[^)]*VIEW_FILENAME' \

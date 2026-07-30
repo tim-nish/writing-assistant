@@ -47,10 +47,12 @@ Relay it as `Operating on host repo: <path>`.
 ## Step 0 — mint the run workspace
 
 Everything this flow writes is an **intermediate**, never a product: the map,
-the payload, the recorded answer. They go to the run's **workspace outside the
-host repo** — under the writing-assistant repository, where the owner works
-(owner ruling — 2026-07-28; `docs/storage-architecture.md` D2) (`docs/storage-architecture.md` D1/D2), never into the host working
-tree. Mint one before anything below uses `$WS`:
+the payload, the recorded answer. They go to the run's **workspace under the
+machine state root** — never into the host working tree, and never into a
+working tree at all (owner ruling — 2026-07-30, narrowing 2026-07-28;
+`docs/storage-architecture.md` D1/D2). **The View is the one exception**: it is
+opened by a human, so it lands in the writing-assistant repository. Mint the
+workspace before anything below uses `$WS`:
 
 ```
 WS=$(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-paths.py new-run --terrain --root <host-repo>)
@@ -60,6 +62,12 @@ WS=$(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-paths.py new-run --terrain --
 them itself. Skipping this step does not fail loudly: `$WS` simply resolves to
 whatever the surrounding shell happens to hold, which is how a real invocation
 wrote its intermediates into a harness scratchpad (#611).
+
+**Relay the workspace path once, as `Run workspace: <path>`**, in the same
+register as the host-repo line above. The intermediates now sit outside every
+working tree, so the path is the owner's only route back to what a run wrote —
+an exit that names none of its state leaves a question no later query answers
+(#935).
 
 ## Step 1 — assemble the map
 

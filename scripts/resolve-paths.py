@@ -175,20 +175,42 @@ def repo_dir(root):
 
 
 def terrain_repo_dir(root):
-    """Terrain's own per-host directory under the terrain output root.
+    """Terrain's per-host directory under the terrain output root — the
+    OWNER-FACING OUTPUT surface, which after 2026-07-30 means the View alone.
 
-    SCOPED DELIBERATELY (#874). The ruling is about Terrain's outputs and
-    Terrain's debug artifacts; the draft pipeline's harvest caches, plan
-    fallbacks and stage checkpoints are not Terrain outputs and stay under the
-    machine state root where D2 has always put them. A wholesale move was
-    tried first and four unrelated checks failed on it — which is the
-    subsystems saying, correctly, that the ruling did not reach them.
+    SCOPED DELIBERATELY (#874), then NARROWED (#935). #874 moved Terrain's
+    outputs and its debug artifacts here on the ground that they belong where
+    the owner works. Half of that held and half did not: the View is opened by
+    a human, so it belongs in a tree; run workspaces are per-invocation
+    intermediates that nothing reopens, and roughly forty repo-key directories
+    accumulated in the working tree with no mechanism owning their deletion —
+    most of them `-tmp-tmp-*-host-repo` leftovers from test and dogfood runs.
+    So the class split runs at this seam: output stays, intermediates go back
+    to the machine state root (see `terrain_runs_dir`).
+
+    The draft pipeline's harvest caches, plan fallbacks and stage checkpoints
+    were never in scope and never moved — a wholesale move was tried first and
+    four unrelated checks failed on it, which is the subsystems saying,
+    correctly, that the ruling did not reach them.
     """
     return os.path.join(terrain_output_root(), repo_key(root))
 
 
 def terrain_runs_dir(root):
-    return os.path.join(terrain_repo_dir(root), "runs")
+    """Terrain's run workspaces — INTERMEDIATES, under the machine state root.
+
+    RELOCATED 2026-07-30 (#935), reversing this half of #874. A run workspace
+    holds the map, the payload and the recorded answer; nothing reopens it
+    after the invocation, so "put it where the owner works" buys nothing and
+    costs an unbounded pile of directories in a public working tree carrying
+    verbatim hub renderings. #874's owed retention rule is discharged BY
+    RELOCATION rather than by a GC mechanism — there is deliberately no
+    collector here.
+
+    Distinct from `runs_dir` so Terrain and the draft pipeline cannot collide
+    on a run id, and named for its subsystem rather than nested under it.
+    """
+    return os.path.join(repo_dir(root), "terrain-runs")
 
 
 # --------------------------------------------------------------------------
@@ -360,9 +382,10 @@ def new_run(root, run_id=None, terrain=False):
     appended until the directory does not already exist. A `latest` symlink is
     repointed at the new run for easy re-finding (F40).
     """
-    # `terrain=True` mints under the terrain output root (#874): Terrain's
-    # intermediates are Terrain outputs and belong where the owner works.
-    # Everything else keeps the machine state root — see terrain_repo_dir.
+    # `terrain=True` mints under Terrain's own state-root subdirectory (#935,
+    # narrowing #874): every run workspace is machine state regardless of
+    # subsystem, and only the View is owner-facing output. The flag now buys
+    # collision isolation between subsystems, not a different storage class.
     base = terrain_runs_dir(root) if terrain else runs_dir(root)
     if run_id is not None:
         ws = os.path.join(base, run_id)
@@ -492,17 +515,12 @@ def cmd_topic_map_view(args):
             "  resolve-writing-sources.py set-draft-location <path> "
             f"--root {host_root(args.root)}\n")
         return 3
-    d = os.path.dirname(path)
-    os.makedirs(d, exist_ok=True)
-    # The View is regenerated every invocation and belongs to nobody's history,
-    # so the destination repo must never report it as untracked. A self-ignoring
-    # directory (`*` also matches this .gitignore) keeps the tree clean without
-    # asking the owner to maintain an ignore rule for a tool-owned path.
-    ignore = os.path.join(d, ".gitignore")
-    if not os.path.exists(ignore):
-        with open(ignore, "w", encoding="utf-8") as fh:
-            fh.write("# Regenerated per invocation by the topic-map skill;\n"
-                     "# never read back, safe to delete. Ignores itself too.\n*\n")
+    # RESOLVING IS A QUERY — it creates nothing (#935). The directory and its
+    # self-ignoring `.gitignore` are created by the writer
+    # (`topic-map-directions.py write_view`), because a resolver that mkdirs
+    # left a repo-key directory behind for every host repo whose View path was
+    # merely asked for, including the suite's temporary ones. That was the
+    # accumulation's second source, invisible beside the run workspaces.
     print(path)
     return 0
 
