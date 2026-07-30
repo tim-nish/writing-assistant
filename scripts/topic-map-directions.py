@@ -1424,24 +1424,87 @@ def _which_half_moved(answer, map_data):
     return f"Moved: {' and '.join(moved)}."
 
 
-def _brief_from_index(answer, cands, map_pin, map_data=None):
-    """An INDEXED selection from the View: `{index, note}` (Story 18.67, #602).
+def _selected_indexes(answer):
+    """The owner's selection as a SET of Strand indexes, however assembled
+    (Story 20.54, #937).
 
-    The composed brief is the subtopic's coverage wording PLUS THE OWNER'S NOTE
-    VERBATIM — the machine resolves which subtopic `T3.2` meant, the owner
-    supplies the angle, and the result is one ordinary brief string for the
-    existing stage-0 `--brief` path. There is no new entry pipeline: downstream
-    cannot tell this from a brief the owner typed, and the note reaches the
-    structure proposer only as brief text.
+    A selection is a set because exploring is how the owner decides what to
+    write about: pointing at the Strands that belong together and having the
+    brief composed from exactly those is the outcome the terrain exists for,
+    and a single index is that set's degenerate case, not a different
+    operation. `index` is therefore accepted as a list or as one string
+    naming several — the payload shape is the owner's convenience, and NO
+    named index is silently dropped or collapsed to the first.
+
+    Order is the owner's, de-duplicated: a repeated index is one member, and
+    reordering their pointers would quietly restate what they chose.
+    """
+    raw = answer.get("index")
+    parts = raw if isinstance(raw, (list, tuple)) else re.split(
+        r"[,\s]+", str(raw or ""))
+    out = []
+    for p in parts:
+        p = str(p).strip()
+        if p and p not in out:
+            out.append(p)
+    return out
+
+
+def _refuse_group_ids(indexes):
+    """A group id addresses INSPECTION, never selection (Story 20.54 AC7).
+
+    `G` is a DISPLAY kind conferring no selection authority (SPEC-terrain, the
+    display-kind clause). Accepting one here would make grouping a gate — the
+    owner would be choosing a machine's partition rather than Strands — so it
+    is refused with the distinction stated rather than resolved to the group's
+    members.
+    """
+    groups = [i for i in indexes if re.fullmatch(r"G\d+", i)]
+    if not groups:
+        return
+    raise SystemExit(_err(
+        f"{', '.join(groups)} name group(s), and a group id carries no "
+        "selection authority: `G` is a display kind, so it addresses "
+        "INSPECTION (pull a full report for it) and never selection. "
+        "Selection is by Strand index — name the Strands inside the group "
+        "you want, and the claim is recomposed over exactly those."))
+
+
+def _member_record(match):
+    """One selected Strand, as the brief records it (Story 20.54 AC4)."""
+    return {"index": match.get("id"), "slug": match.get("slug"),
+            # The served rendering, as served — never re-expressed here.
+            "gloss": match.get("gloss"),
+            "cite": match.get("situation")}
+
+
+def _brief_from_index(answer, cands, map_pin, map_data=None):
+    """An INDEXED selection from the View: `{index, note}` (Story 18.67, #602),
+    where `index` names a SET (Story 20.54, #937).
+
+    For ONE index the composed brief is the Strand's coverage wording PLUS THE
+    OWNER'S NOTE VERBATIM — the machine resolves which Strand `L3` meant, the
+    owner supplies the angle, and the result is one ordinary brief string for
+    the existing stage-0 `--brief` path. There is no new entry pipeline:
+    downstream cannot tell this from a brief the owner typed, and the note
+    reaches the structure proposer only as brief text.
+
+    For a SET the claim is RECOMPOSED over exactly the selected members — not
+    over a group's original member set, and not over a union of groups. The
+    recomposition inputs carried back are those members' served claims and
+    nothing else, so a composer at the gate cannot widen the scope past what
+    the owner pointed at. An owner-adopted `claim` supersedes the deterministic
+    wording; free text at the gate supersedes both (`brief_from_answer`).
 
     An index is meaningless without the map it was read from, so the answer
     must carry the pin the View was rendered at. A mismatch is REFUSED with the
-    mismatch named — never silently re-resolved to whatever `T3.2` happens to
+    mismatch named — never silently re-resolved to whatever `L3` happens to
     mean at the current pin, which would hand the owner a scope they never
     chose. A missing pin is refused for the same reason: it cannot be proven
     not to be stale.
     """
-    index = str(answer.get("index") or "").strip()
+    indexes = _selected_indexes(answer)
+    index = indexes[0] if len(indexes) == 1 else ", ".join(indexes)
     answer_pin = str(answer.get("pin") or "").strip()
     if not answer_pin:
         raise SystemExit(_err(
@@ -1462,20 +1525,56 @@ def _brief_from_index(answer, cands, map_pin, map_data=None):
             f"{moved} That index may now name a different Strand, so it is "
             "refused rather than re-resolved. Re-run the map and choose from "
             "the fresh screens."))
-    match = next((c for c in cands if c.get("id") == index), None)
-    if match is None:
+    _refuse_group_ids(indexes)
+    by_id = {c.get("id"): c for c in cands}
+    # EVERY named index is resolved, and an unresolvable one refuses the whole
+    # selection: dropping it would compose the brief over a set the owner did
+    # not choose, silently.
+    missing = [i for i in indexes if i not in by_id]
+    if missing:
         raise SystemExit(_err(
-            f"index {index!r} names no subtopic in this map. The indexes come "
-            "from the View rendered at this pin — re-read it and choose again."))
+            f"index {', '.join(repr(i) for i in missing)} names no Strand in "
+            "this map. The indexes come from the screens rendered at this pin "
+            "— re-read them and choose again."))
+    matches = [by_id[i] for i in indexes]
     note = str(answer.get("note") or "").strip()
-    brief = f"{match['direction']} — {note}" if note else match["direction"]
+    claim = str(answer.get("claim") or "").strip()
+    if len(matches) == 1 and not claim:
+        # THE DEGENERATE CASE, preserved byte for byte: the coverage wording
+        # plus the note verbatim, exactly as before set selection existed.
+        base = matches[0]["direction"]
+    else:
+        # RECOMPOSED OVER EXACTLY THIS SET. The deterministic wording is a
+        # coverage statement over the selected members, never a narrative
+        # shape; an owner-adopted claim replaces it outright.
+        base = claim or "; ".join(m["direction"] for m in matches)
+    brief = f"{base} — {note}" if note else base
+    cov = (map_data or {}).get("coverage", {}) or {}
     return {"brief": brief,
             # The coverage wording is machine-proposed and the owner adopted it
             # by choosing its index; the note is theirs outright. Both are the
             # owner's words under the shipped rule — never a tool-invented scope.
-            "provenance": "owner-authored", "origin": "adopted-index",
-            "index": index, "pin": answer_pin, "note": note,
-            "candidate": match}
+            "provenance": "owner-authored",
+            "origin": "adopted-index" if len(matches) == 1 else "adopted-index-set",
+            "index": index, "indexes": indexes, "pin": answer_pin, "note": note,
+            "adopted_claim": claim or None,
+            # THE MEMBER SET IS NOT BOOKKEEPING (Story 20.54 AC4): the
+            # completeness invariant follows it into drafting — every selected
+            # Strand placed or its omission disclosed — so with no members
+            # recorded, omission becomes silent.
+            "members": [_member_record(m) for m in matches],
+            # Both halves of the pin: the terrain invocation the indexes were
+            # read at, and the hub commit the material came from.
+            "pins": {"terrain": answer_pin, "hub": cov.get("hub_pin"),
+                     "destination": cov.get("destination_pin")},
+            # Recomposition inputs are the selected members' served claims and
+            # NOTHING else, so a composer at the gate cannot widen the scope.
+            "recomposition": {
+                "authoring": "machine-composed at render time, marked",
+                "over": [m.get("id") for m in matches],
+                "claims": [m.get("gloss") or m.get("direction")
+                           for m in matches]},
+            "candidate": matches[0]}
 
 
 def brief_from_answer(answer, cands, map_pin=None, map_data=None):
@@ -1493,7 +1592,7 @@ def brief_from_answer(answer, cands, map_pin=None, map_data=None):
         raise SystemExit(_err(
             "the owner chose to stop at the map: no brief exists and no run "
             "follows. Stopping is a first-class outcome, not a failure."))
-    if str(answer.get("index") or "").strip():
+    if _selected_indexes(answer):
         return _brief_from_index(answer, cands, map_pin, map_data)
     for c in cands:
         if selection == c["direction"]:
@@ -1643,6 +1742,20 @@ def cmd_brief(args):
                          (map_data or {}).get("recording_target"))
     if gap:
         out["gap"] = gap
+    # A SET discloses every member's gap, not just the first one's (Story
+    # 20.54): the completeness invariant follows the selected set into
+    # drafting, so a gap disclosed for one member and silent for four would
+    # be exactly the silent omission the member record exists to prevent.
+    if len(out.get("members") or []) > 1:
+        by_id = {c.get("id"): c for c in cands}
+        gaps = []
+        for m in out["members"]:
+            g = _selection_gap(by_id.get(m.get("index")),
+                               (map_data or {}).get("recording_target"))
+            if g:
+                gaps.append(dict(g, index=m.get("index")))
+        if gaps:
+            out["gaps"] = gaps
     out["stage"] = "topic-map-brief"
     out["next"] = ("draft-pipeline.py stage0 <framework> <sources...> --brief "
                    "<this brief> — the existing stage-0 path, unchanged")
