@@ -479,10 +479,10 @@ attempt is the contract; the refusal path is recovery, not the workflow:
 }
 ```
 
-Validate the assembled plan (the cap + the zero-plan-no-padding rule) with:
+Validate the assembled plan — the cap (whose operand is the structure's `visual_slots`, never a framework's; #983) and the zero-plan-no-padding rule — with:
 
 ```
-python3 ${CLAUDE_PLUGIN_ROOT}/scripts/validate-visual-set.py --slot-count <n> "$WS/visual-set-plan.json"
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/validate-visual-set.py --plan-record "$WS/plan.json" "$WS/visual-set-plan.json"
 ```
 
 A refusal names the **exact member/field and its concrete fix** (e.g.

@@ -124,6 +124,28 @@ reason 1 "$NOROLE" | grep -q 'resolve exactly the fields named above' \
 pass 1 "$GOOD" && ok "AC(13.79): ratifiability contract unchanged (good plan still passes)" \
   || err "contract changed — previously valid plan now refused"
 
+# --- the cap's operand is the STRUCTURE's slots, not a framework's (#983) ----
+# The framework-anchored operand was undefined on a `bespoke` structure, which
+# #911's own instrument expects to be the common case. These assert the bespoke
+# path works with NO framework vocabulary anywhere in play.
+REC=$(mktemp); RECEMPTY=$(mktemp); RECNONE=$(mktemp)
+trap 'rm -f "$REC" "$RECEMPTY" "$RECNONE"' EXIT
+printf '%s' '{"arc":"a","visual_slots":["overview diagram"]}' > "$REC"
+printf '%s' '{"arc":"a","visual_slots":[]}'                   > "$RECEMPTY"
+printf '%s' '{"arc":"a"}'                                     > "$RECNONE"
+printf '%s' "$GOOD" | python3 "$V" --plan-record "$REC" 2>/dev/null | grep -q '"cap": 3' \
+  && ok "a one-slot structure caps at 3 via --plan-record" \
+  || err "--plan-record did not derive the cap from visual_slots"
+printf '%s' "$ZERO" | python3 "$V" --plan-record "$RECEMPTY" 2>/dev/null | grep -q '"cap": 2' \
+  && ok "a BESPOKE structure declaring no slots caps at 2 — defined, not absent" \
+  || err "a zero-slot structure did not produce a defined cap"
+printf '%s' "$ZERO" | python3 "$V" --plan-record "$RECNONE" >/dev/null 2>&1 \
+  && err "a plan record with no visual_slots was ACCEPTED — the cap had no operand" \
+  || ok "a record declaring no visual_slots is refused, never defaulted"
+printf '%s' "$ZERO" | python3 "$V" >/dev/null 2>&1 \
+  && err "no operand at all was ACCEPTED — a guessed cap is the #983 defect" \
+  || ok "no --slot-count and no --plan-record refuses rather than defaulting"
+
 if [ "$fail" -eq 0 ]; then
   printf '\nAll visual-set-plan checks passed.\n'; exit 0
 else

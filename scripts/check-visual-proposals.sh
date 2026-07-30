@@ -31,7 +31,7 @@ sec=$(awk '/^### Visual proposals/{f=1} f && /^#{2,3} / && !/Visual proposals/{e
 hasin() { printf '%s\n' "$1" | grep -qi -- "$2" && ok "$3" || err "$3 — missing"; }
 
 hasin "$sec" 'owner-facing-proposal-contract' "proposals follow the owner-facing contract"
-hasin "$sec" 'declared visual slot'           "proposes the framework's declared slot (Story 8.1)"
+hasin "$sec" 'declared visual slot'           "proposes the accepted structure's declared slot (Story 8.1; re-anchored 20.68/#983)"
 hasin "$sec" 'rationale\|why.*proposed'       "proposal shows a rationale"
 hasin "$sec" 'preview'                        "proposal shows a preview"
 hasin "$sec" 'plain-text structural sketch'   "preview is a plain-text structural sketch (Story 13.48)"

@@ -171,7 +171,7 @@ python3 "$W" write --slug interview-is-the-difference --root "$h" "$work/plan.md
 # --- #911: the structure-provenance instrument -----------------------------
 # An accepted structure (arc) without its measurement is refused — an explicit
 # bespoke is a measurement, a missing field is never an implicit pass.
-good; sed -i "s|^status: outlined$|status: outlined\narc: thematic-braid — the clusters share cost\nstructure_provenance: bespoke|" "$work/plan.md"
+good; sed -i "s|^status: outlined$|status: outlined\narc: thematic-braid — the clusters share cost\nstructure_provenance: bespoke\nvisual_slots: []|" "$work/plan.md"
 V "$P" && ok "#911: arc plus structure_provenance validates" \
   || err "a measured accepted structure was refused: $(reason "$P")"
 good; sed -i "s|^status: outlined$|status: outlined\narc: thematic-braid — the clusters share cost|" "$work/plan.md"
@@ -186,7 +186,7 @@ good; sed -i "s|^status: outlined$|status: outlined\nstructure_provenance: bespo
 reason "$P" | grep -q 'names no accepted structure' \
   && ok "refuse: structure_provenance with no arc (nothing to measure)" \
   || err "a provenance with no accepted structure was accepted"
-good; sed -i "s|^status: outlined$|status: outlined\narc: sibling arcs\nstructure_provenance: framework:F2+owner-edited|" "$work/plan.md"
+good; sed -i "s|^status: outlined$|status: outlined\narc: sibling arcs\nstructure_provenance: framework:F2+owner-edited\nvisual_slots: []|" "$work/plan.md"
 V "$P" && ok "#911: +owner-edited is inside the vocabulary (matched-then-rewritten stays distinguishable)" \
   || err "+owner-edited refused: $(reason "$P")"
 
@@ -241,7 +241,7 @@ post_snapshot=$(find "$a" -type f | sort; git -C "$a" status --porcelain)
 
 # #911: a legacy plan with an accepted structure but no provenance field
 # surfaces at consultation as a MISSING measurement — never an implicit pass.
-printf -- '---\nkind: article-plan\nslug: legacy-arc\nintent: F2\nclaim: c\nstatus: outlined\nrun_id: r\npin: repo@abc1234\narc: thematic-braid — braided\n---\n\nbody\n' \
+printf -- '---\nkind: article-plan\nslug: legacy-arc\nintent: F2\nclaim: c\nstatus: outlined\nrun_id: r\npin: repo@abc1234\narc: thematic-braid — braided\nvisual_slots: []\n---\n\nbody\n' \
   > "$a/plans/legacy-arc.md"
 c=$(python3 "$W" consult --root "$h" 2>/dev/null)
 printf '%s' "$c" | python3 -c "

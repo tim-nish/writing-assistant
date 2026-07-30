@@ -7,9 +7,15 @@ visual set as a whole. This validator enforces the plan's machine-checkable
 rules so a malformed or over-budget plan never reaches the owner as a ratifiable
 item:
 
-  * the plan holds at most `slot_count + 2` members — the declared framework
-    slot plus the two opportunistic extras CAP-2 allows; the plan proposes
-    WITHIN that cap, never raises it;
+  * the plan holds at most `slot_count + 2` members — the slots THIS ACCEPTED
+    STRUCTURE declares plus the two opportunistic extras CAP-2 allows; the plan
+    proposes WITHIN that cap, never raises it. The count comes from the plan
+    record's `visual_slots` (Story 20.68, #983), never from framework identity:
+    #911 demoted F1-F5 to candidates and records `bespoke` on every accepted
+    structure, so a framework-anchored operand is undefined exactly on the case
+    #911's own instrument expects to be common. A framework-matched structure
+    may declare CAP-1's slots verbatim; a bespoke one declares its own; either
+    way the cap is defined;
   * a ZERO-member plan is valid — an article may need no visual — and is never
     padded toward the cap;
   * every member enumerates role, required_elements, format, and placement;
@@ -75,7 +81,7 @@ def validate(plan, slot_count):
     cap = slot_count + OPPORTUNISTIC_EXTRAS
     if len(members) > cap:
         yield ("plan", f"{len(members)} members exceed the cap of {cap} "
-                       f"(declared slot {slot_count} + {OPPORTUNISTIC_EXTRAS} "
+                       f"(declared slots {slot_count} + {OPPORTUNISTIC_EXTRAS} "
                        "opportunistic extras) — the plan proposes within the "
                        "cap, never raises it")
 
@@ -148,10 +154,38 @@ def main(argv=None):
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("plan", nargs="?", default="-",
                    help="visual-set plan JSON file, or - for stdin")
-    p.add_argument("--slot-count", type=int, default=1,
-                   help="the framework's declared visual-slot count (default 1); "
-                        "the cap is this + 2 opportunistic extras")
+    p.add_argument("--slot-count", type=int, default=None,
+                   help="the ACCEPTED STRUCTURE's declared visual-slot count — "
+                        "len(visual_slots) from the plan record (#983), not a "
+                        "framework's. The cap is this + 2 opportunistic "
+                        "extras. Required unless --plan-record supplies it.")
+    p.add_argument("--plan-record", metavar="PATH",
+                   help="the article plan JSON, to read `visual_slots` from "
+                        "directly instead of passing --slot-count")
     args = p.parse_args(argv)
+
+    slot_count = args.slot_count
+    if args.plan_record:
+        try:
+            rec = json.loads(open(args.plan_record, encoding="utf-8").read())
+        except (OSError, json.JSONDecodeError) as e:
+            sys.stderr.write(f"error: plan record unreadable: {e}\n")
+            return 2
+        slots = rec.get("visual_slots")
+        if not isinstance(slots, list):
+            sys.stderr.write(
+                "error: the plan record declares no `visual_slots` — an "
+                "accepted structure must declare its slots (`[]` when it has "
+                "none) or the cap has no operand (#983)\n")
+            return 2
+        slot_count = len(slots)
+    if slot_count is None:
+        sys.stderr.write(
+            "error: no declared slot count — pass --slot-count (the accepted "
+            "structure's len(visual_slots)) or --plan-record. It is not "
+            "defaulted: a guessed operand is how the framework-anchored cap "
+            "silently mis-sized a bespoke structure's plan (#983)\n")
+        return 2
 
     raw = sys.stdin.read() if args.plan == "-" else open(args.plan, encoding="utf-8").read()
     try:
@@ -160,11 +194,11 @@ def main(argv=None):
         sys.stderr.write(f"error: plan is not valid JSON: {e}\n")
         return 2
 
-    defects = list(validate(plan, args.slot_count))
+    defects = list(validate(plan, slot_count))
     if not defects:
         n = len(plan.get("members", []))
         print(json.dumps({"ok": True, "members": n,
-                          "cap": args.slot_count + OPPORTUNISTIC_EXTRAS,
+                          "cap": slot_count + OPPORTUNISTIC_EXTRAS,
                           "zero_plan": n == 0}))
         return 0
     sys.stderr.write("visual-set plan REFUSED — not ratifiable:\n")
