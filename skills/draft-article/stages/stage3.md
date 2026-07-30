@@ -55,8 +55,7 @@ CAP-9 2026-07-22 #554 amendment).** When the run carries a
 [coverage brief](#owner-coverage-brief-cap-9-aligned-story-1824-505), pass it —
 the candidates are then composed for **the story the owner described**, not from
 the auto-selected elements alone. This is the **same proposer widened at its
-input**: CAP-9's entry generalization adds **no second proposer** and no second
-gate.
+input**: CAP-9's entry generalization adds **no second proposer** and no second gate.
 
 ```
 python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py structures --brief "<the owner's message or a file path>" <<< '{"elements":[…]}'
@@ -83,7 +82,8 @@ The brief steers **emphasis and shape, never scope**:
   proposer still **deterministic**.
 
 With **no** brief, the candidates are **exactly** the element-only ones above —
-byte for byte.
+byte for byte. When the brief carries the owner's selected **Strand set**, the
+composed candidates are covered — see [strand-cover.md](strand-cover.md).
 
 For F2 the shapes are **sibling-lessons** (the current default), **chronological
 journey**, **single-incident deep thread**, and **thematic braid** — each

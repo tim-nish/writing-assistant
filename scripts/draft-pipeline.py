@@ -3368,7 +3368,13 @@ def _narrative_structures(elements, brief=None):
         out["brief_informed"] = True
         out["brief_emphasis"] = emphasis
         out["brief_cued_shapes"] = cued
-    return out
+    # Story 20.61 (#945): the cover is counted HERE — after every candidate is
+    # composed — over the brief's recorded member set. With no member set the
+    # call is a no-op and the output above is returned unchanged.
+    # Story 20.61 (#945): the placement cover is counted HERE — AFTER every
+    # candidate is composed — over the member set the BRIEF records; counting
+    # lives in `strand_cover.py`. No member set recorded = a no-op.
+    return _load("strand_cover.py").apply_cover(out, brief)
 
 
 def cmd_structures(args):
