@@ -3371,9 +3371,8 @@ def _narrative_structures(elements, brief=None):
     # Story 20.61 (#945): the cover is counted HERE — after every candidate is
     # composed — over the brief's recorded member set. With no member set the
     # call is a no-op and the output above is returned unchanged.
-    # Story 20.61 (#945): the placement cover is counted HERE — AFTER every
-    # candidate is composed — over the member set the BRIEF records; counting
-    # lives in `strand_cover.py`. No member set recorded = a no-op.
+    # Story 20.61 (#945): the cover is counted HERE — AFTER composition — over
+    # the member set the BRIEF records. No member set recorded = a no-op.
     return _load("strand_cover.py").apply_cover(out, brief)
 
 
@@ -3486,6 +3485,11 @@ def cmd_structure_record(args):
                 "the run made a structure choice but the plan's `arc` names no "
                 f"structure (arc: {arc!r}) — `arc` is the one recording location")
 
+    # Story 20.62 (#945): a choice resolved by a DECLARED DEFAULT is visible and
+    # OVERRIDABLE in the plan, never merely logged; the axis count is the test.
+    rdm = _load("resolved_defaults.py")
+    defects.extend(rdm.plan_defects(fields, wap))
+
     journal = _load_json_state(args.journal, "interview journal") if args.journal else {}
     anchor = journal.get("editorial_anchor") or {}
     if anchor:
@@ -3511,6 +3515,7 @@ def cmd_structure_record(args):
 
     out = {"structure": chosen, "recorded_in": "arc" if chosen else None,
            "editorial_anchor_clean": True}
+    out.update(rdm.disclosure(fields, wap))
     if args.plan and arc:
         # #911 disclosure: the measurement travels with the completion summary,
         # so the demotion-window review reads it without opening the plan.
