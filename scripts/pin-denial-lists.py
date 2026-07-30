@@ -25,7 +25,11 @@ import sys
 # cheap first pass, so a new one is a new instance of the remedy shape rather
 # than a new tool.
 SOURCES = (
-    ("scripts/topic-map-directions.py", "INTERNAL_VOCAB", lambda v: list(v)),
+    # INTERNAL_VOCAB travelled with `lint_owner_lines`, the only function that
+    # reads it, when the candidate-directions layer was extracted as a leaf
+    # (Story 20.56, #938). Still declared in exactly one place; the pinned
+    # inventory is keyed by list name, so the move leaves it byte-identical.
+    ("scripts/terrain_directions.py", "INTERNAL_VOCAB", lambda v: list(v)),
     ("scripts/validate-proposal-payload.py", "FORBIDDEN_MARKERS",
      lambda v: [name for name, _rx in v]),
 )
