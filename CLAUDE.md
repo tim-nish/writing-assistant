@@ -124,12 +124,30 @@ The declaration's default polarity is inverted against `# tier:` on purpose
 failure mode being defended against is nondeterministic wrongness, not
 slowness. Declare a check only after verifying *that file's* isolation.
 
+**The per-edit run also selects by DECLARED COVERAGE (#998).** A check
+declares `# covers: <globs>` — the paths it asserts over — beside its
+`# tier:` and `# parallel-safe` headers, and the per-edit invocation runs the
+UNION of the name-prefix family and every check whose declaration matches a
+changed path — pass them: `scripts/run-checks.sh --changed "$(git diff
+--name-only HEAD)" 'scripts/check-terrain*'` (`--list` shows the selection
+without running it). The prefix alone finds only checks *named after* what you
+edited, never one asserting a repo-wide property *about* it, which is why a
+green scoped run kept being followed by a failing full tier. An undeclared
+check covers nothing and is selected only by prefix — incomplete-but-honest
+while the declarations are populated; the full tier still runs everything
+once, so nothing goes unrun.
+
 **The FULL tier REPORTS against two ceilings of its own (#961), and neither
 fails the run.** Every full run discloses its *summed per-check work* against
 `FULL_TOTAL_MS` — concurrency-independent, so it is the growth instrument —
 and its *real elapsed wall clock* against `FULL_WALL_MS`, the cost actually
 paid once per PR. Both are declared in `scripts/run-checks.sh`, which is the
 single enforcement copy: do not restate the values here or in any spec or
-check. A breach is a finding to act on (re-tier, fixture-ise, or raise the
+check. **`FULL_TOTAL_MS` is declared AT a concurrency (#1001)** — it is
+summed *elapsed* work, which inflates under contention (452s at `-P 8` vs
+570s at `-P 14`, same suite), so every report carries the `-P` it was
+measured at and a run at a different `-P` reads NOT COMPARABLE rather than
+being checked. Summing CPU instead was tested and rejected: it inflates
++45% under load. Nothing time-based is concurrency-independent here. A breach is a finding to act on (re-tier, fixture-ise, or raise the
 concurrency), never a red suite — the inner tier's ceilings fail, these do
 not, and that asymmetry is deliberate.

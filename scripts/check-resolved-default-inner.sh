@@ -3,6 +3,7 @@
 #   validator, and two `structure-record` invocations. No pipeline run, no
 #   seam call, milliseconds — it guards the record it checks inside the edit
 #   loop that writes it.
+# covers: scripts/write-article-plan.py scripts/draft-pipeline.py skills/draft-article/stages/complete.md specs/spec-article-draft-pipeline/**
 # removal-signal: the plan stops being where a defaulted resolution is
 #   recorded — either because SPEC-article-draft-pipeline CAP-3's single-axis
 #   clause is withdrawn, or because a shipped multi-axis arbitration takes

@@ -1,5 +1,6 @@
 #!/usr/bin/env sh
 # parallel-safe
+# covers: skills/** specs/**
 # check-skill-budget.sh — mechanical skill-size ceiling (Story 19.4, #761;
 # umbrella #744/#740). The packaging invariant
 # (specs/spec-writing-assistant/SPEC.md, 2026-07-26 amendment) says a SKILL.md

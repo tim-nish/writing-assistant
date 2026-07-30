@@ -1,6 +1,7 @@
 #!/usr/bin/env sh
 # parallel-safe
 # tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
+# covers: scripts/write-article-plan.py specs/spec-article-plan/** skills/draft-article/**
 # check-article-plan.sh — verify the article-plan writer (Story 13.55,
 # SPEC-article-plan CAP-1/CAP-2). POSIX shell + stdlib Python.
 #
