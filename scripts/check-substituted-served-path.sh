@@ -23,7 +23,8 @@ fail=0
 err() { printf 'FAIL: %s\n' "$1" >&2; fail=1; }
 ok()  { printf 'ok:   %s\n' "$1"; }
 
-python3 - "scripts/terrain_map.py" "scripts/topic-map-directions.py" <<'PYEOF' || fail=1
+python3 - "scripts/terrain_map.py" "scripts/topic-map-directions.py" \
+         "scripts/terrain_text.py" <<'PYEOF' || fail=1
 import importlib.util, sys
 
 def load(name, path):
@@ -34,6 +35,10 @@ def load(name, path):
 
 tm = load("tm", sys.argv[1])
 di = load("di", sys.argv[2])
+# The disclosure primitives moved to their own leaf module (Story 20.58, #942).
+# Asserted against THAT module's path, not through the composer's re-export:
+# a symbol deleted from where it now lives must fail here.
+tx = load("tx", sys.argv[3])
 
 fail = []
 def check(cond, msg):
@@ -71,7 +76,7 @@ sub = [{"requested": "topics/claude-code-ops.md",
         "served": "topics/archive/claude-code-ops.md"}]
 mp = {"kind": "topic-map", "topics": [], "elements": [],
       "coverage": {"pin": "p1", "substitutions": sub}}
-line = di._substitution_disclosure_line(mp)
+line = tx._substitution_disclosure_line(mp)
 check(line is not None, "a substitution yields a disclosure line")
 check("topics/archive/claude-code-ops.md" in line
       and "topics/claude-code-ops.md" in line,
@@ -84,18 +89,18 @@ check("\n" not in line and "##" not in line,
 row = di._strand_context_line(
     {"situation": "topics/archive/claude-code-ops.md:2@deadbee",
      "tags": [], "evidence": ["x"]},
-    "claude-code-ops", di._substituted_paths(mp))
+    "claude-code-ops", tx._substituted_paths(mp))
 check("SUBSTITUTED SOURCE" in row,
       "material read from a substituted path is marked on its own row")
 
 clean = {"kind": "topic-map", "topics": [], "elements": [],
          "coverage": {"pin": "p1", "substitutions": []}}
-check(di._substitution_disclosure_line(clean) is None,
+check(tx._substitution_disclosure_line(clean) is None,
       "the normal case says nothing — silence by detection, no flag to flip")
 row_ok = di._strand_context_line(
     {"situation": "topics/claude-code-ops.md:2@deadbee",
      "tags": [], "evidence": ["x"]},
-    "claude-code-ops", di._substituted_paths(clean))
+    "claude-code-ops", tx._substituted_paths(clean))
 check("SUBSTITUTED" not in row_ok,
       "an unsubstituted row carries no marker")
 

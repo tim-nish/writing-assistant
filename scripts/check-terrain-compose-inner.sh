@@ -202,7 +202,8 @@ sys.exit(1 if fail else 0)
 PYEOF
 [ $? -eq 0 ] || fail=1
 
-python3 - "$work/big-map.json" "$work/view.md" "$D" <<'PYEOF' || fail=1
+python3 - "$work/big-map.json" "$work/view.md" "scripts/terrain_text.py" \
+         <<'PYEOF' || fail=1
 import importlib.util, json, re, sys
 d = json.load(open(sys.argv[1]))
 view = open(sys.argv[2], encoding="utf-8").read()
@@ -231,7 +232,11 @@ check("- glance:" not in view and "- evidence pointers (" not in view,
 # regression rather than more cleanup (SPEC-terrain, amended 2026-07-27).
 # Compared against the emitters themselves, not against guessed wording: a
 # substring test would keep passing if the line silently changed shape.
-spec = importlib.util.spec_from_file_location("dv", sys.argv[3])
+#
+# The emitters moved to their own leaf module (Story 20.58, #942), so they are
+# loaded from THERE — through the new module's own path, never through the
+# composer's re-export, so deleting one where it now lives fails here.
+spec = importlib.util.spec_from_file_location("dvtext", sys.argv[3])
 mod = importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)
 cov_line = mod._element_coverage_line(d)
 gloss_line = mod._gloss_disclosure_line(d)
