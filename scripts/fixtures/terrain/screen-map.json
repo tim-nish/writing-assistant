@@ -1,0 +1,286 @@
+{
+ "kind": "topic-map",
+ "derived": true,
+ "stored": false,
+ "articles_repo": "/nonexistent/articles",
+ "host_root": "/nonexistent/host",
+ "track_topics": {},
+ "unmapped_tracks": [
+  "engineering",
+  "people"
+ ],
+ "stale_mapping_tracks": [],
+ "subtopic_defects": [],
+ "topics": [
+  {
+   "topic": "engineering",
+   "mapped": false,
+   "tracks": [
+    "engineering"
+   ],
+   "item_count": 1,
+   "items": [
+    {
+     "slug": "retry-storm",
+     "title": "Retry storms",
+     "family": "articles-items",
+     "section": "backlog",
+     "surface": "backlog/retry-storm.md",
+     "status": "shaping",
+     "track": "engineering",
+     "date": "",
+     "evidence": [
+      "host/retro.md:12@abc1234",
+      "host/log.txt:88@abc1234",
+      "host/bench.md:3@abc1234"
+     ],
+     "live": true,
+     "lessons": [
+      "lesson:retry-storm"
+     ],
+     "usability": {
+      "verdict": "matched",
+      "checked": []
+     }
+    }
+   ],
+   "subtopics": []
+  },
+  {
+   "topic": "people",
+   "mapped": false,
+   "tracks": [
+    "people"
+   ],
+   "item_count": 2,
+   "items": [
+    {
+     "slug": "oncall-load",
+     "title": "On-call load",
+     "family": "articles-items",
+     "section": "backlog",
+     "surface": "backlog/oncall-load.md",
+     "status": "seed",
+     "track": "people",
+     "date": "",
+     "evidence": [
+      "host/retro.md:44@abc1234",
+      "host/rota.md:7@abc1234"
+     ],
+     "live": true,
+     "usability": {
+      "verdict": "matched",
+      "checked": []
+     }
+    },
+    {
+     "slug": "team-shape",
+     "title": "Team shape",
+     "family": "articles-items",
+     "section": "backlog",
+     "surface": "backlog/team-shape.md",
+     "status": "seed",
+     "track": "people",
+     "date": "",
+     "evidence": [
+      "host/notes.md:9@abc1234"
+     ],
+     "live": true,
+     "usability": {
+      "verdict": "matched",
+      "checked": []
+     }
+    }
+   ],
+   "subtopics": []
+  }
+ ],
+ "needs_recording": [],
+ "recording_target": {
+  "repo": "host",
+  "file": "/nonexistent/host/docs/journey.md"
+ },
+ "gloss": {
+  "served": false,
+  "reason": "policy_source unavailable: policy_source not declared in writing-sources.yaml (read-policy-source.py exit 10)",
+  "lesson_renderings": 0,
+  "journey_renderings": 0,
+  "journeys_requested": [],
+  "journey_misses": {},
+  "strands": {
+   "source": "tier-1 markdown (fallback)",
+   "fallback_reason": "policy_source unavailable: policy_source not declared in writing-sources.yaml (read-policy-source.py exit 10)"
+  },
+  "decision_renderings": 0,
+  "decision_misses": {}
+ },
+ "coverage": {
+  "pin": "ce5ef6872da8",
+  "destination_pin": "unpinned",
+  "hub_pin": null,
+  "substitutions": [],
+  "bound": 400,
+  "matched": 4,
+  "read": [
+   {
+    "family": "articles-items",
+    "surface": "INDEX.md",
+    "entries": 0
+   },
+   {
+    "family": "articles-items",
+    "surface": "backlog/oncall-load.md",
+    "entries": 6
+   },
+   {
+    "family": "articles-items",
+    "surface": "backlog/retry-storm.md",
+    "entries": 7
+   },
+   {
+    "family": "articles-items",
+    "surface": "backlog/team-shape.md",
+    "entries": 6
+   }
+  ],
+  "skipped": [],
+  "complete": true,
+  "accounting_closes": true,
+  "families": [
+   {
+    "family": "articles-items",
+    "declared": true,
+    "enumerated": true,
+    "reason": null,
+    "matched": 4,
+    "read": 4,
+    "skipped": 0,
+    "complete": true,
+    "accounting_closes": true
+   },
+   {
+    "family": "hub-lessons",
+    "declared": true,
+    "enumerated": false,
+    "reason": "policy_source unavailable: policy_source not declared in writing-sources.yaml (read-policy-source.py exit 10)",
+    "matched": 0,
+    "read": 0,
+    "skipped": 0,
+    "complete": true,
+    "accounting_closes": true
+   },
+   {
+    "family": "host-sources",
+    "declared": true,
+    "enumerated": false,
+    "reason": "host source files are not article material (Story 20.7, #809): Strands are Lessons and Journeys",
+    "matched": 0,
+    "read": 0,
+    "skipped": 0,
+    "complete": true,
+    "accounting_closes": true
+   },
+   {
+    "family": "hub-elements",
+    "declared": true,
+    "enumerated": false,
+    "reason": "the policy source served no decision topics (policy_source unavailable: policy_source not declared in writing-sources.yaml (read-policy-source.py exit 10))",
+    "axis": {
+     "source": "consumer-declared mapping (fallback)",
+     "fallback_reason": "policy_source unavailable: policy_source not declared in writing-sources.yaml (read-policy-source.py exit 10)",
+     "bounded_by_consumer_config": true
+    },
+    "matched": 0,
+    "read": 0,
+    "skipped": 0,
+    "complete": true,
+    "accounting_closes": true
+   },
+   {
+    "family": "hub-gloss",
+    "declared": true,
+    "enumerated": false,
+    "reason": "policy_source unavailable: policy_source not declared in writing-sources.yaml (read-policy-source.py exit 10)",
+    "strands": {
+     "source": "tier-1 markdown (fallback)",
+     "fallback_reason": "policy_source unavailable: policy_source not declared in writing-sources.yaml (read-policy-source.py exit 10)"
+    },
+    "matched": 0,
+    "read": 0,
+    "skipped": 0,
+    "complete": true,
+    "accounting_closes": true
+   }
+  ],
+  "families_enumerated": [
+   "articles-items"
+  ],
+  "families_not_enumerated": [
+   {
+    "family": "hub-lessons",
+    "reason": "policy_source unavailable: policy_source not declared in writing-sources.yaml (read-policy-source.py exit 10)"
+   },
+   {
+    "family": "host-sources",
+    "reason": "host source files are not article material (Story 20.7, #809): Strands are Lessons and Journeys"
+   },
+   {
+    "family": "hub-elements",
+    "reason": "the policy source served no decision topics (policy_source unavailable: policy_source not declared in writing-sources.yaml (read-policy-source.py exit 10))"
+   },
+   {
+    "family": "hub-gloss",
+    "reason": "policy_source unavailable: policy_source not declared in writing-sources.yaml (read-policy-source.py exit 10)"
+   }
+  ],
+  "surfaces_read": "index and frontmatter only \u2014 item bodies are never read; a declared source is read at heading level, never as prose",
+  "element_topics_read": [
+   "engineering",
+   "people"
+  ],
+  "element_topics_skipped": [],
+  "element_axis": {
+   "source": "consumer-declared mapping (fallback)",
+   "fallback_reason": "policy_source unavailable: policy_source not declared in writing-sources.yaml (read-policy-source.py exit 10)",
+   "bounded_by_consumer_config": true
+  }
+ },
+ "consumption": {
+  "available": true,
+  "source": "write-article-plan.py consult",
+  "derived_not_stored": true,
+  "project": "host",
+  "scanned": "plans/*.md",
+  "consumed_index": {},
+  "project_consumed_index": {},
+  "degraded": null
+ },
+ "elements": [
+  {
+   "kind": "lesson",
+   "slug": "retry-storm",
+   "title": "The retry storm",
+   "topic": "engineering",
+   "date": "2026-07-20",
+   "gloss": "Retries without a budget turn one slow dependency into an outage",
+   "situation": "LESSONS.md:3@abc1234",
+   "evidence": [
+    "LESSONS.md:3@abc1234"
+   ],
+   "consumed": false
+  },
+  {
+   "kind": "lesson",
+   "slug": "team-shape",
+   "title": "Team shape",
+   "topic": "people",
+   "date": "2026-07-19",
+   "gloss": "A rota that nobody owns is a rota that silently stops",
+   "situation": "LESSONS.md:4@abc1234",
+   "evidence": [
+    "LESSONS.md:4@abc1234"
+   ],
+   "consumed": false
+  }
+ ]
+}
