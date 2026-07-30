@@ -95,7 +95,7 @@ step files cite them and restate nothing.
 |---|---|---|
 | **Step 0 — mint the run workspace** (above; the storage contract) | — (in this file) | `resolve-paths.py new-run --terrain --root <host-repo>` |
 | **Step 1 — assemble the map** (what the map carries; the tag and decision-topic axes; the usability verdict and `needs_recording`) | [`steps/map.md`](steps/map.md) | `terrain_map.py assemble --root <host-repo> > "$WS/map.json"` |
-| **Step 2 — two screens** (Screen 1's axis payload; Screen 2's whole-member listing, group claim, journey markers and set selection; navigation over held state; the size switch) | [`steps/screens.md`](steps/screens.md) | `topic-map-directions.py axis --map "$WS/map.json"` then `topic-map-directions.py member --map "$WS/map.json" --tag <member> --axis <tag\|topic>` |
+| **Step 2 — two screens** (Screen 1's axis payload; Screen 2's whole-member listing, group claim, journey markers and set selection; the Full Report over named group ids; navigation over held state; the size switch) | [`steps/screens.md`](steps/screens.md) | `topic-map-directions.py axis --map "$WS/map.json"` then `topic-map-directions.py member --map "$WS/map.json" --tag <member> --axis <tag\|topic>` |
 | **Step 3 — the brief, then a normal run** (brief composition; set recomposition; the coherence consultant's four rules; the stage-0 handoff) | [`steps/brief.md`](steps/brief.md) | `topic-map-directions.py brief --payloads "$WS/presented-payloads.jsonl" --map "$WS/map.json"` |
 | **Step 4 — the gap artifact** (only when the brief carries `gap`) | [`steps/gap.md`](steps/gap.md) | — (a relay plus one write into the target repo) |
 
@@ -109,7 +109,9 @@ step files cite them and restate nothing.
   **View** file path — the composer switches on size and the skill decides
   nothing (`steps/screens.md`). Selection is by Strand index and may be a
   **set**; naming a group id as a selection is refused with the distinction
-  stated.
+  stated. Naming group ids as an **inspection** is the `report` subcommand —
+  the Full Report relays those groups whole, selects nothing, and never
+  recomposes a claim (`steps/screens.md`).
 - **Step 3:** free text always wins. A set of two or more returns the
   `consultant` block, whose four rules bind you and may not be traded against
   each other (`steps/brief.md`). The composed brief is handed to the existing

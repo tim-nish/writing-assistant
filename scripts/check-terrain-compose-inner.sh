@@ -120,7 +120,7 @@ python3 "$D" candidates --map "$work/big-map.json" > "$work/big-cands.json"
 # --- ONE assertion pass over everything the CLI produced (#950) --------------
 # Sections and messages are unchanged from the pre-batching check.
 python3 - "$work" "$D" "scripts/terrain_text.py" <<'PYEOF' || fail=1
-import importlib.util, json, re, sys
+import importlib.util, json, os, re, sys
 w, dpath, tpath = sys.argv[1], sys.argv[2], sys.argv[3]
 fail = []
 def check(cond, msg):
@@ -142,7 +142,12 @@ check(not combos,
 # The DEFERRAL IS RECORDED IN THE CODE, so a future reader meets the reason
 # rather than an unexplained gap — this is what distinguishes a deferral from
 # a silent retirement.
-src = open(dpath, encoding="utf-8").read()
+# Story 20.56 (#938): `candidates` and its recorded deferral moved to the
+# extracted leaf scripts/terrain_directions.py; the assertion follows the
+# code, which is the point of asserting on the source at all.
+src = open(dpath, encoding="utf-8").read() + open(
+    os.path.join(os.path.dirname(dpath), "terrain_directions.py"),
+    encoding="utf-8").read()
 check("DEFERRED, not derived" in src and "OQ3" in src,
       "the deferral and its reopen trigger are stated where the move used to be")
 # Every candidate names WHAT to cover, never HOW to tell it.

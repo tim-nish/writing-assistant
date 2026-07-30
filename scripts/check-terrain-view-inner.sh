@@ -363,7 +363,11 @@ check(not hits, f"the reading path carries no internal vocabulary ({hits[:2]})")
 levels = {s.get("depth", {}).get("level") for t in d["topics"] for s in t["subtopics"]}
 families = {i.get("family") for t in d["topics"] for s in t["subtopics"]
             for i in s.get("items", [])}
-vocab = {v.lower() for v in mod.INTERNAL_VOCAB}
+# Story 20.56 (#938): the candidate-directions layer, INTERNAL_VOCAB with it,
+# is the extracted leaf scripts/terrain_directions.py; the registration
+# contract is asserted against its single declaration, wherever it lives.
+import terrain_directions as _td
+vocab = {v.lower() for v in _td.INTERNAL_VOCAB}
 unregistered = [x for x in (levels | families) if x
                 and x.lower().replace(" ", "-") not in vocab and x.lower() not in vocab]
 check(not unregistered,

@@ -108,6 +108,20 @@ from terrain_text import (  # noqa: E402
     _verdict_phrase,
 )
 
+# The candidate-directions layer this surface proposes with (Story 20.56,
+# #938). A LEAF layer, imported by name so every call site below reads exactly
+# as it did before the split — the extraction moved code, not behaviour. Its
+# one constant, INTERNAL_VOCAB, travels with `lint_owner_lines`, the only
+# function that reads it.
+from terrain_directions import (  # noqa: E402
+    _direction_lines,
+    _element_direction,
+    _elements,
+    _is_substance_led,
+    candidates,
+    lint_owner_lines,
+)
+
 REFUSED = 1
 USAGE = 2
 
@@ -167,284 +181,12 @@ def load_map(path):
     return data
 
 
-def _elements(map_data):
-    """Every element in the map, each carrying its STABLE ID (Story 18.80,
-    #641).
-
-    `E<topic>.<n>` — a namespace of its own, so an indexed selection is never
-    ambiguous against the subtopic `T<topic>.<subtopic>` scheme. Topics are
-    numbered from the sorted set of topics the elements actually came from, and
-    `<n>` follows the assembler's order, which is recency-ranked and
-    deterministic within a pin (Story 18.79). Computed here per invocation and
-    stored nowhere, exactly as the subtopic IDs are.
-
-    Since the stance-3 pivot (2026-07-27, #799) the elements are the PRIMARY
-    selection units. They carry TWO namespaces, not three (Story 20.51, #933):
-    `L<n>` for hub Lessons, numbered in the assembler's slug-sorted order and
-    deterministic within a pin, and `E<topic>.<n>` for the decision projection.
-    `J<n>` was retired with independent Journey selection (#871) and its
-    minting code is now gone too — an arc is displayed on its lesson's row and
-    the lesson is what the owner selects.
-    """
-    rows, seen = [], {}
-    # `J<n>` is GONE (Story 20.51, #933). The namespace was retired in spec
-    # text on 2026-07-28 (#871) and the code that minted it stayed — a
-    # `journey` counter and a `J` prefix reachable only on a kind the
-    # record-authoritative path never emits. Dead code implementing a retired
-    # contract is not inert: it is why a screen could be written as though `J`
-    # rows might appear, and then assert their absence as a finding. A
-    # Journey's presence is now carried by its lesson's row, not by an id.
-    counters = {"lesson": 0}
-    hub = [e for e in map_data.get("elements", [])
-           if e.get("kind") not in counters]
-    topics = sorted({e.get("topic", "") for e in hub})
-    index = {name: i for i, name in enumerate(topics, start=1)}
-    for el in map_data.get("elements", []):
-        kind = el.get("kind")
-        if kind in counters:
-            counters[kind] += 1
-            rows.append(dict(el, id=f"L{counters[kind]}"))
-            continue
-        topic = el.get("topic", "")
-        seen[topic] = seen.get(topic, 0) + 1
-        rows.append(dict(el, id=f"E{index[topic]}.{seen[topic]}"))
-    return rows
-
-
-def _element_direction(el):
-    """An element as a coverage direction — the wording that becomes the brief
-    if the owner adopts it, so it names the material in the owner's terms and
-    carries no internal marker (#637's rule, unchanged for the new kind). The
-    summary is carried in FULL: clipping is a render-only concern (#651), so
-    the string the brief is composed from ends where the source did, never
-    mid-word — the View bounds the displayed line itself (`_clip_line`, visible elision)."""
-    kind = el.get("kind")
-    if kind in ("lesson", "journey"):
-        # The slot QUOTES the served `gloss:` / `journey_gloss:` rendering —
-        # the plain-register text the hub ratified at its distill gate — never
-        # the recall one-liner (#799, the pre-ratified amendment). Where no
-        # rendering is served, the slot says so with the reason; nothing is
-        # substituted for a ratified rendering.
-        noun = "lesson" if kind == "lesson" else "journey"
-        gloss = str(el.get("gloss") or "").strip()
-        if gloss:
-            return f"cover the {noun} — {gloss}"
-        reason = str(el.get("gloss_unavailable") or
-                     "its rendering was not served").strip()
-        name = str(el.get("slug") or el.get("title") or "").strip() or noun
-        return (f"cover the {noun} recorded as {name} — its plain-language "
-                f"rendering is not being served ({reason})")
-    # Decision/reversal rows follow the SAME served-rendering-first rule as
-    # lesson rows (Story 20.20, #843): quote a served rendering when one
-    # exists, and otherwise DISCLOSE the absence — never substitute the raw
-    # recall-register topic line as if it were a rendering. The upstream half
-    # (serving renderings for topic decision lines) is the hub's; until it
-    # lands, every one of these rows takes the disclosure branch, and when it
-    # lands they take the served branch with no change here (detection, not a
-    # flag).
-    kind = "reversal" if kind == "reversal" else "decision"
-    gloss = str(el.get("gloss") or "").strip()
-    if gloss:
-        return f"cover the {kind} — {gloss}"
-    when = str(el.get("date") or "").strip() or "an undated line"
-    where = str(el.get("topic") or "").strip()
-    named = f"recorded {when}" + (f" in the {where} record" if where else "")
-    reason = str(el.get("gloss_unavailable") or
-                 "no plain-language rendering of decision records is being "
-                 "served yet").strip()
-    return (f"cover the {kind} {named} — its plain-language rendering is "
-            f"not being served ({reason})")
-
-
 def is_large(map_data):
     """Does this map exceed the screen budget? The ONE predicate the size
     switch turns on (CAP-3 as amended 2026-07-23). Since the pivot (#799) the
     Strands are the only units since the cluster removal (Story 20.7, #809),
     so the budget counts them alone."""
     return len(map_data.get("elements", [])) > SCREEN_BUDGET
-
-
-def candidates(map_data):
-    """Machine-proposed candidate DIRECTIONS. Never a narrative shape — what to
-    cover, not how to tell it.
-
-    Since the cluster removal (Story 20.7, #809) the STRAND — one Lesson or
-    Journey — is the only unit. Subtopic clusters, their ranking and their
-    depth estimate are gone; what survives is the strand list plus the
-    CROSS-TOPIC COMBINATION move, re-based onto strands rather than deleted
-    with the clusters it happened to be built from (re-triage of #809).
-    """
-    out = []
-    strands = _elements(map_data)
-    for el in strands:
-        out.append({
-            "kind": "element",
-            "element_kind": el.get("kind"),
-            "id": el["id"],
-            "slug": el.get("slug"),
-            "direction": _element_direction(el),
-            "topics": [el.get("topic", "")],
-            "subtopics": [],
-            "date": el.get("date"),
-            "situation": el.get("situation"),
-            "depth": None,
-            # The claim the slot leads with: the served rendering, only. A
-            # decision/reversal strand with no served rendering leads with a
-            # disclosure, not a claim (Story 20.20, #843), so its raw topic
-            # line never stands in as the substance here — the row is
-            # fallback-shaped until the rendering is served.
-            "why": el.get("gloss") or (
-                el.get("summary") if el.get("kind") in ("lesson", "journey")
-                else None),
-            "gloss": el.get("gloss"),
-            "gloss_unavailable": el.get("gloss_unavailable"),
-            # The three-valued writability verdict, VISIBLE on every strand
-            # (#799): it surfaces at selection and never filters what appears.
-            "usability": el.get("usability"),
-            "consumed": bool(el.get("consumed")),
-            "evidence_pointers": len(el.get("evidence") or []),
-        })
-
-    # CROSS-TOPIC COMBINATIONS — DEFERRED, not derived (Story 20.7, #809;
-    # SPEC-terrain corrected 2026-07-27).
-    #
-    # CAP-3 still promises the move — "at least one cross-topic combination
-    # when the evidence supports one" — and the promise stands. What does not
-    # exist is evidence that could support one. The rule requires two units
-    # that share an evidence SOURCE, and a Strand's only pointer is the
-    # surface it was read from: `lesson_item` states it outright, "Its own
-    # index line is its evidence pointer". So pairing on shared sources makes
-    # every cross-topic pair share `LESSONS.md`. Measured before this code was
-    # removed: three unrelated lessons in three distinct topics produced two
-    # combinations, both with axis `LESSONS.md`, growing quadratically — the
-    # same junk class the cluster removal exists to delete.
-    #
-    # The blocker is OQ3: lesson bodies are unservable, so the Evidence
-    # pointers that would name a shared SUBJECT never reach this consumer.
-    # REOPEN when a Strand carries an evidence pointer naming something other
-    # than the surface it was read from.
-    #
-    # Pairing on tags or shard membership instead was offered and DECLINED: a
-    # shared tag is not a shared subject (`workflow` alone has 53 members),
-    # and CAP-3's own rule is that "a combination with nothing shared is a
-    # hunch, and a hunch is the owner's to voice at the free-form entry, not
-    # the machine's to propose".
-    return out
-
-
-def _direction_lines(cands):
-    """The candidate directions, as pickable one-line rows (#632).
-
-    COMBINATIONS FIRST, then singles in rank order. The large branch derives
-    one single per subtopic, so on a 25-subtopic terrain the singles alone fill
-    the first screenful and would push the cross-topic combinations — "the move
-    the map exists for", and the scarcer of the two — below the fold. Ordering
-    them first costs nothing (there are few) and is what keeps the combination
-    move visible where the owner actually looks.
-
-    Every row carries its INDEX, because selection is by index against the pin.
-    """
-    # ELEMENTS FIRST (the stance-3 pivot, 2026-07-27, #799): the typed
-    # elements — hub Lessons and Journeys, then decisions/reversals — are the
-    # PRIMARY selection units, so they open the list. Cross-topic combinations
-    # follow (still ahead of the cluster singles, #632's rationale unchanged
-    # within the demoted grouping), and the subtopic singles close it.
-    elements = [c for c in cands if c.get("kind") == "element"]
-    combos = [c for c in cands if c.get("kind") == "combination"]
-    rest = [c for c in cands if c.get("kind") not in ("combination", "element")]
-    rest.sort(key=lambda c: 0 if _is_substance_led(c) else 1)
-    out = []
-    for c in elements + combos + rest:
-        # COUNTS DEMOTE (CAP-3, substance-led rendering): a count may trail a
-        # line that leads with a claim, but it is never what the line says. A
-        # fallback line carries its subject alone — "subject plus counts" is
-        # the exact shape the clause forbids, and the counts stay one section
-        # down in the subtopic's own block.
-        facts = []
-        verdict = _verdict_phrase(c)
-        if verdict:
-            # The writability verdict is VISIBLE on every element row (#799):
-            # it surfaces, it never filters, and it may not be clipped away —
-            # the claim gives way to it below, never the other way round.
-            facts.append(verdict)
-        if _is_substance_led(c):
-            # Declared, not checked (#842): this counts the source references
-            # the material declares; whether they resolve is the verdict's to
-            # say, so the two never share one phrase.
-            n = c.get("evidence_pointers", 0)
-            facts.append(f"{n} source reference{'' if n == 1 else 's'} "
-                         "declared")
-        if c.get("consumed"):
-            facts.append("already consumed — still selectable")
-        trailer = f" ({', '.join(facts)})" if facts else ""
-        head = f"- **{c['id']}** — "
-        room = VIEW_LINE_CHARS - len(head) - len(trailer)
-        direction = c["direction"]
-        if len(direction) > room > 0:
-            direction = _elide(direction, room)
-        out.append(f"{head}{direction}{trailer}")
-    return out or ["- none: this map proposes no directions"]
-
-
-def _is_substance_led(cand):
-    """Does this candidate's wording carry the material's own claim?
-
-    True for an element (its summary IS the claim) and for a subtopic whose
-    material yielded one; False where no claim was found and the
-    wording fell back to coverage. Combinations name an axis derived from
-    shared evidence and are ordered first regardless, so they never reach here.
-    """
-    if cand.get("kind") == "element":
-        return bool(str(cand.get("why") or "").strip())
-    return bool(cand.get("claim"))
-
-
-# The map's OWN internal lexicon, enumerated (Story 18.82, #646). CAP-3's
-# owner-readable clause is only lintable because this list is finite: cluster
-# and track states, the depth ladder's enum keys, the density counter names,
-# and the source-family ids. Every one of them is a legitimate value in
-# `map.json` — the defect is presenting it on the surface the owner reads.
-#
-# A term added to the assembler and not registered here would silently stop
-# being gated, which is why `check-topic-map-screen.sh` derives the depth keys
-# and family names from the map itself and fails on a term this list misses.
-INTERNAL_VOCAB = (
-    "(unclustered)", "(untracked)", "(unnamed)",
-    "seed-only", "short-note", "full-article", "article-series",
-    "hub-lessons", "host-sources", "articles-items",
-    "unclustered", "subtopic:", "cluster:", "frontmatter",
-    " ptr,", " ptr)", "unconsumed", "live item", "density",
-    # The 2026-07-27 owner-flagged spellings (#842): the verdict-fallback
-    # enum and the pointer-count trailer. Registered so a regression FAILS
-    # the render-boundary check instead of passing as unlisted.
-    "evidence lookup: cannot-determine", " evidence pointer",
-    # Retired vocabulary is NOT banned here — see check-retired-vocabulary.sh.
-    # This lint runs over composed lines that QUOTE THE MATERIAL'S OWN WORDS
-    # (CAP-3 substance-led rendering), so it cannot tell the tool's vocabulary
-    # from the owner's content on the same line. Banning a common word here
-    # fires on content: "seed" flagged a fixture subtopic named "seed-heavy".
-    # The retired-vocabulary rule belongs at the layer where the TOOL's words
-    # are written, which is the source text.
-)
-
-
-def lint_owner_lines(lines):
-    """Internal vocabulary found on the owner's reading path — the render-time
-    check CAP-3's owner-readable clause implies (Story 18.82, #646).
-
-    Returns `(line, term)` pairs. Reporting, never rewriting: a line the tool
-    silently launders would hide the derivation defect that produced it, and
-    #637 already established that the fix belongs in the derivation. The caller
-    decides what to do with a defect; `compose_view` reports it on stderr so it
-    cannot be emitted unnoticed.
-    """
-    found = []
-    for line in lines:
-        low = line.lower()
-        for term in INTERNAL_VOCAB:
-            if term.lower() in low:
-                found.append((line.strip(), term))
-    return found
 
 
 def compose_view(map_data, cands):
@@ -1165,6 +907,139 @@ def compose_member_listing(map_data, tag, cands, axis="tag"):
                 lines.append(_clip_line(arc))
         lines.append("")
     return "\n".join(lines).rstrip() + "\n"
+
+
+def compose_full_report(map_data, tag, cands, group_ids, axis="tag",
+                        claims=None, grouping=None):
+    """The FULL REPORT for the group ids the owner named (Story 20.56, #938;
+    SPEC-terrain CAP-3 §"the owner may pull a FULL REPORT for named group ids").
+
+    Each named group is rendered SEPARATELY, in the order asked, keyed by its
+    screen id — never flattened into a union, because the whole point is
+    judging whether a grouping makes sense, and a union destroys exactly the
+    boundary being judged.
+
+    Claims are CARRIED, never recomposed (AC3). Recomposition belongs to subset
+    selection, which is a different operation on a different input: it runs
+    over the owner's chosen subset, while this runs over the group's full,
+    unaltered member set. So the claim arrives from the screen that already
+    composed it and is echoed verbatim; a group whose claim was not carried
+    says so rather than having one invented for it here.
+
+    NOTHING IS SELECTED (AC4). This is inspection: no Strand is picked, no
+    brief is composed, and the standing exits stay exactly where they were.
+
+    The whole-relay is a STATED EXCEPTION to the size switch (AC7), bounded by
+    the owner's own pointers: it relays whole rather than collapsing to a
+    summary plus a path, and it covers exactly the groups named — never the
+    whole member. The reported defect was a relay doing its best and flattening
+    nineteen Strands into headline one-liners, which is why the rendering lives
+    here in code rather than in a prose obligation.
+    """
+    ms = member_sections(map_data, tag, axis, grouping=grouping)
+    by_id = {s.get("group_id"): s for s in ms["sections"]}
+    unknown = [g for g in group_ids if g not in by_id]
+    if unknown:
+        raise SystemExit(_err(
+            f"{', '.join(unknown)} names no group on this screen. Group ids "
+            f"are PER-SCREEN and PER-PIN — they do not survive a re-run — so "
+            f"this screen's ids are {', '.join(sorted(by_id))} at pin "
+            f"{map_data.get('coverage', {}).get('pin')}. Re-read the screen "
+            "and name the groups from it."))
+    by_slug = {c.get("slug"): c for c in cands if c.get("kind") == "element"}
+    subbed = _substituted_paths(map_data)
+    claims = claims or {}
+    noun = "topic" if axis == "topic" else "tag"
+    # THE PIN AND THE GROUP DEFINITIONS ARE RESTATED (AC6): group ids are
+    # per-screen, per-pin identifiers, so a report naming `G2` alone is
+    # unreadable one invocation later.
+    lines = [f"# Full report — {ms['member']} ({noun}), "
+             f"{len(group_ids)} group(s) of {len(ms['sections'])}",
+             "",
+             f"Pin: {_pin_display(map_data)}",
+             f"Grouped by: {ms['substrate']}. Group ids are per-screen and "
+             "per-pin; each is defined below where it is rendered.",
+             "This is inspection only — nothing here selects a Strand or "
+             "composes a brief.",
+             ""]
+    groups = []
+    for gid in group_ids:
+        sec = by_id[gid]
+        strands = sec["strands"]
+        claim = str(claims.get(gid) or "").strip()
+        lines.append(f"## {gid} — {sec['title']} ({len(strands)})")
+        lines.append("")
+        # THE DEFINITION of the id, restated: which Strands this id names on
+        # this screen, so the report is readable without the screen beside it.
+        lines.append(_clip_line(
+            f"Group definition: the {len(strands)} Strand(s) the "
+            f"{ms['substrate']} substrate placed under "
+            f"{sec['title']!r}" + (f" — {sec['note']}" if sec.get("note") else "")))
+        lines.append("")
+        if claim:
+            # VERBATIM, as the screen showed it. Not re-derived, not shortened.
+            lines.append(f"In common: {claim}")
+        else:
+            # Never invented here. A missing claim is a stated absence, which
+            # is the same rule the rest of this surface follows.
+            lines.append("In common: not carried from the screen for this "
+                         "group — stated as absent rather than recomposed "
+                         "here, because recomposition belongs to subset "
+                         "selection.")
+        lines.append("")
+        for el in strands:
+            c = by_slug.get(el.get("slug"))
+            ident = c["id"] if c else el.get("slug", "?")
+            text = el.get("gloss") or el.get("title") or el.get("slug", "")
+            mark = (" — already consumed, still selectable"
+                    if el.get("consumed") else "")
+            lines.append(_clip_line(f"- **{ident}** — {text}{mark}"))
+            lines.append(_clip_line(
+                _strand_context_line(el, ms["member"], subbed)))
+            arc = _journey_arc_line(el)
+            if arc:
+                lines.append(_clip_line(arc))
+        lines.append("")
+        groups.append({"group_id": gid, "title": sec["title"],
+                       "claim": claim or None,
+                       "claim_carried": bool(claim),
+                       "strands": [e.get("slug") for e in strands],
+                       "count": len(strands)})
+    return {"kind": "terrain-full-report", "member": ms["member"], "axis": axis,
+            "pin": map_data.get("coverage", {}).get("pin"),
+            "substrate": ms["substrate"],
+            "asked": list(group_ids),
+            "groups": groups,
+            # Inspection, asserted as data as well as said in prose.
+            "selected": [], "brief": None, "recomposed": False,
+            "relay": "whole",
+            "report": "\n".join(lines).rstrip() + "\n"}
+
+
+def cmd_report(args):
+    m = load_map(args.map)
+    axis = getattr(args, "axis", "tag") or "tag"
+    group_ids = [g for g in re.split(r"[,\s]+", str(args.groups or "")) if g]
+    if not group_ids:
+        return _err("no group id named. A full report is pulled by naming the "
+                    "group ids you want from the current screen.")
+    claims = None
+    if getattr(args, "claims", None):
+        try:
+            claims = json.loads(args.claims)
+        except ValueError as exc:
+            return _err(f"--claims is not readable JSON: {exc}")
+    grouping = None
+    if getattr(args, "grouping", None):
+        try:
+            grouping = json.loads(args.grouping)
+        except ValueError as exc:
+            return _err(f"--grouping is not readable JSON: {exc}")
+    out = compose_full_report(m, str(args.tag).strip(), candidates(m),
+                              group_ids, axis, claims, grouping)
+    json.dump(out, sys.stdout, indent=2, ensure_ascii=False)
+    sys.stdout.write("\n")
+    return 0
 
 
 def cmd_member(args):
@@ -1889,6 +1764,28 @@ def main(argv=None):
                          "[{\"in_common\": str, \"members\": [slug, ...]}]. "
                          "Placement only — any ordering it carries is ignored "
                          "and any Strand it omits is re-attached.")
+    # THE FULL REPORT (Story 20.56, #938). Inspection by group id — a
+    # different operation from selection by Strand index, and they stay
+    # different: `G` is a display kind conferring no selection authority.
+    rp = sub.add_parser("report", help="a FULL REPORT for named group ids: "
+                        "each group's claim, then its members whole")
+    rp.add_argument("--map", required=True)
+    rp.add_argument("--tag", required=True, metavar="MEMBER",
+                    help="the member whose screen the group ids were read from")
+    rp.add_argument("--axis", choices=[a["key"] for a in AXES], default="tag")
+    rp.add_argument("--groups", required=True, metavar="IDS",
+                    help="the group ids to report, comma- or space-separated "
+                         "(for example 'G1,G3'). Rendered separately, in the "
+                         "order asked — never flattened into a union.")
+    rp.add_argument("--claims", metavar="JSON",
+                    help='the claims the screen already composed, as {"G1": '
+                         '"..."}. Carried VERBATIM — this path never '
+                         "recomposes a claim, and a group whose claim is not "
+                         "carried states the absence instead.")
+    rp.add_argument("--grouping", metavar="JSON",
+                    help="the same model-proposed grouping the screen was "
+                         "composed with, so the ids resolve to the same "
+                         "sections")
     ji = sub.add_parser("journey-inputs",
                         help="the judgment inputs for the journey-similarity "
                              "substrate: each Strand's SERVED arc, verbatim")
@@ -1932,6 +1829,7 @@ def main(argv=None):
     return {"candidates": cmd_candidates, "payload": cmd_payload,
             "view": cmd_view, "brief": cmd_brief,
             "axis": cmd_axis, "member": cmd_member,
+            "report": cmd_report,
             "journey-inputs": cmd_journey_inputs}[args.cmd](args)
 
 

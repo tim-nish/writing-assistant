@@ -101,6 +101,34 @@ and **stop here** stay on the table exactly as on Screen 1. There is no `J`
 index: a Journey is an arc on its lesson's row, so selecting the Lesson carries
 the arc with it (#871, and its minting code was removed in #933).
 
+**The owner may pull a FULL REPORT for named group ids (SPEC-terrain CAP-3,
+added 2026-07-30, #938).** When they want to judge whether a grouping actually
+makes sense, they name group ids from the screen and read each group whole:
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/topic-map-directions.py report \
+  --map "$WS/map.json" --tag <member> --groups "G1,G3" \
+  --claims '{"G1":"<the claim you composed for G1, verbatim>", ...}'
+```
+
+Relay the returned `report` **as given**. Each named group renders separately,
+in the order asked, keyed by its screen id — never flattened into a union,
+because a union destroys the boundary being judged. Each group shows its
+existing claim first, then every member Strand's full served rendering. Pass
+back the claims you already composed: this path **carries** them verbatim and
+**never recomposes** — recomposition belongs to subset selection (#937) and is
+not reachable from here. A group whose claim you do not pass states the
+absence rather than having one invented.
+
+The report is **inspection only**: nothing is selected, no brief is composed,
+and the standing exits stay where they are. It relays **whole** even past the
+screen budget — a stated exception, bounded by the owner's own pointers, since
+it covers exactly the groups named and never the whole member. It renders from
+the invocation's held state and `map.json`; the written View file is never read
+back, here or anywhere. Group ids are per-screen and per-pin, so the report
+restates the pin and each id's definition — `G2` alone is unreadable one
+invocation later.
+
 **Selection is a SET (SPEC-terrain CAP-3, added 2026-07-30, #937).** The owner
 may name **several** Strand indexes, and the brief is composed from exactly
 that set — exploring is how they decide what to write about, not a detour
