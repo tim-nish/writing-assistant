@@ -1,4 +1,10 @@
 #!/usr/bin/env sh
+# parallel-safe
+# parallel-verified 2026-07-31 (#999) — added 2026-07-30 with no
+# parallel-safety decision at all. Verified: one `mktemp -d` holds every write,
+# the composer is driven over inline JSON on stdin, and the repo is only read.
+# `py_compile`'s `scripts/__pycache__` write is atomic and already shared by 64
+# declared checks.
 # tier: inner — fixture-based: a handful of `structures` invocations over inline
 #   JSON, no pipeline run, no seam call. Milliseconds, so it belongs in the
 #   per-edit loop that guards the composer it checks.

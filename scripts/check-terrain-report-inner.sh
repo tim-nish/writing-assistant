@@ -1,4 +1,9 @@
 #!/usr/bin/env sh
+# parallel-safe
+# parallel-verified 2026-07-31 (#999) — verified: a `mktemp -d` for the fixture
+# and a bare `mktemp` for the concatenated SKILL text, both unique per process;
+# the repo is only read. (The `mktemp` SKILL file outlives the run because the
+# later `trap` replaces the earlier one — a leak, not a collision.)
 # tier: inner — full-report assertions against a synthesized fixture map; no
 #   seam, no corpus, no assembly. Measured 2026-07-30 at adoption: ~0.9s
 #   (ceiling 2s).

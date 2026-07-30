@@ -1,4 +1,12 @@
 #!/usr/bin/env sh
+# parallel-safe
+# parallel-verified 2026-07-31 (#999) — added 2026-07-30 with no
+# parallel-safety decision at all, which is the omission #999's prevention half
+# now makes an error. Verified: every write is under one `mktemp -d`; the repo
+# is only READ (greps of the plan writer, the resolver and complete.md);
+# `py_compile` writes `scripts/__pycache__` atomically, as 64 already-declared
+# checks do. No fixed temp path, no cwd assumption beyond `cd "$root"`, no
+# ordering dependence on another check.
 # tier: inner — fixture-based: a plan file in a temp dir, the plan writer's
 #   validator, and two `structure-record` invocations. No pipeline run, no
 #   seam call, milliseconds — it guards the record it checks inside the edit

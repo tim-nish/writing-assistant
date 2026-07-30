@@ -1,7 +1,13 @@
 #!/usr/bin/env sh
-# NOT parallel-safe (#957/#964) — deliberately carries no `# parallel-safe`
-# header, so run-checks.sh -P leaves it in the serial remainder. Reason:
-# measured 2026-07-30 to create a per-repo directory under the REAL machine state root (~/.local/state/writing-assistant/) rather than a mktemp jail.
+# parallel-safe
+# parallel-verified 2026-07-31 (#999) — the 2026-07-30 observation stands (it
+# does create a directory under the REAL state root), but re-measuring showed
+# that directory is KEYED ON ITS OWN `mktemp -d` host path — observed
+# `~/.local/state/writing-assistant/-tmp-tmp-<random>-host/` — so two
+# concurrent runs can never name the same path, and no check declared
+# parallel-safe reads the real state root at all (grepped: every state-root
+# consumer in the suite sets XDG_STATE_HOME). The residue is a HYGIENE defect,
+# not a concurrency one, and the undeclared default is not the tool for it.
 # tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
 # check-named-element-pin.sh — verify CAP-9 named-element pin (#431): a
 # `--element <name>` directive at stage 0 records the pin in run state, pinning

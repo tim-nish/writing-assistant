@@ -11,7 +11,9 @@
 #   whichever lands first.
 # check-check-declarations.sh — every NEW check declares its runtime tier and
 # its removal signal in its header (Story 20.48, #922; spec amendment
-# #910/#913 in specs/spec-writing-assistant/SPEC.md).
+# #910/#913 in specs/spec-writing-assistant/SPEC.md), and EVERY check declares
+# a parallel-safety decision (Story 20.71, #999; the 2026-07-31 #999/#1000
+# amendment).
 #
 # Binds NEW checks only: the checks present at adoption (2026-07-30) are
 # baselined below and are classified when touched, per the amendment's
@@ -24,6 +26,27 @@
 # The removal signal follows the ratified shape: concrete, observable
 # conditions recorded at adoption — a bare expiry date alone does not satisfy
 # it (a date is when to look, not what to look for).
+#
+# THE PARALLEL-SAFETY DECISION BINDS EVERY CHECK, NOT ONLY NEW ONES (Story
+# 20.71, #999). The baseline above exempts pre-adoption files from `tier:` and
+# `removal-signal:` because that classification was a retrospective sweep and
+# was declined. Parallel-safety is not in that position: story 20.71 verified
+# and recorded a decision for all 14 undeclared members, so the set is COMPLETE
+# at adoption of this gate and there is nothing to exempt. Each check carries
+# exactly one of:
+#
+#   # parallel-safe                 (the affirmative declaration run-checks.sh
+#                                    reads — the line is exactly this, alone)
+#   # serial-reason: <why it stays serial>
+#
+# and the gate fails NAMING the file that carries neither. The two are not
+# symmetric and must not be made so: `# parallel-safe` is a licence read by the
+# runner, `# serial-reason:` is read by a human and by this gate only. Absence
+# of both still means SERIAL at runtime — this gate never changes what
+# run-checks.sh does, it changes whether the omission is VISIBLE. That is the
+# whole remedy: two of the 14 were added on 2026-07-30 by an agent that had
+# just read the parallel-safe amendment and simply never declared, and an
+# omission that emits no error recurs.
 #
 # POSIX sh; runs in milliseconds (inner tier).
 
@@ -204,6 +227,35 @@ done
 
 [ "$new" -gt 0 ] && ok "$new post-adoption check(s) scanned for tier + removal-signal declarations" \
   || ok "no post-adoption checks yet — baseline unchanged, nothing to enforce"
+
+# --- the parallel-safety decision, over EVERY check (Story 20.71, #999) -------
+# `# parallel-safe` must match run-checks.sh's is_parallel_safe() exactly:
+# the line is that string alone. `# parallel-safe: yes` is not a declaration
+# there and is not one here either, so the gate cannot bless a header the
+# runner ignores.
+decided=0
+for f in scripts/check-*.sh; do
+  [ -e "$f" ] || continue
+  if head -25 "$f" | grep -qE '^# parallel-safe[[:space:]]*$'; then
+    decided=$((decided + 1)); continue
+  fi
+  why=$(head -25 "$f" | sed -n 's/^# serial-reason:[[:space:]]*//p' | head -1)
+  if [ -z "$why" ]; then
+    if head -25 "$f" | grep -qE '^# parallel-safe'; then
+      err "$f writes '# parallel-safe' with something after it — run-checks.sh reads that line only when it stands alone, so this is NOT a declaration and the check runs serially. Put '# parallel-safe' on its own line, or declare '# serial-reason: <why>' (Story 20.71, #999)"
+    else
+      err "$f declares no parallel-safety decision — add '# parallel-safe' (on its own line, after verifying the check's isolation) or '# serial-reason: <why it stays serial>' in the first 25 lines (Story 20.71, #999)"
+    fi
+  else
+    rwords=$(printf '%s' "$why" | sed -E 's/[0-9]{4}-[0-9]{2}-[0-9]{2}//g; s/[^A-Za-z]+/ /g' | wc -w | tr -d ' ')
+    if [ "$rwords" -ge 3 ]; then
+      decided=$((decided + 1))
+    else
+      err "$f declares a serial reason with no substance ('$why') — name the shared resource or the nondeterminism that keeps it serial (Story 20.71, #999)"
+    fi
+  fi
+done
+ok "$decided check(s) carry an explicit parallel-safety decision"
 
 if [ "$fail" -eq 0 ]; then
   printf '\nAll check-declaration checks passed.\n'; exit 0

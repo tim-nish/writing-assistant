@@ -1,4 +1,9 @@
 #!/bin/sh
+# parallel-safe
+# parallel-verified 2026-07-31 (#999) — the second of the two checks added
+# 2026-07-30 with no declaration either way. Verified: one `mktemp -d` holds
+# the fixture map and all three rendered claim states; the repo is only read;
+# same concurrency-neutral cwd reliance as check-terrain-relay-fidelity.sh.
 # check-terrain-group-disclosure.sh — Story 20.67 (#979/#980).
 #
 # A group's `in common:` line has THREE states — composed, explicitly no

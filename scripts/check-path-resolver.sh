@@ -1,7 +1,13 @@
 #!/usr/bin/env sh
-# NOT parallel-safe (#957/#964) — deliberately carries no `# parallel-safe`
-# header, so run-checks.sh -P leaves it in the serial remainder. Reason:
-# uses the FIXED shared paths /tmp/xdgstate and /tmp/xdgconf outside any mktemp dir.
+# parallel-safe
+# parallel-verified 2026-07-31 (#999) — the fixed paths /tmp/xdgstate and
+# /tmp/xdgconf are STRING FIXTURES, never filesystem state: they are passed as
+# XDG_STATE_HOME / XDG_CONFIG_HOME to `resolve-paths.py state-root|repo-dir|
+# config-home`, which only PRINT (resolving is a query, #935 — the resolver
+# mkdir'd once and that was the accumulation bug it stopped doing). Confirmed
+# empirically: neither directory exists after a run. Everything the check
+# actually writes is a `mktemp -d`, and its stderr captures are /tmp/sf_err.$$,
+# unique per check process.
 # tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
 # check-path-resolver.sh — verify the path resolver is the single source of
 # storage paths (Story 9.1). POSIX shell + stdlib Python only.
