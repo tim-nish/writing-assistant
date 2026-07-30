@@ -599,7 +599,11 @@ python3 - <<'NAV_EOF'
 import json, subprocess, tempfile, os, sys
 
 D = "scripts/topic-map-directions.py"
-SK = "skills/terrain/SKILL.md"
+# Story 20.64 (#962): the skill is a dispatcher + step companions; the
+# assertion is over the family, whose order matches the pre-split file.
+SK = ["skills/terrain/SKILL.md", "skills/terrain/steps/map.md",
+      "skills/terrain/steps/screens.md", "skills/terrain/steps/brief.md",
+      "skills/terrain/steps/gap.md"]
 fail = 0
 
 
@@ -652,7 +656,7 @@ check(not any(tok in src for tok in ("read_view(", "load_view(", "VIEW_CACHE")),
       "no reader and no cache exist for the view file (grep-assertable)")
 
 # --- AC7: the standing exits are on the screen -----------------------------
-sk = open(SK).read()
+sk = "".join(open(p).read() for p in SK)
 for exit_name in ("switch substrate", "back to the member list",
                   "name your own direction", "stop here"):
     check(exit_name in sk, f"the standing exit '{exit_name}' is on the screen")

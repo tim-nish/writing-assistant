@@ -85,7 +85,9 @@ case "$listing" in
   *) bad "Screen 2's listing carries no codebook pointer — the vocabulary is undecodable from the surface" ;;
 esac
 
-if grep -q "$DOC" skills/terrain/SKILL.md; then
+# Story 20.64 (#962): the pointer lives in the Step 2 companion the presenter
+# reads on entry; assert over the dispatcher + step-companion family.
+if cat skills/terrain/SKILL.md skills/terrain/steps/*.md | grep -q "$DOC"; then
   ok "the skill presenting Screen 1 carries the codebook pointer"
 else
   bad "skills/terrain/SKILL.md carries no codebook pointer — Screen 1's fields are budgeted, so the presenter is its carrier"

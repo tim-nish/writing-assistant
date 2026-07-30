@@ -24,7 +24,12 @@ M="scripts/terrain_map.py"
 D="scripts/topic-map-directions.py"
 T="scripts/terrain_text.py"
 VP="scripts/validate-proposal-payload.py"
-SKILL="skills/terrain/SKILL.md"
+SKILL=$(mktemp)
+cat skills/terrain/SKILL.md skills/terrain/steps/map.md \
+    skills/terrain/steps/screens.md skills/terrain/steps/brief.md \
+    skills/terrain/steps/gap.md > "$SKILL"
+# ^ story 20.64 (#962): the skill is now a dispatcher + step companions; checks
+#   assert over the concatenation, whose order matches the pre-split file.
 FIX="scripts/fixtures/terrain/screen-map.json"
 
 fail=0
@@ -86,7 +91,12 @@ done
 
 
 # --- lockstep: the SKILL states the shipped mechanics ------------------------
-[ -f "$SKILL" ] && ok "the topic-map skill exists" || err "$SKILL missing"
+for __sk in skills/terrain/SKILL.md skills/terrain/steps/map.md \
+            skills/terrain/steps/screens.md skills/terrain/steps/brief.md \
+            skills/terrain/steps/gap.md; do
+  [ -s "$__sk" ] && ok "the terrain skill family ships $__sk" \
+    || err "$__sk missing or empty (dispatcher + step companions, story 20.64)"
+done
 # The owner path is the two-screen flow (Story 20.19, #841): axis, then
 # member, then brief. The pre-pivot `payload --view` invocation left the
 # skill with that story; the View survives on the size switch's over-budget
