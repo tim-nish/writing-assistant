@@ -397,6 +397,67 @@ grep -qE 'lessons_index|LESSONS\.md.*open\(|policy_lookup' "$CODE" \
   && err "terrain_map.py talks to the gateway itself (the seam is the only reader)" \
   || ok "hub-lessons: no second policy reader exists in the implementation"
 
+# --- the retired `J<n>` namespace has no minting code (Story 20.51, #933) ----
+# The namespace was retired in spec text on 2026-07-28 (#871) and its code
+# stayed for two days — reachable only on a kind the record path never emits,
+# and therefore invisible to every test while still teaching a reader that `J`
+# rows might appear. Grep-asserted like the other absences in this file.
+grep -qE '"journey": *0|prefix *= *"L" if|f"\{prefix\}\{counters' "$D" \
+  && err "the J<n> minting code is back in topic-map-directions.py (#933/#871)" \
+  || ok "no J<n> minting code remains — an arc is carried by its lesson's row"
+
+# --- journey presence is read from the RECORD, not from a pointer (#933) -----
+# The correction this story exists for: presence must not be inferred from
+# whether an arc rendering was addressable, and must never be read off the
+# `journey` KIND discriminator (doing so misroutes 109 of 117 lesson
+# renderings). Both wrong sources are named so a future edit cannot pick them
+# by accident.
+grep -qE 'journey_recorded' "$D" \
+  && ok "the renderer reads journey presence from the paired record" \
+  || err "the renderer no longer reads journey_recorded — presence has lost its carrier (#933)"
+grep -nE 'no-journey' "$D" | grep -qE 'journey_shard|\["journey"\]' \
+  && err "the no-journey marker is derived from a pointer or the kind discriminator, not the record (#933)" \
+  || ok "the no-journey marker is not derived from a pointer or the kind flag"
+
+# --- AC7: the lessons/journeys split has a guard, because it had none --------
+# All four terrain checks passed while a change moved 109 of 117 served lesson
+# renderings out of the lessons lookup: nothing exercised the split. This
+# asserts count-in == count-out over it — the shape the suite already uses for
+# composed Strands — so the trap cannot be re-armed silently.
+python3 - "$M" <<'PYEOF' || fail=1
+import importlib.util, sys
+fail = []
+def check(cond, msg):
+    print(("ok:   " if cond else "FAIL: ") + msg, file=sys.stdout if cond else sys.stderr)
+    if not cond: fail.append(msg)
+spec = importlib.util.spec_from_file_location("tm", sys.argv[1])
+tm = importlib.util.module_from_spec(spec)
+try:
+    spec.loader.exec_module(tm)
+except SystemExit:
+    pass
+by_file, strands, reason = tm.strand_entries(".")
+entries = [e for _rel, parsed in by_file for e in parsed]
+if not entries:
+    check(True, f"no records served here — split guard not exercised ({reason})")
+else:
+    # The routing the gloss read performs, reproduced exactly.
+    lessons = [e for e in entries if not e["journey"]]
+    arcs = [e for e in entries if e["journey"]]
+    check(len(lessons) == len(entries) and not arcs,
+          f"every served lesson rendering lands in the lessons lookup — "
+          f"count-in == count-out ({len(lessons)}/{len(entries)}, {len(arcs)} misrouted)")
+    # And presence is carried, separately from that discriminator.
+    rec = sum(1 for e in entries if e.get("journey_recorded"))
+    ptr = sum(1 for e in entries if e.get("journey_shard") is not None)
+    check(any(e.get("journey_recorded") for e in entries),
+          f"journey presence reaches the composed entries ({rec} of {len(entries)})")
+    check(rec >= ptr,
+          f"presence is record-based, never narrower than pointer resolution "
+          f"({rec} recorded vs {ptr} resolving)")
+sys.exit(1 if fail else 0)
+PYEOF
+
 
 [ "$fail" -eq 0 ] && printf '\nAll %s checks passed.\n' "$0" \
   || { printf '\n%s FAILED.\n' "$0" >&2; exit 1; }

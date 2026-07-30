@@ -98,6 +98,7 @@ from terrain_text import (  # noqa: E402
     _fit_parts,
     _fit_with_path,
     _gloss_disclosure_line,
+    _journey_coverage_line,
     _journey_disclosure_line,
     _pin_display,
     _short_path,
@@ -178,13 +179,22 @@ def _elements(map_data):
     stored nowhere, exactly as the subtopic IDs are.
 
     Since the stance-3 pivot (2026-07-27, #799) the elements are the PRIMARY
-    selection units and carry three namespaces, so a selection is never
-    ambiguous: `L<n>` for hub Lessons and `J<n>` for Journey renderings (both
-    numbered in the assembler's slug-sorted order, deterministic within a
-    pin), and `E<topic>.<n>` for the decision/reversal projection, unchanged.
+    selection units. They carry TWO namespaces, not three (Story 20.51, #933):
+    `L<n>` for hub Lessons, numbered in the assembler's slug-sorted order and
+    deterministic within a pin, and `E<topic>.<n>` for the decision projection.
+    `J<n>` was retired with independent Journey selection (#871) and its
+    minting code is now gone too — an arc is displayed on its lesson's row and
+    the lesson is what the owner selects.
     """
     rows, seen = [], {}
-    counters = {"lesson": 0, "journey": 0}
+    # `J<n>` is GONE (Story 20.51, #933). The namespace was retired in spec
+    # text on 2026-07-28 (#871) and the code that minted it stayed — a
+    # `journey` counter and a `J` prefix reachable only on a kind the
+    # record-authoritative path never emits. Dead code implementing a retired
+    # contract is not inert: it is why a screen could be written as though `J`
+    # rows might appear, and then assert their absence as a finding. A
+    # Journey's presence is now carried by its lesson's row, not by an id.
+    counters = {"lesson": 0}
     hub = [e for e in map_data.get("elements", [])
            if e.get("kind") not in counters]
     topics = sorted({e.get("topic", "") for e in hub})
@@ -193,8 +203,7 @@ def _elements(map_data):
         kind = el.get("kind")
         if kind in counters:
             counters[kind] += 1
-            prefix = "L" if kind == "lesson" else "J"
-            rows.append(dict(el, id=f"{prefix}{counters[kind]}"))
+            rows.append(dict(el, id=f"L{counters[kind]}"))
             continue
         topic = el.get("topic", "")
         seen[topic] = seen.get(topic, 0) + 1
@@ -491,6 +500,12 @@ def compose_view(map_data, cands):
     jline = _journey_disclosure_line(map_data)
     if jline:
         lines += ["", jline]
+    # The View renders Strand rows too, so it owes the same denominator
+    # (#933/#934) — "every screen rendering Strand rows" admits no exception
+    # for the one that is a file.
+    cline = _journey_coverage_line(map_data.get("elements") or [])
+    if cline:
+        lines += ["", cline]
     # THE VIEW ENDS HERE (Story 20.5, #802). What used to follow — "Subtopic
     # clusters", "Maintenance", "Diagnostics" — was ~2,300 of a 2,511-line
     # view serving no function the owner could identify, so the sections AND
@@ -1053,6 +1068,16 @@ def _strand_context_line(el, member_tag, substituted=()):
     mark = ""
     if origin and any(str(origin).startswith(p) for p in substituted):
         mark = " · SUBSTITUTED SOURCE — not the path requested"
+    # ABSENCE is marked; presence is silent (SPEC-terrain CAP-2, amended
+    # 2026-07-30, #933/#934). Presence-marking was designed against ~50%
+    # coverage and inverts at 109/117: a marker on nearly every row carries
+    # nothing per row, while the thin Strands are the actionable set. Read from
+    # the paired record (`journey_recorded`), never from the arc rendering or
+    # the shard pointer — those answer "was it addressable?", not "does it
+    # exist?". The screen-level denominator is what keeps this readable as
+    # coverage drifts; see `_journey_coverage_line`.
+    if el.get("kind") == "lesson" and not el.get("journey_recorded"):
+        mark += " · no-journey"
     return f"  ({topics} · {where} · {reasoning}{mark})"
 
 
@@ -1111,6 +1136,14 @@ def compose_member_listing(map_data, tag, cands, axis="tag"):
     jline = _journey_disclosure_line(map_data)
     if jline:
         lines += [_clip_line(jline), ""]
+    # The coverage denominator for THIS screen's rows (#933/#934). It sits with
+    # the other disclosures and above the sections, because it states what the
+    # `no-journey` markers below are a fraction of — a marker whose denominator
+    # arrives after the rows it qualifies is read as a verdict, not a ratio.
+    cline = _journey_coverage_line(
+        [e for sec in ms["sections"] for e in sec["strands"]])
+    if cline:
+        lines += [_clip_line(cline), ""]
     for sec in ms["sections"]:
         head = f"## {sec['title']} ({len(sec['strands'])})"
         if sec.get("note"):

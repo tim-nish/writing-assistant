@@ -208,9 +208,25 @@ commonality and never substitutes for a Strand's own text; every Strand stays
 exactly once and selectable — you never omit, merge, rank, or gate one; and
 when the gateway is unavailable or you skip composition, **say so** and
 relay the deterministic titles — a silent skip is the defect a stated
-absence is not. Selection is by
-Strand index (`L3`, `J1`, `E2.1`) plus a short note about the angle; free-form
-and **stop here** stay on the table exactly as on Screen 1. Record the answer
+absence is not.
+
+**Journey presence is marked by ABSENCE, and the screen states its denominator
+(SPEC-terrain CAP-2 as amended 2026-07-30, #933/#934).** Relay both as given —
+neither is yours to compose. A row carrying an arc says nothing about it in its
+context line (the arc itself is displayed below the row, as always); a row
+whose Lesson has **no** paired journey record carries `· no-journey`. The
+listing's coverage line — *n of m Strands carry journey material* — is what
+those markers are a fraction of, so it is relayed **above** the sections, never
+dropped as boilerplate: at 93% coverage the markers are rare, and a rare marker
+with no denominator reads as a defect in the row rather than a fact about the
+corpus. Never assert that a member carries no journey material — the
+denominator says how much it carries, and only the served records can say none.
+
+Selection is by
+Strand index (`L3`, `E2.1`) plus a short note about the angle; free-form
+and **stop here** stay on the table exactly as on Screen 1. There is no `J`
+index: a Journey is an arc on its lesson's row, so selecting the Lesson carries
+the arc with it (#871, and its minting code was removed in #933). Record the answer
 against the `ask_id` the validator returned, with the **pin the listing
 shows**:
 

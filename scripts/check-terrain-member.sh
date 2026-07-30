@@ -30,7 +30,7 @@ ok()  { printf 'ok:   %s\n' "$1"; }
 D="scripts/topic-map-directions.py"
 
 python3 - "$D" <<'PYEOF' || fail=1
-import json, re, subprocess, sys, tempfile
+import json, os, re, subprocess, sys, tempfile
 D = sys.argv[1]
 fail = []
 def check(cond, msg):
@@ -163,6 +163,41 @@ check(any("origin not recorded" in c for c in ctx),
       "an unrecorded origin is stated as absent, never invented")
 check(all("·" in c for c in ctx),
       "context lines carry all three fields on the one line")
+
+# --- journey presence: ABSENCE is marked, and the denominator is stated ------
+# (Story 20.51, #933/#934; CAP-2 as amended and corrected 2026-07-30.)
+# The fixture's Strands carry no `journey_recorded`, so EVERY row is thin —
+# which makes the polarity assertable in both directions from one run.
+cov = [ln for ln in d["listing"].split("\n") if "carry journey material" in ln]
+check(len(cov) == 1,
+      f"the screen states its journey-coverage denominator exactly once ({len(cov)})")
+check(re.search(r"\b0 of \d+ Strands carry journey material", cov[0] or ""),
+      f"the denominator counts this screen's own Strands ({cov[0] if cov else None!r})")
+check(all("no-journey" in c for c in ctx),
+      "a Strand with no paired journey record is marked on its own row")
+# Polarity, the other way round: a row WITH a record carries no marker.
+els_j = [{"kind": "lesson", "slug": "with-arc", "title": "W", "gloss": "c",
+          "tags": ["workflow"], "evidence": [], "consumed": False,
+          "journey_recorded": True},
+         {"kind": "lesson", "slug": "no-arc", "title": "N", "gloss": "c",
+          "tags": ["workflow"], "evidence": [], "consumed": False,
+          "journey_recorded": False}]
+mj = {"kind": "topic-map", "topics": [], "coverage": {"pin": "h@abc1234"},
+      "elements": els_j}
+fj = tempfile.NamedTemporaryFile("w", suffix=".json", delete=False)
+json.dump(mj, fj); fj.close()
+dj = json.loads(subprocess.run(["python3", D, "member", "--map", fj.name,
+                                "--tag", "workflow"],
+                               capture_output=True, text=True).stdout)
+ctxj = re.findall(r"^  \((?:also in: .+|in no other Topic).*$", dj["listing"], re.M)
+check(sum(1 for c in ctxj if "no-journey" in c) == 1,
+      f"presence is SILENT and only absence is marked ({ctxj})")
+check("1 of 2 Strands carry journey material" in dj["listing"],
+      "the denominator reports the mixed case correctly")
+# The wrong-kind claim this amendment exists to stop.
+check("no Journey" not in dj["listing"],
+      "no screen asserts that no Journey material falls under the member")
+os.unlink(fj.name)
 
 # --- background composition: script owns sections, composer owns prose ------
 # (Story 20.24, #853; CAP-2 as amended 2026-07-27 #850.)
