@@ -27,8 +27,15 @@ Point at it; never restate a definition in your own words, which is how N
 paraphrases drift from one contract. If the owner asks what a term means,
 the codebook is the answer, not the implementation.
 
-Present the validated payload **in-conversation** under the
-[owner-facing proposal contract](../owner-facing-proposal-contract.md): every
+**Quote** the validated payload under the
+[owner-facing proposal contract](../owner-facing-proposal-contract.md) — never
+compose prose from it. The payload declares its own `render:` form (carrier
+amendment 2026-08-01, #1102, `specs/spec-writing-assistant/amendments.md`):
+`control: "selection"` is quoted into the host's selection control with the
+recommended option first, and `control: "block"` — screen 2's form, whose
+Strand count exceeds any control's capacity — is an enumerated decision block
+carrying a banner, the options, and an explicit reply line. A block is a
+rendering of the payload, not a licence to narrate it. Every
 served tag listed deterministically with its Strand count — the count is a cue
 for choosing where to look, never a gate — plus the untagged-disclosure line
 when it applies (see Step 1). The payload is **plain text**: no `**bold**`, no
