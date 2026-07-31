@@ -198,8 +198,16 @@ makes sense, they name group ids from the screen and read each group whole:
 ```
 python3 ${CLAUDE_PLUGIN_ROOT}/scripts/topic-map-directions.py report \
   --map "$WS/map.json" --tag <member> --groups "G1,G3" \
-  --claims '{"G1":"<the claim you composed for G1, verbatim>", ...}'
+  --claims '{"G1":"<the claim you composed for G1, verbatim>", ...}' \
+  --subgroups '<the same subdivisions you passed to `member`, if any>'
 ```
+
+Pass `--subgroups` here and on `view` too, exactly as you passed it to
+`member`. **A subdivided group renders its parent claim first and its subgroup
+claims beneath it** — the parent says why these Strands share a screen at all,
+and showing only the subgroup claims makes their relation to one another
+illegible (owner ruling, 2026-07-30). All three surfaces render one hierarchy;
+a group you leave out of `--subgroups` renders exactly as it always has.
 
 Relay the returned `report` **as given**. Each named group renders separately,
 in the order asked, keyed by its screen id — never flattened into a union,

@@ -189,6 +189,7 @@ from terrain_members import (  # noqa: E402
     _axis_strands,
     _err,
     _member_record,
+    apply_subgroups,
     axis_members,
     cmd_member,
     compose_full_report,
@@ -295,8 +296,18 @@ def cmd_report(args):
             grouping = json.loads(args.grouping)
         except ValueError as exc:
             return _err(f"--grouping is not readable JSON: {exc}")
-    out = compose_full_report(m, str(args.tag).strip(), candidates(m),
-                              group_ids, axis, claims, grouping)
+    subgroups = None
+    if getattr(args, "subgroups", None):
+        try:
+            subgroups = json.loads(args.subgroups)
+        except ValueError as exc:
+            return _err(f"--subgroups is not readable JSON: {exc}")
+    try:
+        out = compose_full_report(m, str(args.tag).strip(), candidates(m),
+                                  group_ids, axis, claims, grouping,
+                                  subgroups=subgroups)
+    except ValueError as exc:
+        return _err(str(exc))
     json.dump(out, sys.stdout, indent=2, ensure_ascii=False)
     sys.stdout.write("\n")
     return 0
@@ -635,6 +646,14 @@ def cmd_view(args):
                              substrate=getattr(args, "substrate",
                                                SUBSTRATE_DEFAULT),
                              grouping=grouping)
+        # The View file is the surface that holds the WHOLE rendering, so the
+        # hierarchy must reach it too (Story 20.87 AC2): three surfaces showing
+        # the same grouping differently is the defect #1039 records.
+        try:
+            apply_subgroups(ms, json.loads(args.subgroups)
+                            if getattr(args, "subgroups", None) else None)
+        except ValueError as exc:
+            return _err(str(exc))
         if not ms["count"]:
             return _err(f"no Strand sits under {tag!r} at this pin")
         # THE CLAIMS REACH THE VIEW PATH (Story 20.83, #1039). `--claims` was
@@ -1039,6 +1058,13 @@ def main(argv=None):
                          '"..."}. Carried VERBATIM — this path never '
                          "recomposes a claim, and a group whose claim is not "
                          "carried states the absence instead.")
+    rp.add_argument("--subgroups", metavar="JSON",
+                    help="the subdivisions the screen adopted, in the shape "
+                         "`member --subgroups` takes (Story 20.87, #1041). "
+                         "Carried VERBATIM like the parent claims, and the "
+                         "parent claim stays ABOVE them: a subdivided group "
+                         "shows why its Strands share a screen at all, then "
+                         "what separates the strata inside them.")
     rp.add_argument("--grouping", metavar="JSON",
                     help="the same model-proposed grouping the screen was "
                          "composed with, so the ids resolve to the same "
@@ -1074,6 +1100,12 @@ def main(argv=None):
                         "as `member --claims`: carried VERBATIM, never "
                         "recomposed, and a group whose claim is absent says so "
                         "rather than having one invented.")
+    v.add_argument("--subgroups", metavar="JSON",
+                   help="the subdivisions the screen adopted, in the shape "
+                        "`member --subgroups` takes. The View is the surface "
+                        "that holds the WHOLE rendering, so the hierarchy "
+                        "belongs here too — three surfaces showing one "
+                        "grouping differently is the defect #1039 records.")
     v.add_argument("--map", required=True, help="assembled map JSON, or - for stdin")
     v.add_argument("--out", required=True, metavar="PATH",
                    help=f"where to write it (the run workspace's {VIEW_FILENAME})")
