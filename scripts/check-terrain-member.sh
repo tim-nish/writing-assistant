@@ -1049,5 +1049,168 @@ sys.exit(1 if fail else 0)
 SIZE_EOF
 [ $? -eq 0 ] || fail=1
 
+# --- The semantic SUBGROUP layer (Story 20.86, #1041) ------------------------
+# The layer is model-triggered, so what a check can hold is exactly the
+# mechanical half: the partition, the ids, the leaf cover, and the ABSENCE of a
+# member-count trigger. Those are the criteria a well-meaning diff breaks.
+python3 - <<'SUBGROUP_EOF'
+import json, re, subprocess, sys, tempfile
+
+D = "scripts/topic-map-directions.py"
+fail = 0
+
+
+def check(cond, msg):
+    global fail
+    if cond:
+        print(f"ok:   {msg}")
+    else:
+        print(f"FAIL: {msg}", file=sys.stderr)
+        fail = 1
+
+
+# IN-PROCESS, deliberately: the layer is a pure function of the sections and a
+# proposal, so exercising it through six CLI round trips buys nothing but
+# interpreter starts — and this check is inner-tier, where the runtime ceiling
+# is the constraint. ONE subprocess below covers the CLI wiring.
+sys.path.insert(0, "scripts")
+from terrain_members import member_sections, apply_subgroups  # noqa: E402
+
+els = [{"kind": "lesson", "slug": f"s{i}", "title": f"S{i}", "gloss": f"g{i}",
+        "tags": ["workflow", "agents"], "evidence": [], "consumed": False,
+        "journey_recorded": True, "journey": f"arc {i}"} for i in range(6)]
+m = {"kind": "topic-map", "topics": [], "coverage": {"pin": "h@abc1234"},
+     "elements": els}
+
+
+def sections():
+    return member_sections(m, "workflow")
+
+
+base = apply_subgroups(sections(), None)
+gid = base["sections"][0]["group_id"]
+slugs = [e["slug"] for e in base["sections"][0]["strands"]]
+check(len(base["sections"]) == 1 and len(slugs) == 6,
+      f"fixture: one group of six ({gid})")
+
+# AC8 — an UNSUBDIVIDED screen is unchanged, and the leaf cover agrees with the
+# parent cover rather than being a special case.
+check(base["subdivided"] == [] and base["leaf_covered"] is True
+      and base["leaf_placements"] == base["placements"],
+      "AC5/AC8: with no subdivision the leaf cover equals the parent cover and "
+      "nothing is marked subdivided")
+
+d = apply_subgroups(sections(), {gid: [
+    {"claim": "the first stratum", "strands": slugs[:3]},
+    {"claim": "the second stratum", "strands": slugs[3:]}]})
+sub = d["sections"][0]["subgroups"]
+
+# AC4 — the ids are G<n>-<m>, and they are a DISPLAY kind.
+check([s["subgroup_id"] for s in sub] == [f"{gid}-1", f"{gid}-2"],
+      f"AC4: subgroup ids follow G<n>-<m> ({[s['subgroup_id'] for s in sub]})")
+
+# AC5/AC6 — the cover is counted at the LEAVES, in placements, AFTER
+# composition. Equality with count is what "no silent drop" means here.
+check(d["leaf_covered"] is True and d["leaf_placements"] == d["placements"],
+      "AC5/AC6: the leaf cover is asserted over the composed hierarchy and "
+      "still holds every Strand, in placements")
+
+# AC7 — presentation only: parent membership does not move because a
+# subdivision was adopted.
+check([e["slug"] for e in d["sections"][0]["strands"]] == slugs,
+      "AC7: parent membership and order are untouched by the subdivision")
+
+# AC7 again, on the refusal side: a proposal that would move a Strand across
+# parents, drop one, or duplicate one is REFUSED rather than repaired.
+def refuses(proposal, needle, msg):
+    try:
+        apply_subgroups(sections(), proposal)
+    except ValueError as exc:
+        check(needle in str(exc), f"{msg} ({str(exc)[:60]!r})")
+    else:
+        check(False, f"{msg} — but it was ACCEPTED")
+
+
+refuses({gid: [{"claim": "a", "strands": slugs[:3]},
+                {"claim": "b", "strands": slugs[3:5]}]}, "drops",
+        "AC5: a subdivision that drops a Strand is refused, naming what it lost")
+refuses({gid: [{"claim": "a", "strands": slugs[:4]},
+                {"claim": "b", "strands": slugs[3:]}]}, "exactly one part",
+        "AC7: a Strand in two parts of one parent is refused")
+refuses({gid: [{"claim": "a", "strands": slugs[:3] + ["not-in-this-group"]},
+                {"claim": "b", "strands": slugs[3:]}]},
+        "never moves a Strand between parent groups",
+        "AC7: a Strand from another parent group is refused")
+refuses({"G99": [{"claim": "a", "strands": slugs[:3]},
+                  {"claim": "b", "strands": slugs[3:]}]}, "PER-SCREEN",
+        "AC4: an id that is not on this screen is refused — ids are "
+        "per-screen and per-pin")
+refuses({gid: [{"claim": "a", "strands": slugs}]}, "at least two parts",
+        "AC4: a one-part 'subdivision' is refused as the leaf case it is")
+
+# AC3 — the recursive stop is semantic, and the structure supports any depth.
+dn = apply_subgroups(sections(), {gid: [
+    {"claim": "the first stratum", "strands": slugs[:3]},
+    {"claim": "the second stratum", "strands": slugs[3:],
+     "subgroups": [{"claim": "deeper a", "strands": slugs[3:5]},
+                   {"claim": "deeper b", "strands": slugs[5:]}]}]})
+deep = [x["subgroup_id"]
+        for x in dn["sections"][0]["subgroups"][1]["subgroups"]]
+check(deep == [f"{gid}-2-1", f"{gid}-2-2"],
+      f"AC3: a subgroup subdivides again, ids composing downward ({deep})")
+check(dn["leaf_covered"] is True,
+      "AC5/AC6: the leaf cover is counted at the DEEPEST parts, not the "
+      "intermediate ones")
+
+# The CLI wiring, once: `--subgroups` reaches the layer, and an unsubdivided
+# run's composed listing is byte-identical to today's (AC8).
+f = tempfile.NamedTemporaryFile("w", suffix=".json", delete=False)
+json.dump(m, f); f.close()
+cli = subprocess.run(
+    ["python3", D, "member", "--map", f.name, "--tag", "workflow",
+     "--claims", '{"G1":"the parent claim"}', "--subgroups",
+     json.dumps({gid: [{"claim": "a", "strands": slugs[:3]},
+                       {"claim": "b", "strands": slugs[3:]}]})],
+    capture_output=True, text=True)
+dc = json.loads(cli.stdout)
+check(cli.returncode == 0 and dc["subdivided"] == [gid]
+      and dc["sections"][0]["subgroups"][0]["subgroup_id"] == f"{gid}-1",
+      "AC4: --subgroups reaches the layer through the CLI and the payload "
+      "carries the ids and claims as data")
+from terrain_members import candidates, compose_member_listing  # noqa: E402
+check(dc["listing"] == compose_member_listing(
+          m, "workflow", candidates(m), "tag", {"G1": "the parent claim"}),
+      "AC8: an adopted subdivision changes NOTHING about the composed "
+      "listing at this story's boundary — the hierarchy is data here, and "
+      "rendering it is story 20.87")
+
+# AC2/AC9 — THE DECLINED CAP STAYS DECLINED. No member-count constant may
+# appear in the layer, and the surface must state the trigger it does use.
+src = open("scripts/terrain_members.py").read()
+layer = src.split("The SEMANTIC SUBGROUP LAYER", 1)[1].split(
+    "def _strand_context_line", 1)[0]
+check(not re.search(r"len\((?:sec|group|strands|parent_strands)[^)]*\)\s*[<>]=?\s*\d",
+                    layer),
+      "AC9: the subgroup layer compares no member count against a constant — "
+      "the trigger is the tightness differential, never a cap (#980's decline "
+      "is untouched)")
+check("tightness differential" in layer.lower(),
+      "AC2: the layer names the tightness differential as what decides")
+sk = open("skills/terrain/steps/screens.md").read()
+check("tightness differential" in sk.lower()
+      and "measurably tighter" in sk,
+      "AC2: the composing surface states the trigger the composer applies")
+check("no member count" in sk.lower() or "No member count" in sk,
+      "AC9: ...and states that no member count participates")
+
+# AC8 — the deterministic co-tag subdivision is untouched and the two compose.
+check("_subdivide_section" in src and "WHICH RUNS WHEN" in src,
+      "AC8: `_subdivide_section` still ships and the layer states which "
+      "mechanism runs when")
+
+sys.exit(1 if fail else 0)
+SUBGROUP_EOF
+[ $? -eq 0 ] || fail=1
+
 [ "$fail" -eq 0 ] || { printf '\nFAILED.\n' >&2; exit 1; }
 printf '\nAll terrain-member checks passed (every Strand is covered).\n'

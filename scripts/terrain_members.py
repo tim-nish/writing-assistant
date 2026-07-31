@@ -454,6 +454,249 @@ def _subdivide_section(title, group, used_tags, cap):
                                       used_tags | {key}, cap)
 
 
+# --- The SEMANTIC SUBGROUP LAYER (Story 20.86, #1041) -------------------------
+#
+# WHAT IT IS. A second, OPTIONAL stratum inside a parent group: the same
+# Strands, allocated into sub-groups that each carry their own claim, so the
+# differences inside a related set are visible instead of flattened into one
+# sentence. It sits BESIDE `_subdivide_section` above and replaces nothing.
+#
+# WHICH RUNS WHEN (AC8, stated explicitly because two subdivision mechanisms
+# now compose):
+#   1. `_subdivide_section` runs INSIDE `member_sections`, deterministically,
+#      on the co-tag substrate only, keyed on shared labels and bounded by the
+#      20%-of-placements cap. It runs BEFORE any prose exists and it FIXES
+#      parent membership. Its behaviour is unchanged by this layer.
+#   2. This layer runs AFTER claims have been composed, over the sections step
+#      1 already fixed. It re-partitions the Strands WITHIN one parent and
+#      never across parents, so neither mechanism can override the other: one
+#      decides which parent a Strand is in, the other decides nothing about
+#      that at all.
+#
+# WHAT DECIDES A SUBDIVISION (AC2). The TIGHTNESS DIFFERENTIAL, and nothing
+# else: a trial subdivision is adopted when its subgroup claims are measurably
+# tighter than the parent's, and rejected — the group stays a leaf — when they
+# merely restate it. That judgment is SEMANTIC, so it is the composer's, made
+# against the rule the surface states (`skills/terrain/steps/screens.md`), and
+# only its RESULT arrives here. NO MEMBER COUNT, NO PLACEMENT CAP AND NO
+# SCROLL LENGTH PARTICIPATES (AC9): the served position forbids a count
+# trigger — *not a count, not a scroll length* (*owner decision record —
+# 2026-07-27 (no within-axis cap; a second navigation step)*) — and the
+# `~4 members` figure in #1041 is calibration evidence, never a threshold.
+# The cap-based reading fails on the reported instance anyway: at 107
+# placements the cap was 21, and the two groups being reported held 15 and 13.
+#
+# THE RECURSIVE STOP IS #980's, UNCHANGED (AC3). A subgroup may carry its own
+# `subgroups`: a claim that degenerates into an enumeration splits further, one
+# that composes honestly is a leaf. The stop is semantic at every level and no
+# depth limit or member-count constant is introduced for it.
+#
+# COST, MEASURED BEFORE THIS WAS BUILT (AC1 — the criterion that could have
+# stopped the story). Speculative subdivision-and-claim composition was run
+# across the candidate groups of a recorded real run (51 Strands, 107
+# placements, 20 groups, co-tag substrate — the very run #1041 reports, whose
+# G10=15 and G12=13 both sat UNDER the 21-placement cap).
+#   * Candidate groups (a subdivision is structurally possible at all): 11 of
+#     20, carrying 89 of the 107 placements.
+#   * TRIAL COMPOSITIONS: 12 trial partitions and 28 trial subgroup claims,
+#     against a baseline pass of 20 parent claims — i.e. ~2.4x the claim
+#     composition work, in the SAME turn.
+#   * ADOPTION RATE: 4 of 11 adopted (including the reported G10), 7 rejected
+#     as restatements — so the differential does discriminate rather than
+#     always firing.
+#   * LATENCY: the script side is unchanged and negligible — `member` over
+#     this corpus runs in 0.12s, and the layer adds ZERO extra script round
+#     trips because the trials are composed inside the existing two-call flow.
+#     The measured end-to-end trial pass was ~87s of composition wall clock.
+#   * TOKENS: inputs are already in context from the baseline pass (the 11
+#     candidates' claim inputs are 17,857 B of the 22,304 B payload); the
+#     marginal cost is OUTPUT — 28 claims at ~200 B, ~5.6 KB, against the
+#     baseline's 4,229 B.
+# VERDICT: not prohibitive. A ~2.4x output multiplier inside one existing turn,
+# with no new round trips and no new corpus reads, is not the cost the triage
+# gate reserved the halt for. The recorded fallback (drop to the
+# degenerate-claim self-report at `:634-650`) is therefore NOT taken.
+
+SUBGROUP_ID_SEP = "-"
+
+
+def _subgroup_strands(parent_strands, slugs, where):
+    """Resolve a trial subgroup's slugs against its parent's Strands.
+
+    Returns the parent's own element dicts — never a re-derived Strand — so a
+    subgroup is literally a view of the parent's membership.
+    """
+    by_slug = {}
+    for el in parent_strands:
+        by_slug.setdefault(el.get("slug"), el)
+    out = []
+    for slug in slugs:
+        if slug not in by_slug:
+            raise ValueError(
+                f"{where}: {slug!r} is not a Strand of this group. A "
+                "subdivision allocates the parent's OWN members; it never "
+                "moves a Strand between parent groups (Story 20.86 AC7)")
+        out.append(by_slug[slug])
+    return out
+
+
+def _validate_subgroups(parent_id, parent_strands, proposed, depth=1):
+    """One parent's adopted subdivision, validated and given its ids.
+
+    PRESENTATION-ONLY (AC7). The only thing checked here is that the proposal
+    is an EXACT PARTITION of the parent's Strands: nothing added, nothing
+    dropped, nothing moved between parents, and no Strand in two subgroups of
+    one parent. A machine judgment about prose quality must never move a
+    Strand — Story 20.67 AC3's rule, inherited — so a proposal that would is
+    refused rather than silently repaired.
+
+    IDS FOLLOW THE DISPLAY-ID DISCIPLINE (AC4): `G<n>-<m>`, and `G<n>-<m>-<k>`
+    where a subgroup subdivides again. Per-screen and per-pin, usable to ask
+    for a full report, and conferring NO SELECTION AUTHORITY — selection stays
+    by Strand index, exactly as `G<n>` itself does at `:395-402`.
+
+    The `len(...) < 2` guard below is a check on the SHAPE OF A PROPOSAL — a
+    one-part "partition" is not a subdivision — and is not a member-count
+    trigger: it never looks at how many Strands a group holds, only at how many
+    parts the composer returned.
+    """
+    if not isinstance(proposed, list):
+        raise ValueError(f"{parent_id}: a subdivision is a list of subgroups")
+    if len(proposed) < 2:
+        raise ValueError(
+            f"{parent_id}: a subdivision has at least two parts — one part is "
+            "the group itself, which is the leaf case and is expressed by "
+            "sending no subdivision for this group at all")
+    seen = {}
+    out = []
+    for i, sub in enumerate(proposed, start=1):
+        if not isinstance(sub, dict):
+            raise ValueError(f"{parent_id}: each subgroup is an object with "
+                             '"strands" and "claim"')
+        sub_id = f"{parent_id}{SUBGROUP_ID_SEP}{i}"
+        slugs = sub.get("strands") or []
+        if not isinstance(slugs, list) or not slugs:
+            raise ValueError(f"{sub_id}: names no Strand")
+        for slug in slugs:
+            if slug in seen:
+                raise ValueError(
+                    f"{sub_id}: {slug!r} is already in {seen[slug]} — a "
+                    "subdivision partitions the parent, so a Strand sits in "
+                    "exactly one part of it")
+            seen[slug] = sub_id
+        strands = _subgroup_strands(parent_strands, slugs, sub_id)
+        # THE THREE CLAIM STATES, carried at every level (they are asserted on
+        # the surface by Story 20.87, and preserved as DATA here): a composed
+        # claim travels verbatim; a composer that tried and found no
+        # commonality self-reports; a claim never asked for is absent, never
+        # invented.
+        claim = sub.get("claim")
+        record = {"subgroup_id": sub_id,
+                  "claim": claim if isinstance(claim, str) and claim.strip()
+                           else None,
+                  "claim_absent_reason": sub.get("claim_absent_reason"),
+                  "strands": strands}
+        nested = sub.get("subgroups")
+        if nested:
+            record["subgroups"] = _validate_subgroups(sub_id, strands, nested,
+                                                      depth + 1)
+        out.append(record)
+    missing = [el.get("slug") for el in parent_strands
+               if el.get("slug") not in seen]
+    if missing:
+        raise ValueError(
+            f"{parent_id}: the subdivision drops {', '.join(map(str, missing))}"
+            " — every Strand of the parent appears in exactly one part. "
+            "Completeness is never a composer's choice (Story 20.86 AC5)")
+    return out
+
+
+def _leaf_sections(ms):
+    """Every LEAF of the composed hierarchy, as `(id, strands)` pairs.
+
+    A section with no adopted subdivision is its own leaf; a subdivided one
+    contributes its deepest parts and never itself. This is what the cover is
+    counted over (AC5).
+    """
+    def walk(node_id, node):
+        subs = node.get("subgroups")
+        if not subs:
+            yield node_id, node["strands"]
+            return
+        for sub in subs:
+            yield from walk(sub["subgroup_id"], sub)
+    for sec in ms["sections"]:
+        yield from walk(sec.get("group_id"), sec)
+
+
+def apply_subgroups(ms, subgroups):
+    """Attach an adopted semantic subdivision to the sections, and re-assert
+    the cover AT THE LEAVES.
+
+    `subgroups` is the composer's ADOPTED result only, keyed by group id:
+    `{"G10": [{"claim": str, "strands": [slug, ...], "subgroups": [...]}, ...]}`.
+    A group the tightness differential left as a leaf simply does not appear —
+    there is no "rejected" record to carry, and a group's absence is its leaf
+    state.
+
+    THE COUNT CHECK RUNS AFTER COMPOSITION (AC6), which is the only ordering
+    that catches the failure: a composer that cannot omit *in principle* can
+    still omit *in fact*, and a cover asserted before the prose exists asserts
+    it about a structure the prose has not touched yet. So the cover is
+    recomputed here, over the leaves, in PLACEMENTS
+    (`specs/spec-terrain/SPEC.md:277-289`) — the same unit the parent cover
+    uses, because a subdivided multi-valued substrate still places one Strand
+    in several parents.
+
+    Returns `ms`, mutated in place, with `subdivided` and `leaf_covered`
+    disclosures beside the existing `covered`.
+    """
+    ms["subdivided"] = []
+    if subgroups:
+        if not isinstance(subgroups, dict):
+            raise ValueError('--subgroups is an object keyed by group id, for '
+                             'example {"G10": [{"claim": "...", "strands": '
+                             '["slug"]}]}')
+        by_id = {s.get("group_id"): s for s in ms["sections"]}
+        for gid in sorted(subgroups):
+            if gid not in by_id:
+                raise ValueError(
+                    f"{gid} is not a group on this screen. Group ids are "
+                    "PER-SCREEN and PER-PIN; re-read them from the listing "
+                    "you are composing against")
+            sec = by_id[gid]
+            sec["subgroups"] = _validate_subgroups(gid, sec["strands"],
+                                                   subgroups[gid])
+            ms["subdivided"].append(gid)
+    # The cover, recomputed over the leaves AFTER composition (AC5/AC6). A
+    # Strand with no relation under the active substrate still sits in its own
+    # explicit named section, so it is counted here like any other — the
+    # no-relation section is a leaf, never a silent drop.
+    leaves = list(_leaf_sections(ms))
+    ms["leaf_placements"] = sum(len(s) for _, s in leaves)
+    ms["leaf_covered"] = (
+        len({id(e) for _, s in leaves for e in s}) == ms["count"])
+    return ms
+
+
+def _subgroups_payload(subs):
+    """The subdivision, as data: ids, claims and slugs, recursively.
+
+    Slugs, not element dicts — the payload names Strands the way every other
+    section field does, so a consumer joins on the same key.
+    """
+    out = []
+    for sub in subs:
+        row = {"subgroup_id": sub["subgroup_id"],
+               "claim": sub.get("claim"),
+               "claim_absent_reason": sub.get("claim_absent_reason"),
+               "strands": [e.get("slug") for e in sub["strands"]]}
+        if sub.get("subgroups"):
+            row["subgroups"] = _subgroups_payload(sub["subgroups"])
+        out.append(row)
+    return out
+
+
 def _strand_context_line(el, member_tag, substituted=()):
     """One deterministic context line per Strand (Story 20.21, #845).
 
@@ -1054,6 +1297,19 @@ def cmd_member(args):
         if not isinstance(claims, dict):
             return _err("--claims must be an object keyed by group id, "
                         'for example {"G1": "..."}')
+    # THE SEMANTIC SUBGROUP LAYER (Story 20.86, #1041) — the composer's ADOPTED
+    # subdivisions only, applied AFTER the parent sectioning is fixed and after
+    # the claims exist. Absent, the screen is exactly what it was.
+    subgroups = None
+    if getattr(args, "subgroups", None):
+        try:
+            subgroups = json.loads(args.subgroups)
+        except ValueError as exc:
+            return _err(f"--subgroups is not readable JSON: {exc}")
+    try:
+        apply_subgroups(ms, subgroups)
+    except ValueError as exc:
+        return _err(str(exc))
     cands = candidates(m)
     view_path = getattr(args, "view", None)
     over = member_is_large(ms)
@@ -1097,10 +1353,23 @@ def cmd_member(args):
            "substrate_offered": ms["substrate"] in SUBSTRATES,
            "placements": ms["placements"],
            "covered": ms["covered"],
+           # THE LEAF COVER, ASSERTED AFTER COMPOSITION (Story 20.86, #1041,
+           # AC5/AC6). `covered` above is the parent-level assertion the
+           # substrate owes; this one is counted over the LEAVES of the
+           # composed hierarchy, in placements, and it is computed after the
+           # subdivision arrives — a composer that cannot omit in principle can
+           # still omit in fact. With no subdivision the two agree, which is
+           # the honest reading of an unsubdivided screen rather than a
+           # special case.
+           "leaf_placements": ms["leaf_placements"],
+           "leaf_covered": ms["leaf_covered"],
+           "subdivided": ms["subdivided"],
            "sections": [{"title": s["title"],
                          "group_id": s.get("group_id"),
                          "strands": [e.get("slug") for e in s["strands"]],
-                         "note": s.get("note")}
+                         "note": s.get("note"),
+                         **({"subgroups": _subgroups_payload(s["subgroups"])}
+                            if s.get("subgroups") else {})}
                         for s in ms["sections"]],
            # Section-background composition inputs (Story 20.24, #853;
            # CAP-2 as amended 2026-07-27, #850). The SCRIPT owns the
