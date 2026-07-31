@@ -2,7 +2,8 @@
 name: terrain
 description: >
   Show the terrain before choosing what to write. Invoke as "show the terrain"
-  (also accepted, unchanged: "show the topic map", "what could I write about")
+  (also accepted, unchanged: "show the topic map", "what could I write about";
+  and "open the brief [<path>]" to re-enter an existing brief at Step 3)
   to assemble the derived, bounded ELEMENT SURVEY of the hub — every Lesson
   and Journey an individually selectable Strand, quoting its served
   Gloss rendering and carrying its visible writability verdict — navigate it
@@ -29,11 +30,22 @@ owner's free-form move.)
 
 ```
 show the terrain [<host-repo>]
+open the brief [<path>]
 ```
 
 `show the topic map` and `what could I write about` remain accepted triggers —
 the rename is owner-facing vocabulary, not a change to what the owner may type
-(SPEC-terrain, 2026-07-26 amendment).
+(SPEC-terrain, 2026-07-26 amendment). All three still start at **Step 0**,
+unchanged.
+
+**`open the brief [<path>]` enters at Step 3** (Story 20.92, #1042). Re-opening
+was already a first-class move and the subcommand already shipped; what was
+missing was **words that reach it** — every accepted phrase began at Step 0, so
+an owner holding a brief had no way in. This adds discovery for the existing
+move and no capability: it runs `brief-open`, relays the artifact's
+`lifecycle.line`, and walks no screens and loads no corpus. **With no path**
+the brief is resolved by the rule stated in [`steps/brief.md`](steps/brief.md);
+with no brief anywhere it says so plainly and starts nothing.
 
 **Name the target repository first (#309).** Before reading anything else,
 print the resolved target as the flow's first owner-visible line:

@@ -185,6 +185,56 @@ for p in DRAFT:
 check("intent gate" in S,
       "the dispatcher's own summary records where the sitting now ends")
 
+# --- a NAMED TRIGGER opens the brief (Story 20.92, #1042) -------------------
+# Discovery for an existing move. What is asserted is that the trigger is
+# listed WITH the phrases it joins rather than replacing them, that its
+# no-path resolution is stated rather than heuristic, and that the
+# cross-workspace refusal it could most easily have relaxed is intact.
+check("open the brief" in S and "show the terrain" in S
+      and "show the topic map" in S and "what could I write about" in S,
+      "AC2: the new trigger is listed WITH the three existing phrases, not "
+      "instead of them")
+check("All three still start at **Step 0**" in S,
+      "AC2: ...and those three still start at Step 0, unchanged")
+check("enters at Step 3" in S,
+      "AC1: the trigger's entry point is stated on the skill's own surface")
+brief_trigger = B.split("The named trigger", 1)[-1]
+check("walks no screens and loads no corpus" in (brief_trigger + S),
+      "AC1: the trigger reaches the brief without walking Screens 1-2 or "
+      "re-loading the corpus")
+check("newest terrain run workspace" in brief_trigger
+      and "sorts last" in brief_trigger,
+      "AC3: the no-path resolution rule is STATED and deterministic")
+check("named, never guessed between" in brief_trigger,
+      "AC3: ...and an ambiguous workspace is stated, never silently picked")
+check("says so plainly" in brief_trigger
+      and "composes nothing" in brief_trigger,
+      "AC3: with no brief it says so plainly rather than starting Step 0")
+check("Opening and inspecting" in brief_trigger
+      and "still hits the existing refusal" in brief_trigger,
+      "AC4: opening across workspaces succeeds while the EDIT refusal stands")
+check("no new transition, no new state" in brief_trigger,
+      "AC5: the lifecycle stays forward-only and gains nothing")
+check("standing exits are offered" in brief_trigger,
+      "AC6: the standing exits are offered at this entry too")
+
+# AC4, on the code rather than the prose: the refusal message itself is
+# untouched. This is the criterion a convenience-minded diff relaxes.
+TMD = open("scripts/topic-map-directions.py", encoding="utf-8").read()
+check("are in different " in TMD and "Retention is WITHIN-SITTING" in TMD
+      and "cross-invocation" in TMD,
+      "AC4: the cross-workspace edit refusal ships unchanged, with its "
+      "existing message")
+
+# AC3 — the resolver owns the layout. The consumer must ASK for the run root,
+# never compose it (D1).
+resolve = TMD.split("_resolve_newest_brief", 1)[-1].split("\ndef ", 1)[0]
+check("terrain-runs-root" in resolve and "resolve-paths.py" in resolve,
+      "AC3: the run root is resolved through the path resolver, never "
+      "composed here (storage-architecture D1)")
+check('"terrain-runs"' not in resolve,
+      "AC3: ...and no layout string is spelled out in the consumer")
+
 sys.exit(1 if fail else 0)
 PYEOF
 [ $? -eq 0 ] || fail=1

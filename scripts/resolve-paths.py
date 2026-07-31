@@ -545,6 +545,22 @@ def cmd_terrain_output_root(args):
     return 0
 
 
+def cmd_terrain_runs_root(args):
+    """Terrain's RUN-WORKSPACE root, under the machine state root.
+
+    Exposed as a verb (Story 20.92, #1042) because a consumer needed to find
+    the newest terrain workspace and the layout is the resolver's to know: the
+    alternative was `topic-map-directions.py` composing
+    `<repo-dir>/terrain-runs` itself, which is exactly the storage-path
+    composition D1 bars. Distinct from `terrain-output-root`, which is the
+    OWNER-FACING output root in the working tree — the two were relocated apart
+    on purpose (#935) and a caller that confuses them writes intermediates
+    where the owner works.
+    """
+    print(terrain_runs_dir(host_root(args.root)))
+    return 0
+
+
 def cmd_new_run(args):
     print(new_run(host_root(args.root), args.run_id,
                   terrain=getattr(args, "terrain", False)))
@@ -676,6 +692,11 @@ def main(argv=None):
     sub.add_parser("terrain-output-root",
                    help="print the root this tool's outputs and debug "
                         "artifacts live under (D2, #874)")
+    sp = sub.add_parser("terrain-runs-root",
+                        help="print the root Terrain's run workspaces live "
+                             "under, in the machine state root (#935) — NOT "
+                             "the owner-facing output root above")
+    sp.add_argument("--root", help="host-repo root (default: git top-level of cwd; errors outside a git repo)")
     # THE VERB TRAVELS WITH THE FILENAME (Story 20.85, #1040). It is typed into
     # an owner-facing procedure document, and a resolver whose verb and answer
     # disagree manufactures exactly the drift #1039 records.
@@ -703,6 +724,7 @@ def main(argv=None):
         "new-run": cmd_new_run,
         "run-workspace": cmd_run_workspace,
         "terrain-output-root": cmd_terrain_output_root,
+        "terrain-runs-root": cmd_terrain_runs_root,
         "terrain-view": cmd_topic_map_view,
         "list-drafts": cmd_list_drafts,
         "target": cmd_target,

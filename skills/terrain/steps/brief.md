@@ -33,8 +33,45 @@ terrain surface reads back:**
 
 ```
 python3 ${CLAUDE_PLUGIN_ROOT}/scripts/topic-map-directions.py brief-open \
-  --at "$WS/brief.json" [--state inspected|adopted]
+  [--at "$WS/brief.json"] [--state inspected|adopted]
 ```
+
+### The named trigger: `open the brief [<path>]` (Story 20.92, #1042)
+
+The move above already shipped; what was missing was **words that reach it**.
+Every accepted invocation phrase began at Step 0, so an owner holding a brief
+had no way to Step 3. `open the brief [<path>]` is that way in — **discovery
+for the existing move, not a new capability.** A diff that adds capability here
+has exceeded the story.
+
+It runs `brief-open`, relays the returned `lifecycle.line`, and **walks no
+screens and loads no corpus**. The lifecycle is exactly what `brief-open`
+already performs: forward-only, no new transition, no new state.
+
+**With no path, the resolution rule is stated and deterministic** — never a
+heuristic the owner cannot predict:
+
+1. the **newest terrain run workspace** (run ids are timestamps, so the newest
+   sorts last; the `latest` shorthand is a symlink and is skipped);
+2. inside it, the artifact named **`brief.json`**.
+
+A workspace may also hold recompositions from the edit-set loop under their own
+names. Those are **named, never guessed between**. And when no brief exists
+anywhere, the trigger **says so plainly** — it does not fall through to Step 0
+and it composes nothing.
+
+**The cross-workspace boundary is preserved, and it is the criterion most at
+risk here.** Opening and inspecting a brief from an earlier workspace
+**succeed** — opening is not editing. Any **edit-set or recompose** move
+reached from that opened brief still hits the existing refusal, unchanged and
+with its existing message: retention is within this sitting, and an edit across
+workspaces would be the cross-invocation store the never-read-back rule
+forbids. Relaxing that refusal to make the trigger convenient would take a
+decision this story was not given.
+
+**The standing exits are offered**, as at any other gate on this surface — the
+open returns them in `opened.exits`. An entry into the surface that left the
+owner with no way onward would be a side door out of it.
 
 **This does not weaken the never-read-back rule, and the difference is the
 point.** A View is a *rendering* regenerated per invocation — nothing reads it
