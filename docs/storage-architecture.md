@@ -155,8 +155,19 @@ What the amendment costs, stated rather than assumed:
 Every pipeline invocation gets a workspace, resolved through D1's seam:
 
 ```
-<terrain-output-root>/<repo-key>/runs/<run-id>/
+<state-root>/<repo-key>/runs/<run-id>/            # pipeline runs
+<state-root>/<repo-key>/terrain-runs/<run-id>/    # terrain runs
 ```
+
+Corrected 2026-07-31 (#991): this block still read
+`<terrain-output-root>/<repo-key>/runs/<run-id>/` — the **pre-relocation**
+shape, drifted from story 20.52 (#943), which is precisely the shape whose
+appearance in a working tree the relocation forbids. No code read the stale
+line, but it contradicted the shipped resolver and stood to mislead the next
+reader investigating exactly that leak — as it did.
+`<terrain-output-root>` remains real and is documented above; what it no
+longer holds is run workspaces. The View file is the only thing that lands
+there now.
 
 All intermediates live there: the harvest fact sheet and NEEDS-OWNER list,
 interview answers, the provenance map (closing harness OQ4), quality-gate
