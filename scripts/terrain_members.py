@@ -230,13 +230,26 @@ def _substrate_co_tags(strands, tag, axis):
     return sections, placements
 
 
-# --- journey similarity (Story 20.37, #891) ---------------------------------
+# --- journey similarity (Story 20.37, #891; OFFERED, Story 20.82, #1031) -----
 # MODEL-JUDGED, so the script owns the inputs and the enforcement and never the
-# judgment. It is BUILT AND NOT OFFERED (SPEC-terrain CAP-2's offering gate,
-# #889): a deterministic substrate is inspectable by reading the key it grouped
-# on; this one is not, because whether its groups read as one shared background
-# is the very thing under test. It joins the offered set only after one
-# measurement run passes an owner verdict.
+# judgment. It was BUILT AND NOT OFFERED behind SPEC-terrain CAP-2's offering
+# gate (#889): a deterministic substrate is inspectable by reading the key it
+# grouped on; this one is not, because whether its groups read as one shared
+# background is the very thing under test.
+#
+# THE GATE RAN AND PASSED, 2026-07-31 (#889, offered by #1031). One measurement
+# over the `agents` member — 51 Strands, 10 machine-composed shared-path groups,
+# 48 of 51 placed and the remaining 3 accounted for in the two named residues,
+# permutation checked mechanically (count-in 51 = count-out 51, no drops, no
+# duplicates, no invented ids) — and the owner verdicted PASS. The spec clause
+# already stated the consequence — *"Pass → it joins the offered set"* — so
+# this is the conditional discharging, not a new decision.
+#
+# What the pass does NOT change: the enforcement below is unchanged (the
+# composer still cannot rank, hide or omit), co-tags remains the default
+# (offering an axis does not promote it), and both residues stay DISTINCT —
+# a Strand with no served arc was never eligible for judgment, one judged into
+# nothing was, and merging them would erase which happened.
 JOURNEY_SUBSTRATE = "journey-similarity"
 NO_ARC_TITLE = "no served journey arc"
 NO_SHARED_PATH_TITLE = "no shared path"
@@ -285,16 +298,25 @@ def _substrate_journey_similarity(strands, tag, axis, grouping=None):
     return apply_journey_grouping(strands, grouping)
 
 
-# OFFERED substrates — what the owner may choose today.
-SUBSTRATES = {"co-tags": _substrate_co_tags}
-# BUILT BUT NOT OFFERED (#889). Reachable through the dogfood harness only.
-SUBSTRATES_UNOFFERED = {JOURNEY_SUBSTRATE: _substrate_journey_similarity}
+# OFFERED substrates — what the owner may choose today. Journey similarity
+# joined on the 2026-07-31 verdict (Story 20.82, #1031); see the gate note
+# above for what was measured.
+SUBSTRATES = {"co-tags": _substrate_co_tags,
+              JOURNEY_SUBSTRATE: _substrate_journey_similarity}
+# BUILT BUT NOT OFFERED — the holding pen for a substrate still behind the
+# offering gate. EMPTY today, and kept rather than deleted because the gate is
+# a standing rule for model-judged substrates, not a one-off for this one: the
+# next judged substrate lands here until its own measurement run passes.
+SUBSTRATES_UNOFFERED = {}
+# UNCHANGED by the offering (AC6). Offering an axis makes it choosable; it does
+# not make it the answer for a run that named no substrate.
 SUBSTRATE_DEFAULT = "co-tags"
 
 
 def _substrate_fn(name):
     """Resolve a substrate by name across both sets. Membership of the OFFERED
-    set is what the chooser reads; this resolver is what the harness uses."""
+    set is what the chooser reads; this resolver also reaches anything still
+    behind the offering gate, for its measurement run."""
     if name in SUBSTRATES:
         return SUBSTRATES[name]
     if name in SUBSTRATES_UNOFFERED:
@@ -553,7 +575,32 @@ def compose_member_listing(map_data, tag, cands, axis="tag", claims=None,
         # (CAP-2 as amended 2026-07-30, #936): repeating it on every line
         # carries nothing per line and costs attention on all of them.
         lines += ["Every `in common:` line below is machine-composed at "
-                  "render time from the served claims.", ""]
+                  "render time from the served claims.",
+                  # THE `G` KIND IS DECLARED WHERE IT IS RENDERED (Story 20.82,
+                  # #1031, carrying #889's verified constraints onto the
+                  # offered axis). Composed mode is the only screen-2 path that
+                  # prints group ids, and an id that looks selectable and is
+                  # not is exactly what retired the `J<n>` namespace — so the
+                  # surface says what kind `G` is rather than leaving the
+                  # owner to infer it from the one screen that happens to
+                  # explain it (the Full Report).
+                  "`G<n>` is a DISPLAY id: per-screen and per-pin, usable to "
+                  "ask for a full report, and conferring no selection "
+                  "authority — selection stays by Strand index.", ""]
+    if ms["substrate"] != SUBSTRATE_DEFAULT:
+        # THE ACQUISITION DISCLOSURE, on the reading surface (Story 20.82,
+        # #1031). A judged substrate groups on something the owner cannot
+        # recover by reading a served field, so the screen states which
+        # substrate placed these Strands, that NOTHING was narrowed away, and
+        # that the order is a declared key rather than a strength ranking —
+        # the three constraints #889's measurement verified. The co-tag screen
+        # is left byte-identical: its key is readable on every row.
+        lines += [f"Grouped by: {ms['substrate']} — a model-judged substrate. "
+                  f"All {len(ms['sections'])} group(s) are shown, none "
+                  f"narrowed away, ordered by section title (a declared key, "
+                  f"never a strength ranking). Sections are presentation "
+                  f"only: nothing here gates, filters or ranks what is "
+                  f"selectable.", ""]
     subbed = _substituted_paths(map_data)
     sline = _substitution_disclosure_line(map_data)
     if sline:

@@ -524,14 +524,22 @@ els += [{"kind": "lesson", "slug": f"n{n}", "title": f"N{n}", "gloss": "g",
          "evidence": [], "consumed": False} for n in range(2)]
 path = mkmap(els)
 
-# --- AC7: built but NOT OFFERED --------------------------------------------
-check(m.JOURNEY_SUBSTRATE not in m.SUBSTRATES,
-      "the judged substrate is absent from the OFFERED set (#889's gate)")
-check(m.JOURNEY_SUBSTRATE in m.SUBSTRATES_UNOFFERED,
-      "it is built and reachable — withheld, not missing")
+# --- Story 20.82 (#1031) AC1/AC6: OFFERED, and the default is unchanged -----
+# The gate this replaces (#889) asserted the substrate was withheld. It ran on
+# 2026-07-31 over the `agents` member and the owner verdicted PASS, so the
+# assertion flips to its discharged form: offered, and NOT promoted. Both
+# halves are checked, because "offer it" and "make it the default" are one
+# edit apart and only the first was ratified.
+check(m.JOURNEY_SUBSTRATE in m.SUBSTRATES,
+      "the judged substrate is in the OFFERED set (#889's gate, discharged 2026-07-31)")
+check(m.SUBSTRATE_DEFAULT == "co-tags",
+      f"offering did not promote: the default is still co-tags ({m.SUBSTRATE_DEFAULT})")
 d_off = member(path, "agents")
 check(d_off["substrate"] == "co-tags" and d_off["substrate_offered"] is True,
-      f"the default substrate is the offered one ({d_off['substrate']})")
+      f"a run naming no substrate composes on co-tags ({d_off['substrate']})")
+d_js = member(path, "agents", ["--substrate", "journey-similarity"])
+check(d_js["substrate_offered"] is True,
+      "substrate_offered reports TRUE for journey similarity (AC1)")
 
 # --- AC4: arcs come from the SERVED rendering ------------------------------
 r = subprocess.run(["python3", D, "journey-inputs", "--map", path,
@@ -539,7 +547,8 @@ r = subprocess.run(["python3", D, "journey-inputs", "--map", path,
 ji = json.loads(r.stdout)
 check(ji["count"] == 8 and ji["served"] == 6,
       f"inputs carry every Strand and count what is SERVED ({ji['served']}/{ji['count']})")
-check(ji["offered"] is False, "the inputs surface states the substrate is not offered")
+check(ji["offered"] is True,
+      "the inputs surface states the substrate IS offered (gate discharged)")
 by = {x["slug"]: x for x in ji["inputs"]}
 check(by["a0"]["arc"] == "arc 0" and by["a0"]["arc_cite"].startswith("gloss/journeys/"),
       "an arc is the served rendering, quoted with its cite")
@@ -593,6 +602,31 @@ check(all(t in listing for t in sec_titles),
       f"every section title in `sections` appears in the composed listing "
       f"({[t for t in sec_titles if t not in listing]} missing)")
 
+# --- Story 20.82 (#1031) AC3: the verified constraints are ON THE SURFACE ---
+# #889 verified four constraints; two of them are surface declarations, and
+# until this story the composed screen 2 carried neither. Asserted here rather
+# than trusted, because an axis now offered to the owner is read by the owner.
+check("machine-composed" in listing,
+      "composed `in common:` lines are marked machine-composed")
+check("DISPLAY id" in listing and "no selection authority" in listing,
+      "the `G` group-id kind is DECLARED on the screen that renders it")
+check("Grouped by: journey-similarity" in listing
+      and "none narrowed away" in listing,
+      "the judged screen names its substrate and states that nothing was narrowed")
+check("declared key" in listing and "never a strength ranking" in listing,
+      "the section order is declared as a key, not a ranking")
+check(f"All {len(dc['sections'])} group(s) are shown" in listing,
+      "the disclosure counts the groups actually rendered")
+# AC5, in its stronger single-valued form: this substrate places each Strand
+# ONCE, checked AFTER composition on the composed output.
+check(dc["placements"] == dc["count"] and dc["covered"] is True,
+      f"exactly-once holds after composition ({dc['placements']} placements "
+      f"for {dc['count']} Strands)")
+# AC6 at the rendering layer: the co-tag screen is untouched by the above.
+plain = member(path, "agents", ["--claims", json.dumps({})])["listing"]
+check("model-judged substrate" not in plain,
+      "the judged-substrate disclosure does not leak onto the co-tag screen")
+
 # --- AC6/AC3: residues are NAMED and distinguished -------------------------
 check(m.NO_SHARED_PATH_TITLE in titles
       and sorted(titles[m.NO_SHARED_PATH_TITLE]["strands"]) == ["a2", "a3", "a4", "a5"],
@@ -600,6 +634,19 @@ check(m.NO_SHARED_PATH_TITLE in titles
 check(m.NO_ARC_TITLE in titles
       and sorted(titles[m.NO_ARC_TITLE]["strands"]) == ["n0", "n1"],
       "a Strand with no SERVED arc gets its own named section — not-served is not no-shared-path")
+# Story 20.82 (#1031) AC4: the two residues are TWO sections on the READING
+# surface too, with distinct group ids and no merged heading. One Strand was
+# never eligible for judgment, the other was judged and matched nothing; the
+# #889 measurement kept them apart (G11 vs G12) and merging them would report
+# a judgment that never happened.
+check(titles[m.NO_ARC_TITLE]["group_id"] != titles[m.NO_SHARED_PATH_TITLE]["group_id"],
+      "the two residues carry different group ids — never one merged section")
+res_heads = [ln for ln in listing.splitlines()
+             if ln.startswith("## ") and any(
+                 f"— {t} (" in ln for t in (m.NO_ARC_TITLE,
+                                            m.NO_SHARED_PATH_TITLE))]
+check(len(res_heads) == 2,
+      f"both residues render as their own named heading on the screen ({res_heads})")
 
 # --- AC1: ranking, scoring and hiding are unreachable ----------------------
 # A proposal carrying an order and a score must not change what reaches the

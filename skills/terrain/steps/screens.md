@@ -263,6 +263,14 @@ no back button. So navigation is in-invocation and runs over **held state**
 - **Every screen carries the standing exits**, without exception: switch
   substrate, back to the member list, name your own direction, stop here. A
   screen missing one is the dead end this whole section exists to remove.
+- **Two substrates are OFFERED** (SPEC-terrain CAP-2's offering gate,
+  discharged 2026-07-31, #889/#1031): **co-tags** — shared tags, the default —
+  and **journey similarity** — shared background, judged over the served arc
+  renderings. Name the pair when you offer the exit, so "switch substrate" is
+  a choice rather than a prompt for a word the owner has to guess. Pass the
+  choice through: `member … --substrate journey-similarity --grouping <the
+  proposal>`. **Offering is not promoting** — a run that names no substrate
+  still composes on co-tags, and you never switch on the owner's behalf.
 
 ### The size switch — an over-budget member gets a View file
 
