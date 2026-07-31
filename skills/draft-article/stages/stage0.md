@@ -396,9 +396,10 @@ boundaries**:
   not in the declared sources is a
   NEEDS-OWNER gap, not a reason to read further.
 
-At completion, record `brief_provenance: owner-authored` on the emitted plan so
-the brief's influence is auditable. With **no** `--brief`, the run behaves
-exactly as before — the brief is an optional owner input, never a required gate.
+At completion record `brief_provenance` **matching the actual producer** (Story 20.94, #1050): `owner-authored` when the owner typed the brief, `terrain-adopted` when it arrived composed from a selection they made over enumerated alternatives — both are the owner's scope, and neither is a tool-invented one. With `terrain-adopted` also record `brief_source` as one-line JSON, `{"pins": {"terrain": ..., "hub": ...}, "artifact": ...}` — **pins first**, because the path is a state-dir location that goes stale by relocation while still looking authoritative, and the pins identify the material without it.
+**Nothing reads that pointer and no stage may** — it is never opened, stat'd or followed — and **no stage branches on `brief_provenance`**: the draft, the harvest emphasis and the argument plan are byte-identical either way. Resolving it would oblige this pipeline to know another producer's rendering, invocation and lifetime; a value nothing reads creates no such obligation.
+With **no** `--brief`, the run behaves exactly as before — the brief is an
+optional owner input, never a required gate.
 
 ### Plan consultation at draft start (SPEC-article-plan CAP-3, Story 13.57)
 
