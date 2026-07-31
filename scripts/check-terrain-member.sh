@@ -1178,11 +1178,12 @@ check(cli.returncode == 0 and dc["subdivided"] == [gid]
       "AC4: --subgroups reaches the layer through the CLI and the payload "
       "carries the ids and claims as data")
 from terrain_members import candidates, compose_member_listing  # noqa: E402
-check(dc["listing"] == compose_member_listing(
-          m, "workflow", candidates(m), "tag", {"G1": "the parent claim"}),
-      "AC8: an adopted subdivision changes NOTHING about the composed "
-      "listing at this story's boundary — the hierarchy is data here, and "
-      "rendering it is story 20.87")
+check(dc["listing"] != compose_member_listing(
+          m, "workflow", candidates(m), "tag", {"G1": "the parent claim"})
+      and f"{gid}-1" in dc["listing"],
+      "AC4: an adopted subdivision reaches the composed listing carrying its "
+      "ids (the rendering itself is asserted in "
+      "check-terrain-group-disclosure.sh, story 20.87)")
 
 # AC2/AC9 — THE DECLINED CAP STAYS DECLINED. No member-count constant may
 # appear in the layer, and the surface must state the trigger it does use.

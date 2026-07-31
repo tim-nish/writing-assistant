@@ -594,6 +594,12 @@ def _validate_subgroups(parent_id, parent_strands, proposed, depth=1):
         record = {"subgroup_id": sub_id,
                   "claim": claim if isinstance(claim, str) and claim.strip()
                            else None,
+                  # WHICH OF THE THREE STATES this is, kept as data rather than
+                  # inferred from a falsy claim: `"claim": null` is a composer
+                  # that TRIED and found no commonality; no `claim` key at all
+                  # is one that was never asked. Collapsing them hides the
+                  # signal #980 was decided on (Story 20.87 AC4).
+                  "claim_declared": "claim" in sub,
                   "claim_absent_reason": sub.get("claim_absent_reason"),
                   "strands": strands}
         nested = sub.get("subgroups")
@@ -679,6 +685,77 @@ def apply_subgroups(ms, subgroups):
     return ms
 
 
+# --- RENDERING THE SUBGROUP HIERARCHY (Story 20.87, #1041) --------------------
+#
+# THE PARENT CLAIM STAYS, ABOVE ITS SUBGROUPS (AC1), per the owner's 2026-07-30
+# ruling: the parent claim is supporting information for why the members belong
+# together at all, and *"showing only G10-X claims makes the subgroups' relation
+# to one another illegible"* — while the Full Report's purpose is surveying the
+# material as a whole. So the hierarchy is VISIBLE: parent header, parent claim,
+# then each subgroup with its own.
+#
+# THREE SURFACES, ONE WALK (AC2). `compose_member_listing` and
+# `compose_member_view` are already one rendering (Story 20.83, #1039); the Full
+# Report is the third and is a separate composer. Both call the SAME walk below
+# and differ only in how a Strand ROW is drawn — which is a real difference
+# between the surfaces (the selection screens clip, the report does not, and the
+# report moves the context line to a footnote), not a second implementation of
+# the hierarchy. A second walk is exactly the drift #1039 records.
+
+SUBGROUP_ID_KIND = (
+    "`G<n>-<m>` is a DISPLAY id like `G<n>`: per-screen and per-pin, usable to "
+    "ask for a full report, and conferring no selection authority — selection "
+    "stays by Strand index.")
+
+
+def _subgroup_claim_line(sub, prefix):
+    """One subgroup's claim, in whichever of the THREE STATES it is (AC4).
+
+    The states are the parent's, unchanged (`:634-650`): a composed claim
+    renders VERBATIM — never re-derived, never shortened and never clipped,
+    because clipping it re-creates #976 one layer up (AC3); a composer that
+    tried and found no commonality SELF-REPORTS; and a claim never asked for is
+    stated as absent rather than invented.
+    """
+    if sub.get("claim"):
+        return f"{prefix}: {sub['claim']}"
+    if sub.get("claim_declared"):
+        reason = str(sub.get("claim_absent_reason") or "").strip()
+        return (f"{prefix}: no single commonality found — the composer reports "
+                "these Strands share no one denominator it could state. They "
+                "are grouped as placed; nothing here has been regrouped, "
+                "reordered or dropped on account of it."
+                + (f" ({reason})" if reason else ""))
+    return (f"{prefix}: not composed for this subgroup — stated as absent "
+            "rather than invented here.")
+
+
+def _render_subgroups(lines, subs, render_strands, prefix, level):
+    """The hierarchy walk both surfaces share.
+
+    `render_strands(strands)` appends a leaf's Strand rows in the calling
+    surface's own row contract. Nothing here touches membership, order or
+    counts (AC7): the walk reads the structure `apply_subgroups` validated and
+    renders it.
+    """
+    head = "#" * min(level, 6)
+    for sub in subs:
+        lines.append(f"{head} {sub['subgroup_id']} ({len(sub['strands'])})")
+        lines.append("")
+        lines.append(_subgroup_claim_line(sub, prefix))
+        lines.append("")
+        if sub.get("subgroups"):
+            _render_subgroups(lines, sub["subgroups"], render_strands,
+                              prefix, level + 1)
+        else:
+            render_strands(sub["strands"])
+            lines.append("")
+
+
+def _any_subgroups(ms):
+    return any(s.get("subgroups") for s in ms["sections"])
+
+
 def _subgroups_payload(subs):
     """The subdivision, as data: ids, claims and slugs, recursively.
 
@@ -689,6 +766,7 @@ def _subgroups_payload(subs):
     for sub in subs:
         row = {"subgroup_id": sub["subgroup_id"],
                "claim": sub.get("claim"),
+               "claim_declared": sub.get("claim_declared"),
                "claim_absent_reason": sub.get("claim_absent_reason"),
                "strands": [e.get("slug") for e in sub["strands"]]}
         if sub.get("subgroups"):
@@ -779,7 +857,7 @@ def member_is_large(ms):
 
 def compose_member_listing(map_data, tag, cands, axis="tag", claims=None,
                            substrate=SUBSTRATE_DEFAULT, grouping=None,
-                           view_path=None):
+                           view_path=None, subgroups=None):
     """Screen 2 as a LISTING: the member's Strands, WHOLE, in sections.
 
     Served whole with the count disclosed — no within-member cap, no
@@ -818,6 +896,11 @@ def compose_member_listing(map_data, tag, cands, axis="tag", claims=None,
     # at the source — faithfully relayed, and wrong.
     ms = member_sections(map_data, tag, axis, substrate=substrate,
                          grouping=grouping)
+    # The adopted semantic subdivision, applied to THIS composer's own sections
+    # (Story 20.87). It is threaded like `grouping` and `substrate` above and
+    # for the same reason: a rendering composed from a different structure than
+    # the JSON beside it is two answers to one question.
+    apply_subgroups(ms, subgroups)
     return _compose_member_rendering(map_data, ms, cands, claims,
                                      view_path=view_path,
                                      summarise=member_is_large(ms))
@@ -925,6 +1008,13 @@ def _compose_member_rendering(map_data, ms, cands, claims=None,
     lines += ["`G<n>` is a DISPLAY id: per-screen and per-pin, usable to "
               "ask for a full report, and conferring no selection "
               "authority — selection stays by Strand index.", ""]
+    # THE SUBGROUP ID KIND IS DECLARED WHERE IT IS RENDERED (Story 20.87 AC6),
+    # beside the `G<n>` declaration above and only on a screen that actually
+    # prints one — an id that looks selectable and is not is exactly what
+    # retired the `J<n>` namespace, and a declaration for ids the screen does
+    # not contain is the same defect #978 names in the other direction.
+    if _any_subgroups(ms):
+        lines += [SUBGROUP_ID_KIND, ""]
     if ms["substrate"] != SUBSTRATE_DEFAULT:
         # THE ACQUISITION DISCLOSURE, on the reading surface (Story 20.82,
         # #1031). A judged substrate groups on something the owner cannot
@@ -1029,26 +1119,39 @@ def _compose_member_rendering(map_data, ms, cands, claims=None,
             # exists, and no branch here touches them — a machine judgment
             # about prose must never move a Strand, or grouping stops being
             # navigation and becomes a gate.
-        for el in sec["strands"]:
-            c = by_slug.get(el.get("slug"))
-            ident = c["id"] if c else el.get("slug", "?")
-            claim = el.get("gloss") or el.get("title") or el.get("slug", "")
-            mark = " — already consumed, still selectable" if el.get("consumed") else ""
-            # THIS SURFACE KEEPS CLIPPING (Story 20.73, #1011). The size
-            # switch binds the selection screens; only the Full Report is a
-            # stated exception to it, so the unclipping done in
-            # `compose_full_report` stops here deliberately. Removing
-            # `_clip_line` from this path would widen that story into the
-            # surfaces the switch governs.
-            lines.append(_clip_line(f"- **{ident}** — {claim}{mark}"))
-            lines.append(_clip_line(_strand_context_line(el, ms["member"], subbed)))
-            # The lesson's ARC, on the lesson's own row (Story 20.30, #871).
-            # It is displayed, never selectable: the row's index still names
-            # the Lesson, so picking it carries the rule and its arc together.
-            arc = _journey_arc_line(el)
-            if arc:
-                lines.append(_clip_line(arc))
-        lines.append("")
+        def rows(strands, _lines=lines):
+            for el in strands:
+                c = by_slug.get(el.get("slug"))
+                ident = c["id"] if c else el.get("slug", "?")
+                claim = el.get("gloss") or el.get("title") or el.get("slug", "")
+                mark = (" — already consumed, still selectable"
+                        if el.get("consumed") else "")
+                # THIS SURFACE KEEPS CLIPPING (Story 20.73, #1011). The size
+                # switch binds the selection screens; only the Full Report is a
+                # stated exception to it, so the unclipping done in
+                # `compose_full_report` stops here deliberately. Removing
+                # `_clip_line` from this path would widen that story into the
+                # surfaces the switch governs.
+                _lines.append(_clip_line(f"- **{ident}** — {claim}{mark}"))
+                _lines.append(_clip_line(
+                    _strand_context_line(el, ms["member"], subbed)))
+                # The lesson's ARC, on the lesson's own row (Story 20.30,
+                # #871). It is displayed, never selectable: the row's index
+                # still names the Lesson, so picking it carries the rule and
+                # its arc together.
+                arc = _journey_arc_line(el)
+                if arc:
+                    _lines.append(_clip_line(arc))
+
+        # THE HIERARCHY RENDERS UNDER THE PARENT CLAIM (Story 20.87 AC1), and
+        # ONLY where a subdivision was adopted: an unsubdivided group takes the
+        # branch below and its output is byte-identical to what it has always
+        # been (AC8).
+        if sec.get("subgroups"):
+            _render_subgroups(lines, sec["subgroups"], rows, "in common", 3)
+        else:
+            rows(sec["strands"])
+            lines.append("")
     if summarise:
         # THE ABOVE-BUDGET BRANCH PROPOSES NO LESS (AC5; `presentation.md:316`,
         # *"the size switch changes where the terrain is presented, never
@@ -1067,7 +1170,7 @@ def _compose_member_rendering(map_data, ms, cands, claims=None,
 
 
 def compose_full_report(map_data, tag, cands, group_ids, axis="tag",
-                        claims=None, grouping=None):
+                        claims=None, grouping=None, subgroups=None):
     """The FULL REPORT for the group ids the owner named (Story 20.56, #938;
     SPEC-terrain CAP-3 §"the owner may pull a FULL REPORT for named group ids").
 
@@ -1123,6 +1226,7 @@ def compose_full_report(map_data, tag, cands, group_ids, axis="tag",
     CO-TAGGING, not in row contract.
     """
     ms = member_sections(map_data, tag, axis, grouping=grouping)
+    apply_subgroups(ms, subgroups)
     by_id = {s.get("group_id"): s for s in ms["sections"]}
     unknown = [g for g in group_ids if g not in by_id]
     if unknown:
@@ -1172,6 +1276,15 @@ def compose_full_report(map_data, tag, cands, group_ids, axis="tag",
              "collected in the FOOTNOTES at the end of this report, out of "
              "the reading flow and none of them dropped.",
              ""]
+    # The subgroup id kind, declared where it is rendered and only where it is
+    # (Story 20.87 AC6) — the same pairing the `G<n>` declaration follows on
+    # the selection screens.
+    if any(by_id[g].get("subgroups") for g in group_ids if g in by_id):
+        lines += [SUBGROUP_ID_KIND, "",
+                  "A subdivided group shows its parent claim first — why "
+                  "these Strands share a screen at all — and then each "
+                  "subgroup's own claim beneath it. Both are carried verbatim "
+                  "from the screen that composed them.", ""]
     groups = []
     # Collected as the body renders, emitted once at the end: one entry per
     # rendered Strand, in the order the report rendered them, so the footnote
@@ -1204,42 +1317,59 @@ def compose_full_report(map_data, tag, cands, group_ids, axis="tag",
                          "here, because recomposition belongs to subset "
                          "selection.")
         lines.append("")
-        for el in strands:
-            c = by_slug.get(el.get("slug"))
-            ident = c["id"] if c else el.get("slug", "?")
-            text = el.get("gloss") or el.get("title") or el.get("slug", "")
-            mark = (" — already consumed, still selectable"
-                    if el.get("consumed") else "")
-            # NOTHING ON THE REPORT PATH IS CLIPPED (Story 20.73, #1011;
-            # SPEC-terrain CAP-3 as amended 2026-07-31, #986). The whole relay
-            # was already the contract — *"it relays whole, a stated exception
-            # to the size switch, not an oversight"* — and this renderer was
-            # violating it: `_clip_line` cut every line at VIEW_LINE_CHARS, so
-            # in the one surface exempted from the size switch the journey arc
-            # was the content systematically ending in `…` mid-sentence. The
-            # exception is a property of THIS surface, not of the material, so
-            # the fix is here at the consumer and not in `_journey_arc_line`
-            # (which never truncated) or in VIEW_LINE_CHARS (which still binds
-            # the size-switched screens, `compose_member_listing` above).
-            lines.append(f"- **{ident}** — {text}{mark}")
-            # THE CONTEXT LINE IS NOT ON THE ROW HERE (Story 20.74, #987). It
-            # is composed by the SAME function the selection screens use and
-            # carried, byte for byte, into the footnote block below: what it
-            # says is unchanged, only where it lives. Its three fields —
-            # placement, origin pin, attestation — plus the SUBSTITUTED SOURCE
-            # and `no-journey` marks therefore all survive the move.
-            footnotes.append(
-                f"- **{ident}** — {gid} — "
-                f"{_strand_context_line(el, ms['member'], subbed).strip()}")
-            arc = _journey_arc_line(el)
-            if arc:
-                lines.append(arc)
+
+        def report_rows(els, _gid=gid):
+            for el in els:
+                c = by_slug.get(el.get("slug"))
+                ident = c["id"] if c else el.get("slug", "?")
+                text = el.get("gloss") or el.get("title") or el.get("slug", "")
+                mark = (" — already consumed, still selectable"
+                        if el.get("consumed") else "")
+                # NOTHING ON THE REPORT PATH IS CLIPPED (Story 20.73, #1011;
+                # SPEC-terrain CAP-3 as amended 2026-07-31, #986). The whole
+                # relay was already the contract — *"it relays whole, a stated
+                # exception to the size switch, not an oversight"* — and this
+                # renderer was violating it: `_clip_line` cut every line at
+                # VIEW_LINE_CHARS, so in the one surface exempted from the size
+                # switch the journey arc was the content systematically ending
+                # in `…` mid-sentence. The exception is a property of THIS
+                # surface, not of the material, so the fix is here at the
+                # consumer and not in `_journey_arc_line` (which never
+                # truncated) or in VIEW_LINE_CHARS (which still binds the
+                # size-switched screens, `compose_member_listing` above).
+                lines.append(f"- **{ident}** — {text}{mark}")
+                # THE CONTEXT LINE IS NOT ON THE ROW HERE (Story 20.74, #987).
+                # It is composed by the SAME function the selection screens use
+                # and carried, byte for byte, into the footnote block below:
+                # what it says is unchanged, only where it lives. Its three
+                # fields — placement, origin pin, attestation — plus the
+                # SUBSTITUTED SOURCE and `no-journey` marks therefore all
+                # survive the move.
+                footnotes.append(
+                    f"- **{ident}** — {_gid} — "
+                    f"{_strand_context_line(el, ms['member'], subbed).strip()}")
+                arc = _journey_arc_line(el)
+                if arc:
+                    lines.append(arc)
+
+        # THE PARENT CLAIM IS RETAINED AS THE HEADER and the subgroups render
+        # beneath it (Story 20.87 AC1) — the Full Report is the surface whose
+        # purpose is surveying the material as a whole, which is the ruling's
+        # own reason for keeping the parent. An UNSUBDIVIDED group takes the
+        # else branch and its output is byte-identical to today's (AC8).
+        if sec.get("subgroups"):
+            _render_subgroups(lines, sec["subgroups"], report_rows,
+                              "In common", 3)
+        else:
+            report_rows(strands)
         lines.append("")
         groups.append({"group_id": gid, "title": sec["title"],
                        "claim": claim or None,
                        "claim_carried": bool(claim),
                        "strands": [e.get("slug") for e in strands],
-                       "count": len(strands)})
+                       "count": len(strands),
+                       **({"subgroups": _subgroups_payload(sec["subgroups"])}
+                          if sec.get("subgroups") else {})})
     # THE FOOTNOTE BLOCK (Story 20.74, #987). One entry per rendered Strand —
     # never per co-tagged Strand, since the line renders for every Strand and
     # only its first field varies — carrying exactly what the row used to
@@ -1316,7 +1446,7 @@ def cmd_member(args):
     listing = compose_member_listing(
         m, args.tag, cands, axis, claims,
         substrate=getattr(args, "substrate", SUBSTRATE_DEFAULT),
-        grouping=grouping, view_path=view_path)
+        grouping=grouping, view_path=view_path, subgroups=subgroups)
     if over and not view_path:
         # Mirrors `cmd_payload`'s warning on the terrain path: the screen has
         # already switched — it does NOT fail open into the dump — but the half
