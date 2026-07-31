@@ -77,6 +77,32 @@ emit() {  # $1 = selection string, $2 = artifact path
 }
 
 emit "L1, L2, L3" "$work/set.json" || { printf '\nFAILED.\n' >&2; exit 1; }
+
+# ADOPTION REQUIRES THE CANDIDATES (Story 20.101, #1079). Asserted at the CLI
+# because the refusal is the behaviour: the state that must never exist is
+# `adopted` beside an empty record of what it was adopted from.
+cat > "$work/cands.json" <<'CJ'
+{"kind": "candidate-theses", "over": ["L1", "L2", "L3"], "pin": "PIN",
+ "candidates": [{"thesis": "reading one", "places": ["L1", "L2", "L3"]},
+                {"thesis": "reading two", "places": ["L1", "L2", "L3"]}],
+ "recommendation": {"pick": 1, "axes": ["coverage"],
+                    "overturn": "if the cost angle is wanted"}}
+CJ
+sed -i "s/PIN/$pin/" "$work/cands.json"
+
+printf '{"index":"L1, L2, L3","pin":"%s","claim":"reading two"}' "$pin" \
+  | python3 "$D" brief --map "$work/map.json" --answer - \
+      > /dev/null 2>"$work/refusal.err" \
+  && err "#1079: adopting a thesis with NO composed candidates was allowed" \
+  || { grep -q 'adopted from' "$work/refusal.err" \
+       && ok "#1079: adopting without composed candidates is REFUSED, naming what is missing" \
+       || err "#1079: refused for the wrong reason: $(cat "$work/refusal.err")"; }
+
+printf '{"index":"L1, L2, L3","pin":"%s","claim":"reading two"}' "$pin" \
+  | python3 "$D" brief --map "$work/map.json" --answer - \
+      --composed "$work/cands.json" --out "$work/adopted.json" \
+      > /dev/null 2>"$work/err" \
+  || err "#1079: adopting WITH composed candidates failed: $(cat "$work/err")"
 emit "L1"         "$work/one.json" || { printf '\nFAILED.\n' >&2; exit 1; }
 
 python3 - "$work" <<'PYEOF' || fail=1
@@ -122,6 +148,25 @@ RENDERED = {
 
 s = json.load(open(w + "/set.json"))
 one = json.load(open(w + "/one.json"))
+adopted = json.load(open(w + "/adopted.json"))
+
+# THE ADOPTED BRIEF CARRIES WHAT IT WAS ADOPTED FROM (#1079).
+_ct = adopted.get("candidate_theses") or {}
+check(adopted.get("thesis", {}).get("state") == "adopted"
+      and _ct.get("composed") is True,
+      "#1079: an adopted thesis records that its candidates were composed")
+check(len(_ct.get("candidates") or []) == 2,
+      "#1079: ...and the REJECTED candidate survives beside the taken one — "
+      "the choice's provenance is the whole offer")
+_rec = _ct.get("recommendation") or {}
+check(_rec.get("axes") and _rec.get("overturn"),
+      "#1079: ...and the recommendation keeps its declared axes and its "
+      "OVERTURNING conditions — stripped of those it is a default in disguise")
+# The gate's guarantee object and the composed recommendation share a key and
+# are told apart by `composed`, a declared field, never by shape.
+check((s.get("candidate_theses") or {}).get("recommendation") is None,
+      "#1079/#1078: before composition the key holds the gate's own guarantee "
+      "object, which is process self-documentation and is NOT stored")
 
 for name, b in (("a 3-member set", s), ("a 1-member set", one)):
     keys = set(b)
