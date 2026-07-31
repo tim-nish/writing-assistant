@@ -349,9 +349,23 @@ Story 18.24 (#505):
 
 ```
 python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py stage0 <the intent the owner chose> <the sources they named> \
-  --brief "$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["brief"])' "$WS/brief.json")" \
+  --brief "$WS/brief.json" \
   --root <host-repo>
 ```
+
+**`--brief` takes the artifact ITSELF, and that is the whole arc carrier**
+(Story 20.91, #1044). `--brief` has accepted a FILE since Story 18.24 (#505),
+and stage 0 reads a JSON **brief record** — the brief string, plus the selected
+members and their journey arcs — by its shape alone. So the string it uses is
+the one this step composed, unchanged, and the **arcs travel with it**: the
+selected Strands' served arcs cross as declared source material at the recorded
+pin, **beside** the host-repo sources and never in place of them. There is no
+second argument and no second hand-off. Nothing on the owner's surface changes,
+and the extraction one-liner is gone because the pipeline reads the file.
+
+The coupling direction is unchanged by this: stage 0 recognises a **format**,
+never a producer. It does not detect, name, import or resolve terrain, and it
+cannot tell this record from one the owner wrote by hand.
 
 From here the run is **an ordinary brief-carrying run**: the brief maps to
 story-element clusters, seeds the argument-plan thesis candidate, and directs

@@ -609,7 +609,68 @@ assert "never" in gap["drafting"] and "gate" in gap["drafting"], gap
 nr = gap["needs_recording"]
 assert nr["slug"] == "cache-warmth" and nr["target_file"].endswith("journey.md"), nr
 assert nr["heading"] == "NEEDS-RECORDING" and nr["entry"], nr
+# Story 20.91 (#1044) AC2: with NO arc served, the absence is still reported —
+# and it says WHICH absence it is, in the kind Story 20.90 carries. "No arc
+# exists" and "no arc arrived" must not collapse into one finding.
+ep = gap["episode"]
+assert ep["served"] is False and ep["arc"] is None, ep
+assert "not requested" in (ep["not_served_reason"] or ""), ep
+assert "host_join" not in gap, gap
 PYEOF
+
+# --- 7f. an episode the system is CARRYING is not an absent one (#1044, 20.91)
+# Same fixture, unit-exact: a selected Strand whose host-repo join found nothing
+# but whose served arc IS present is not reported `episodic-unrecorded`. The
+# host verdict is kept under `host_join`, the arc travels quoted at its cite,
+# and the NEEDS-RECORDING task is STILL minted — recording host-side feeds
+# evidence, the arc is material that already existed; adjacent, never
+# substitutes (AC3/AC4).
+python3 - <<PYEOF && ok "#1044/20.91: a served arc is reported as episode-served, keeps host_join, and still mints NEEDS-RECORDING" || err "the served-arc gap disclosure is wrong"
+import sys
+sys.path.insert(0, "$root/scripts")
+from terrain_select import _selection_gap
+target = {"repo": "host", "file": "docs/journey.md"}
+served = {"kind": "element", "slug": "retry-storm",
+          "journey": "JOURNEY-ALPHA the belief inverted after the retro.",
+          "journey_cite": "gloss/journeys/agents.md:6@" + "1" * 40,
+          "usability": {"verdict": "episodic-unrecorded", "checked": ["docs/journey.md"]}}
+g = _selection_gap(served, target)
+assert g["verdict"] == "episode-served", g
+assert g["host_join"]["verdict"] == "episodic-unrecorded", g
+assert g["host_join"]["checked"] == ["docs/journey.md"], g
+assert "NOT an unrecorded episode" in g["disclosure"], g
+# The arc is QUOTED, never re-expressed, and carries its cite (AC5).
+assert g["episode"]["arc"] == served["journey"], g
+assert g["episode"]["arc_cite"] == served["journey_cite"], g
+assert g["episode"]["served"] is True, g
+# AC4: the flow is unchanged and the relationship is STATED, not silently
+# subsumed. AC3: the arc is material, never a Fact.
+assert g["needs_recording"]["slug"] == "retry-storm", g
+assert g["needs_recording"]["heading"] == "NEEDS-RECORDING", g
+assert "adjacent, not substitutes" in g["disclosure"], g
+assert "never a Fact" in g["disclosure"], g
+assert "never" in g["drafting"] and "gate" in g["drafting"], g
+# An arc-less Strand at the same verdict is UNCHANGED — the two findings stay
+# distinct, and nothing here relabels an absence.
+bare = dict(served, journey=None, journey_cite=None,
+            journey_unavailable="requested journeys/agents and it did not arrive")
+b = _selection_gap(bare, target)
+assert b["verdict"] == "episodic-unrecorded", b
+assert "host_join" not in b, b
+assert b["episode"]["served"] is False, b
+assert b["episode"]["not_served_reason"] == bare["journey_unavailable"], b
+# A `no-episode` or `cannot-determine` verdict is never relabelled by an arc.
+noep = dict(served, usability={"verdict": "no-episode", "checked": []})
+assert _selection_gap(noep, target)["verdict"] == "no-episode", noep
+PYEOF
+
+# The step companion states the relationship rather than leaving it inferred.
+__gapf=$(cat skills/terrain/steps/gap.md)
+printf '%s' "$__gapf" | grep -q 'episode-served' \
+  && printf '%s' "$__gapf" | grep -qi 'adjacent, not' \
+  && printf '%s' "$__gapf" | grep -qi 'harvest' \
+  && ok "#1044/20.91: gap.md states episode-served and the NEEDS-RECORDING relationship" \
+  || err "gap.md missing the episode-served relationship note"
 
 # A MATCHED selection carries no gap block — the verdict already located its
 # evidence, and the brief is indistinguishable from any other.

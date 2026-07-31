@@ -4043,27 +4043,13 @@ def _entry_gate_ok(key, framework_file, root):
 DEPTH_LEVELS = {"deep-dive", "standard", "note"}
 
 
-def _read_brief(raw):
-    """Resolve a free-form coverage brief (Story 18.24, #505) into its recorded
-    form. A value that is an existing file path is read (origin `file`, source
-    path retained for provenance); anything else is the brief text inline
-    (origin `inline`). Provenance is always owner-authored — like an interview
-    answer, the brief is the owner's own words. Returns None for an empty
-    value."""
-    if raw is None:
-        return None
-    val = raw.strip()
-    if not val:
-        return None
-    if os.path.isfile(val):
-        try:
-            text = open(val, encoding="utf-8").read().strip()
-        except OSError:
-            text = val
-        else:
-            return {"text": text, "provenance": "owner-authored",
-                    "origin": "file", "source": os.path.abspath(val)}
-    return {"text": val, "provenance": "owner-authored", "origin": "inline"}
+# --- The brief INPUT contract lives in its own module (Story 20.91, #1044) ---
+# `--brief` takes TEXT, a FILE, or a JSON brief record carrying the brief string
+# plus the selected Strands' journey arcs — resolved in `draft_brief.py`, which
+# carries the grounds. `_read_brief` keeps its name: callers and checks unchanged.
+sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
+import draft_brief  # noqa: E402
+_read_brief = draft_brief._read_brief
 
 
 # --- One entry mechanism (Story 18.47, #560; CAP-9 2026-07-22 #554 amendment) -
@@ -4195,10 +4181,14 @@ def _run_state(framework, sources, root=None, depth=None, element=None,
         d = depth.strip()
         state["depth"] = ({"level": d.lower()} if d.lower() in DEPTH_LEVELS
                           else {"scope": d})
+    # ONE resolution for the whole function (Story 20.91): the entry request and
+    # `state.brief` read the SAME record, or a FILE `--brief` records its path
+    # as the request. Grounds, and the record's two accepted shapes: draft_brief.
+    brief_state = _read_brief(brief)
     # ONE entry path (Story 18.47): the named-element pin and the free-form
     # request resolve through the same resolver, and `state.element` below is
     # PROJECTED from it — the pin is the degenerate case, not a second path.
-    entry = _entry_request(element, brief)
+    entry = _entry_request(element, brief_state)
     if entry:
         state["entry"] = entry
     if entry and entry["named"]:
@@ -4212,8 +4202,14 @@ def _run_state(framework, sources, root=None, depth=None, element=None,
         # declared-source boundary — harvest still reads only writing-sources
         # files (the sources selection above), just gathered for one element.
         state["element"] = {"name": element.strip()}
-    brief_state = _read_brief(brief)
     if brief_state:
+        # THE ARCS CROSS BESIDE THE SOURCES (Story 20.91, #1044 AC1): declared
+        # source material at the recorded pin, stated at the top level ALONGSIDE
+        # the host-repo sources and never in place of them. `sources` is
+        # untouched (AC3); NEEDS-RECORDING is untouched (AC4).
+        arcs = brief_state.pop("journey_arcs", None)
+        if arcs:
+            state["journey_arcs"] = arcs
         # CAP-9-aligned owner coverage brief (#505): a free-form "what this
         # article should cover" in the owner's words, recorded with
         # owner-authored provenance. It maps to story-element clusters and
@@ -4903,7 +4899,9 @@ def main(argv=None):
                                       "selection is pinned to it, harvest scopes to that element alone "
                                       "without widening the source boundary — CAP-9, #431")
     sp.add_argument("--brief", help="optional free-form owner coverage brief (\"what this article "
-                                    "should cover\", TEXT or a FILE path): recorded with "
+                                    "should cover\", TEXT, a FILE path, or a JSON brief record "
+                                    "carrying `brief` plus the selected Strands' journey arcs "
+                                    "(#1044)): recorded with "
                                     "owner-authored provenance, maps to story-element clusters, "
                                     "seeds the argument-plan thesis candidate and harvest emphasis "
                                     "WITHIN the declared sources — a filter, never a scope widener "
@@ -5010,7 +5008,9 @@ def main(argv=None):
                                       "selection is pinned to it, harvest scopes to that element alone "
                                       "without widening the source boundary — CAP-9, #431")
     sp.add_argument("--brief", help="optional free-form owner coverage brief (\"what this article "
-                                    "should cover\", TEXT or a FILE path): recorded with "
+                                    "should cover\", TEXT, a FILE path, or a JSON brief record "
+                                    "carrying `brief` plus the selected Strands' journey arcs "
+                                    "(#1044)): recorded with "
                                     "owner-authored provenance, maps to story-element clusters, "
                                     "seeds the argument-plan thesis candidate and harvest emphasis "
                                     "WITHIN the declared sources — a filter, never a scope widener "
