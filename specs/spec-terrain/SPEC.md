@@ -41,6 +41,17 @@ sources:
 > `presentation.md` would put one sitting's ratifications in two files and
 > stays refused.
 >
+> **The date cut is now MECHANICAL and is no longer a decision** (2026-07-31,
+> #1046). Amendment-history companions are their own budgeted file class under
+> `SPEC-writing-assistant`'s per-file-class criterion, and the era-split fires
+> on a threshold declared in `scripts/check-skill-budget.sh` — the single
+> enforcement copy, so no byte figure appears here. When the append target
+> crosses it, the closing sitting renames it to its own date range, opens a
+> fresh `amendments.md`, and updates this pointer. **What is decided per
+> incident is nothing; what is decided once is this rule.** The two splits
+> already taken (2026-07-27, 2026-07-31) are its retrospective instances and
+> are not re-litigated.
+>
 > **CAP-3's clauses live in the companion `presentation.md`** (relocated
 > verbatim 2026-07-30, #941, when this file passed its byte ceiling). The
 > pointer under CAP-3 below names what is there, so a reader learns the
