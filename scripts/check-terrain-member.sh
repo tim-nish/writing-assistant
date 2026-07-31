@@ -707,8 +707,14 @@ check(open(out).read() == open(out2).read(),
 # when the hyphenated entry point was inverted into a CLI shim. The rule is a
 # property of the SURFACE, so the entry point and that module are read as one
 # text — the guard follows the code it guards.
+# Story 20.81 (#1030): the write_view BODY is read from its owner alone. Over a
+# concatenation the `split` would take whichever file happened to be first, so
+# naming the owner is what keeps this assertion about the function it names; the
+# absence assertion below keeps the whole surface, where more text is stronger.
 src = "".join(open(p).read() for p in (D, "scripts/terrain_screens.py"))
-after_write = src.split("def write_view(", 1)[1]
+owner = open("scripts/terrain_screens.py").read()
+check("def write_view(" in owner, "write_view lives in terrain_screens.py")
+after_write = owner.split("def write_view(", 1)[1]
 check("open(" not in after_write.split("\ndef ", 1)[0].replace("open(path", "OK"),
       "write_view only writes — it never opens the view for reading")
 check(not any(tok in src for tok in ("read_view(", "load_view(", "VIEW_CACHE")),

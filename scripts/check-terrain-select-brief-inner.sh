@@ -143,13 +143,19 @@ check(r["brief"] == b["brief"] and r["step"] == b["step"],
       "a written brief is read back whole — the never-read-back rule does "
       "not bind the owner's own decision")
 # The composition moved into importable siblings (Story 20.80, #1029) while
-# argparse and dispatch stayed in the hyphenated entry point, so the SURFACE
-# this asserts over is the entry point plus its siblings, read as one text —
-# which keeps the "exactly one reader" claim at least as strong as it was.
-src = "".join(open(p, encoding="utf-8").read() for p in (
-    "scripts/topic-map-directions.py", "scripts/terrain_brief.py",
-    "scripts/terrain_select.py", "scripts/terrain_screens.py"))
-check("def read_brief_artifact(" in src
+# argparse and dispatch stayed in the hyphenated entry point. The two halves of
+# this assertion do NOT take the same surface, and Story 20.81 (#1030) splits
+# them for that reason:
+#   * the ABSENCE half gets stronger the more text it reads, so it keeps the
+#     whole surface — entry point plus siblings, as one text;
+#   * the PRESENCE half gets WEAKER over a union (any one of four files could
+#     satisfy it), so it names the module that owns the reader. Deleting
+#     `read_brief_artifact` where it now lives has to fail here.
+SURFACE = ("scripts/topic-map-directions.py", "scripts/terrain_brief.py",
+           "scripts/terrain_select.py", "scripts/terrain_screens.py")
+src = "".join(open(p, encoding="utf-8").read() for p in SURFACE)
+owner = open("scripts/terrain_brief.py", encoding="utf-8").read()
+check("def read_brief_artifact(" in owner
       and not any(t in src for t in ("read_view(", "load_view(", "VIEW_CACHE")),
       "exactly one reader exists, and it is the brief's — no View reader, "
       "no rendering cache")

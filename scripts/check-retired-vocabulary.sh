@@ -13,7 +13,10 @@
 # NOT mechanically enforceable here.
 #
 # WHY THIS IS A SOURCE-LEVEL CHECK, not a render-time one. The obvious home was
-# `lint_owner_lines` / INTERNAL_VOCAB in topic-map-directions.py. That is the
+# `lint_owner_lines` / INTERNAL_VOCAB in terrain_directions.py (they were in
+# topic-map-directions.py when this was written; both travelled together to
+# their own module, and the pointer is corrected here rather than left to
+# mislead — Story 20.81, #1030). That is the
 # wrong layer, demonstrated rather than argued: that lint runs over composed
 # lines which QUOTE THE MATERIAL'S OWN WORDS (CAP-3 substance-led rendering), so
 # it cannot distinguish the tool's vocabulary from the owner's content on the

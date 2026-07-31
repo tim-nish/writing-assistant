@@ -344,9 +344,16 @@ rm -f "$vdir/.gitignore"
 rmdir "$vdir" 2>/dev/null || true
 # The View is never read back — CAP-1's derived-never-stored property, at the
 # same strength it held when the file lived in a run workspace.
+# Story 20.81 (#1030): `VIEW_FILENAME` and every code path that could open the
+# View moved to scripts/terrain_screens.py with the inversion (Story 20.80,
+# #1029). The entry point still names the constant in its argparse help, so this
+# grep kept passing — but it could no longer see the code it guards. Both files
+# are named: the entry point, because it still imports the constant and could
+# re-acquire a read, and the module that now owns the writer.
 if grep -nE '(open|read_text|json\.load|cat)[^)]*VIEW_FILENAME' \
-     "$root/scripts/topic-map-directions.py" >/dev/null 2>&1; then
-  err "topic-map-directions.py appears to READ the View back"
+     "$root/scripts/topic-map-directions.py" \
+     "$root/scripts/terrain_screens.py" >/dev/null 2>&1; then
+  err "the terrain composer appears to READ the View back"
 else
   ok "no code path reads the View back (write-only, CAP-1)"
 fi
