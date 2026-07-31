@@ -159,12 +159,40 @@ OPTIONAL_KEYS = ("audience", "audience_id", "policy_seeded", "seed", "relates",
                  # field is a missing declaration, never an implicit pass.
                  # Rides this record; no new store.
                  "visual_slots",
-                 # `brief_provenance` (Story 18.24, #505): records that this
-                 # plan was shaped by a free-form OWNER coverage brief. The only
-                 # accepted value is `owner-authored` — the brief is the owner's
-                 # own words (like an interview answer), never a tool-invented
-                 # scope, so a non-owner provenance is refused.
+                 # `brief_provenance` (Story 18.24, #505; the vocabulary
+                 # widened to a CLOSED PAIR by Story 20.94, #1050): records
+                 # WHICH PRODUCER shaped this plan's coverage brief. Two values
+                 # and no others: `owner-authored`, the owner's own free-form
+                 # words; and `terrain-adopted`, a brief composed at the terrain
+                 # gate from Strands the owner selected and a candidate they
+                 # adopted from enumerated alternatives. The rule's PURPOSE —
+                 # never a tool-invented scope — is satisfied by both; only its
+                 # mechanism, matching one literal string, refused the second.
                  "brief_provenance",
+                 # `brief_source` (Story 20.94, #1050): required with
+                 # `terrain-adopted` and forbidden otherwise — where that brief
+                 # came from, PINS FIRST. Read from fields the brief artifact
+                 # already carries; no new store, id or registry exists.
+                 #
+                 # THE PINS COME FIRST AND THE PATH IS A BREADCRUMB, which is
+                 # this record's answer to its own disclosed cost: the path is a
+                 # machine state-dir location and terrain's retention is
+                 # "discharged by relocation, not by GC", so it is exactly the
+                 # kind of pointer that goes stale while still looking
+                 # authoritative. The pins identify the map INDEPENDENTLY of the
+                 # path, so a reader whose path has gone still holds what
+                 # identifies the material — and the record says the path may be
+                 # stale rather than presenting it as resolvable.
+                 #
+                 # NOTHING IN THE PIPELINE MAY RESOLVE IT. That prohibition is
+                 # the load-bearing half of #1050, not the field: the ratified
+                 # boundary forbids drafting learning which producer ran because
+                 # resolving a terrain pointer would oblige draft-article to
+                 # know terrain's rendering, invocation and lifetime. A value
+                 # nothing reads creates no such obligation, so behaviour stays
+                 # byte-identical and no branch on it exists to test.
+                 # `check-brief-pointer-unresolved.sh` asserts that absence.
+                 "brief_source",
                  # `resolved_defaults` (Story 20.62, #945; SPEC-article-draft-
                  # pipeline CAP-3, second clause): every choice the run
                  # resolved by a DECLARED DEFAULT, recorded HERE — visible in
@@ -284,6 +312,54 @@ def parse_sections(raw):
     return out
 
 RESOLVED_DEFAULT_KEYS = ("choice", "value", "default", "declared_in", "axes")
+
+
+# THE CLOSED PAIR (Story 20.94, #1050). Declared once, here, so the validator
+# and its refusal message cannot drift apart, and so a third value is a change
+# to a named vocabulary rather than an edit to a string comparison.
+BRIEF_PROVENANCE = ("owner-authored", "terrain-adopted")
+
+
+def parse_brief_source(raw):
+    """A `brief_source:` value -> the recorded pointer (Story 20.94, #1050).
+
+    One-line JSON object (the flat frontmatter parses no nested YAML):
+    `{"pins": {"terrain": <str>, "hub": <str>}, "artifact": <str>}`.
+
+    PINS ARE REQUIRED; the artifact path is OPTIONAL, and that asymmetry is
+    the whole design. The path is a machine state-dir location and terrain's
+    retention is discharged by relocation rather than by a collector, so it is
+    precisely the kind of pointer that goes stale while still looking
+    authoritative. The pins identify the map independently of it - the fallback
+    shape #1050 named in advance - so a reader whose path has gone still holds
+    what identifies the material, and one whose path resolves knows it was
+    never guaranteed to.
+
+    THIS FUNCTION VALIDATES; IT NEVER RESOLVES. It does not open, stat, or
+    otherwise touch `artifact`, and nothing downstream may either.
+    """
+    try:
+        val = json.loads(raw)
+    except ValueError as e:
+        raise ValueError(f"not one-line JSON ({e})")
+    if not isinstance(val, dict):
+        raise ValueError("not a JSON object")
+    pins = val.get("pins")
+    if not isinstance(pins, dict):
+        raise ValueError('"pins" is required and is an object')
+    for k in ("terrain", "hub"):
+        if not isinstance(pins.get(k), str) or not pins[k].strip():
+            raise ValueError(f'"pins.{k}" is required and is a non-empty '
+                             "string - the pins are what identify the map "
+                             "when the path no longer does")
+    art = val.get("artifact")
+    if art is not None and (not isinstance(art, str) or not art.strip()):
+        raise ValueError('"artifact", when present, is a non-empty string')
+    extra = set(val) - {"pins", "artifact"}
+    if extra:
+        raise ValueError(f"unknown key(s) {', '.join(sorted(extra))} - this "
+                         "record carries a pointer, never a store")
+    return val
 
 
 def parse_resolved_defaults(raw):
@@ -628,13 +704,46 @@ def validate_plan(text, path):
                    'one-line JSON array of {"choice": <str>, "value": <str>, '
                    '"default": <str>, "declared_in": <str>, "axes": 1}')
 
-    # `brief_provenance` (Story 18.24/#505): the owner coverage brief is the
-    # owner's own words — the only accepted provenance is owner-authored.
+    # `brief_provenance` (Story 18.24/#505; the CLOSED PAIR of Story 20.94,
+    # #1050): a coverage brief is never a tool-invented scope. Two producers
+    # satisfy that and nothing else does — the owner typing their own words,
+    # and the terrain gate composing over Strands the owner selected from a
+    # candidate they adopted. The refusal still names the REASON rather than
+    # only listing what is permitted: the reason is what a third value has to
+    # answer to.
     bp = fields.get("brief_provenance")
-    if bp and bp != "owner-authored":
+    if bp and bp not in BRIEF_PROVENANCE:
         yield ("brief_provenance",
-               f"must be 'owner-authored' (got {bp!r}) — a coverage brief is the "
-               "owner's own words, never a tool-invented scope")
+               f"must be one of {', '.join(repr(v) for v in BRIEF_PROVENANCE)} "
+               f"(got {bp!r}) — a coverage brief is the owner's own words or a "
+               "brief they adopted at the terrain gate over Strands they "
+               "selected, never a tool-invented scope")
+
+    # `brief_source` (Story 20.94, #1050): rides `terrain-adopted` and nothing
+    # else. PINS FIRST, path second — see the field's declaration above for why
+    # the ordering is the record's answer to its own staleness cost.
+    bs = fields.get("brief_source")
+    if bs and bp != "terrain-adopted":
+        yield ("brief_source",
+               f"is recorded only with brief_provenance: terrain-adopted (this "
+               f"plan records {bp!r}) — an owner-typed brief has no artifact to "
+               "point at, and a pointer with nothing behind it is worse than "
+               "none")
+    if bp == "terrain-adopted" and not bs:
+        yield ("brief_source",
+               "is required with brief_provenance: terrain-adopted — recording "
+               "the producer without what it produced from is the lossy record "
+               "#1050 was filed on")
+    if bs:
+        try:
+            parse_brief_source(bs)
+        except ValueError as e:
+            yield ("brief_source",
+                   f"malformed brief source — {e}; the value is a one-line JSON "
+                   'object {"pins": {"terrain": <str>, "hub": <str>}, '
+                   '"artifact": <str>}, PINS FIRST because the path is a '
+                   "machine state-dir location that goes stale by relocation "
+                   "while still looking authoritative")
 
     # Forbidden fields.
     for key in fields:
