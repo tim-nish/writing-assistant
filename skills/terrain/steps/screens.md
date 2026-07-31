@@ -136,6 +136,43 @@ when the gateway is unavailable or you skip composition, **say so** and
 relay the deterministic titles — a silent skip is the defect a stated
 absence is not.
 
+**Try a SUBDIVISION of each group, and adopt it only where the subgroup claims
+come out tighter (Story 20.86, #1041; SPEC-terrain, amended 2026-07-31).** A
+large related set flattened into one sentence hides the differences inside it.
+So after composing a group's claim, try allocating its Strands into semantic
+sub-groups and compose a claim for each part — speculatively, as a trial.
+
+**The tightness differential is the whole trigger.** Adopt the subdivision when
+those subgroup claims are *measurably tighter* than the parent's — each naming
+something the parent could not say. **Reject it, and leave the group a leaf,
+when they merely restate the parent** in narrower words. **No member count, no
+placement cap and no scroll length participates in this decision**: a count
+trigger is declined outright (*owner decision record — 2026-07-27 (no
+within-axis cap; a second navigation step)*), and the calibration figures in
+#1041 are evidence, never a threshold. Measured on the run #1041 reports, this
+adopted 4 of 11 candidate groups — a differential that discriminates, not one
+that always fires.
+
+**The recursive stop is the same one you already apply to a group claim
+(#980):** a subgroup claim that degenerates into an enumeration splits further;
+one that composes honestly is a leaf. The three claim states hold at every
+level — composed, `null` self-report, or omitted-and-stated-absent.
+
+Pass only what you **adopted**, alongside `--claims`:
+
+```
+  --subgroups '{"G10":[{"claim":"<subgroup claim>","strands":["slug", ...]}, ...]}'
+```
+
+A subdivision **partitions its parent exactly**: nothing added, nothing
+dropped, and **no Strand moves between parent groups** — parent membership was
+fixed by the script before any prose existed, and a machine judgment about
+prose quality never moves a Strand (Story 20.67 AC3). The script refuses a
+proposal that would, rather than repairing it. Subgroup ids are `G<n>-<m>`,
+the same display kind as `G<n>`: per-screen, per-pin, usable to ask for a full
+report, and conferring **no selection authority** — selection stays by Strand
+index.
+
 **Journey presence is marked by ABSENCE, and the screen states its denominator
 (SPEC-terrain CAP-2 as amended 2026-07-30, #933/#934).** Relay both as given —
 neither is yours to compose. A row carrying an arc says nothing about it in its

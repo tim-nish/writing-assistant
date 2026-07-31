@@ -996,6 +996,18 @@ def main(argv=None):
                          "Carried VERBATIM, never recomposed; a group whose "
                          "claim is absent says so. Omit for the pre-20.66 "
                          "listing, byte-identical.")
+    mb.add_argument("--subgroups", metavar="JSON",
+                    help="the semantic subdivisions you ADOPTED, as {\"G10\": "
+                         "[{\"claim\": \"...\", \"strands\": [\"slug\", ...]}, "
+                         "...]} (Story 20.86, #1041). Send a group only when "
+                         "its subgroup claims came out measurably TIGHTER than "
+                         "the parent's; a group whose trial merely restated "
+                         "the parent is a leaf and is simply omitted. A "
+                         "subdivision partitions the parent exactly — nothing "
+                         "added, dropped, or moved between parent groups — and "
+                         "a part may carry its own `subgroups` when its claim "
+                         "degenerates into an enumeration. No member count "
+                         "triggers this and none is accepted.")
     mb.add_argument("--view", metavar="PATH",
                     help="the View file's path, as `resolve-paths.py` resolved "
                          "it. Pass it ALWAYS: the composer switches on the "
