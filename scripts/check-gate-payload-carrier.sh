@@ -28,10 +28,13 @@ import importlib.util, json, os, sys
 sys.path.insert(0, "scripts")
 spec = importlib.util.spec_from_file_location("dp", "scripts/draft-pipeline.py")
 dp = importlib.util.module_from_spec(spec); spec.loader.exec_module(dp)
-from draft_gates import intent_gate
+from draft_gates import intent_gate, sources_gate
 from draft_resume import confirmation
 w = sys.argv[1]
 json.dump(intent_gate(dp.INTENT_LABELS), open(os.path.join(w, "intent.json"), "w"))
+json.dump(sources_gate(11, default_kind="subtree", default_detail="skills/terrain",
+                       candidates=["skills/terrain/", "scripts/harvest-scope.py"]),
+          open(os.path.join(w, "sources.json"), "w"))
 json.dump(confirmation("20260718T000000-111111", "/ws", {"next_stage": "harvest"},
                        "started 14 days ago, on a different calendar day"),
           open(os.path.join(w, "resume.json"), "w"))
@@ -41,7 +44,7 @@ PY
 # --require-render (Story 20.107, #1102) is what turns this from an EXISTENCE
 # assertion into a CONFORMANCE one: a gate must declare how it renders, or the
 # rendering step is free to compose prose from it, which is #1102 exactly.
-for g in intent resume; do
+for g in intent resume sources; do
   if python3 scripts/validate-proposal-payload.py --require-render "$work/$g.json" >/dev/null 2>"$work/$g.err"; then
     ok "the $g gate emits a PRESENTABLE payload (shipped validator, #1081)"
   else
@@ -63,7 +66,7 @@ def check(cond, msg):
         fail = 1
 
 
-for name in ("intent", "resume"):
+for name in ("intent", "resume", "sources"):
     item = json.load(open(os.path.join(w, name + ".json")))["items"][0]
     # OPTIONS PLUS FREE FORM, never options alone: options-only is a different
     # violation of the same clause that prose-only violates.
@@ -102,7 +105,7 @@ check(_v.CONTROL_CAPACITY == BUILDER_CAP,
       f"#1102: builder and validator agree on the control capacity "
       f"({BUILDER_CAP})")
 
-for name in ("intent", "resume"):
+for name in ("intent", "resume", "sources"):
     item = json.load(open(os.path.join(w, name + ".json")))["items"][0]
     r = item.get("render")
     check(isinstance(r, dict),
@@ -123,6 +126,34 @@ for name in ("intent", "resume"):
         check(bool(r.get("banner")) and bool(r.get("reply_line")),
               f"#1102: ...and the {name} block carries its own banner and "
               f"reply line rather than leaving them to the renderer")
+
+# THE SOURCES GATE ASKS A SCOPE (Story 20.109, #1103). The observed gate listed
+# candidate FILES and expected them typed back. The owner's decision is where
+# the evidence lives; which files carry it is harvest's own step. So what is
+# asserted is the ANSWER FORMAT: the choices are the closed scope vocabulary,
+# and a path never appears as a choice label.
+from draft_gates import SCOPE_KINDS
+src = json.load(open(os.path.join(w, "sources.json")))["items"][0]
+check(len(src["choices"]) == len(SCOPE_KINDS),
+      f"#1103: the sources gate offers exactly the {len(SCOPE_KINDS)} scopes")
+check(src["render"]["control"] == "selection",
+      "#1103: ...as a selection, not a typing exercise")
+check(src["render"]["recommended"] == 0,
+      "#1103: ...with the recommended scope leading")
+# CANDIDATES INFORM THE DEFAULT AND ARE NEVER THE ANSWER FORMAT: the evidence
+# state a terrain-originated run carries is preserved, in the prose the owner
+# reads, rather than promoted into the choice set.
+# A SUBTREE SCOPE MAY NAME ITS SUBTREE — that is a scope, not a file list.
+# What may never happen is a CANDIDATE becoming an option, which is the exact
+# shape #1103 reports: the run's evidence state promoted from reason to answer.
+_cands = ["skills/terrain/", "scripts/harvest-scope.py"]
+check(not any(c["label"] in _cands for c in src["choices"]),
+      "#1103: ...and no candidate file was promoted into the choice set")
+check(not any(c["label"].endswith(".py") or c["label"].endswith(".md")
+              for c in src["choices"]),
+      "#1103: ...and no choice label is an individual file")
+check("skills/terrain/" in src["why"],
+      "#1103: ...while the candidates justifying the default survive in the reason")
 
 sys.exit(1 if fail else 0)
 PY

@@ -200,3 +200,69 @@ def intent_gate(labels):
         reply_line="Reply with one article type from the list, or describe "
                    "the piece you have in mind.",
     )
+
+
+# The scope vocabulary the stage-0 sources ask offers (Story 20.109, #1103).
+# EVERY MEMBER NARROWS. "all declared sources" is the whole of the host's
+# writing-sources.yaml, never the whole filesystem — the stage-0 selection is a
+# filter and never a scope widener, and that invariant is restated here rather
+# than re-decided, because a scope vocabulary is exactly where a widener would
+# enter unnoticed.
+SCOPE_KINDS = ("all", "subtree", "commit-range")
+
+
+def sources_gate(declared_count, default_kind="all", default_detail=None,
+                 candidates=(), reason=None):
+    """"Where does the evidence live?" — the gate #1103 saw as a typing exercise.
+
+    THE OWNER'S DECISION IS WHERE THE EVIDENCE LIVES, and identifying which
+    files carry it is harvest's job rather than this gate's precondition. The
+    served allocation has a home for each granularity — repositories are
+    harvest SCOPE, and file scope is proposed at the HARVEST gate under
+    proposal-plus-free-form — and the observed gate asked for file scope at a
+    third location licensed for neither.
+
+    CANDIDATES INFORM THE DEFAULT AND ARE NEVER THE ANSWER FORMAT. A
+    terrain-originated run arrives holding what no cold run has, and that
+    evidence state is preserved in full: it is what makes the default
+    non-arbitrary. What it may not do is come back as a list of paths for the
+    owner to retype — that reads the 2026-07-31 licence to "name candidate
+    sources" as a licence to demand them.
+
+    `default_kind` is moved to the front by `payload`, so the recommendation
+    leads and the directive reads `recommended: 0`.
+    """
+    if default_kind not in SCOPE_KINDS:
+        raise ValueError(f"{default_kind!r} is not a scope; expected one of "
+                         f"{', '.join(SCOPE_KINDS)}")
+    labels = {
+        "all": "all declared sources",
+        "subtree": (f"just {default_detail}" if default_detail
+                    else "a directory subtree"),
+        "commit-range": (f"the commit range {default_detail}"
+                         if default_detail else "a commit range"),
+    }
+    effects = {
+        "all": f"harvests the whole declared set ({declared_count} file(s)) — "
+               f"the widest scope the source boundary allows",
+        "subtree": "narrows the declared set to one subtree; files outside it "
+                   "are counted as unexamined, never read",
+        "commit-range": "narrows the declared set to what that range touched; "
+                        "the rest is counted as unexamined",
+    }
+    choices = [{"label": labels[k], "effect": effects[k]} for k in SCOPE_KINDS]
+    why = reason or ("Scope decides where harvest looks. Which files carry the "
+                     "evidence is harvest's own step, not an answer owed here.")
+    if candidates:
+        # The candidates are EVIDENCE FOR THE DEFAULT, carried in the prose the
+        # owner reads — never promoted into the choice set, which is the whole
+        # correction.
+        shown = ", ".join(list(candidates)[:3])
+        why = f"{why} Seen so far: {shown}."
+    return payload(
+        where=f"Stage 0: the article type is chosen and harvest needs its "
+              f"scope; {declared_count} file(s) are declared for this repo.",
+        why=why,
+        choices=choices,
+        recommended=SCOPE_KINDS.index(default_kind),
+    )
