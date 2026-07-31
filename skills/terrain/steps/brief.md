@@ -70,6 +70,91 @@ The owner's wording, if they supply any, **is** the brief and the proposal is
 discarded. To record an adopted claim instead of the deterministic wording,
 pass it back as `claim` in the answer.
 
+## The gate proposes 2–3 CANDIDATE THESES, not one
+
+**Added 2026-07-31** (SPEC-terrain CAP-3, #995). One thesis was composed per
+selection and the gate offered adopt, narrow, or restart — so every upstream
+step was free-form reading and free-form typing, and the owner **designed the
+article from scratch in chat**. The intended shape is **article design as a
+sequence of selections**: a thesis chosen from candidates, then a structure,
+and onward.
+
+**Compose the candidates yourself. Nothing already computes them.** The
+command returns `candidate_theses` with `composed: false`, and that is literal:
+it carries the composition **inputs** (`inputs` — each member's served gloss
+and cite), the complete set they are composed over (`over`), the pin, and the
+`requirements` your output must satisfy. The consultant block is *not* this
+material — it computes a subject list and an unranked substitution pool and
+nothing else. **The brief string is not a thesis either**: until a candidate is
+adopted it is a `thesis.state: candidates-pending` **coverage statement** over
+the members. Relay `thesis.line` so the owner is not left reading a
+semicolon-joined list as your reading of their set.
+
+**The requirements bind you and you may not trade them against each other:**
+
+1. **Every candidate is composed over the same complete selected set.** They
+   are alternative *readings* of one set, never a narrowing of it. A candidate
+   that silently drops a selected Strand is the failure this exists to catch.
+2. **Every candidate places every selected Strand or discloses the omission**
+   by name, with its reason. Completeness is a **cover counted in placements**.
+3. **Every placement cites the Strand's served rendering at this pin.**
+   Nothing from outside the served corpus enters a candidate.
+4. **Enumerate; never rank-and-trim.** Offering the strongest while discarding
+   the rest is the narrowing the owner's own selection already did.
+5. **Free text wins**, here as everywhere — the owner's own thesis is the
+   brief, and every candidate is discarded when they write one.
+
+The assessment itself is again **not a fixed procedure**: what is frozen is
+what must be TRUE of the candidates that arrive, never how you arrive at them.
+
+**Then run the count — it is not optional, and it runs AFTER composition:**
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/topic-map-directions.py cover \
+  --composed "$WS/candidates.json" --from "$WS/brief.json"
+```
+
+Write the composed candidates as `{"kind": "candidate-theses", "over": [...],
+"pin": ..., "candidates": [{"thesis", "places", "omits": [{"index", "why"}],
+"grounds": [{"index", "cite"}]}]}` — the shape the command hands you in
+`candidate_theses.answer`. **A composer that cannot omit in principle can still
+omit in fact**, so the count reads what you emitted, never what you composed
+from. A refusal returns the **whole** proposal to you — never one candidate
+while the rest go on, which would be the map choosing.
+
+To record the owner's chosen candidate, pass it back as `claim` in the answer:
+it supersedes the coverage statement and is pinned to this same member set.
+
+## A large selection may be proposed as k article-scoped groups
+
+**Added 2026-07-31** (SPEC-terrain CAP-3, #988). Reviewing fifteen Strands as
+one undifferentiated set is harder than it looks, and such a set is often
+really *k* coherent theses. Where the selection is large enough the command
+returns `partition_proposal` — the same machinery applied to a **partition**
+rather than to one set, with the same inputs, the same pin, and its own
+`requirements`. Relay `line` and offer it under the **proposal contract**:
+**approve / modify / decline**, and **never a silent restructure**.
+
+**It must not filter.** Every selected Strand lands in some proposed group. The
+owner may drop members and **only explicitly** — record such a drop as
+`{"index", "why", "by": "owner"}`. A Strand that belongs in two groups is
+placed in both: this is a cover, and forcing a tie-break would be the map
+deciding which relationship the owner may see. Verify with the **same** `cover`
+command, over `{"kind": "partition", "over": [...], "groups": [{"label",
+"members", "thesis"}], "dropped": [...]}`.
+
+**k accepted briefs feed the drafting backlog — one run at a time, never k
+simultaneous publishes.** Compose one brief per approved group by running
+`brief` again with that group's members as the selection and its own `--out`
+in this same workspace, so each brief is pinned to the subset it was composed
+over. `cover` returns the `backlog` block with that order and those commands.
+
+**This is not subdividing an oversized group on the serving screens** (#980).
+That is pre-selection presentation refinement bound by the terrain invariants;
+this is post-selection and bound by the proposal contract. The licence here is
+that the owner **already narrowed, at selection** — so nothing may propose over
+an unselected population.
+
 ## The gate is a LOOP over the member set
 
 **Added 2026-07-31** (SPEC-terrain CAP-3, #997). The gate used to offer adopt,

@@ -1,0 +1,326 @@
+#!/usr/bin/env sh
+# parallel-safe
+# parallel-verified 2026-07-31 (#999) — one `mktemp -d` holds the fixture map,
+# every answer, every composed-candidate file and every output; the repository
+# is only read. No shared path, no ambient state, no network.
+# covers: scripts/topic-map-directions.py scripts/terrain_theses.py
+#   scripts/terrain_text.py scripts/strand_cover.py
+#   skills/terrain/steps/brief.md
+# tier: inner — CANDIDATE THESES and the k-GROUP PROPOSAL (Story 20.78,
+#   #995/#988) against a derived fixture map; no seam, no corpus, no assembly.
+#   Its own check rather than more assertions in
+#   check-terrain-select-brief-inner.sh or the iteration check, for the #948
+#   reason those two exist: the cover needs a case per refusal, and exactly
+#   that growth pushed an earlier check to ~90% of INNER_MS. It tripped the
+#   ceiling here too, at 2201ms with one CLI run per case; the remedy was #950
+#   batching (two CLI runs at the command's boundary, the rest through the same
+#   entry point in one interpreter), never a re-tier. Measured 2026-07-31 after
+#   that: ~1.2s (ceiling 2s).
+# removal-signal: the terrain checks are retired or re-shaped under the #910
+#   retention sweep (a check provably subsumed by the #857/#858 seam, or the
+#   full-tier terrain harnesses rebuilt fixture-based), which re-places these
+#   assertions; removed with that pass.
+# check-terrain-theses-inner.sh — the gate proposes 2–3 candidate theses over
+# the COMPLETE selected set, a large selection may be proposed as k
+# article-scoped groups, and THE PLACEMENT COUNT RUNS AFTER COMPOSITION. That
+# count is the story's own falsifier: a composer that cannot omit in principle
+# can still omit in fact, so the assertions below drive the shipped command
+# over compositions that DO omit, and require the omission to be caught.
+set -eu
+
+root=$(git rev-parse --show-toplevel 2>/dev/null) || {
+  printf 'FAIL: not inside a git repository\n' >&2; exit 1;
+}
+cd "$root"
+
+D="scripts/topic-map-directions.py"
+T="scripts/terrain_theses.py"
+FIX="scripts/fixtures/terrain/screen-map.json"
+SKILL="skills/terrain/steps/brief.md"
+
+fail=0
+err() { printf 'FAIL: %s\n' "$1" >&2; fail=1; }
+ok()  { printf 'ok:   %s\n' "$1"; }
+
+work=$(mktemp -d); trap 'rm -rf "$work"' EXIT
+
+python3 -c "import py_compile; py_compile.compile('$T', doraise=True)" 2>/dev/null \
+  && ok "terrain_theses.py compiles" || err "terrain_theses.py syntax error"
+
+# One prep run widens the fixture past the partition threshold and writes both
+# answers (#950 batching: one interpreter for the map and every fixture).
+python3 - "$FIX" "$work" <<'PYEOF'
+import json, sys
+d = json.load(open(sys.argv[1])); w = sys.argv[2]
+strands = list(d.get("elements") or [])
+for n in range(8):
+    strands.append({
+        "kind": "lesson", "slug": f"widened-{n:02d}", "title": f"Lesson {n}",
+        "topic": "engineering" if n % 2 else "people",
+        "date": f"2026-07-{n + 1:02d}",
+        "gloss": f"A claim the material itself makes, number {n}",
+        "situation": f"LESSONS.md:{n + 10}@abc1234",
+        "evidence": [f"LESSONS.md:{n + 10}@abc1234"], "consumed": False})
+d["elements"] = strands
+json.dump(d, open(w + "/map.json", "w"))
+PYEOF
+
+python3 "$D" candidates --map "$work/map.json" > "$work/cands.json"
+python3 - "$work" <<'PYEOF'
+import json, sys
+w = sys.argv[1]
+pin = json.load(open(w + "/map.json"))["coverage"]["pin"]
+ids = [c["id"] for c in json.load(open(w + "/cands.json"))["candidates"]
+       if c["kind"] == "element"]
+put = lambda n, o: json.dump(o, open(f"{w}/{n}.json", "w"))
+put("a-small", {"index": ids[:3], "note": "through the on-call retro",
+                "pin": pin})
+put("a-large", {"index": ids[:7], "note": "n", "pin": pin})
+put("a-one", {"index": ids[0], "note": "n", "pin": pin})
+put("a-free", {"free_text": "my own thesis, in my own words"})
+PYEOF
+
+python3 "$D" brief --answer "$work/a-small.json" --map "$work/map.json" \
+  --out "$work/ws/brief.json" > "$work/b-small.json"
+python3 "$D" brief --answer "$work/a-large.json" --map "$work/map.json" \
+  --out "$work/ws/brief-large.json" > "$work/b-large.json"
+python3 "$D" brief --answer "$work/a-one.json" --map "$work/map.json" \
+  > "$work/b-one.json"
+python3 "$D" brief --answer "$work/a-free.json" --map "$work/map.json" \
+  > "$work/b-free.json"
+
+# The COMPOSED candidate files. Written here, not by the code under test: the
+# count reads what a composer EMITTED, so the fixtures are the emissions —
+# including the ones that omit a Strand, which is the point.
+python3 - "$work" <<'PYEOF'
+import json, sys
+w = sys.argv[1]
+b = json.load(open(w + "/b-small.json"))
+bl = json.load(open(w + "/b-large.json"))
+ids, big = b["indexes"], bl["indexes"]
+cite = {m["index"]: m["cite"] for m in b["members"]}
+g = lambda xs: [{"index": i, "cite": cite[i]} for i in xs]
+put = lambda n, o: json.dump(o, open(f"{w}/{n}.json", "w"))
+base = {"kind": "candidate-theses", "over": ids, "pin": b["pin"], "candidates": [
+    {"thesis": "one reading", "places": ids, "grounds": g(ids)},
+    {"thesis": "another reading", "places": ids[:2],
+     "omits": [{"index": ids[2], "why": "a different register"}],
+     "grounds": g(ids[:2])}]}
+put("c-good", base)
+# THE FALSIFIER: the same shape with the disclosure removed. Placements are
+# identical; only the honesty differs.
+silent = json.loads(json.dumps(base)); silent["candidates"][1].pop("omits")
+put("c-silent", silent)
+one = json.loads(json.dumps(base)); one["candidates"] = one["candidates"][:1]
+put("c-one", one)
+four = json.loads(json.dumps(base))
+four["candidates"] = four["candidates"] + four["candidates"]
+put("c-four", four)
+inv = json.loads(json.dumps(base))
+inv["candidates"][0]["grounds"][0]["cite"] = "INVENTED.md:1@deadbeef"
+put("c-invented", inv)
+nar = json.loads(json.dumps(base))
+nar["over"] = ids[:2]; nar["candidates"][0]["places"] = ids[:2]
+nar["candidates"][0]["grounds"] = g(ids[:2])
+nar["candidates"][1]["omits"] = []
+put("c-narrowed", nar)
+out = json.loads(json.dumps(base))
+out["candidates"][0]["places"] = ids + ["L99"]
+put("c-outside", out)
+# The partition fixtures.
+part = {"kind": "partition", "over": big, "pin": bl["pin"], "groups": [
+    {"label": "the on-call thread", "members": big[:3], "thesis": "t1"},
+    {"label": "the budget thread", "members": big[3:], "thesis": "t2"}]}
+put("p-good", part)
+filt = json.loads(json.dumps(part)); filt["groups"][1]["members"] = big[3:-1]
+put("p-filtered", filt)
+drop = json.loads(json.dumps(filt))
+drop["dropped"] = [{"index": big[-1], "why": "not this article", "by": "owner"}]
+put("p-dropped", drop)
+mach = json.loads(json.dumps(filt))
+mach["dropped"] = [{"index": big[-1], "why": "weakest of the set"}]
+put("p-machine-drop", mach)
+solo = json.loads(json.dumps(part))
+solo["groups"] = [{"label": "all of it", "members": big}]
+put("p-one-group", solo)
+PYEOF
+
+# --- the COMMAND, at its two ends: a conforming set, and the falsifier ------
+# Two CLI runs, not thirteen. The shipped entry point is exercised here — exit
+# code, stderr, the artifact it reads — and every remaining case is driven
+# through the same `verify_cover` in ONE interpreter below (#950 batching;
+# thirteen interpreter starts put this check over INNER_MS by itself).
+python3 "$D" cover --composed "$work/c-good.json" \
+  --from "$work/ws/brief.json" > "$work/r-good.json" 2>"$work/e-good" \
+  && ok "a conforming candidate set passes the cover" \
+  || err "a conforming candidate set was refused: $(cat "$work/e-good")"
+# AC2/AC3 — THE STORY'S OWN FALSIFIER, at the command's own boundary: the same
+# placements as the conforming set, with the disclosure removed.
+if python3 "$D" cover --composed "$work/c-silent.json" \
+     --from "$work/ws/brief.json" >/dev/null 2>"$work/e-silent"; then
+  err "the cover accepted a candidate that silently dropped a selected Strand"
+else
+  grep -q 'says nothing about' "$work/e-silent" \
+    && ok "a silent omission is refused by the command, with the Strand named" \
+    || err "wrong silent-omission behaviour: $(cat "$work/e-silent")"
+fi
+
+# --- the skill carries the requirements as contract text --------------------
+# Asserted as TEXT for the reason the consultant check states: the requirements
+# bind the composer, who reads the skill.
+for token in 'CANDIDATE THESES' 'never a narrowing of it' \
+             'cover counted in placements' 'runs AFTER composition' \
+             'Nothing already computes them' 'Free text wins' \
+             'must not filter' 'only explicitly' \
+             'never k' 'not a fixed procedure'; do
+  grep -q -- "$token" "$SKILL" && ok "the skill carries: $token" \
+    || err "the skill is missing the contract text: $token"
+done
+
+# --- AC9 — the consultant kept its rules and gained no procedure ------------
+grep -q 'CONSULTANT_RULES = \[' "$D" \
+  && ok "the consultant's four rules are untouched" \
+  || err "CONSULTANT_RULES no longer exists as the consultant's binding"
+if grep -nE 'CONSULTANT_(STRUCTURES|PROCEDURE|STEPS)|assessment_steps' \
+     "$D" "$T" >/dev/null; then
+  err "a fixed assessment procedure was added to build candidates (#939)"
+else
+  ok "candidates were built without smuggling a procedure into the consultant"
+fi
+# --- one assertion run over the produced payloads (#950 batching) -----------
+python3 - "$work" <<'PYEOF' || fail=1
+import importlib, json, os, sys
+w = sys.argv[1]
+sys.path.insert(0, os.path.abspath("scripts"))
+verify_cover = importlib.import_module("terrain_theses").verify_cover
+fail = []
+def check(cond, msg):
+    print(("ok:   " if cond else "FAIL: ") + msg,
+          file=sys.stdout if cond else sys.stderr)
+    if not cond: fail.append(msg)
+
+def cover(name, brief):
+    """The SAME entry point the command calls, over the SAME emitted files."""
+    return verify_cover(json.load(open(f"{w}/{name}.json")),
+                        json.load(open(f"{w}/ws/{brief}")), f"{w}/ws/{brief}")
+
+def refuses(name, brief, phrase):
+    r = cover(name, brief)
+    got = " ".join(r.get("refusals") or [])
+    check(bool(r.get("refusals")) and phrase in got,
+          f"{name}: refused, with the reason named ({phrase!r})")
+
+# AC1/AC2/AC4 — everything a candidate set is refused for.
+refuses("c-one", "brief.json", "the gate proposes")
+refuses("c-four", "brief.json", "the gate proposes")
+refuses("c-invented", "brief.json", "invented material")
+refuses("c-narrowed", "brief.json", "OWNER'S selection")
+refuses("c-outside", "brief.json", "not in the owner's")
+# AC6 — and everything a partition is refused for.
+refuses("p-filtered", "brief-large.json", "MUST NOT FILTER")
+refuses("p-machine-drop", "brief-large.json", "explicit act")
+refuses("p-one-group", "brief-large.json", "proposes nothing")
+
+s = json.load(open(w + "/b-small.json"))
+l = json.load(open(w + "/b-large.json"))
+one = json.load(open(w + "/b-one.json"))
+free = json.load(open(w + "/b-free.json"))
+ct = s.get("candidate_theses") or {}
+
+# --- AC1 — 2–3 candidates per selection, offered as a step -----------------
+check(ct.get("count") == {"min": 2, "max": 3},
+      "the gate asks for 2–3 candidate theses, never one")
+check(bool(ct.get("label")) and bool(ct.get("line")),
+      "the candidate step is offered with its own label and line")
+check("consultant" not in one and "candidate_theses" not in one,
+      "one Strand gets no candidates — there is nothing to re-read")
+
+# --- AC2 — candidates are readings of the COMPLETE set ---------------------
+check(ct.get("over") == s["indexes"],
+      "the candidates are composed over the complete selected set")
+check([m["index"] for m in ct.get("inputs") or []] == s["indexes"],
+      "the composition inputs are exactly the selected members")
+
+# --- the grounding correction: candidates are NEW COMPOSITION --------------
+check(ct.get("composed") is False,
+      "the block states that nothing here is a composed thesis")
+con = s.get("consultant") or {}
+check(set(con) >= {"subject", "substitution_candidates"}
+      and "candidates" not in con,
+      "the consultant still computes a subject and an unranked pool, and no "
+      "candidate theses — they were never there to render")
+check(ct.get("ranked") is False,
+      "the candidates are enumerated, never ranked — no candidate is hidden")
+
+# --- the join is REPLACED as the thesis, not extended ----------------------
+th = s.get("thesis") or {}
+check(th.get("state") == "candidates-pending" and th.get("text") is None,
+      "no thesis exists until the owner chooses one")
+check("COVERAGE STATEMENT" in (th.get("brief_string_is") or "")
+      and "COVERAGE STATEMENT" in (th.get("line") or ""),
+      "the brief string says what it is — a coverage statement, not a reading")
+src = open("scripts/topic-map-directions.py", encoding="utf-8").read()
+body = src.split("def _brief_from_index")[1].split("\ndef ")[0]
+check('"; ".join(' not in body and "coverage_statement(matches)" in body,
+      "the one-thesis join is gone from the brief path, not extended")
+
+# --- AC4 — each candidate is pinned and grounded ---------------------------
+check(ct.get("pin") == s["pin"],
+      "the candidates are pinned to the selection's own pin")
+check(all(m.get("cite") for m in ct.get("inputs") or []),
+      "every input carries the served cite a candidate must ground in")
+
+# --- AC3 — the count, and what it counted ----------------------------------
+r = json.load(open(w + "/r-good.json"))
+check(r.get("counted") == "after-composition",
+      "the report states that the count ran after composition")
+c1, c2 = r["candidates"]
+check(c1["placed"] == c1["selected"] == 3 and c1["complete"],
+      "a candidate placing every selected Strand is counted complete")
+check(c2["placed"] == 2 and c2["omitted"] and not c2["undisclosed"],
+      "a DISCLOSED omission is named and offered anyway — annotation, never "
+      "narrowing")
+check(not r["refusals"],
+      "a disclosed omission does not refuse the proposal")
+
+# --- AC5/AC6/AC7 — the partition -------------------------------------------
+pp = l.get("partition_proposal") or {}
+check("partition_proposal" not in s,
+      "a small selection is offered no partition — the threshold is a "
+      "condition for OFFERING, and an unoffered proposal is absent")
+check(pp.get("over") == l["indexes"] and pp.get("offered") is True,
+      "the partition is proposed over the whole selected set")
+check((pp.get("contract") or {}).get("options")
+      == ["approve", "modify", "decline"],
+      "the partition runs under the proposal contract")
+check("never a silent restructure" in json.dumps(pp),
+      "the proposal states that it is never a silent restructure")
+p = cover("p-good", "brief-large.json")
+check(not p["refusals"], "a conforming partition passes the cover")
+check(p["placed"] == p["selected"] == len(l["indexes"]) and p["complete"],
+      "every one of the N selected Strands lands in some proposed group")
+b = p.get("backlog") or {}
+check(b.get("k") == 2 and "ONE AT A TIME" in (b.get("policy") or ""),
+      "k accepted briefs feed the drafting backlog, not k simultaneous "
+      "publishes")
+check([g["members"] for g in b.get("briefs") or []]
+      == [g["members"] for g in p["groups"]],
+      "each backlog brief is pinned to its own group's member subset")
+d = cover("p-dropped", "brief-large.json")
+check([x["index"] for x in d["dropped"]] == [l["indexes"][-1]]
+      and d["complete"] and not d["refusals"],
+      "an explicitly owner-dropped member is accepted and recorded as "
+      "dropped, not lost")
+
+# --- AC8 — free text remains a first-class exit ----------------------------
+check(free["brief"] == "my own thesis, in my own words"
+      and free["origin"] == "free-form",
+      "free text still wins, unchanged")
+check("candidate_theses" not in free and "partition_proposal" not in free,
+      "a free-form brief proposes nothing over a set it does not have")
+sys.exit(1 if fail else 0)
+PYEOF
+[ $? -eq 0 ] || fail=1
+
+[ "$fail" -eq 0 ] && printf '\nAll %s checks passed.\n' "$0" \
+  || { printf '\n%s FAILED.\n' "$0" >&2; exit 1; }
