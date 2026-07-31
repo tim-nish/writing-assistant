@@ -173,6 +173,17 @@ def candidates(map_data):
                 else None),
             "gloss": el.get("gloss"),
             "gloss_unavailable": el.get("gloss_unavailable"),
+            # THE ARC TRAVELS (Story 20.90, #1044). These three were on the
+            # element and were dropped by this projection, which is why a
+            # brief's recorded members carried no journey even though the hub
+            # was serving one. Carried as the SERVED rendering, verbatim — a
+            # consumer never re-expresses an arc and never synthesises one from
+            # a headline (`terrain_members.py:500-507`). Absence is carried in
+            # its own kind rather than as a missing key, so "no arc exists" and
+            # "no arc arrived" stay distinguishable downstream.
+            "journey": el.get("journey"),
+            "journey_cite": el.get("journey_cite"),
+            "journey_unavailable": el.get("journey_unavailable"),
             # The three-valued writability verdict, VISIBLE on every strand
             # (#799): it surfaces at selection and never filters what appears.
             "usability": el.get("usability"),

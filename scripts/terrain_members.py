@@ -1546,12 +1546,44 @@ def cmd_member(args):
     return 0
 
 
-def _member_record(match):
-    """One selected Strand, as the brief records it (Story 20.54 AC4)."""
-    return {"index": match.get("id"), "slug": match.get("slug"),
-            # The served rendering, as served — never re-expressed here.
-            "gloss": match.get("gloss"),
-            "cite": match.get("situation")}
+def _member_record(match, arc=True):
+    """One selected Strand, as the brief records it (Story 20.54 AC4).
+
+    THE ARC TRAVELS WITH THE STRAND (Story 20.90, #1044). This projection was
+    the single drop point: it flattened a selected Strand to four keys while
+    the element it projects from carried `journey` and `journey_cite`, so the
+    material the owner had just been shown on Screen 2 was not in the brief
+    they composed from it. The arc is the SERVED `journey_gloss:` rendering,
+    QUOTED VERBATIM — never re-expressed, never paraphrased, never synthesised
+    from a headline, and never rewritten into a rule, a summary or a claim by
+    any later stage. That is the same rule `:500-507` states for the row.
+
+    ABSENCE IS CARRIED IN ITS THREE KINDS (AC2), never as a missing key: the
+    shape is the one `journey_similarity_inputs` already ships — `served:
+    false` plus the `not_served_reason` the element carries as
+    `journey_unavailable` — so "no arc exists" and "no arc arrived" stay
+    different findings downstream. It is nested under `journey` so those field
+    names keep their meaning beside the record's own `cite`.
+
+    `arc=False` IS FOR ONE CALLER AND ITS GROUND IS AT THAT CALL SITE
+    (AC3): the substitution pool. Widening is not a default here — the
+    anti-widening bound is real, it simply never excluded a SELECTED Strand's
+    own arc, which is material the owner pointed at.
+    """
+    rec = {"index": match.get("id"), "slug": match.get("slug"),
+           # The served rendering, as served — never re-expressed here.
+           "gloss": match.get("gloss"),
+           "cite": match.get("situation")}
+    if arc:
+        served = match.get("journey")
+        served = served if isinstance(served, str) and served.strip() else None
+        rec["journey"] = {
+            "arc": served,
+            "arc_cite": match.get("journey_cite"),
+            "served": served is not None,
+            "not_served_reason": match.get("journey_unavailable"),
+        }
+    return rec
 
 
 def compose_member_view(map_data, ms, cands=None, claims=None):

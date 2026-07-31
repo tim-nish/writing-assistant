@@ -53,6 +53,14 @@ for n in range(12):
         "situation": f"LESSONS.md:{n + 10}@abc1234",
         "evidence": [f"LESSONS.md:{n + 10}@abc1234"],
         "consumed": False,
+        # Journey material on HALF the Strands (Story 20.90, #1044): the
+        # record must carry a served arc verbatim AND state an unserved one in
+        # its kind, so the fixture has to contain both.
+        **({"journey": f"before {n} -> what broke -> after {n}",
+            "journey_cite": f"JOURNEYS.md:{n + 10}@abc1234"}
+           if n % 2 == 0 else
+           {"journey_unavailable": "no journey record is paired with this "
+                                   "Lesson at this pin"}),
     })
 d["elements"] = strands
 d["coverage"] = dict(d.get("coverage", {}), hub_pin="0123456789abcdef")
@@ -280,6 +288,68 @@ check(mx_raw == mxt_raw,
 # group id bought the owner typing, never a group-shaped selection.
 check(mx["origin"] == "adopted-index-set" and g["origin"] == "adopted-index-set",
       "an expanded selection records an ordinary index SET, not a group")
+
+# --- the selected Strand's ARC travels into the brief (Story 20.90, #1044) --
+# The record was the single drop point: it flattened a selected Strand to four
+# keys while the element carried `journey` and `journey_cite`, so the material
+# the owner had just read on Screen 2 was absent from the brief composed from
+# it. What is asserted here is that the arc arrives, VERBATIM, and that its
+# absence arrives in its KIND rather than as a missing key.
+src_el = {e["slug"]: e for e in json.load(open(w + "/big-map.json"))["elements"]}
+members = s.get("members") or []
+check(members and all("journey" in m for m in members),
+      "AC1: every recorded member carries a journey block")
+served_seen = unserved_seen = False
+for m in members:
+    j = m.get("journey") or {}
+    check({"arc", "arc_cite", "served", "not_served_reason"} <= set(j),
+          f"AC2: {m['index']} states its arc in the shape "
+          "journey_similarity_inputs already ships — served plus a reason, "
+          "never a bare missing key")
+    el = src_el.get(m["slug"], {})
+    want = el.get("journey")
+    want = want if (want or "").strip() else None
+    # AC1/AC7 — the SERVED rendering, quoted. A paraphrase, a summary, or a
+    # rewrite into rule-statement register fails here rather than reaching
+    # drafting dressed as the arc.
+    check(j.get("arc") == want,
+          f"AC1/AC7: {m['index']}'s arc is the served rendering VERBATIM "
+          f"({j.get('arc')!r} vs {want!r})")
+    check(j.get("arc_cite") == el.get("journey_cite"),
+          f"AC1: {m['index']}'s arc cite is the served pointer")
+    check(j.get("served") is (want is not None),
+          f"AC2: {m['index']}'s served flag agrees with what it carries")
+    if want is None:
+        unserved_seen = True
+        check(j.get("not_served_reason") == el.get("journey_unavailable"),
+              f"AC2: {m['index']} distinguishes 'no arc arrived' from 'no arc "
+              "exists' by carrying the element's own reason")
+    else:
+        served_seen = True
+check(served_seen and unserved_seen,
+      "the fixture exercises BOTH a served arc and an unserved one — an "
+      "absence assertion that never sees an absence proves nothing")
+
+# AC6 — a brief.json written BEFORE this story still opens, and its lifecycle
+# line is unaffected. The member-record schema was never PINNED anywhere: the
+# nearest thing is this file's own `"gloss" in m and "cite" in m` above, which
+# EXERCISES the record without asserting a key set, so widening is additive.
+import copy, os, subprocess  # noqa: E402
+old_brief = copy.deepcopy(s)
+for m in old_brief.get("members") or []:
+    m.pop("journey", None)
+old_path = os.path.join(w, "brief-preexisting.json")
+json.dump(old_brief, open(old_path, "w"))
+p_old = subprocess.run(["python3", "scripts/topic-map-directions.py",
+                        "brief-open", "--at", old_path],
+                       capture_output=True, text=True)
+check(p_old.returncode == 0,
+      "AC6: a brief.json written before this story still opens "
+      f"({p_old.stderr.strip()[:90]!r})")
+if p_old.returncode == 0:
+    check((json.loads(p_old.stdout).get("lifecycle") or {}).get("line"),
+          "AC6: ...and its lifecycle line is unaffected")
+
 sys.exit(1 if fail else 0)
 PYEOF
 [ $? -eq 0 ] || fail=1

@@ -278,6 +278,25 @@ check(any("ENUMERATED, never ranked-and-trimmed" in r
           for r in (ct.get("requirements") or [])),
       "and THESIS_REQUIREMENTS[3] is RETAINED — the new requirement constrains "
       "ranking, it does not replace the ban on trimming")
+# --- the ARC travels into the block's inputs (Story 20.90, #1044, AC5) ------
+# `thesis_candidates_block` sets `"inputs": list(members)` and gained no edit
+# of its own; this asserts the inheritance is a TESTED property rather than an
+# incidental one, and that the pool beside it was deliberately NOT widened.
+inputs = ct.get("inputs") or []
+check(all("journey" in i for i in inputs),
+      "every candidate-thesis input carries its Strand's journey block — the "
+      "arcs reach the gate without thesis_candidates_block changing")
+check(all({"arc", "arc_cite", "served", "not_served_reason"} <= set(i["journey"])
+          for i in inputs),
+      "and each states absence in its KIND — served plus a reason — never as "
+      "a missing key")
+check(all("journey" not in c
+          for c in (con.get("substitution_candidates") or [])),
+      "AC3: the substitution pool is NOT widened — it is offered material, not "
+      "pointed-at material, and it is the complete unselected set")
+check(all("journey" in m for m in (con.get("subject") or [])),
+      "AC3: the consultant's SUBJECT — what the owner selected — does carry "
+      "the arcs")
 check(len(ct.get("requirements") or []) == 6,
       f"the requirement count follows the list "
       f"({len(ct.get('requirements') or [])}) — a silently dropped "
