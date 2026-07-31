@@ -394,6 +394,20 @@ _tmd = _u.module_from_spec(_spec); _spec.loader.exec_module(_tmd)
 _sh.copy(w + "/big-map.json", w + "/ws-set/map.json")
 if True:
     rp = json.load(open(w + "/ws-set/brief.json"))
+    # THE ARTIFACT NO LONGER STORES THE LINES (Story 20.100, #1078) — they are
+    # composed at read time, which is what makes the stored copy unnecessary
+    # rather than merely unwanted. Asserted here before rehydrating, because
+    # "not stored" and "re-presented on open" are two different properties and
+    # the second is worthless without the first.
+    check("line" not in (rp.get("lifecycle") or {}),
+          "#1078: the artifact does not STORE the lifecycle line")
+    check("line" not in (rp.get("step") or {}),
+          "#1078: ...nor the step line")
+    # This test hand-rolls `brief-open`; it must run the same rehydration the
+    # command does, or it asserts against a payload no owner ever sees.
+    _st = (rp.get("lifecycle") or {}).get("state")
+    rp.setdefault("lifecycle", {})["line"] = _tmd._brief_lifecycle_line(_st)
+    _tmd._rehydrate_lines(rp)
     rp["label"] = _tmd._brief_label(rp)
     rec = _tmd._recompose_gate_blocks(rp, w + "/ws-set/brief.json")
     rp["recomposed_from_map"] = rec

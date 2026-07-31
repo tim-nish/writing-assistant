@@ -139,6 +139,7 @@ from terrain_text import (  # noqa: E402
     VIEW_LINE_CHARS,
     _backlog_line,
     _brief_artifact_line,
+    _brief_iteration_line,
     _brief_lifecycle_line,
     _brief_step_line,
     _elide,
@@ -952,7 +953,48 @@ def cmd_brief(args):
 # `brief-result.json`, `brief-adopted.json` and `brief-adopted-result.json`
 # resolves as a CONSEQUENCE of that (AC8) — no deduplication mechanism exists
 # or is needed, and if one seemed necessary this rule was not fully applied.
-GATE_ONLY_BLOCKS = ("consultant", "recomposition")
+GATE_ONLY_BLOCKS = ("consultant", "recomposition",
+                    # THE SCREEN'S NEXT-STEP SENTENCE (Story 20.100, #1078).
+                    # `next` is the stage-0 invocation written as prose for the
+                    # owner to read; it is the screen's line, not the decision.
+                    "next")
+
+# RENDERING AND PROCESS KEYS, per block (Story 20.100, #1078; SPEC-terrain
+# presentation.md, "what the brief CARRIES, and what it never carries").
+#
+# THE SEAM IS THE ONE STORY 20.93 ALREADY BUILT — the stdout payload carries the
+# gate, the artifact carries the decision — and this widens what counts as gate
+# rather than adding machinery. `brief-open` already derives `lifecycle.line` at
+# read time and never writes it (`:1183`, "composed after it so nothing derived
+# can leak into what is stored"); that is the pattern, applied to every line.
+#
+# WHY THESE ARE NOT DECISION CONTENT:
+#   * `line` — the exact UI sentence, and a second copy that DRIFTS. One
+#     already had: the stored line read "Choose a thesis: 2-3 candidates" while
+#     the screen showed 3.
+#   * `label`, `brief_string_is`, `read_back`, `requirements`,
+#     `recommendation` (five booleans asserting the process's own spec
+#     compliance) — process self-documentation and design rationale. Both
+#     belong to the spec and to `skills/terrain/steps/brief.md`, which carry
+#     them authoritatively; a second copy here has no declared precedence.
+#   * `answer` — a fill-in template (`{"thesis": "<the reading, in one or two
+#     sentences>"}`) sitting where a consumer reads values. A reader must be
+#     able to tell "nothing here yet" from "here is a candidate".
+#
+# The ground is the ratified boundary property: drafting must not learn
+# Terrain's rendering, invocation or lifetime (owner decision record —
+# 2026-07-29 (terrain draft handoff)), and every embedded screen line couples
+# it to exactly those.
+RENDERED_KEYS = {
+    "step": ("line",),
+    "artifact": ("line", "read_back"),
+    "lifecycle": ("line",),
+    "iteration": ("line",),
+    "thesis": ("line", "brief_string_is"),
+    "candidate_theses": ("line", "label", "requirements", "recommendation",
+                         "answer", "inputs"),
+    "partition_proposal": ("line", "label", "backlog_line"),
+}
 
 
 def _decision_record(payload):
@@ -960,14 +1002,46 @@ def _decision_record(payload):
 
     A shallow copy — the payload printed to stdout is untouched, because the
     gate must see what it always saw (AC2). Shrinking the artifact must never
-    shrink what reaches the owner.
+    shrink what reaches the owner, and Story 20.100 does not change that: every
+    line stripped here is still composed, still printed, and still relayed.
+    What stops is *storing* it.
     """
     rec = {k: v for k, v in payload.items() if k not in GATE_ONLY_BLOCKS}
-    ct = rec.get("candidate_theses")
-    if isinstance(ct, dict):
-        rec["candidate_theses"] = {k: v for k, v in ct.items()
-                                   if k != "inputs"}
+    for block, drop in RENDERED_KEYS.items():
+        val = rec.get(block)
+        if isinstance(val, dict):
+            rec[block] = {k: v for k, v in val.items() if k not in drop}
     return rec
+
+
+def _rehydrate_lines(payload):
+    """Compose the owner-facing lines a re-opened brief relays (Story 20.100).
+
+    The artifact no longer stores them (`RENDERED_KEYS`), so they are composed
+    from the state it does store. Mutates in place, after any write — nothing
+    derived may leak back into the stored record, which is the rule
+    `brief-open` already followed for `label` and the lifecycle line.
+
+    A block that is absent gets no line invented for it: an absent block is not
+    a block with an empty sentence.
+    """
+    step = payload.get("step")
+    if isinstance(step, dict):
+        step["line"] = _brief_step_line()
+    art = payload.get("artifact")
+    if isinstance(art, dict) and art.get("path"):
+        art["line"] = _brief_artifact_line(art["path"])
+    th = payload.get("thesis")
+    if isinstance(th, dict) and th.get("state"):
+        th["line"] = _thesis_state_line(th["state"])
+    it = payload.get("iteration")
+    if isinstance(it, dict) and isinstance(it.get("n"), int):
+        # The line's second argument is the count of EARLIER compositions, not
+        # the `retention` string beside it (that states the retention scope).
+        # A re-opened brief derives the count from `n`, which is the stored
+        # state — one composer, reading the record rather than a frozen copy.
+        it["line"] = _brief_iteration_line(it["n"], max(0, it["n"] - 1))
+    return payload
 
 
 def _recompose_gate_blocks(payload, at):
@@ -1181,6 +1255,14 @@ def cmd_brief_open(args):
     else:
         payload["lifecycle"] = _brief_lifecycle(state, life.get("history"))
     payload["lifecycle"]["line"] = _brief_lifecycle_line(state)
+    # THE OTHER LINES ARE COMPOSED HERE TOO (Story 20.100, #1078), for the same
+    # reason and by the same rule as the lifecycle line above: derived at read
+    # time, never written. The artifact stopped storing them, so re-opening a
+    # brief composes them from the state it kept — which is what makes the
+    # stored copy unnecessary rather than merely unwanted. What the owner reads
+    # is unchanged; there is simply one composer instead of a composer and a
+    # frozen copy that drifted from it.
+    _rehydrate_lines(payload)
     # THE OWNER-MEANINGFUL LABEL, derived here and never written (AC7): the
     # transition above wrote the artifact, and this is composed after it so
     # nothing derived can leak into what is stored.
