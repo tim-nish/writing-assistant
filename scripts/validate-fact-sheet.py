@@ -99,6 +99,16 @@ COV_REPO_RE = re.compile(r"^repo:\s*(?P<name>\S+)\s+(?P<root>\S+)\s*$")
 # an unrecognized line: a `harvest:` line missing any of the three fields.
 COV_HARVEST_PARTIAL_RE = re.compile(r"^harvest:\s*(?P<rest>.*)$")
 COV_MATCHED_RE = re.compile(r"^matched:\s*(?P<n>\d+)\s*$")
+# THE SUBSTRATE THE COVERAGE FIGURE IS COMPUTED OVER (Story 20.110, #1104).
+# `matched:` is a numerator whose denominator is a SUPPLIED enumeration, so a
+# sheet could report high coverage of a predetermined subset and read as a
+# thorough harvest. This line carries the denominator's provenance: how many
+# files the declaration admitted, and how many the repository holds outside it.
+# `cannot-determine` is a THIRD VALUE — a repository that could not be
+# enumerated is not a repository with nothing outside it.
+COV_SUBSTRATE_RE = re.compile(
+    r"^substrate:\s+(?P<admitted>\d+)\s+declared,\s+"
+    r"(?P<outside>\d+|cannot-determine)\s+outside$")
 COV_READ_RE = re.compile(r"^read:\s*(?P<file>.+?)\s*\((?P<n>\d+)\)\s*$")
 COV_SKIPPED_NONE_RE = re.compile(r"^skipped:\s*none\s*$", re.I)
 COV_SKIPPED_RE = re.compile(r"^skipped:\s*(?P<file>.+?)\s*\((?P<reason>.+)\)\s*$")
@@ -140,7 +150,7 @@ def validate_coverage(text):
     body = _coverage_section(text)
     if body is None:
         return None
-    pins, matched = [], []
+    pins, matched, substrates = [], [], []
     reads, skips = [], []
     harvests, repos = [], []
     skipped_none = False
@@ -167,6 +177,9 @@ def validate_coverage(text):
         m = COV_MATCHED_RE.match(s)
         if m:
             matched.append(int(m["n"])); continue
+        m = COV_SUBSTRATE_RE.match(s)
+        if m:
+            substrates.append(m); continue
         m = COV_READ_RE.match(s)
         if m:
             reads.append((m["file"], int(m["n"]))); continue
@@ -178,12 +191,27 @@ def validate_coverage(text):
         return (f"coverage manifest: unrecognized line {s!r} — allowed lines are "
                 "`pin: <ref>`, `harvest: repo=<repo> commit=<sha> "
                 "extractor=<version>`, `repo: <name> <root>`, `matched: <int>`, "
-                "`read: <file> (<count>)`, and `skipped: <file> (<reason>)` or "
-                "`skipped: none`")
+                "`read: <file> (<count>)`, `substrate: <n> declared, <n|"
+                "cannot-determine> outside`, and `skipped: <file> (<reason>)` "
+                "or `skipped: none`")
     if len(pins) != 1:
         return f"coverage manifest: expected exactly one `pin:` line, found {len(pins)}"
     if len(matched) != 1:
         return f"coverage manifest: expected exactly one `matched: <int>` line, found {len(matched)}"
+    # SHAPE, ALWAYS; PRESENCE, ONLY UNDER THE FLAG (Story 20.110, #1104).
+    # Requiring the line here failed an existing sheet, and this repository
+    # already carries the assertion that catches exactly that — "#907: adding
+    # the requirement retroactively failed an existing sheet" — together with
+    # the remedy it established: `--require-harvest-pin` binds new sheets
+    # "without retroactively failing old ones". This follows that precedent
+    # rather than inventing a second answer to the same question.
+    if len(substrates) > 1:
+        return (f"coverage manifest: expected at most one `substrate:` line, "
+                f"found {len(substrates)}")
+    if substrates and int(substrates[0]["admitted"]) < matched[0]:
+        return (f"coverage manifest: matched {matched[0]} exceeds the "
+                f"{substrates[0]['admitted']} files the declaration admitted — "
+                "the numerator cannot be larger than its own denominator")
     if len(harvests) > 1:
         return (f"coverage manifest: expected at most one `harvest:` line, "
                 f"found {len(harvests)} — one sheet is one harvest")
@@ -508,6 +536,16 @@ def main(argv=None):
                         "resolving diagnosable rather than merely broken; the "
                         "flag exists so the requirement binds new sheets "
                         "without retroactively failing old ones.")
+    p.add_argument("--require-substrate", action="store_true",
+                   help="reject a sheet whose coverage manifest carries no "
+                        "`substrate: <n> declared, <n|cannot-determine> "
+                        "outside` line (Story 20.110, #1104). A `matched:` "
+                        "count is a numerator over a SUPPLIED enumeration, so "
+                        "without its denominator's provenance a thorough "
+                        "harvest and a predetermined subset read alike. Opt-in "
+                        "for the reason --require-harvest-pin is: the "
+                        "requirement binds new sheets without retroactively "
+                        "failing old ones.")
     p.add_argument("--require-coverage", action="store_true",
                    help="require a well-formed `## Coverage` manifest header (#514) — "
                         "the pipeline/harvest invocation passes this so a sheet with no "
@@ -563,6 +601,18 @@ def main(argv=None):
                   "stops resolving be diagnosed rather than merely observed "
                   "broken. The pin IS the version — no separate version number "
                   "is stored.")
+            return 1
+
+    if args.require_substrate:
+        body = _coverage_section(text) or []
+        if not any(COV_SUBSTRATE_RE.match(ln.strip()) for ln in body):
+            print("REJECT  coverage manifest\n        -> missing `substrate: "
+                  "<n> declared, <n|cannot-determine> outside` (Story 20.110, "
+                  "#1104): a coverage count whose denominator has no "
+                  "provenance cannot be told apart from coverage of a "
+                  "predetermined subset. `cannot-determine` is a third value — "
+                  "a repository that could not be enumerated is not one with "
+                  "nothing outside it.")
             return 1
 
     # Cache-population compliance (#534, Story 18.37): a completed harvest whose

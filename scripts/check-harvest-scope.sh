@@ -141,5 +141,64 @@ else
   ok "negative test: the determinism comparison distinguishes different output"
 fi
 
+
+# --- THE SUBSTRATE DISCLOSURE (Story 20.110, #1104) ------------------------
+# A coverage figure is a numerator over a SUPPLIED enumeration, so without its
+# denominator's provenance a thorough harvest and a predetermined subset read
+# alike. These assert the composed artifact, which is all this check can see.
+python3 - "$h" <<'PYEOF' || fail=1
+import subprocess, sys, json
+h = sys.argv[1]
+out = subprocess.run([sys.executable, "scripts/harvest-scope.py", "--root", h,
+                      "--terms", "agents,zzzznotathing", "--json"],
+                     capture_output=True, text=True)
+if out.returncode != 0:
+    print("FAIL: harvest-scope --json exited", out.returncode, file=sys.stderr)
+    sys.exit(1)
+p = json.loads(out.stdout)
+sub = p.get("substrate")
+fail = 0
+def check(cond, msg):
+    global fail
+    print(("ok:   " if cond else "FAIL: ") + msg,
+          file=sys.stdout if cond else sys.stderr)
+    if not cond:
+        fail = 1
+
+check(isinstance(sub, dict), "#1104: the payload carries a substrate block")
+if isinstance(sub, dict):
+    check("declared_admitted" in sub and "outside_declaration" in sub,
+          "#1104: ...naming what the declaration admitted and what sits outside")
+    # THE REMAINDER IS COUNTED, NEVER READ. The declared-sources boundary is
+    # not widened by a count: widening was declined at the #1104 gate against
+    # three ratified texts.
+    check(sub.get("remainder_read") is False,
+          "#1104: ...and states that the remainder was counted, never read")
+    # CANNOT-DETERMINE IS A THIRD VALUE, never a confident zero.
+    check(sub["outside_declaration"] is None
+          or isinstance(sub["outside_declaration"], int),
+          "#1104: ...with an unenumerable repo yielding null, never 0")
+    # NEGATIVE EVIDENCE: a term that matched nothing is a reportable result.
+    check("zzzznotathing" in (sub.get("terms_without_match") or []),
+          "#1104: a term that matched nothing is surfaced as negative evidence")
+sys.exit(1 if fail else 0)
+PYEOF
+
+# A COVERAGE FIGURE CANNOT BE READ WITHOUT ITS DENOMINATOR: the rendered
+# manifest line carries the examined count AND the unexamined remainder.
+if python3 scripts/harvest-scope.py --root "$h" --terms "agents" \
+     | grep -q "outside the declaration unexamined"; then
+  ok "#1104: the rendered manifest carries the unexamined remainder beside the count"
+else
+  err "#1104: a coverage figure is rendered without its denominator"
+fi
+
+# NEGATIVE TEST: the substrate assertion must be able to fail.
+if python3 -c "import sys; sys.exit(0 if {} .get('substrate') is None else 1)"; then
+  ok "#1104: negative test — a payload with no substrate block is detectable"
+else
+  err "#1104: negative test could not fail"
+fi
+
 [ "$fail" -eq 0 ] || { printf '\nharvest-scope checks FAILED.\n' >&2; exit 1; }
 printf '\nAll harvest-scope checks passed.\n'

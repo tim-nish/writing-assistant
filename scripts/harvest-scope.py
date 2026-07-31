@@ -148,6 +148,72 @@ def propose(root, files, terms):
     return proposed, binary
 
 
+def repo_files(root):
+    """The host repository's tracked files, WITHOUT READING ANY OF THEM.
+
+    THE REMAINDER IS COUNTED, NEVER READ (Story 20.110, #1104). The
+    declared-sources boundary is not widened by this: widening was considered
+    at the #1104 gate and declined against three ratified texts. What the count
+    buys is the one thing every disclosure lacked — the denominator's
+    provenance.
+
+    Returns (absolute paths, reason) and never raises: a repository that cannot
+    be enumerated yields a stated cannot-determine, which is a THIRD VALUE and
+    never a zero — "not observed" without consulting the source is not
+    "absent".
+    """
+    base = os.path.abspath(root or ".")
+    r = subprocess.run(["git", "-C", base, "ls-files"],
+                       capture_output=True, text=True)
+    if r.returncode != 0:
+        detail = (r.stderr.strip().split("\n")[-1] if r.stderr.strip()
+                  else f"git ls-files exited {r.returncode}")
+        return None, detail
+    return {os.path.join(base, ln.strip())
+            for ln in r.stdout.splitlines() if ln.strip()}, None
+
+
+def substrate(root, files, terms, proposed):
+    """What this harvest was computed OVER, stated before any coverage figure.
+
+    THE ISSUE'S CLAIM SURVIVED EVERYTHING ALREADY BUILT. The coverage
+    disclosure is closed and refuses to sample, and the term list is emitted
+    whether or not it matched — yet the universe is `declared_files(root)`, so
+    every disclosure is denominated against a SUPPLIED enumeration and the
+    phase cannot discover the enumeration was wrong. Coverage of a
+    predetermined subset is indistinguishable from coverage.
+
+    So the denominator gets its own provenance: admitted, the unexamined
+    remainder, and the terms that found nothing. "92% coverage" was not
+    actionable; "92% of 11 declared files, with 340 outside the declaration"
+    is.
+    """
+    tracked, unavailable = repo_files(root)
+    admitted = len(files)
+    matched_terms = {t for p in proposed for t in p.get("terms", [])}
+    # A SET DIFFERENCE, NEVER A SUBTRACTION OF COUNTS. Measured on this
+    # repository while building this story: 404 declared against 356 tracked —
+    # the declaration is not a SUBSET of the tracked tree (globs reach
+    # untracked and generated files), so `total - admitted` would have gone
+    # negative and clamped to a confident, unfounded zero. That is the exact
+    # class this story exists to fix, committed inside the fix.
+    declared_abs = {os.path.abspath(f) for f in files}
+    outside = None if tracked is None else sorted(tracked - declared_abs)
+    return {
+        "declared_admitted": admitted,
+        # Counted, never read — and cannot-determine stays distinct from zero.
+        "repo_files": None if tracked is None else len(tracked),
+        "outside_declaration": (None if outside is None else len(outside)),
+        "outside_unavailable": unavailable,
+        "examined": len(proposed),
+        # NEGATIVE EVIDENCE. A term that matched nothing is a reportable
+        # result: "searched for X, found nowhere" is what makes a thin harvest
+        # visible as thin instead of simply quiet.
+        "terms_without_match": sorted(t for t in terms if t not in matched_terms),
+        "remainder_read": False,
+    }
+
+
 def build(root, terms, include):
     """The whole proposal plus its coverage-manifest disclosure."""
     files, reason = declared_files(root)
@@ -165,6 +231,8 @@ def build(root, terms, include):
         "declared_sources": len(files),
         "unavailable": reason,
         "proposed": proposed + requested,
+        # STATED BEFORE ANY COVERAGE FIGURE (Story 20.110, #1104).
+        "substrate": substrate(root, files, terms, proposed),
         # The manifest half: which repository contributed, and the standing
         # fact that nothing outside it was searched. An added repository would
         # appear here as an explicit entry, never as a silent widening.
@@ -182,6 +250,23 @@ def build(root, terms, include):
 
 def render(payload):
     lines = []
+    # THE SUBSTRATE LEADS. A coverage number read without its denominator's
+    # provenance is the defect #1104 reports, so the provenance is not
+    # something the reader must go looking for further down.
+    sub = payload.get("substrate")
+    if sub:
+        if sub["outside_declaration"] is None:
+            outside = f"outside: cannot-determine ({sub['outside_unavailable']})"
+        else:
+            outside = (f"outside: {sub['outside_declaration']} file(s) in this "
+                       f"repo are not declared — counted, never read")
+        lines.append(f"substrate: {sub['declared_admitted']} declared file(s) "
+                     f"admitted; {outside}")
+        if sub["terms_without_match"]:
+            lines.append(f"found-nowhere: {', '.join(sub['terms_without_match'])}")
+        else:
+            lines.append("found-nowhere: none — every derived term matched "
+                         "at least one declared file")
     for t in payload["terms"]:
         lines.append(f"term: {t}")
     if payload["unavailable"]:
@@ -198,9 +283,20 @@ def render(payload):
                      f"source(s) — no terms to match: "
                      f"{', '.join(m['binary_skipped'][:3])}"
                      f"{' …' if len(m['binary_skipped']) > 3 else ''}")
-    lines.append(f"manifest: {len(m['repositories'])} repository(ies), "
-                 f"{payload['declared_sources']} declared source(s), "
-                 f"out-of-scope searched: {str(m['out_of_scope_searched']).lower()}")
+    # A COVERAGE FIGURE CANNOT BE READ WITHOUT ITS DENOMINATOR: the examined
+    # count and the unexamined remainder travel in the same statement.
+    if sub:
+        rem = ("unknown" if sub["outside_declaration"] is None
+               else str(sub["outside_declaration"]))
+        lines.append(f"manifest: {len(m['repositories'])} repository(ies), "
+                     f"{sub['examined']} of {payload['declared_sources']} "
+                     f"declared source(s) examined, {rem} outside the "
+                     f"declaration unexamined, out-of-scope searched: "
+                     f"{str(m['out_of_scope_searched']).lower()}")
+    else:
+        lines.append(f"manifest: {len(m['repositories'])} repository(ies), "
+                     f"{payload['declared_sources']} declared source(s), "
+                     f"out-of-scope searched: {str(m['out_of_scope_searched']).lower()}")
     return "\n".join(lines)
 
 
