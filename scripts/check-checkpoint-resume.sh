@@ -350,6 +350,67 @@ assert d["resumed"] is False and d.get("fresh_skipped"), d
 unset XDG_STATE_HOME XDG_CONFIG_HOME
 rm -rf "$wfr"
 
+# --- Story 20.104 (#1082): automatic resume is BOUNDED BY THE SITTING --------
+# #142's ruling is retained; what is bounded is the reach of "an in-progress
+# run". The incident adopted a run halted FOURTEEN DAYS earlier with no
+# announcement and no confirmation. In-process and unit-shaped: the predicate
+# is a pure function of a run id, its checkpoint and the declared sitting, so a
+# CLI round trip would buy interpreter starts and no coverage.
+python3 - <<'PY104' || fail=1
+import datetime, importlib.util, sys
+
+# The predicate lives beside its caller (`draft_resume.py`), extracted at
+# introduction because draft-pipeline.py sits on its declared line ratchet.
+spec = importlib.util.spec_from_file_location("dr", "scripts/draft_resume.py")
+dp = importlib.util.module_from_spec(spec); spec.loader.exec_module(dp)
+
+fail = 0
+
+
+def check(cond, msg):
+    global fail
+    print(("ok:   " if cond else "FAIL: ") + msg,
+          file=sys.stdout if cond else sys.stderr)
+    if not cond:
+        fail = 1
+
+
+now = datetime.datetime.now()
+today = now.strftime("%Y%m%dT%H%M%S") + "-222222"
+old = ((now - datetime.timedelta(days=14)).strftime("%Y%m%dT%H%M%S") + "-111111")
+st = {"next_stage": "harvest"}
+
+# AC1 — the normal completion model is UNTOUCHED. A draft continuing across
+# invocations the same day is exactly what #142 exists to keep working.
+check(dp.predates_sitting(today, st, None)[0] is False,
+      "#1082/AC1: a run started today resumes silently — #142's normal "
+      "completion model is not disturbed")
+
+# AC2 — the reported incident, as its own assertion.
+pre, why = dp.predates_sitting(old, st, None)
+check(pre is True and "14 day" in why,
+      "#1082/AC2: a run from an earlier day is NOT adopted silently, and the "
+      f"reason names its age ({why[:44]}…)")
+
+# AC4 — the precise answer is DECLARED, because nothing recorded identifies a
+# sitting; a checkpoint carries next_stage/stage/framework/sources and no
+# session id or timestamp of its own.
+check(dp.predates_sitting(old, dict(st, sitting="S1"), "S1")[0] is False,
+      "#1082/AC4: a DECLARED sitting matching the recorded one resumes, even "
+      "across days — the declaration outranks the day-boundary fallback")
+check(dp.predates_sitting(today, dict(st, sitting="S1"), "S2")[0] is True,
+      "#1082/AC4: ...and a different declared sitting does not resume, even "
+      "on the same day")
+
+# CANNOT-DETERMINE is treated as predating: disclosure costs a confirmation,
+# silent adoption of stale state is what this exists to prevent.
+check(dp.predates_sitting("not-a-timestamp", st, None)[0] is True,
+      "#1082: an unparseable run id is cannot-determine and is confirmed, "
+      "never adopted")
+
+sys.exit(1 if fail else 0)
+PY104
+
 if [ "$fail" -eq 0 ]; then
   printf '\nAll checkpoint/resume checks passed.\n'; exit 0
 else

@@ -3627,6 +3627,10 @@ def cmd_checkpoint(args):
             "error: checkpoint state has no `next_stage` — pass a stage's output "
             "state (start/consume/interview/...), which records where to resume\n")
         return 1
+    # Recorded only when declared — an undeclared sitting is not a guessed
+    # one (Story 20.104, #1082; see `draft_resume.py` for why it is declared).
+    if getattr(args, "sitting", None):
+        state = dict(state, sitting=args.sitting)
     path = _write_checkpoint(args.ws, state)
     print(f"checkpoint: next_stage={state['next_stage']} -> {path}")
     return 0
@@ -3910,34 +3914,7 @@ def cmd_stop_disclosure(args):
 DONE_STAGE = "done"
 
 
-def _resume_disclosure_line(run_id, ws, state):
-    """One line naming what a resumed run IS (Story 19.10, #746): id, age, and
-    subject from checkpointed state — so a topic mismatch (tanuki F86: a
-    tutorial invocation adopting a q_a-gateway run) is visible at turn one."""
-    import datetime
-    age = ""
-    try:
-        ts = datetime.datetime.strptime(run_id.split("-")[0], "%Y%m%dT%H%M%S")
-        mins = int((datetime.datetime.now() - ts).total_seconds() // 60)
-        age = f", started {mins // 60}h{mins % 60:02d}m ago" if mins >= 60 else f", started {mins}m ago"
-    except (ValueError, IndexError):
-        pass
-    rs = state.get("run_state") or state
-    bits = []
-    if rs.get("framework"):
-        bits.append(f"framework {rs['framework']}")
-    ent = (rs.get("entry") or {}).get("request") or rs.get("element")
-    if ent:
-        bits.append(f"entry {str(ent)[:60]!r}")
-    srcs = rs.get("sources_raw") or [s.get("value") for s in rs.get("sources", []) if isinstance(s, dict)]
-    if srcs:
-        bits.append(f"sources {', '.join(map(str, srcs))[:60]}")
-    subject = "; ".join(bits) or "subject unrecorded in checkpoint"
-    return (f"resuming run {run_id}{age} — {subject}; stage {state.get('next_stage')}. "
-            f"Not your topic? re-run with --fresh (this run stays untouched).")
-
-
-def _autostart(root, fresh=False):
+def _autostart(root, fresh=False, sitting=None):
     """Core of automatic resume (Story 13.12): return the workspace to use and
     where to start — resuming the newest in-progress run (checkpoint next_stage
     != done), or minting a fresh run when none is in progress. Shared by the
@@ -3968,9 +3945,21 @@ def _autostart(root, fresh=False):
                 if fresh:
                     skipped = run_id      # left untouched, reported, never deleted
                     break
-                out = {"resumed": True, "ws": os.path.join(base, run_id), "run_id": run_id}
+                # AUTOMATIC RESUME IS BOUNDED BY THE SITTING (Story 20.104,
+                # #1082). #142's ruling is retained with its purpose intact;
+                # what is bounded is the reach of "an in-progress run". The
+                # predicate and the confirmation payload live in
+                # `draft_resume.py` — see there for why the sitting is
+                # declared rather than inferred.
+                _dr = _load("draft_resume.py")
+                predates, why = _dr.predates_sitting(run_id, state, sitting)
+                ws = os.path.join(base, run_id)
+                if predates:
+                    return _dr.confirmation(run_id, ws, state, why)
+                out = {"resumed": True, "ws": ws, "run_id": run_id,
+                       "sitting_check": why}
                 out.update(state)
-                out["resume_disclosure"] = _resume_disclosure_line(run_id, out["ws"], state)
+                out["resume_disclosure"] = _dr.disclosure_line(run_id, out["ws"], state)
                 return out
     # No in-progress run — start fresh (this is the AC4 no-false-resume path).
     ws = rp.new_run(root)
@@ -3993,7 +3982,8 @@ def cmd_autostart(args):
     A large draft completing across several invocations is the normal model."""
     rp = _load("resolve-paths.py")
     print(json.dumps(_autostart(rp.host_root(args.root),
-                                fresh=getattr(args, "fresh", False)), indent=2))
+                                fresh=getattr(args, "fresh", False),
+                                sitting=getattr(args, "sitting", None)), indent=2))
     return 0
 
 
@@ -4827,7 +4817,8 @@ def cmd_stage0(args):
     # owner-visible line can name the repository it is about to operate on —
     # before scope is read, a workspace is minted, or a token is spent (#309).
     out = {"config_ok": True, "target": root, "run_state": run_state}
-    out.update(_autostart(root, fresh=getattr(args, "fresh", False)))
+    out.update(_autostart(root, fresh=getattr(args, "fresh", False),
+                          sitting=getattr(args, "sitting", None)))
     # Durability by construction (#830): a freshly minted workspace persists the
     # state stage0 just composed IN THE SAME INVOCATION — the enforced-mechanism
     # invariant (SPEC-writing-assistant), not a per-skill checkpoint reminder.
@@ -4917,6 +4908,8 @@ def main(argv=None):
     sp = sub.add_parser("checkpoint", help="persist a completed stage's state to <ws>/checkpoint.json (Story 13.5)")
     sp.add_argument("--ws", required=True, help="the run workspace ($WS) to checkpoint into")
     sp.add_argument("state", nargs="?", default="-", help="the stage's output state JSON, or - for stdin")
+    sp.add_argument("--sitting", metavar="ID",
+                    help="record this sitting on the checkpoint (Story 20.104, #1082)")
     sp = sub.add_parser("resume", help="report where to resume a run from its workspace checkpoint (Story 13.5)")
     sp.add_argument("--ws", required=True, help="the run workspace ($WS) to resume")
     sp = sub.add_parser("progress", help="record sub-stage progress (a completed unit inside a long stage) "
@@ -4992,7 +4985,11 @@ def main(argv=None):
     sp.add_argument("--rubric-applied", action="store_true",
                     help="a rubric-mapped finding was applied — the required-checks worklist adds "
                          "the quality gate's mechanical dimensions")
+    SITTING_HELP = ("declare this sitting (Story 20.104, #1082): a "
+                    "same-sitting run resumes silently, an earlier one is "
+                    "confirmed. Absent, the day-boundary rule applies.")
     sp = sub.add_parser("autostart", help="auto-resume the newest in-progress run, else mint a fresh one (Story 13.12)")
+    sp.add_argument("--sitting", metavar="ID", help=SITTING_HELP)
     sp.add_argument("--root", help="host-repo root (default: git top-level of cwd; errors outside a git repo)")
     sp.add_argument("--fresh", action="store_true",
                     help="mint a new workspace even when a resumable run exists (#746): "
@@ -5002,6 +4999,7 @@ def main(argv=None):
     sp.add_argument("--fresh", action="store_true",
                     help="opt out of automatic resumption for THIS invocation (#746): "
                          "mint a new workspace; the in-progress run stays resumable")
+    sp.add_argument("--sitting", metavar="ID", help=SITTING_HELP)
     sp.add_argument("sources", nargs="*")
     sp.add_argument("--depth", help="optional depth/scope directive (deep-dive|standard|note, or an explicit scope statement) — CAP-8, #432")
     sp.add_argument("--element", help="pin the run to one named story element (\"write about <element>\"): "
