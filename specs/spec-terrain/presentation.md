@@ -94,6 +94,111 @@ clause on this page, and append new amendments there rather than here.
     scope originator** — the owner having already selected is the discharging
     condition for the second-proposer bar, and the consultant never runs
     upstream of a selection.
+  - **the brief is a NAMED artifact with a visible lifecycle (added
+    2026-07-31, #994).** Selection at the screen composes the brief — that
+    boundary property is settled and is not reopened here (owner decision
+    record — 2026-07-29 (terrain draft handoff)). What is added is
+    consumer-side surfacing, which was missing entirely: the brief arrived as
+    a chat continuation, so the owner could not tell when a brief began
+    existing, where it lived, or how to return to one.
+    - the gate carries a **named step identity**, so the owner can refer to
+      the act that produced the brief;
+    - the composed brief is **written to a durable artifact** the owner can
+      inspect and re-open, under the run workspace resolved through the
+      storage seam — never composed into a host working tree;
+    - the lifecycle is **stated on the surface**: composed → inspected →
+      adopted, with the current state legible at the gate.
+    Format, artifact path and the step's name are this consumer's to choose;
+    the hub ratified the boundary property only. **The never-read-back rule
+    does not bind here, and the difference is the point:** a View is a
+    rendering regenerated per invocation, while the brief is the owner's
+    decision — re-opening it is the requirement, not a cache.
+  - **G-ids are owner-facing SHORTHAND that expands at the screen; L-ids are
+    the addresses (added 2026-07-31, #996).** Selection previously refused
+    group ids outright. The refusal protected the right invariant with the
+    wrong reach: a rendering is not an address (owner decision record —
+    2026-07-29 (terrain draft handoff)), so a **G-id may never be recorded**,
+    but it may be **typed**.
+    - a G-id **expands to its member L-ids at the screen that defined it**,
+      and from that moment only the members exist;
+    - mixed input composes by **expand-then-set-arithmetic** — `G4 + L26,
+      minus L48` — resolved in full **before the brief exists**;
+    - the composed brief records **the member set and its pins, never a
+      G-id**. This is what keeps the rendering-not-address rule intact while
+      giving the owner the ergonomics the refusal cost them.
+    **Sections stay presentation-only and this does not make grouping a
+    gate:** expansion is a typing convenience over ids the owner read on a
+    screen, and the resulting selection is per-Strand, identical to one typed
+    member by member. Nothing downstream can tell the two apart — which is the
+    test.
+    **No recommendation is ever keyed on a G-id.** Proposing "other Lessons
+    from the same group" would make a semantic act depend on one invocation's
+    ephemeral presentation grouping. Where sibling recommendation is wanted, it
+    is computed from the **substrate** (co-tags, similarity) at recommendation
+    time under the proposal contract; it may coincide with a group's
+    membership, but it must not reference the grouping.
+  - **the gate carries an ITERATION LOOP over the member set (added
+    2026-07-31, #997).** The semantics were already ratified and shipped — a
+    claim is pinned to the member set it was composed over and **recomposes**
+    when that set changes, a set change being a gate event rather than a
+    refresh (owner decision record — 2026-07-29 (terrain draft handoff)). What
+    was missing was the move: the gate offered adopt, narrow, or "go back to
+    Screen 2 and pick differently", so the owner developing a thesis by trying
+    members had to leave the gate and lose the composition.
+    - the gate offers an **edit-set option class** — `+Lxx −Lyy → recompose` —
+      in place of restarting selection;
+    - **each recomposition is pinned to its own member set**, exactly as any
+      other composition is;
+    - **prior compositions are retained and remain visible** within the
+      sitting, so the owner compares theses across set variants rather than
+      remembering them.
+    Retention is not a cache and does not breach the never-read-back rule: it
+    is the comparison the loop exists to enable, held for the sitting.
+  - **the gate proposes 2–3 CANDIDATE THESES over the selected set, not one
+    (added 2026-07-31, #995).** One thesis was composed per selection, so
+    every upstream step was free-form reading and free-form typing and the
+    owner designed the article from scratch in chat. Filed as a **bug** under
+    the standing ruling that a rule-conformant surface bad for the user is an
+    incorrect design (owner decision record — 2026-07-27 (terrain cold-reader
+    verdict)), and the intended shape is **article design as a sequence of
+    selections**: a recognizable combination proposed, one thesis chosen from
+    candidates, then a structure, and onward.
+    - candidates are composed over the **same complete selected set** — they
+      are alternative *readings* of one set, never a narrowing of it;
+    - each candidate is **pinned to the set it was composed over** and carries
+      its own grounds;
+    - **free text remains a first-class exit**, as at every step.
+    **This is where the completeness invariant bites, and it is checkable:**
+    completeness is a **cover counted in placements** (owner decision record —
+    2026-07-29 (terrain grouping and evidence model)), so a candidate thesis
+    places every selected Strand **or discloses the omission** — and the count
+    check runs **after** composition, since a composer that cannot omit in
+    principle can still omit in fact.
+    **The no-second-proposer boundary is not crossed, by its own test:** the
+    narrowing already happened, by the owner, at selection. Composing several
+    readings over an owner-selected set narrows nothing. The boundary engages
+    when what reaches the owner is smaller than what exists — so the failure
+    mode to guard is a candidate set that quietly drops a selected Strand,
+    which is precisely what the placement count catches.
+  - **a large selection may be proposed as k article-scoped groups (added
+    2026-07-31, #988).** Reviewing fifteen Strands as one undifferentiated set
+    was harder than expected, and such a set is often really *k* coherent
+    theses — k candidate briefs, each pinned to its own member subset. This is
+    the candidate-thesis machinery above applied to a **partition** rather than
+    to one set, and it lives at the selection → brief boundary.
+    - it runs under the **proposal contract** — approve / modify / decline —
+      and is **never a silent restructure**;
+    - **it must not filter**: every selected Strand lands in some proposed
+      group, the cover discipline transferring intact, with the owner free to
+      drop members **explicitly**;
+    - a multi-brief outcome feeds the **drafting backlog**, not k simultaneous
+      publishes.
+    **This is a different capability from subdividing an oversized group on
+    the serving screens, and the two stay separate.** Pre-selection
+    subdivision is presentation refinement bound by the terrain invariants;
+    this is post-selection and bound by the proposal contract. Conflating them
+    would put a machine partition upstream of the owner's selection, which is
+    the one place the second-proposer boundary does engage.
   - **navigation is in-invocation, over held state (added 2026-07-29,
     #887).** Screen 2's substrates are only usable if the owner can move
     between them — tag → co-tags → Journey similarity, and *back* when a
@@ -132,8 +237,38 @@ clause on this page, and append new amendments there rather than here.
       draft handoff)). The report renders, **per group, in the order asked**:
       - the group's **existing** composed claim, verbatim as the screen showed
         it, and
-      - every member Strand's **full served rendering** — its gloss, its
-        deterministic context line, and its journey arc — in prose.
+      - every member Strand's **full served rendering** — its gloss and its
+        journey arc — in prose, **untruncated** (amended 2026-07-31, #986), and
+      - a **legend naming the journey label** (amended 2026-07-31, #986): the
+        rendered `how it changed:` line is the **Journey**, stated on the
+        surface rather than left to be inferred. Screen 2's legend defines a
+        `J` row that never renders here, so the ratified vocabulary and the
+        rendered label were disconnected on the one surface whose purpose is
+        reading.
+      **Untruncated is not a new promise — it is the whole-relay clause below,
+      which the renderer was violating.** Every line was clipped to a fixed
+      width, so journey arcs ended in `…` mid-sentence: in the one surface
+      contracted to relay whole, the journey material was the content
+      systematically cut. Read with the same-day ruling that **UX defines
+      correctness** (owner decision record — 2026-07-27 (terrain cold-reader
+      verdict)), a report the owner cannot read whole fails its purpose whether
+      or not a clause forbade the clipping.
+      The **deterministic context line moves out of the row** to a **footnote
+      block at the end of the report** (amended 2026-07-31, #987). It bundles
+      three things with three different audiences — cross-group placement,
+      which serves *selection-screen navigation*; the audit pin, which serves
+      *verification*; and a completeness attestation with no reader action —
+      and on a surface whose job is reading one group whole, all three are
+      noise between the reader and the material. **The information is
+      relocated, never dropped:** the pins stay reachable in the footnote, so
+      the report still restates what it rendered, and the selection screens
+      keep the line on the row where it does serve navigation.
+      Recorded because the issue reported it as a defect and it is not one:
+      the line's **presence was never conditional** — it renders for every
+      Strand, and only its first field varies (`in no other Topic` when a
+      Strand carries no co-tags). What looked like per-member inconsistency was
+      per-member **co-tagging**. The row contract was already uniform; this
+      amendment changes where a uniform line lives, not whether it exists.
       Four constraints fix what it is not:
       - **it preserves claims; it never recomposes.** The claim renders over
         the unchanged, full member set it was composed from, so it stays true
@@ -151,6 +286,20 @@ clause on this page, and append new amendments there rather than here.
       oversight**, since reading each group entire is the report's purpose;
       bounded by the owner's own pointers, covering the groups named and never
       the whole member.
+      **It writes no file, and the md-export request is DECLINED a second time
+      (2026-07-31, #986).** The ground of the original rejection is unchanged:
+      answering a mid-conversation request by rewriting a file and handing over
+      a path moves the reading outside the interaction. What #986 added was not
+      an argument against that ground but a *symptom* — "the displayed result
+      is truncated" — and the export was proposed as the remedy for it. The
+      truncation has its own cause and its own fix above, so the symptom is
+      addressed at its source and the export buys nothing the whole relay does
+      not now provide. Recorded rather than left silent so the next sitting
+      inherits the reasoning instead of re-deciding it. **What would reopen
+      it:** an owner who, having read an *untruncated* report, still cannot
+      read it in a terminal — that would ground the export in terminal limits
+      rather than in truncation, which is evidence neither rejection has
+      weighed.
   - **size switch (amended 2026-07-23; re-based per axis member 2026-07-27,
     #803).** One screen does not scale: past a **screen budget** (~7
     candidates) a large terrain collapses into a handful of options and the map
