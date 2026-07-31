@@ -15,13 +15,24 @@ step runs beside it, never instead of it.** Do both:
    verdict means and, for `no-episode`, that the draft is offered on the
    owner-attributed framing tier, stated as such.
 2. **Create the NEEDS-RECORDING tracking artifact in the target repo** from
-   `gap.needs_recording`: append `entry` as a list item under a
-   `## NEEDS-RECORDING` heading in the declared journey doc (`target_file`,
-   creating the heading if absent) — or, when the owner prefers, open a GitHub
-   Issue in `target_repo` carrying the same content. This is the one write
-   this flow makes outside the run workspace and the View, and it is what
-   turns a gap into a discharged backfill: recording the episode there makes
-   the next run match it (the flywheel).
+   `gap.needs_recording`, **in this run** — that is what turns a gap into a
+   discharged backfill, and the flywheel holds only if every emitted gap gets
+   its artifact then. **The form is declared in the payload** (`form`), not
+   decided here:
+   - **Default — `tracker-issue`:** open a GitHub Issue in `form.repo`
+     carrying `entry`. An Issue is **not a working-tree write**, so it needs
+     no exception to the host-repo footprint invariant.
+   - **On explicit owner consent — `form.consented_alternative`:** append
+     `entry` as a list item under a `## NEEDS-RECORDING` heading in the
+     declared journey doc (creating the heading if absent). Ask first; that
+     consent is what makes it **the owner's write rather than the plugin's**.
+     Never take this branch from config or from a previous run's choice.
+
+   **This flow writes nothing into the host working tree on its own.** The
+   invariant is stated as total in `SPEC-writing-assistant`, and this step
+   used to declare an exception to it — a dogfood run that stopped before
+   drafting left exactly the residue that predicts: a new tracked file with no
+   artifact beside it explaining why.
 
 A `cannot-determine` gap is relayed as its disclosure alone — an absence is
 asserted only where it was established, so no recording task is minted from a
