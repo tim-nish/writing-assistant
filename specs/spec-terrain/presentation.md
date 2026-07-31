@@ -272,6 +272,38 @@ clause on this page, and append new amendments there rather than here.
       prints compact section summaries (derived title, member ids, counts,
       per the label rule above); the complete rendering of the **current**
       view is written to a per-invocation path the owner may open.
+    - **a section summary CARRIES ITS CLAIM (amended 2026-07-31, #1075).**
+      The summary is a judgment surface, not a table of contents: without the
+      claim its whole information content over the tag name is a member
+      count, so every judgment requires opening the View and the screen stops
+      doing the thing it exists for. This **reverses** the 2026-07-31 (#1038)
+      position that claims do not ride along with the summaries, and it
+      reverses it on that position's own ground — *unclipped composer prose
+      is unbounded screen height*. Measured on the run that produced the
+      finding: 20 composed claims, median 173 characters, longest 215, 3536
+      total — roughly 25 lines, and most claims are already a single
+      sentence. Height is bounded by group COUNT, which the 20%-of-placements
+      sectioning cap already bounds; it was never bounded by prose length,
+      and that is what the reversal fixes rather than ignores.
+      **The bound is stated, because length has no cap and a claim is never
+      clipped (#976):** a claim renders **whole** where it fits one line, and
+      otherwise as **first sentence verbatim plus a pointer to the whole** —
+      the same sanctioned reduction this companion states for served
+      renderings (#1076), applied to composed prose for the same reason. A
+      mid-sentence `…` is not an available rendering of a claim on any
+      surface.
+      **A summary that renders no claims does not announce them.** The
+      observed defect was a screen opening with *"every `in common:` line is
+      machine-composed at render time"* above twenty headings carrying none;
+      whichever way a future amendment moves this clause, the announcement
+      and the rendering move together.
+    - **an ADOPTED SUBDIVISION is visible on the summary (added 2026-07-31,
+      #1075).** Where subgroups were adopted, the summary says so — at
+      minimum a per-group count (`G10 — also knowledge-architecture (15, 4
+      subgroups)`). A screen that defines the `G<n>-<m>` id family and
+      exhibits no member of it leaves the owner facing the parent's fifteen
+      members exactly as before the mechanism shipped. This is a count, not
+      composer prose, so the height argument above never applied to it.
     - **this is the CAP-3 supersession's own shape, not an exception to
       it.** That ruling admits a file as *"a rendering of one invocation
       addressed by path — never a named entity … regenerate per invocation,

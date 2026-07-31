@@ -657,16 +657,19 @@ subprocess.run(["python3", D, "view", "--map", path, "--tag", "agents",
 whole_dc = open(vt).read()
 check("machine-composed" in whole_dc and "in common: shared path X" in whole_dc,
       "composed `in common:` lines are marked machine-composed")
-# LINE-ANCHORED, not a bare substring (tightened by Story 20.96, #1074). What
-# this forbids is a RENDERED claim line on the summarised console; the bare
-# substring test also caught prose that merely NAMES `in common:` while
-# rendering none — which is what the screen must do to explain that a claim is
-# recomposed when the set changes.
-check("machine-composed at render time" not in listing
-      and not any(l.lstrip().startswith("in common:")
-                  for l in listing.splitlines()),
-      "the summarised console declares no authoring class, because it carries "
-      "no composed lines to declare one for")
+# ANNOUNCED IFF RENDERED (Story 20.97, #1075), over the wording Story 20.96
+# (#1074) landed. Two supersessions stack here and the later one wins: the
+# original required the summarised console to carry NEITHER the authoring-class
+# declaration nor a claim; 20.96 line-anchored it, because prose that merely
+# NAMES `in common:` is not a rendered claim; 20.97 makes the summary render
+# claims, so what is left worth asserting is the PAIRING — which is the defect
+# observed, a screen announcing machine-composed claims above headings carrying
+# none.
+check(("machine-composed at render time" in listing)
+      == any(l.lstrip().startswith("in common:")
+             for l in listing.splitlines()),
+      "the summarised console announces the authoring class exactly when it "
+      "renders composed claims — the two never separate")
 check("DISPLAY id" in listing and "NEVER recorded" in listing,
       "the `G` group-id kind is DECLARED on the screen that renders it")
 # Story 20.96 (#1074): the screen states the WHOLE contract, not only its
@@ -1024,10 +1027,18 @@ check("- **L" not in L,
       "AC3: the over-budget console carries NO per-Strand rows")
 check("how it changed:" not in L,
       "AC3: ...and no journey lines")
-check("in common: a claim that must not ride along" not in L,
-      "AC4 (decided): the `in common:` claims do NOT ride along with the "
-      "summaries — they are unclipped composer prose, which is unbounded "
-      "screen height, and they are in the View one open away")
+# REVERSED by Story 20.97 (#1075), on this position's own ground. It held that
+# N unclipped composer sentences is unbounded screen height; measured on the
+# run that produced the finding, 20 claims came to ~25 lines (median 173 chars,
+# longest 215). Height is bounded by group COUNT — which the 20%-of-placements
+# sectioning cap bounds — and never was bounded by prose length. Without the
+# claim, this screen's information content over the tag name is a member count.
+check("in common: a claim that must not ride along" in L,
+      "#1075: the `in common:` claim rides along with the summary — the one "
+      "artifact that lets an owner judge a group at a glance")
+check("…" not in L.split("in common:")[1].split("\n")[0],
+      "#1075: ...and it is never clipped mid-sentence (#976) — the bounded "
+      "form is first-sentence-verbatim plus a pointer, never an ellipsis")
 heads = [l for l in L.splitlines() if l.startswith("## ")]
 check(len(heads) == len(d3["sections"]) >= 2,
       f"AC3: one compact summary line per group, all of them ({len(heads)})")
@@ -1260,6 +1271,60 @@ check("_subdivide_section" in src and "WHICH RUNS WHEN" in src,
 sys.exit(1 if fail else 0)
 SUBGROUP_EOF
 [ $? -eq 0 ] || fail=1
+
+
+# --- Story 20.97 (#1075): the summary's claim bound and subdivision marker ---
+# IN-PROCESS and unit-shaped: both are pure functions of a section and a claims
+# dict, so a CLI round trip would buy an interpreter start and no coverage. The
+# properties asserted are the two the amendment states, and the third — that a
+# claim is never cut mid-sentence — is what makes the bound honest.
+python3 - <<'PY' || fail=1
+import sys
+sys.path.insert(0, "scripts")
+from terrain_members import _summary_head, _summary_claim_line
+from terrain_text import VIEW_LINE_CHARS
+
+fail = 0
+
+
+def check(cond, msg):
+    global fail
+    print(f"ok:   {msg}" if cond else f"FAIL: {msg}",
+          file=sys.stdout if cond else sys.stderr)
+    if not cond:
+        fail = 1
+
+
+sec = {"strands": [1] * 15, "subgroups": [1, 2, 3, 4]}
+head = "## G10 — also knowledge-architecture (15)"
+check(_summary_head(head, sec) == "## G10 — also knowledge-architecture "
+                                  "(15, 4 subgroups)",
+      "#1075: an adopted subdivision is declared on the summary heading")
+check(_summary_head(head, {"strands": [1] * 15}) == head,
+      "#1075: ...and an UNSUBDIVIDED group's heading is byte-identical")
+check(_summary_head(head, {"strands": [1] * 15, "subgroups": [1]})
+      .endswith("(15, 1 subgroup)"),
+      "#1075: ...with the count pluralised honestly")
+
+short = "A commonality short enough to sit on one line."
+check(_summary_claim_line({"G1": short}, "G1").endswith(short),
+      "#1075: a claim that fits renders WHOLE")
+long_first = ("A first sentence deliberately long enough that the whole claim "
+              "cannot sit on one rendered line without exceeding the budget, "
+              "which is the case the bound exists for. A second sentence that "
+              "must not appear on the summary at all.")
+out = _summary_claim_line({"G1": long_first}, "G1")
+check("second sentence" not in out and "full claim in the View" in out,
+      "#1075: an over-line claim reduces to FIRST SENTENCE plus a pointer")
+check("…" not in out,
+      "#1075: ...and never to a mid-sentence ellipsis (#976 forbids clipping "
+      "a claim; the reduction is the same one served renderings get)")
+check("no single commonality found" in _summary_claim_line({"G1": None}, "G1")
+      and "not composed" in _summary_claim_line({}, "G1"),
+      "#1075: the three claim states stay distinct on the summary — tried-and"
+      "-found-nothing is not never-asked")
+sys.exit(1 if fail else 0)
+PY
 
 [ "$fail" -eq 0 ] || { printf '\nFAILED.\n' >&2; exit 1; }
 printf '\nAll terrain-member checks passed (every Strand is covered).\n'

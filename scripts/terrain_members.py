@@ -46,6 +46,7 @@ from terrain_directions import (  # noqa: E402
 from terrain_text import (
     row_type_legend,  # noqa: E402
     SCREEN_BUDGET,
+    VIEW_LINE_CHARS,
     _clip_line,
     _journey_coverage_line,
     _journey_disclosure_line,
@@ -738,6 +739,53 @@ GROUP_ID_KIND = " ".join(GROUP_ID_KIND_LINES)
 SUBGROUP_ID_KIND = " ".join(SUBGROUP_ID_KIND_LINES)
 
 
+def _summary_head(head, sec):
+    """The summary heading, declaring an adopted subdivision (Story 20.97).
+
+    A screen that defines the `G<n>-<m>` id family and exhibits no member of it
+    leaves the owner facing the parent's members exactly as before subdivision
+    shipped. This is a COUNT, not composer prose, so the screen-height argument
+    that governed the claim never reached it.
+    """
+    subs = sec.get("subgroups") or []
+    if not subs:
+        return head
+    n = len(subs)
+    return head.replace(f"({len(sec['strands'])})",
+                        f"({len(sec['strands'])}, {n} subgroup"
+                        f"{'' if n == 1 else 's'})", 1)
+
+
+def _summary_claim_line(claims, gid):
+    """One group's `in common:` claim on the SUMMARY, bounded (Story 20.97).
+
+    The three claim states are the same three the whole listing renders — a
+    composer that TRIED and found nothing is not one that was never asked — so
+    this states which absence it is rather than rendering a bare heading.
+
+    THE BOUND, because claim length has no cap and #976 forbids clipping one:
+    whole where it fits a line, otherwise FIRST SENTENCE VERBATIM plus a
+    pointer to the whole. That is the same sanctioned reduction the spec states
+    for served renderings (#1076) — a mid-sentence ellipsis is not an available
+    rendering of a claim on any surface, which is why this never calls
+    `_clip_line`. Where even the first sentence is over the line, it renders
+    whole: over-budget beats cut.
+    """
+    if gid not in claims:
+        return "  in common: not composed for this group — stated as absent " \
+               "rather than invented here."
+    claim = str(claims.get(gid) or "").strip()
+    if not claim:
+        return "  in common: no single commonality found — grouped as placed, " \
+               "with nothing regrouped, reordered or dropped on account of it."
+    body = " ".join(claim.split())
+    line = f"  in common: {body}"
+    if len(line) <= VIEW_LINE_CHARS:
+        return line
+    first = re.split(r"(?<=[.!?])\s+", body, maxsplit=1)[0]
+    return f"  in common: {first} — full claim in the View."
+
+
 def _subgroup_claim_line(sub, prefix):
     """One subgroup's claim, in whichever of the THREE STATES it is (AC4).
 
@@ -1025,10 +1073,17 @@ def _compose_member_rendering(map_data, ms, cands, claims=None,
                  f"What the words mean: {OWNER_TERMS_DOC} defines "
                  f"{' and '.join(OWNER_TERMS)}.",
                  ""]
-    if claims is not None and not summarise:
+    if claims is not None:
         # The authoring class is declared ONCE for the screen, never per line
         # (CAP-2 as amended 2026-07-30, #936): repeating it on every line
         # carries nothing per line and costs attention on all of them.
+        #
+        # ANNOUNCED IFF RENDERED (Story 20.97, #1075). This used to be gated on
+        # `not summarise` while the summary rendered no claims — correct then.
+        # The observed defect was the pairing coming apart the other way: a
+        # screen announcing that every `in common:` line is machine-composed,
+        # above twenty headings carrying none. Now both are gated on the same
+        # condition, so they cannot separate again.
         lines += ["Every `in common:` line below is machine-composed at "
                   "render time from the served claims.", ""]
     # THE `G` KIND IS DECLARED WHERE IT IS RENDERED (Story 20.82, #1031,
@@ -1110,18 +1165,24 @@ def _compose_member_rendering(map_data, ms, cands, claims=None,
             head += f" — {sec['note']}"
         if summarise:
             # THE COMPACT GROUP SUMMARY (Story 20.84, #1038): group id, derived
-            # title, count, and the section's own note — one line per group,
-            # which is what makes this readable in a terminal at all.
+            # title, count, and the section's own note.
             #
-            # AC4, DECIDED AND RECORDED: the `in common:` claims DO NOT ride
-            # along. They are the composer's own sentences, carried verbatim and
-            # deliberately NOT clipped (#976 — clipping one would re-create the
-            # reworded-headline defect one layer up), so N of them is unbounded
-            # screen height. That is precisely the overflow this branch exists
-            # to remove, and the readability constraint AC4 names is what
-            # decides it. Nothing is lost: the claims are in the View this
-            # screen names, one open away, in the same rendering.
-            lines.append(_clip_line(head))
+            # THE CLAIM NOW RIDES ALONG (Story 20.97, #1075), reversing #1038's
+            # recorded AC4 on that decision's own ground. AC4 held that N
+            # unclipped composer sentences is unbounded screen height. Measured
+            # on the run that produced the finding: 20 claims, median 173 chars,
+            # longest 215, ~25 lines against a summary of about thirty. Height
+            # is bounded by group COUNT — which the 20%-of-placements sectioning
+            # cap already bounds — and never was bounded by prose length, which
+            # is the step "unclipped" → "unbounded" skipped.
+            #
+            # Without the claim, this screen's whole information content over
+            # the tag name is a member count, so every judgment required opening
+            # the View: a judgment surface that is a table of contents.
+            lines.append(_clip_line(_summary_head(head, sec)))
+            cl = _summary_claim_line(claims, gid) if claims is not None else None
+            if cl:
+                lines.append(cl)
             continue
         lines.append(head)
         lines.append("")
