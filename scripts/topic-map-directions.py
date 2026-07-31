@@ -521,13 +521,66 @@ def _brief_from_index(answer, cands, map_pin, map_data=None,
     cov = (map_data or {}).get("coverage", {}) or {}
     members = [_member_record(m) for m in matches]
     out = {"brief": brief,
-            # The coverage wording is machine-proposed and the owner adopted it
-            # by choosing its index; the note is theirs outright. Both are the
-            # owner's words under the shipped rule — never a tool-invented scope.
-            "provenance": "owner-authored",
+            # THE RATIFIED VALUE, not a new shape (Story 20.102, #1080).
+            # This path emitted `owner-authored` beside a `brief:` that is a
+            # machine-composed coverage statement over the members — the
+            # attestation #1080 reports as claiming more than the owner wrote.
+            #
+            # The correct value already exists and predates the finding: the
+            # CLOSED PAIR ratified by Story 20.94 (#1050) is `owner-authored`,
+            # *the owner's own free-form words*, and `terrain-adopted`, *a
+            # brief composed at the terrain gate from Strands the owner
+            # selected and a candidate they adopted*. This path is the second
+            # one by construction, so the fix is the ratified value rather than
+            # a scoping wrapper invented here — the rule's purpose (never a
+            # tool-invented scope) is satisfied by both members, which is why
+            # the pair was widened in the first place.
+            #
+            # The FREE-FORM path (`:648`) keeps `owner-authored`, correctly:
+            # there the owner typed the brief.
+            "provenance": "terrain-adopted",
             "origin": "adopted-index" if len(matches) == 1 else "adopted-index-set",
-            "index": index, "indexes": indexes, "pin": answer_pin, "note": note,
+            "index": index, "indexes": indexes, "pin": answer_pin,
+            # THE OWNER'S SLOT HOLDS OWNER TEXT OR NOTHING (Story 20.102).
+            # It carried machine prose — "selected as a set from the agents
+            # View; no angle stated" — on a run where the owner stated no
+            # angle, which inverts the ratified ruling that kept free text
+            # first-class: a reader could no longer tell owner speech from
+            # composer commentary in the one field reserved for owner speech.
+            # Absence of an angle is now recorded AS absence.
+            "note": note or None,
             "adopted_claim": claim or None,
+            # WHERE THE COMPOSER'S OWN SUMMARY GOES (Story 20.102 AC5). The
+            # machine does have something useful to say about how the
+            # selection was made; the information was never the problem, its
+            # slot was. Labelled as the composer's, beside the owner's rather
+            # than inside it.
+            "selection_summary": (
+                f"selected as a set of {len(matches)} from the terrain"
+                if len(matches) > 1 else "selected as a single Strand"),
+            # HARVEST SCOPE IS OWED AND NOT EMITTABLE HERE (Story 20.102,
+            # #1080). The ratified field is the union of the members'
+            # `projects:` — and `projects:` is populated hub-side (100% of 115
+            # lessons, measured 2026-07-28) but is NOT among the fields the
+            # element manifest serves (slug, kind, tags, journey shard, topic,
+            # renderings, pins). So the union cannot be computed from what
+            # arrives, and re-deriving it by parsing lesson bodies is the
+            # consumer re-derivation class the hub ruled against in the same
+            # breath as the manifest — "serve structure so there is nothing to
+            # parse".
+            #
+            # Stated in the artifact rather than silently omitted, in the same
+            # three-valued shape a served arc uses: a consumer must be able to
+            # tell "no scope" from "scope not served", and Step 4 must not
+            # quietly re-derive what was ratified to stop being re-derived.
+            "harvest_scope": {
+                "projects": None,
+                "served": False,
+                "not_served_reason": (
+                    "`projects:` is not served by the element manifest; the "
+                    "union is owed by a hub-side manifest extension and is "
+                    "never re-derived here"),
+            },
             # THE MEMBER SET IS NOT BOOKKEEPING (Story 20.54 AC4): the
             # completeness invariant follows it into drafting — every selected
             # Strand placed or its omission disclosed — so with no members

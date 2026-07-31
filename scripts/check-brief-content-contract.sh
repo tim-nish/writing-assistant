@@ -125,6 +125,10 @@ CARRIED = {
     "brief", "provenance", "origin", "index", "indexes", "pin", "note",
     "adopted_claim", "members", "pins", "recomposition", "consultant",
     "gaps", "thesis", "candidate_theses", "stage",
+    # #1080: the composer's own summary, labelled as the composer's and sitting
+    # BESIDE the owner's slot rather than inside it; and the harvest scope,
+    # which is owed but not emittable here (see the assertions below).
+    "selection_summary", "harvest_scope",
 }
 INTERIM = {  # present today, scheduled for removal, named with its issue
     "step": 1079, "lifecycle": 1079, "artifact": 1079, "iteration": 1079,
@@ -177,6 +181,25 @@ for name, b in (("a 3-member set", s), ("a 1-member set", one)):
     for k, issue in REMOVED.items():
         check(k not in keys,
               f"{name}: `{k}` is absent from the artifact (#{issue})")
+
+# THE OWNER'S SLOT HOLDS OWNER TEXT OR NOTHING (#1080). It carried machine
+# prose on a run where the owner stated no angle, which inverts the ruling that
+# kept free text first-class: a reader could no longer tell owner speech from
+# composer commentary in the one field reserved for owner speech.
+for name, b in (("a 3-member set", s), ("a 1-member set", one)):
+    check(b.get("note") is None,
+          f"{name}: with no angle stated, `note` is null — absence of an angle "
+          f"is recorded AS absence, never as machine prose (#1080)")
+    check(isinstance(b.get("selection_summary"), str),
+          f"{name}: ...and the composer's own summary sits in its own labelled "
+          f"field beside the owner's, never inside it")
+    check(b.get("provenance") == "terrain-adopted",
+          f"{name}: `provenance` is the RATIFIED value for a brief composed at "
+          f"the gate — `owner-authored` is the owner's own free-form words")
+    hs = b.get("harvest_scope") or {}
+    check(hs.get("served") is False and hs.get("not_served_reason"),
+          f"{name}: harvest scope states WHY it is absent — `projects:` is not "
+          f"served by the element manifest, and it is never re-derived here")
 
 # NO RENDERED SENTENCE OR PROCESS DOC IS STORED (#1078). Each is a second copy
 # that drifts — one already had, the stored line reading "2-3 candidates" while

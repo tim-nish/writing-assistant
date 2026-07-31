@@ -158,7 +158,15 @@ check(note in b["brief"], "the owner's note is carried into the brief VERBATIM")
 wording = next(c["direction"] for c in cands if c["id"] == b["index"])
 check(b["brief"].startswith(wording),
       "the brief is the subtopic's coverage wording plus the note")
-check(b["provenance"] == "owner-authored", "an adopted index is owner-adopted wording")
+# THE RATIFIED VALUE (Story 20.102, #1080). This path composes the brief AT
+# THE TERRAIN GATE from a Strand the owner selected, which is precisely what
+# `terrain-adopted` names in the closed pair Story 20.94 (#1050) ratified.
+# `owner-authored` is reserved for the owner's own free-form words, and
+# asserting it here is what let a machine-composed coverage statement carry an
+# attestation that the owner wrote it.
+check(b["provenance"] == "terrain-adopted",
+      "an adopted index is TERRAIN-ADOPTED — composed at the gate from the "
+      "owner's selection, not typed by them (#1080)")
 check(b["origin"] == "adopted-index", "the origin records that an index was adopted")
 check(isinstance(b["brief"], str), "the outcome is one plain brief string")
 
