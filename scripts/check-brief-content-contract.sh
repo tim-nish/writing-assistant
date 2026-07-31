@@ -59,14 +59,20 @@ PYEOF
 
 pin=$(python3 -c "import json,sys;print(json.load(open('$work/map.json'))['coverage']['pin'])")
 
-emit() {  # $1 = selection string, $2 = out file
+# THE SUBJECT IS THE WRITTEN ARTIFACT, NOT STDOUT (corrected by Story 20.100,
+# #1078). The two are deliberately different: the stdout payload carries the
+# GATE and must stay undiminished, while the artifact carries the DECISION —
+# the seam Story 20.93 built. A check reading stdout would assert the contract
+# against the one surface it does not bind, and would block Story 20.100's
+# whole change.
+emit() {  # $1 = selection string, $2 = artifact path
   # `--answer -` reads the recorded answer from stdin; passing it inline would
   # be read as a PATH, which is what the flag's other form means. The typed
   # selection rides on `index` — the key `_selection_terms` parses — which also
   # accepts one string naming several ids.
   printf '{"index":"%s","pin":"%s"}' "$1" "$pin" \
-    | python3 "$D" brief --map "$work/map.json" --answer - \
-        > "$2" 2>"$work/err" \
+    | python3 "$D" brief --map "$work/map.json" --answer - --out "$2" \
+        > "$work/stdout.json" 2>"$work/err" \
     || { err "brief failed for index '$1': $(cat "$work/err")"; return 1; }
 }
 
@@ -95,11 +101,23 @@ CARRIED = {
     "gaps", "thesis", "candidate_theses", "stage",
 }
 INTERIM = {  # present today, scheduled for removal, named with its issue
-    "step": 1078, "lifecycle": 1078, "artifact": 1078, "iteration": 1078,
-    "next": 1078,
+    "step": 1079, "lifecycle": 1079, "artifact": 1079, "iteration": 1079,
 }
-REMOVED = {  # this story's own removals, asserted absent
-    "candidate": 1077, "gap": 1077,
+REMOVED = {  # removals asserted absent, each with the issue that made it
+    "candidate": 1077, "gap": 1077, "next": 1078,
+}
+# Rendering and process keys, per block (#1078). The artifact keeps the STATE;
+# the screen composes the sentence at render time. Asserted per block so a
+# regression names which block grew a line back.
+RENDERED = {
+    "step": ("line",),
+    "artifact": ("line", "read_back"),
+    "lifecycle": ("line",),
+    "iteration": ("line",),
+    "thesis": ("line", "brief_string_is"),
+    "candidate_theses": ("line", "label", "requirements", "recommendation",
+                         "answer", "inputs"),
+    "partition_proposal": ("line", "label", "backlog_line"),
 }
 
 s = json.load(open(w + "/set.json"))
@@ -113,8 +131,21 @@ for name, b in (("a 3-member set", s), ("a 1-member set", one)):
           f"({'unknown: ' + ', '.join(sorted(unknown)) if unknown else 'none'})")
     for k, issue in REMOVED.items():
         check(k not in keys,
-              f"{name}: `{k}` is absent — the vestigial singular #{issue} "
-              f"removed, which read as 'the selection' beside the true record")
+              f"{name}: `{k}` is absent from the artifact (#{issue})")
+
+# NO RENDERED SENTENCE OR PROCESS DOC IS STORED (#1078). Each is a second copy
+# that drifts — one already had, the stored line reading "2-3 candidates" while
+# the screen showed 3 — and every embedded screen line couples drafting to
+# Terrain's rendering, which the ratified boundary property forbids.
+for name, b in (("a 3-member set", s), ("a 1-member set", one)):
+    for block, keys in RENDERED.items():
+        val = b.get(block)
+        if not isinstance(val, dict):
+            continue
+        for k in keys:
+            check(k not in val,
+                  f"{name}: `{block}.{k}` is not stored — the screen composes "
+                  f"it at render time (#1078)")
 
 # THE DEGENERATE CASE TAKES THE SAME PATH. A set of one is not a different
 # operation, and the singular growing back as a special case is exactly the
