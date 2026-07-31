@@ -1,7 +1,8 @@
 ---
 id: SPEC-terrain
 companions:
-  - amendments.md
+  - amendments.md            # ratified amendments, 2026-07-30 onward — new ones append here
+  - amendments-archive.md    # ratified amendments, 2026-07-24 → 2026-07-29 (relocated verbatim 2026-07-31; closed)
   - presentation.md   # CAP-3, the presentation surface (relocated verbatim 2026-07-30, #941)
 sources:
   - ../spec-article-draft-pipeline/SPEC.md   # CAP-9 / the coverage brief and structure proposer this map feeds
@@ -27,12 +28,18 @@ sources:
 > for what this map must contain: it exists to *feed* the brief, not to replace
 > it.
 
-> **Ratified amendments** (2026-07-24 → 2026-07-30, eleven to date) live in the
-> companion `amendments.md` — relocated verbatim per the amendment-history
-> companion decision (#829, spec sitting 2026-07-27). New amendments are
-> appended there, newest-last, never here — **including amendments to CAP-3**,
-> whose clause text now lives in `presentation.md`. The amendment history is
-> deliberately not split alongside it: one spec, one dated record.
+> **Ratified amendments** (2026-07-24 → 2026-07-31) live in two companions,
+> cut at a **date boundary** — relocated verbatim per the amendment-history
+> companion decision (#829, spec sitting 2026-07-27) and, one level down, on
+> 2026-07-31 when that companion reached its own byte ceiling.
+> `amendments-archive.md` holds **2026-07-24 → 2026-07-29** and is **closed**;
+> `amendments.md` holds **2026-07-30 onward**. New amendments are appended to
+> `amendments.md`, newest-last, never here and never to the archive —
+> **including amendments to CAP-3**, whose clause text now lives in
+> `presentation.md`. The cut is by **date and never by CAP**: one spec, one
+> dated record, read archive-then-current. Splitting the history alongside
+> `presentation.md` would put one sitting's ratifications in two files and
+> stays refused.
 >
 > **CAP-3's clauses live in the companion `presentation.md`** (relocated
 > verbatim 2026-07-30, #941, when this file passed its byte ceiling). The
