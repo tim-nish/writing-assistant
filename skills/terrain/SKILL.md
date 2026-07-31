@@ -127,8 +127,14 @@ step files cite them and restate nothing.
   in the same $WS>`. Prior compositions stay visible in
   `iteration.compositions` so the owner compares theses across set variants;
   retention is **within this sitting**, and an edit across workspaces is
-  refused (`steps/brief.md`). The composed brief is handed to the existing
-  stage-0 `--brief` path and the run is an ordinary brief-carrying run.
+  refused (`steps/brief.md`). The sitting then ends at **draft-article's own
+  intent gate** — the closed label set, a reason and a nearest fit, payload
+  captured — entered, never reimplemented, with a recommended intent grounded
+  in the adopted thesis and sources asked with this run's evidence state
+  attached. The composed brief is wired into the existing stage-0 `--brief`
+  path from the artifact rather than retyped, and the run is an ordinary
+  brief-carrying run: uniform in BEHAVIOUR, while the provenance record does
+  distinguish the producers (#1050).
 - **Step 4:** runs **beside** the draft, never instead of it, and only when
   the brief carries `gap`. A `cannot-determine` gap is relayed as its
   disclosure alone.
