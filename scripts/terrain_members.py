@@ -946,9 +946,17 @@ def _compose_member_rendering(map_data, ms, cands, claims=None,
         # it exists to remove: with no path the screen is still a summary, and
         # it says the complete rendering was not written anywhere.
         if view_path:
+            # THE POINTER IS RENDERED WHOLE (#1073). It was passed through
+            # `_short_path`, which keeps the last two segments — so the one
+            # line whose purpose is *open this* named a path that cannot be
+            # opened. That helper's own justification ("the full path stays in
+            # `map.json`") holds for a trailing annotation and not for an
+            # instruction to the owner; `_fit_with_path` states the same rule
+            # for the summary payload — shorten the PREFIX, never the path,
+            # because a clipped path is an unopenable View.
             lines += [f"The complete rendering — every Strand with its claim, "
                       f"its `in common:` line and its journey — is in the View "
-                      f"file: {_short_path(view_path)}",
+                      f"file: {view_path}",
                       "Open it, then answer with a Strand's index (for example "
                       "L3) and a short note about the angle you want. Free "
                       "text always wins."]

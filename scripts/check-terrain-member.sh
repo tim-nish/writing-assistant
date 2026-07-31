@@ -989,6 +989,14 @@ VP = "/nonexistent-destination/terrain/terrain-view.md"
 d3 = json.loads(member(big_member, "--view", VP,
                        "--claims", '{"G1":"a claim that must not ride along"}').stdout)
 L = d3["listing"]
+# #1073: the pointer is rendered WHOLE. It went through `_short_path`, which
+# keeps the last two segments, so the one line whose purpose is *open this*
+# named an unopenable path. `_short_path(VP)` is a SUFFIX of `VP`, so asserting
+# the whole string is what discriminates the two renderings.
+check(VP in L,
+      "#1073: the View pointer renders the WHOLE path — a line telling the "
+      "owner where to open the complete rendering must name a path they can "
+      "open")
 check("- **L" not in L,
       "AC3: the over-budget console carries NO per-Strand rows")
 check("how it changed:" not in L,
