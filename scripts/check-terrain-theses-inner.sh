@@ -249,8 +249,39 @@ check(set(con) >= {"subject", "substitution_candidates"}
       and "candidates" not in con,
       "the consultant still computes a subject and an unranked pool, and no "
       "candidate theses — they were never there to render")
-check(ct.get("ranked") is False,
-      "the candidates are enumerated, never ranked — no candidate is hidden")
+# --- the RECOMMENDATION is contract (Story 20.89, #1043) --------------------
+# This assertion replaces `ct.get("ranked") is False`, whose reason string
+# carried the same false statement the field did: what THESIS_REQUIREMENTS[3]
+# bans is ranked-AND-trimmed, not ranking. The gate now states what it actually
+# guarantees.
+check("ranked" not in ct,
+      "the false field is gone — the gate no longer claims that no ordering "
+      "exists, which is stronger than anything its requirements say")
+rec = ct.get("recommendation") or {}
+check(rec.get("required") is True,
+      "a recommendation is REQUIRED beside the candidates — a gate presenting "
+      "options carries its own comparison, and this is a promise the product "
+      "makes rather than something the model happened to do")
+check(rec.get("trims") is False and rec.get("machine_final") is False,
+      "and nothing is hidden: rank confers no default, no candidate is "
+      "trimmed or reordered away, and the recommendation is machine-proposed "
+      "and never machine-final")
+check(rec.get("declares_axes") is True
+      and rec.get("declares_overturn") is True,
+      "the recommendation names the axes it assessed on and states what would "
+      "overturn it")
+check(any("RECOMMENDATION is offered BESIDE" in r
+          for r in (ct.get("requirements") or [])),
+      "the requirement governing the recommendation ships in "
+      "THESIS_REQUIREMENTS, where the composer reads it")
+check(any("ENUMERATED, never ranked-and-trimmed" in r
+          for r in (ct.get("requirements") or [])),
+      "and THESIS_REQUIREMENTS[3] is RETAINED — the new requirement constrains "
+      "ranking, it does not replace the ban on trimming")
+check(len(ct.get("requirements") or []) == 6,
+      f"the requirement count follows the list "
+      f"({len(ct.get('requirements') or [])}) — a silently dropped "
+      "requirement still fails this check")
 
 # --- the join is REPLACED as the thesis, not extended ----------------------
 th = s.get("thesis") or {}
