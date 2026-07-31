@@ -1,0 +1,155 @@
+#!/usr/bin/env sh
+# parallel-safe
+# tier: inner
+# covers: scripts/topic-map-directions.py scripts/terrain_brief.py
+# removal-signal: the brief acquires a declared JSON schema enforced by a
+#   validator at the write — this check asserts by hand exactly what such a
+#   schema would assert, and retires the moment one exists.
+# check-brief-content-contract.sh — the brief's CONTENT contract (Story 20.99,
+# #1077; SPEC-terrain presentation.md, "what the brief CARRIES, and what it
+# never carries", added 2026-07-31 for #1077/#1078/#1079/#1080).
+#
+# WHY A KEY-SET CHECK AND NOT A PROPERTY ONE. The alternative considered at
+# triage was to contract the brief's PROPERTIES and leave field names free,
+# which matches the hub's non-ratification of the schema most literally. It was
+# declined because "no rendering strings" is a judgment nothing can decide
+# mechanically, while a key set is decidable — and the whole point of closing
+# the list is that a field arrives by amending the clause rather than by
+# accretion nobody decided. A five-member brief had reached 41 KB across 21
+# top-level keys that way.
+#
+# THE ALLOWED LIST SHRINKS AS THE COUPLED GROUP LANDS. #1077 (this story)
+# removes the vestigial singulars; #1078 removes the embedded screen rendering
+# and process documentation; #1079 lands the candidate write-back; #1080 adds
+# the harvest scope. Until those land, their keys are listed below as PRESENT
+# AND SCHEDULED FOR REMOVAL, named individually with the issue that removes
+# each — an honest interim, and one that makes the tightening a visible edit
+# here rather than a silent widening.
+#
+# SCOPE: the INDEXED/SET path (`origin: adopted-index*`), which is what #1077 is
+# about. The adopted-candidate path (`topic-map-directions.py:626-629`) is a
+# different, older brief shape with no member set; it is not contracted here and
+# is recorded as an open observation rather than silently swept in.
+
+set -u
+cd "$(dirname "$0")/.."
+D="scripts/topic-map-directions.py"
+fail=0
+ok()  { printf 'ok:   %s\n' "$1"; }
+err() { printf 'FAIL: %s\n' "$1" >&2; fail=1; }
+
+python3 -c "import py_compile; py_compile.compile('$D', doraise=True)" 2>/dev/null \
+  || { err "$D does not compile"; printf '\nFAILED.\n' >&2; exit 1; }
+
+work=$(mktemp -d); trap 'rm -rf "$work"' EXIT
+
+python3 - "$work" <<'PYEOF'
+import json, sys
+w = sys.argv[1]
+els = [{"kind": "lesson", "slug": f"s{n}", "title": f"S{n}",
+        "gloss": f"a claim the material makes, number {n}",
+        "tags": ["workflow"], "situation": f"LESSONS.md:{n}@abc1234",
+        "evidence": ["LESSONS.md:1@abc1234"], "consumed": False,
+        "journey_recorded": True, "journey": f"the position changed, {n}"}
+       for n in range(4)]
+json.dump({"kind": "topic-map", "topics": [],
+           "coverage": {"pin": "h@abc1234", "hub_pin": "hub@def5678"},
+           "elements": els}, open(w + "/map.json", "w"))
+PYEOF
+
+pin=$(python3 -c "import json,sys;print(json.load(open('$work/map.json'))['coverage']['pin'])")
+
+emit() {  # $1 = selection string, $2 = out file
+  # `--answer -` reads the recorded answer from stdin; passing it inline would
+  # be read as a PATH, which is what the flag's other form means. The typed
+  # selection rides on `index` — the key `_selection_terms` parses — which also
+  # accepts one string naming several ids.
+  printf '{"index":"%s","pin":"%s"}' "$1" "$pin" \
+    | python3 "$D" brief --map "$work/map.json" --answer - \
+        > "$2" 2>"$work/err" \
+    || { err "brief failed for index '$1': $(cat "$work/err")"; return 1; }
+}
+
+emit "L1, L2, L3" "$work/set.json" || { printf '\nFAILED.\n' >&2; exit 1; }
+emit "L1"         "$work/one.json" || { printf '\nFAILED.\n' >&2; exit 1; }
+
+python3 - "$work" <<'PYEOF' || fail=1
+import json, sys
+w = sys.argv[1]
+fail = 0
+
+
+def check(cond, msg):
+    global fail
+    print(("ok:   " if cond else "FAIL: ") + msg,
+          file=sys.stdout if cond else sys.stderr)
+    if not cond:
+        fail = 1
+
+
+# The contract's carried fields, plus the interim ones each named with the
+# issue that removes it. Editing this list is how a field arrives or leaves.
+CARRIED = {
+    "brief", "provenance", "origin", "index", "indexes", "pin", "note",
+    "adopted_claim", "members", "pins", "recomposition", "consultant",
+    "gaps", "thesis", "candidate_theses", "stage",
+}
+INTERIM = {  # present today, scheduled for removal, named with its issue
+    "step": 1078, "lifecycle": 1078, "artifact": 1078, "iteration": 1078,
+    "next": 1078,
+}
+REMOVED = {  # this story's own removals, asserted absent
+    "candidate": 1077, "gap": 1077,
+}
+
+s = json.load(open(w + "/set.json"))
+one = json.load(open(w + "/one.json"))
+
+for name, b in (("a 3-member set", s), ("a 1-member set", one)):
+    keys = set(b)
+    unknown = keys - CARRIED - set(INTERIM)
+    check(not unknown,
+          f"{name}: no key outside the contract "
+          f"({'unknown: ' + ', '.join(sorted(unknown)) if unknown else 'none'})")
+    for k, issue in REMOVED.items():
+        check(k not in keys,
+              f"{name}: `{k}` is absent — the vestigial singular #{issue} "
+              f"removed, which read as 'the selection' beside the true record")
+
+# THE DEGENERATE CASE TAKES THE SAME PATH. A set of one is not a different
+# operation, and the singular growing back as a special case is exactly the
+# shape #1077 reports.
+check(set(one) - set(s) == set() or not (set(one) - set(s)),
+      "a 1-member selection emits no key a 3-member one does not")
+check(one.get("origin", "").startswith("adopted-index"),
+      "...and it still takes the indexed path")
+
+# GAPS COVER EVERY MEMBER, at every set size — the disclosure that `gap` used
+# to provide for member[0] alone must not have been dropped with it.
+for name, b in (("a 3-member set", s), ("a 1-member set", one)):
+    g = b.get("gaps")
+    if g is not None:
+        check(all("index" in x for x in g),
+              f"{name}: every disclosed gap names the member it belongs to")
+        check(len({x["index"] for x in g}) == len(g),
+              f"{name}: ...and no member is disclosed twice")
+
+# MAP-INTERNAL WORKING STATE DOES NOT CROSS THE BOUNDARY. `candidate` dragged
+# the map-element schema over whole; internal topic vocabulary reaching an
+# artifact that crosses into drafting is the specific defect.
+blob = json.dumps(s)
+for leak in ("element_kind", "usability", "evidence_pointers", "subtopics",
+             "hub-lessons"):
+    check(leak not in blob,
+          f"map-internal `{leak}` does not reach the brief")
+
+# EACH MEMBER IS THE CLEAN PROJECTION, not a raw map element.
+for m in s.get("members") or []:
+    check(set(m) <= {"index", "slug", "gloss", "cite", "journey"},
+          f"member {m.get('index')} carries only the recorded projection")
+
+sys.exit(1 if fail else 0)
+PYEOF
+
+[ "$fail" -eq 0 ] || { printf '\nFAILED.\n' >&2; exit 1; }
+printf '\nAll brief content-contract checks passed.\n'
