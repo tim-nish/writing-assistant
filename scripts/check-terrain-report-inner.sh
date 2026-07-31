@@ -42,16 +42,33 @@ work=$(mktemp -d); trap 'rm -rf "$work"' EXIT
 # A member with two co-tag groups, each big enough that "whole" is observably
 # different from "a summary": the failure being guarded is a relay that
 # collapses many Strands into one-liners.
+#
+# ONE member carries a served journey arc LONGER THAN THE VIEW LINE BUDGET
+# (Story 20.73, #1011). That is the fixture the whole-relay assertion needs:
+# with every arc short, a renderer that clips every line is indistinguishable
+# from one that clips none — which is exactly why the violation shipped
+# unnoticed while all four terrain checks passed.
 python3 - "$work" <<'PYEOF'
 import json, sys
 w = sys.argv[1]
+LONG_ARC = ("the rule began as a local workaround nobody wrote down, then a "
+            "second incident showed the same shape at a different layer, and "
+            "the reversal came when measurement contradicted the premise the "
+            "workaround rested on — so the remedy moved from the consumer to "
+            "the site that authored the loss, which is the form it holds "
+            "today and the reason it is stated as a rule rather than as a "
+            "note attached to one incident")
 els = []
 for n in range(12):
-    els.append({"kind": "lesson", "slug": f"w{n}", "title": f"W{n}",
-                "gloss": f"a claim the material makes, number {n}",
-                "tags": ["workflow", "agents" if n % 2 else "cost"],
-                "situation": f"LESSONS.md:{n}@abc1234",
-                "evidence": ["LESSONS.md:1@abc1234"], "consumed": False})
+    el = {"kind": "lesson", "slug": f"w{n}", "title": f"W{n}",
+          "gloss": f"a claim the material makes, number {n}",
+          "tags": ["workflow", "agents" if n % 2 else "cost"],
+          "situation": f"LESSONS.md:{n}@abc1234",
+          "evidence": ["LESSONS.md:1@abc1234"], "consumed": False}
+    if n == 1:
+        el["journey"] = LONG_ARC
+        el["journey_recorded"] = True
+    els.append(el)
 json.dump({"kind": "topic-map", "topics": [],
            "coverage": {"pin": "h@abc1234"}, "elements": els},
           open(w + "/map.json", "w"))
@@ -179,6 +196,48 @@ check([g["group_id"] for g in one["groups"]] == ["G2"],
 check(one["groups"][0]["count"] == len(secs["G2"]["strands"])
       and all(f"number {s[1:]}" in one["report"] for s in one["groups"][0]["strands"]),
       "the one named group is still relayed whole, every member")
+
+# --- Story 20.73 (#1011): UNTRUNCATED, and the journey label named ----------
+# Whole-relay was already the contract and the renderer was violating it:
+# every line was clipped at VIEW_LINE_CHARS, so journey arcs ended in `…`
+# mid-sentence on the one surface exempted from the size switch. NO CHECK
+# COVERED THIS, which is why it shipped — so the assertion is written against
+# a fixture whose served arc exceeds the budget.
+import importlib.util
+spec = importlib.util.spec_from_file_location("ttext", "scripts/terrain_text.py")
+mod = importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)
+arc = next(e["journey"] for e in json.load(open(w + "/map.json"))["elements"]
+           if e.get("journey"))
+check(len(arc) > mod.VIEW_LINE_CHARS,
+      f"the fixture's served arc exceeds the View line budget ({len(arc)} > "
+      f"{mod.VIEW_LINE_CHARS}) — otherwise this assertion proves nothing")
+
+# AC1 — the served arc reaches the report WHOLE, and no line on the report
+# path carries a cut this renderer authored.
+check(f"how it changed: {arc}" in rep,
+      "the served journey arc renders WHOLE on the report path")
+cut = [ln for ln in rep.splitlines() if ln.rstrip().endswith("…")]
+check(not cut,
+      "no line on the report path ends in the renderer's elision marker"
+      + (f" (found: {cut[:1]})" if cut else ""))
+srcseg = open("scripts/terrain_members.py", encoding="utf-8").read()
+fnseg = srcseg.split("def compose_full_report")[1].split("\ndef ")[0]
+check("_clip_line(" not in fnseg,
+      "the report composer calls no clipper — the whole relay is structural, "
+      "not a property of today's fixture widths")
+
+# AC2 — and the SIZE-SWITCHED surface is untouched: screen 2's listing still
+# clips at the same budget. A diff that removed clipping globally has overshot
+# this story; this is the assertion that says so.
+listing = mem["listing"]
+check(f"how it changed: {arc}" not in listing,
+      "screen 2's listing still clips the same over-budget arc")
+check(max(len(ln) for ln in listing.splitlines()) <= mod.VIEW_LINE_CHARS,
+      "screen 2's listing still bounds every line at VIEW_LINE_CHARS")
+
+# AC3 — the journey label is named ON the surface, not left to be inferred.
+check("JOURNEY" in rep and "how it changed:" in rep.split("## ")[0],
+      "the report carries a legend naming `how it changed:` as the Journey")
 sys.exit(1 if fail else 0)
 PYEOF
 [ $? -eq 0 ] || fail=1

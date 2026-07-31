@@ -603,6 +603,12 @@ def compose_member_listing(map_data, tag, cands, axis="tag", claims=None):
             ident = c["id"] if c else el.get("slug", "?")
             claim = el.get("gloss") or el.get("title") or el.get("slug", "")
             mark = " — already consumed, still selectable" if el.get("consumed") else ""
+            # THIS SURFACE KEEPS CLIPPING (Story 20.73, #1011). The size
+            # switch binds the selection screens; only the Full Report is a
+            # stated exception to it, so the unclipping done in
+            # `compose_full_report` stops here deliberately. Removing
+            # `_clip_line` from this path would widen that story into the
+            # surfaces the switch governs.
             lines.append(_clip_line(f"- **{ident}** — {claim}{mark}"))
             lines.append(_clip_line(_strand_context_line(el, ms["member"], subbed)))
             # The lesson's ARC, on the lesson's own row (Story 20.30, #871).
@@ -641,6 +647,15 @@ def compose_full_report(map_data, tag, cands, group_ids, axis="tag",
     whole member. The reported defect was a relay doing its best and flattening
     nineteen Strands into headline one-liners, which is why the rendering lives
     here in code rather than in a prose obligation.
+
+    WHOLE MEANS UNTRUNCATED (Story 20.73, #1011; CAP-3 as amended 2026-07-31,
+    #986). No line composed here is clipped: not the group definition, not a
+    gloss row, not a context line, and above all not a journey arc — the
+    material screen 2 advertises 49 of 51 Strands as carrying, and the only
+    content this surface was systematically cutting. A rendered line ending in
+    the elision marker is therefore the served material's own. The surface also
+    NAMES ITS JOURNEY LABEL in the header legend, because the owner asked what
+    `how it changed:` was and nothing here answered.
     """
     ms = member_sections(map_data, tag, axis, grouping=grouping)
     by_id = {s.get("group_id"): s for s in ms["sections"]}
@@ -667,6 +682,23 @@ def compose_full_report(map_data, tag, cands, group_ids, axis="tag",
              "per-pin; each is defined below where it is rendered.",
              "This is inspection only — nothing here selects a Strand or "
              "composes a brief.",
+             # THE JOURNEY LABEL IS NAMED ON THE SURFACE (amended 2026-07-31,
+             # #986). The owner asked whether `how it changed:` shows
+             # journeys — it does, and nothing here said so, while screen 2's
+             # legend is composed from the row types that actually mint ids
+             # and so never speaks the word here. The ratified vocabulary and
+             # the rendered label were disconnected on the one surface whose
+             # purpose is reading, so the report states the mapping itself
+             # rather than borrowing a spelling from another screen.
+             "Legend: a Strand's `how it changed:` line is its JOURNEY — the "
+             "arc recorded for that Lesson, rendered on the Lesson's own row. "
+             "A Journey is never a row of its own, so no separate journey row "
+             "appears here; an absent arc says which absence it is.",
+             # THE RELAY IS WHOLE, and that is stated where the reader meets
+             # it: nothing below is clipped by this renderer, so a line ending
+             # in an elision marker is the served material's own.
+             "Every line below is relayed whole — this report does not "
+             "shorten a gloss, a context line or a journey arc.",
              ""]
     groups = []
     for gid in group_ids:
@@ -677,10 +709,13 @@ def compose_full_report(map_data, tag, cands, group_ids, axis="tag",
         lines.append("")
         # THE DEFINITION of the id, restated: which Strands this id names on
         # this screen, so the report is readable without the screen beside it.
-        lines.append(_clip_line(
+        # UNCLIPPED, like every other line on this path: the note it carries
+        # is the disclosure that a group stayed over the one-fifth bound, and
+        # a clipped disclosure is the failure mode the disclosure exists for.
+        lines.append(
             f"Group definition: the {len(strands)} Strand(s) the "
             f"{ms['substrate']} substrate placed under "
-            f"{sec['title']!r}" + (f" — {sec['note']}" if sec.get("note") else "")))
+            f"{sec['title']!r}" + (f" — {sec['note']}" if sec.get("note") else ""))
         lines.append("")
         if claim:
             # VERBATIM, as the screen showed it. Not re-derived, not shortened.
@@ -699,12 +734,22 @@ def compose_full_report(map_data, tag, cands, group_ids, axis="tag",
             text = el.get("gloss") or el.get("title") or el.get("slug", "")
             mark = (" — already consumed, still selectable"
                     if el.get("consumed") else "")
-            lines.append(_clip_line(f"- **{ident}** — {text}{mark}"))
-            lines.append(_clip_line(
-                _strand_context_line(el, ms["member"], subbed)))
+            # NOTHING ON THE REPORT PATH IS CLIPPED (Story 20.73, #1011;
+            # SPEC-terrain CAP-3 as amended 2026-07-31, #986). The whole relay
+            # was already the contract — *"it relays whole, a stated exception
+            # to the size switch, not an oversight"* — and this renderer was
+            # violating it: `_clip_line` cut every line at VIEW_LINE_CHARS, so
+            # in the one surface exempted from the size switch the journey arc
+            # was the content systematically ending in `…` mid-sentence. The
+            # exception is a property of THIS surface, not of the material, so
+            # the fix is here at the consumer and not in `_journey_arc_line`
+            # (which never truncated) or in VIEW_LINE_CHARS (which still binds
+            # the size-switched screens, `compose_member_listing` above).
+            lines.append(f"- **{ident}** — {text}{mark}")
+            lines.append(_strand_context_line(el, ms["member"], subbed))
             arc = _journey_arc_line(el)
             if arc:
-                lines.append(_clip_line(arc))
+                lines.append(arc)
         lines.append("")
         groups.append({"group_id": gid, "title": sec["title"],
                        "claim": claim or None,
