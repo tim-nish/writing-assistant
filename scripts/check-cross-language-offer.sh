@@ -262,12 +262,26 @@ else
   ok "the emission path names the route but never invokes adaptation"
 fi
 
-# --- the shipped emission harnesses keep passing verbatim --------------------
-for c in check-stage5-variants.sh check-platform-lint.sh check-ja-emission.sh \
-         check-canonical-adaptation.sh; do
-  sh "scripts/$c" >/dev/null 2>&1 && ok "$c passes unchanged" || err "$c regressed"
-done
-
+# The four emission harnesses this section used to re-run verbatim
+# (check-stage5-variants, check-platform-lint, check-ja-emission,
+# check-canonical-adaptation) are REMOVED, measured 2026-07-31 (#1007).
+#
+# They are independent suite members that already run on their own in the same
+# tier, so a regression in any of them fails the run whether or not this check
+# repeats it. The repeat carried no interaction value either: each of the four
+# exports its own XDG_CONFIG_HOME from its own mktemp -d, overwriting whatever
+# this check had set up, so they were byte-identical re-runs and not runs in a
+# composed environment. Nothing in this file's `Covers:` list above named them.
+#
+# The cost was 19.6s of a 21.9s check — 89.6%. Everything this check exists to
+# assert costs 2.2s.
+#
+# Removed on FULL_TOTAL_MS, the tier's declared growth instrument, NOT on wall
+# clock: the counterfactual wall saving is ~5s and this check is not the wall
+# floor (35.4s against a 55.5s average lane at -P 8), so a case made on
+# "it is the critical path" would be the borrowed-evidence mistake that closed
+# #1000. The real figure is that the suite sat at 95.5% of FULL_TOTAL_MS with
+# ~31.4s of that being one check re-running four others.
 # --- lockstep: the SKILL states the shipped offer ----------------------------
 for token in 'adapt first' 'adapt_first' 'direct' 'stop here' \
              'never what the owner may do' 'language-mismatch'; do
