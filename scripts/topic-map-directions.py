@@ -410,7 +410,8 @@ def _consultant_block(matches, cands, map_data):
     }
 
 
-def _brief_from_index(answer, cands, map_pin, map_data=None):
+def _brief_from_index(answer, cands, map_pin, map_data=None,
+                      composed_block=None):
     """An INDEXED selection from the View: `{index, note}` (Story 18.67, #602),
     where `index` names a SET (Story 20.54, #937).
 
@@ -586,6 +587,19 @@ def _brief_from_index(answer, cands, map_pin, map_data=None):
                 len(matches), THESIS_CANDIDATES_MIN, THESIS_CANDIDATES_MAX)),
             **thesis_candidates_block(members, answer_pin, claim or None),
         }
+        # THE COMPOSED CANDIDATES ARE RECORDED HERE (Story 20.101, #1079).
+        #
+        # `composed: false` / `candidates-pending` is CORRECT BY DESIGN and is
+        # not what this fixes: the command emits composition INPUTS and the
+        # agent composes (`skills/terrain/steps/brief.md:120-126`). What was
+        # wrong is that the composition never came back — an observed run
+        # reached `thesis.state: adopted` while `candidate_theses.composed`
+        # stayed false and the three real candidates sat in a sibling file
+        # referenced by nothing, so the record of WHAT WAS OFFERED, what was
+        # recommended and what would overturn it existed nowhere in the one
+        # artifact that crosses into drafting.
+        if composed_block:
+            out["candidate_theses"].update(composed_block)
         # k CANDIDATE BRIEFS OVER A PROPOSED PARTITION (#988) — the same
         # machinery over a partition, offered only where a selection is large
         # enough to carry several theses. `None` below the threshold: an
@@ -603,7 +617,8 @@ def _brief_from_index(answer, cands, map_pin, map_data=None):
     return out
 
 
-def brief_from_answer(answer, cands, map_pin=None, map_data=None):
+def brief_from_answer(answer, cands, map_pin=None, map_data=None,
+                      composed_block=None):
     """The owner's outcome as the brief string for stage-0 `--brief`.
 
     Free text ALWAYS wins: machine-proposed wording becomes the brief only when
@@ -623,7 +638,8 @@ def brief_from_answer(answer, cands, map_pin=None, map_data=None):
     # it is refused as one rather than falling through to "that is not a
     # proposed direction".
     if _selection_terms(answer):
-        return _brief_from_index(answer, cands, map_pin, map_data)
+        return _brief_from_index(answer, cands, map_pin, map_data,
+                                 composed_block)
     for c in cands:
         if selection == c["direction"]:
             return {"brief": c["direction"], "provenance": "owner-authored",
@@ -745,6 +761,32 @@ def _answer_from_payloads(path, ask_id=None):
     return rows[-1]
 
 
+def _composed_candidates(doc):
+    """The composed candidates, as the brief records them (Story 20.101).
+
+    THE WHOLE OFFER SURVIVES, not the adopted one. The rejected candidates are
+    the provenance of the choice as much as the taken one is, and the
+    recommendation travels with its DECLARED AXES and its OVERTURNING
+    CONDITIONS — a recommendation recorded stripped of what would overturn it
+    is a default in disguise, which is exactly what the 2026-07-31 (#1043)
+    amendment made contract.
+
+    Read from the same file `cover` reads, so there is one composed artifact
+    and not two: a second file for the record would be free to disagree with
+    the one the cover was counted over.
+    """
+    if not isinstance(doc, dict):
+        raise ValueError("composed candidates must be an object")
+    cands = doc.get("candidates")
+    if not isinstance(cands, list) or not cands:
+        raise ValueError("composed candidates carry no `candidates` list")
+    block = {"composed": True, "candidates": cands}
+    for key in ("recommendation", "over", "pin"):
+        if doc.get(key) is not None:
+            block[key] = doc[key]
+    return block
+
+
 def cmd_brief(args):
     try:
         if getattr(args, "payloads", None):
@@ -760,6 +802,33 @@ def cmd_brief(args):
     map_data = load_map(args.map) if args.map else None
     cands = candidates(map_data) if map_data else []
     map_pin = (map_data or {}).get("coverage", {}).get("pin")
+    # THE COMPOSED CANDIDATES, AND THE REFUSAL THAT MAKES THEM MEAN SOMETHING
+    # (Story 20.101, #1079).
+    composed_block = None
+    if getattr(args, "composed", None):
+        try:
+            with open(args.composed, encoding="utf-8") as fh:
+                composed_block = _composed_candidates(json.load(fh))
+        except (OSError, ValueError) as exc:
+            return _err(f"unreadable composed candidates at "
+                        f"{args.composed}: {exc}")
+    # ADOPTION MAY NOT OUTRUN THE RECORD OF WHAT WAS ADOPTED FROM. The observed
+    # run reached `adopted` with `composed: false` and a placeholder where the
+    # candidates go, while the three real ones sat in a sibling file nothing
+    # pointed at — so the provenance of the choice (what was offered, what was
+    # recommended, what would overturn it) existed nowhere in the artifact that
+    # crosses into drafting. Refusing is the point: the state that must never
+    # exist is `adopted` beside an empty record of its own candidates.
+    if str(answer.get("claim") or "").strip() and composed_block is None:
+        return _err(
+            "this answer adopts a thesis (`claim`) but no composed candidates "
+            "were given, so the brief would record an ADOPTED thesis with no "
+            "record of what it was adopted from. Pass `--composed <the "
+            "candidates file>` — the same file `cover` reads. The rejected "
+            "candidates and the recommendation's declared axes and overturning "
+            "evidence are the provenance of the choice, and a pinned decision "
+            "artifact that drops them keeps the answer while losing the "
+            "question.")
     # THE ITERATION LOOP (Story 20.77, #997). An edit is resolved to a member
     # set BEFORE composition, so everything below is the ordinary indexed
     # path: recomposition is REACHED here, never re-implemented.
@@ -834,7 +903,8 @@ def cmd_brief(args):
             # Built from the ANSWER, never from the base: an adopted claim
             # the owner did not restate simply is not there to inherit.
             answer = dict(answer, index=indexes, note=note)
-    out = brief_from_answer(answer, cands, map_pin, map_data)
+    out = brief_from_answer(answer, cands, map_pin, map_data,
+                            composed_block)
     # Evidence-independence at the hand-off (#799): a selected element's
     # writability gap is DISCLOSED beside the brief — with the tracking
     # artifact's content for the target repo — and the run proceeds. There is
@@ -1011,6 +1081,21 @@ def _decision_record(payload):
         val = rec.get(block)
         if isinstance(val, dict):
             rec[block] = {k: v for k, v in val.items() if k not in drop}
+    # ONE KEY, TWO MEANINGS — resolved on a DECLARED field, not on shape
+    # (Story 20.101, #1079). `candidate_theses.recommendation` is the gate's
+    # own guarantee object before composition (five booleans asserting the
+    # process's spec compliance — process self-documentation, which #1078
+    # strips) and the COMPOSED recommendation after it (the pick, its declared
+    # axes and its overturning conditions — decision content, which #1079 must
+    # keep). The two are told apart by `composed`, which the block declares,
+    # rather than by inspecting the value's shape: a shape test would silently
+    # change meaning the first time either object gained a field.
+    ct = rec.get("candidate_theses")
+    if isinstance(ct, dict) and ct.get("composed") is True:
+        src = (payload.get("candidate_theses") or {})
+        for keep in ("recommendation", "candidates"):
+            if src.get(keep) is not None:
+                ct[keep] = src[keep]
     return rec
 
 
@@ -1499,6 +1584,12 @@ def main(argv=None):
                         "(`+L12 −L3`) applies to. Its `--out` must land in the "
                         "SAME run workspace — retention is within-sitting, and "
                         "an edit across workspaces is refused.")
+    b.add_argument("--composed", metavar="PATH",
+                   help="the composed candidate theses (the same file `cover` "
+                        "reads). ADOPTION REQUIRES THIS (Story 20.101, "
+                        "#1079): a brief may not reach `adopted` while the "
+                        "candidates it was adopted FROM live only in a sibling "
+                        "file nothing points at.")
     b.add_argument("--out", metavar="PATH",
                    help=f"write the brief as a durable artifact here — pass "
                         f"the run workspace's {BRIEF_FILENAME} (Story 20.75). "
