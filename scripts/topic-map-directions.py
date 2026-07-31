@@ -637,7 +637,23 @@ def cmd_view(args):
                              grouping=grouping)
         if not ms["count"]:
             return _err(f"no Strand sits under {tag!r} at this pin")
-        write_view(args.out, compose_member_view(data, ms))
+        # THE CLAIMS REACH THE VIEW PATH (Story 20.83, #1039). `--claims` was
+        # parsed on `member` only, so the file could not carry the `in common:`
+        # lines even in principle — the plumbing was the missing half of the
+        # rendering, not an afterthought to it.
+        claims = None
+        if getattr(args, "claims", None):
+            try:
+                claims = json.loads(args.claims)
+            except ValueError as exc:
+                return _err(f"--claims is not readable JSON: {exc}")
+            if not isinstance(claims, dict):
+                return _err("--claims must be an object keyed by group id, "
+                            'for example {"G1": "..."}')
+        # ONE derivation of the candidate ids, shared with the screen: the
+        # display indexes in the file must be the ids selection is made by.
+        write_view(args.out,
+                   compose_member_view(data, ms, candidates(data), claims))
         print(args.out)
         return 0
     write_view(args.out, compose_view(data, candidates(data)))
@@ -1032,6 +1048,12 @@ def main(argv=None):
     v.add_argument("--substrate", default=SUBSTRATE_DEFAULT,
                    choices=sorted(set(SUBSTRATES) | set(SUBSTRATES_UNOFFERED)))
     v.add_argument("--grouping", metavar="JSON")
+    v.add_argument("--claims", metavar="JSON",
+                   help='the `in common:` claims you composed, as {"G1": '
+                        '"..."}, so the View carries them too. Same contract '
+                        "as `member --claims`: carried VERBATIM, never "
+                        "recomposed, and a group whose claim is absent says so "
+                        "rather than having one invented.")
     v.add_argument("--map", required=True, help="assembled map JSON, or - for stdin")
     v.add_argument("--out", required=True, metavar="PATH",
                    help=f"where to write it (the run workspace's {VIEW_FILENAME})")

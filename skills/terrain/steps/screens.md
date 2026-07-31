@@ -250,12 +250,21 @@ no back button. So navigation is in-invocation and runs over **held state**
   ```
   VIEW=$(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-paths.py topic-map-view --root <host-repo>)
   python3 ${CLAUDE_PLUGIN_ROOT}/scripts/topic-map-directions.py view \
-    --map "$WS/map.json" --tag <member> --out "$VIEW"
+    --map "$WS/map.json" --tag <member> --out "$VIEW" \
+    --substrate <the substrate you composed on> --grouping <the same proposal> \
+    --claims <the same claims you passed to `member`>
   ```
 
   Neither half alone is the requirement: ~50 Strands reprinted per view is
   unreadable, and a view living only in a file is uninspectable at the moment
   of selection. **The split is the requirement.**
+- **The split is of which surface is SHOWN, never of what the rendering is**
+  (Story 20.83, #1039). The file carries the complete rendering the screen
+  summarises: the same `L` display indexes selection is made by, the same pin,
+  the same machine-composed `in common:` lines, the same `how it changed:`
+  journey lines and `no-journey` marks. Pass `view` the same substrate,
+  grouping and claims you passed `member` — the two are one code path, and the
+  only way to make them disagree now is to feed them different inputs.
 - **The file is never read back.** It is a rendering of one invocation
   addressed by path, regenerated every time, with no identity anything else
   refers to. In-invocation memory is fine — it is not storage. **A

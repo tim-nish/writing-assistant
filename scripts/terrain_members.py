@@ -532,8 +532,12 @@ def compose_member_listing(map_data, tag, cands, axis="tag", claims=None,
     `no-journey` mark (#977) is what a hand-relay produces. Claims are CARRIED
     verbatim, never recomposed, exactly as `compose_full_report` carries them;
     a section whose claim was not passed states the absence rather than having
-    one invented. With `claims=None` the output is byte-identical to the
-    pre-20.66 listing.
+    one invented. With `claims=None` the output is the pre-20.66 listing plus
+    the placement disclosure Story 20.83 (#1039) moved onto both surfaces.
+
+    THE RENDERING ITSELF LIVES IN `_compose_member_rendering` (Story 20.83),
+    which the View file also calls. This function is now the console's entry to
+    it: it resolves the sections, nothing more.
     """
     # The substrate and grouping are THREADED, not defaulted (#1017). This
     # call used to be `member_sections(map_data, tag, axis)`, so a judged
@@ -550,9 +554,30 @@ def compose_member_listing(map_data, tag, cands, axis="tag", claims=None,
     # at the source — faithfully relayed, and wrong.
     ms = member_sections(map_data, tag, axis, substrate=substrate,
                          grouping=grouping)
+    return _compose_member_rendering(map_data, ms, cands, claims)
+
+
+def _compose_member_rendering(map_data, ms, cands, claims=None):
+    """THE complete rendering of one member — the ONE code path both surfaces
+    draw from (Story 20.83, #1039).
+
+    `compose_member_listing` (the console) and `compose_member_view` (the file
+    the console points at) used to be two implementations of one rendering, and
+    they drifted exactly as two implementations do: the View carried a heading,
+    a placement count and a bare ``- `slug` — gloss`` per Strand, while the
+    screen beside it had gained display indexes, the pin, the `in common:`
+    claims, the journey arcs, the row-type legend and the disclosure block. The
+    spec's split is *screen summarises, file holds the whole*
+    (`specs/spec-terrain/presentation.md:218-221`) — so the file being the
+    POORER surface inverted the requirement it was built to serve.
+
+    The split is a split of WHICH surface is shown, never of what the complete
+    rendering IS. Keeping one function is therefore the fix: a second copy would
+    re-earn the drift the moment either surface gains a line.
+    """
     by_slug = {c.get("slug"): c for c in cands if c.get("kind") == "element"}
     pin = map_data.get("coverage", {}).get("pin")
-    noun = "topic" if axis == "topic" else "tag"
+    noun = "topic" if ms.get("axis") == "topic" else "tag"
     lines = [f"# {ms['member']} ({noun}) — {ms['count']} Strand(s), shown whole",
              "",
              f"Pin: {_pin_display(map_data)}",
@@ -575,18 +600,22 @@ def compose_member_listing(map_data, tag, cands, axis="tag", claims=None,
         # (CAP-2 as amended 2026-07-30, #936): repeating it on every line
         # carries nothing per line and costs attention on all of them.
         lines += ["Every `in common:` line below is machine-composed at "
-                  "render time from the served claims.",
-                  # THE `G` KIND IS DECLARED WHERE IT IS RENDERED (Story 20.82,
-                  # #1031, carrying #889's verified constraints onto the
-                  # offered axis). Composed mode is the only screen-2 path that
-                  # prints group ids, and an id that looks selectable and is
-                  # not is exactly what retired the `J<n>` namespace — so the
-                  # surface says what kind `G` is rather than leaving the
-                  # owner to infer it from the one screen that happens to
-                  # explain it (the Full Report).
-                  "`G<n>` is a DISPLAY id: per-screen and per-pin, usable to "
-                  "ask for a full report, and conferring no selection "
-                  "authority — selection stays by Strand index.", ""]
+                  "render time from the served claims.", ""]
+    # THE `G` KIND IS DECLARED WHERE IT IS RENDERED (Story 20.82, #1031,
+    # carrying #889's verified constraints onto the offered axis). An id that
+    # looks selectable and is not is exactly what retired the `J<n>` namespace —
+    # so the surface says what kind `G` is rather than leaving the owner to
+    # infer it from the one screen that happens to explain it (the Full Report).
+    #
+    # UNCONDITIONAL AS OF STORY 20.83 (#1039). This used to ride with `claims`,
+    # on the reading that composed mode was "the only screen-2 path that prints
+    # group ids" — which was already false: the View file printed them on every
+    # render, and printed them with no declaration of their kind. Now that the
+    # two surfaces are one rendering, the ids are shown always and the kind is
+    # declared always, which is the pairing the rule actually asks for.
+    lines += ["`G<n>` is a DISPLAY id: per-screen and per-pin, usable to "
+              "ask for a full report, and conferring no selection "
+              "authority — selection stays by Strand index.", ""]
     if ms["substrate"] != SUBSTRATE_DEFAULT:
         # THE ACQUISITION DISCLOSURE, on the reading surface (Story 20.82,
         # #1031). A judged substrate groups on something the owner cannot
@@ -616,13 +645,25 @@ def compose_member_listing(map_data, tag, cands, axis="tag", claims=None,
         [e for sec in ms["sections"] for e in sec["strands"]])
     if cline:
         lines += [_clip_line(cline), ""]
+    # The placement disclosure, carried onto BOTH surfaces (Story 20.83, #1039).
+    # It was the one line the View had and the console did not — and under a
+    # multi-valued substrate placements exceed the Strand count, so a reader
+    # counting rows against the heading needs it wherever the rows are.
+    lines += [_clip_line(f"{ms['placements']} placement(s) across "
+                         f"{len(ms['sections'])} group(s); "
+                         + ("every Strand is placed at least once."
+                            if ms.get("covered")
+                            else "NOT every Strand was placed — the substrate "
+                                 "dropped one, which is a defect, not a "
+                                 "narrowing you may rely on.")), ""]
     for sec in ms["sections"]:
         gid = sec.get("group_id")
-        # In composed mode the id is rendered by the SCRIPT, in the shape the
-        # View and report paths already use: the owner names these ids to pull
-        # a full report, so an id typed by the relay is the same exposure as a
-        # row typed by the relay.
-        if claims is not None and gid:
+        # The id is rendered by the SCRIPT, in the shape the View and report
+        # paths already use: the owner names these ids to pull a full report, so
+        # an id typed by the relay is the same exposure as a row typed by the
+        # relay. Unconditional as of Story 20.83 (#1039) — see the `G<n>`
+        # declaration above, which now travels with it on every render.
+        if gid:
             head = f"## {gid} — {sec['title']} ({len(sec['strands'])})"
         else:
             head = f"## {sec['title']} ({len(sec['strands'])})"
@@ -986,7 +1027,7 @@ def _member_record(match):
             "cite": match.get("situation")}
 
 
-def compose_member_view(map_data, ms):
+def compose_member_view(map_data, ms, cands=None, claims=None):
     """One member's WHOLE view, for the file the screen points at (#892).
 
     The screen carries compact summaries — a derived title, member ids and
@@ -994,20 +1035,16 @@ def compose_member_view(map_data, ms):
     carries the complete rendering, because a view that lives only in a file
     is uninspectable at the moment of selection. Neither alone is the
     requirement; the split is.
+
+    AS OF STORY 20.83 (#1039) THIS IS A DELEGATION, NOT A RENDERING. It used to
+    compose its own, poorer output — no display indexes, no pin, no `in common:`
+    claim, no journey line — so the file the owner was pointed at was the worse
+    of the two surfaces and could not even be selected from. The complete
+    rendering is `_compose_member_rendering`, and both surfaces draw from it.
+
+    `cands` is accepted so the caller can pass the SAME `candidates(map_data)`
+    the screen used — deriving it twice is how the two would drift again.
     """
-    lines = [f"# {ms['member']} — {ms['count']} Strand(s), grouped by "
-             f"{ms['substrate']}", "",
-             f"{ms['placements']} placement(s) across {len(ms['sections'])} "
-             f"group(s). Every Strand appears at least once.", ""]
-    for sec in ms["sections"]:
-        head = f"## {sec.get('group_id') or ''} {sec['title']} "\
-               f"({len(sec['strands'])})".strip()
-        lines.append(head)
-        if sec.get("note"):
-            lines.append(f"_{sec['note']}_")
-        lines.append("")
-        for el in sec["strands"]:
-            lines.append(f"- `{el.get('slug')}` — "
-                         f"{el.get('gloss') or el.get('title') or ''}")
-        lines.append("")
-    return "\n".join(lines).rstrip() + "\n"
+    if cands is None:
+        cands = candidates(map_data)
+    return _compose_member_rendering(map_data, ms, cands, claims)

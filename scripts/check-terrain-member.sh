@@ -115,11 +115,24 @@ titles3 = [s["title"] for s in d3["sections"]]
 check(any(" + " in t for t in titles3),
       f"an over-cap section subdivides on the next shared label ({titles3})")
 listing3 = d3["listing"]
+
+
+def _head_line(listing, sec):
+    """The section's heading line, addressed the way the composer writes it.
+
+    Story 20.83 (#1039): the group id is now rendered on EVERY heading, not
+    only in composed mode, because the View file always printed it and the two
+    surfaces are one rendering. So the heading is addressed by `<gid> — <title>`
+    where a gid exists, and by the bare title where one does not.
+    """
+    key = f"## {sec['group_id']} — {sec['title']} (" if sec.get("group_id") \
+        else f"## {sec['title']} ("
+    return listing.split(key)[1].split("\n")[0] if key in listing else ""
+
+
 bad3 = [s["title"] for s in d3["sections"]
         if len(s["strands"]) > cap3
-        and "over the one-fifth bound" not in
-        (listing3.split(f"## {s['title']} (")[1].split("\n")[0]
-         if f"## {s['title']} (" in listing3 else "")]
+        and "over the one-fifth bound" not in _head_line(listing3, s)]
 check(not bad3,
       f"every section is under the bound or discloses why not ({bad3})")
 sectioned3 = [s for sec in d3["sections"] for s in sec["strands"]]
@@ -701,7 +714,7 @@ JOURNEY_EOF
 # (SPEC-terrain CAP-3 as amended 2026-07-29). The screen summarises, the path
 # holds the whole view, and the file is never read back.
 python3 - <<'NAV_EOF'
-import json, subprocess, tempfile, os, sys
+import json, re, subprocess, tempfile, os, sys
 
 D = "scripts/topic-map-directions.py"
 # Story 20.64 (#962): the skill is a dispatcher + step companions; the
@@ -736,13 +749,57 @@ r = subprocess.run(["python3", D, "view", "--map", f.name, "--tag", "agents",
 check(r.returncode == 0 and os.path.exists(out),
       f"a member's whole view renders to the given path (rc={r.returncode})")
 body = open(out).read()
-check(all(f"`v{n}`" in body for n in range(8)),
+check(all(f"g{n}" in body for n in range(8)),
       "the file carries EVERY Strand of the member — the whole view, not a summary")
 mem = json.loads(subprocess.run(["python3", D, "member", "--map", f.name,
                                  "--tag", "agents"],
                                 capture_output=True, text=True).stdout)
 check(all(s["group_id"] in body for s in mem["sections"]),
       "the file and the screen address the same groups by the same ids")
+
+# --- Story 20.83 (#1039): the View IS the complete rendering ---------------
+# The defect: `compose_member_view` was a SECOND implementation of the member
+# rendering and had drifted into the poorer of the two surfaces — no display
+# index (so the file could not be selected from at all), no pin (so it could
+# not be joined to the screen it mirrors), no `in common:` claim, no journey
+# line. Each assertion below names the thing that was missing, so a future
+# re-split is caught by what it drops rather than by a shape comparison.
+ids = re.findall(r"^- \*\*(L\d+)\*\* — ", body, re.M)
+check(len(ids) == 8,
+      f"AC1: every row carries its `L` display index — selection is by index "
+      f"and a View without indexes cannot be selected from ({len(ids)})")
+check(sorted(ids) == sorted(re.findall(r"^- \*\*(L\d+)\*\* — ",
+                                       mem["listing"], re.M)),
+      "AC1: the file's indexes are the SAME ids the composed screen assigns")
+check("Pin: " in body, "AC2: the View states the pin, so it joins to its screen")
+check(all(f"how it changed: arc {n}" in body for n in range(8)),
+      "AC4: the journey material reaches the file, per row")
+
+vc = tempfile.mktemp(suffix=".md")
+gids = [s["group_id"] for s in mem["sections"]]
+rc = subprocess.run(["python3", D, "view", "--map", f.name, "--tag", "agents",
+                     "--out", vc, "--claims",
+                     json.dumps({gids[0]: "they share a background"})],
+                    capture_output=True, text=True)
+cbody = open(vc).read() if rc.returncode == 0 else ""
+check(rc.returncode == 0 and "in common: they share a background" in cbody,
+      f"AC6/AC3: `view --claims` reaches the composer and the claim is carried "
+      f"VERBATIM (rc={rc.returncode})")
+check(len(gids) < 2 or "not composed for this group" in cbody,
+      "AC3: a section whose claim was not passed STATES the absence rather "
+      "than having one invented")
+check(cbody.count("machine-composed at render time from the served claims") == 1,
+      "AC7: the authoring class is declared ONCE for the surface, never per line")
+# AC5 — one rendering, not two. Asserted structurally: the View path must not
+# own a rendering of its own, or the drift this story fixed can simply recur.
+mem_src = open("scripts/terrain_members.py").read()
+vsrc = mem_src.split("def compose_member_view(", 1)[1].split("\ndef ", 1)[0]
+check("_compose_member_rendering(" in vsrc and "lines.append(" not in vsrc,
+      "AC5: compose_member_view DELEGATES — it composes no lines of its own, "
+      "so one code path renders both surfaces")
+check(mem_src.count("def _compose_member_rendering(") == 1,
+      "AC5: there is exactly ONE complete member rendering in the module")
+os.path.exists(vc) and os.unlink(vc)
 
 # --- AC1/AC2: regenerated per invocation, byte-identical from held inputs ---
 out2 = tempfile.mktemp(suffix=".md")
