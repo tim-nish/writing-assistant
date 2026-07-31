@@ -26,7 +26,36 @@ WHAT THIS DOES NOT DO: it does not compose candidate theses. That gate's
 options are composed by the agent from served material, and its payload is
 assembled from those candidates at the point of composition; what is fixed
 here is the SHAPE it must arrive in, not the composing.
+
+THE PAYLOAD DECLARES ITS RENDER FORM (Story 20.107, #1102). The clause above
+ended at "the rendering step QUOTES it" and said nothing about what a
+conforming rendering IS — so one sitting later, seven minutes after 20.103
+merged, five gates still reached the owner as prose. Measured rather than
+assumed: the reporting run's `intent.payload.json` exists and its
+`presented-payloads.jsonl` records the ask with its choices. The payload was
+emitted, validated, and then narrated.
+
+Worse, the clause was UNSATISFIABLE at a shipped surface: the host control
+admits four options and terrain's Strand pick offers roughly fifty. A clause
+that cannot be obeyed where it governs is not strict but absent, because the
+first gate that cannot comply teaches that compliance is optional everywhere.
+So `render` is emitted with every payload — `control` COMPUTED from the choice
+count against the capacity, never authored, so a builder cannot declare the
+wrong one; `recommended` an INDEX rather than a label, because a label drifts
+the moment wording changes.
+
+THE HONEST LIMIT, recorded because it is what the next instance is measured
+against: nothing here can force the rendering step to call the control. Where
+the violating layer belongs to another system the remedy is to SHRINK the
+free-form surface rather than lint it, and a payload declaring its own render
+form leaves nothing free-form to compose. The excuse is removed, not the
+possibility.
 """
+
+# The host selection control admits 2-4 options. This is the capacity the
+# render form is computed against, declared once here and imported by the
+# check rather than restated in it.
+CONTROL_CAPACITY = 4
 
 # Mirrors validate-proposal-payload.py, which is the enforcing copy. Kept here
 # so a builder can refuse before emitting rather than after; the validator
@@ -58,22 +87,75 @@ def _plain(text, field):
     return s
 
 
-def payload(where, why, choices, free_text=True):
+def render_form(choices, recommended=None, banner=None, reply_line=None):
+    """The `render` directive for a choice set (Story 20.107, #1102).
+
+    `control` is COMPUTED, never accepted as an argument: it follows from the
+    choice count against `CONTROL_CAPACITY`, so the invalid states — declaring
+    `selection` for a six-option payload, or `block` for a three-option one —
+    are unrepresentable rather than caught after the fact.
+
+    `banner` and `reply_line` are REQUIRED for a block and refused for a
+    selection. A block is a rendering of the payload, not a licence to narrate
+    it, so the fields a decision block needs are carried BY the payload — if
+    the renderer had to invent them, the block would be exactly the free-form
+    composition this whole carrier exists to remove.
+    """
+    control = "selection" if len(choices) <= CONTROL_CAPACITY else "block"
+    form = {"control": control, "recommended": None}
+    if recommended is not None:
+        if not isinstance(recommended, int) or isinstance(recommended, bool):
+            raise ValueError("recommended is an INDEX into choices, not a "
+                             "label — a label drifts when wording changes")
+        if not 0 <= recommended < len(choices):
+            raise ValueError(f"recommended index {recommended} is outside the "
+                             f"{len(choices)} choices")
+        # The recommended option leads. Rank is not pre-selection: nothing is
+        # selected, and the free-text channel is untouched.
+        form["recommended"] = 0
+    if control == "block":
+        if not banner or not reply_line:
+            raise ValueError(
+                f"{len(choices)} choices exceed the control capacity of "
+                f"{CONTROL_CAPACITY}, so this renders as a block and owes a "
+                "banner and a reply_line; without them the renderer would "
+                "compose them itself")
+        form["banner"] = _plain(banner, "banner")
+        form["reply_line"] = _plain(reply_line, "reply_line")
+    elif banner or reply_line:
+        raise ValueError("banner/reply_line belong to the block form; this "
+                         "payload fits the selection control")
+    return form
+
+
+def payload(where, why, choices, free_text=True, recommended=None,
+            banner=None, reply_line=None):
     """One gate item in the shipped payload shape.
 
     `free_text` is TRUE by default and is the contract's other half: options
     plus a free-form override, never options alone. Options-only is a
     different violation of the same clause that prose-only violates.
+
+    `recommended` names the index of the option this gate recommends, and the
+    builder MOVES it to the front rather than trusting the caller to have
+    ordered it — the render directive then reads `recommended: 0`, so the
+    directive and the ordering cannot disagree.
     """
+    choices = list(choices)
+    if not choices:
+        raise ValueError("a gate carries at least one choice")
+    form = render_form(choices, recommended, banner, reply_line)
+    if recommended:
+        choices = [choices[recommended]] + [c for i, c in enumerate(choices)
+                                            if i != recommended]
     item = {
         "where": _plain(where, "where"),
         "why": _plain(why, "why"),
         "choices": [{"label": _plain(c["label"], "effect"),
                      "effect": _plain(c["effect"], "effect")}
                     for c in choices],
+        "render": form,
     }
-    if not item["choices"]:
-        raise ValueError("a gate carries at least one choice")
     if free_text:
         # Recorded on the item so the renderer cannot drop the override
         # channel while faithfully quoting everything else.
@@ -96,14 +178,25 @@ def intent_gate(labels):
     entirely. Building the choices from the dict's keys is the obvious
     implementation and would have shipped the alias to the one surface it is
     barred from.
+
+    THIS GATE IS THE CAPACITY BOUNDARY'S FIRST INSTANCE (Story 20.107, #1102).
+    The closed set has FIVE members and the host control admits four, so the
+    gate 20.103 converted is itself over capacity and renders as a block. That
+    is the boundary being real rather than hypothetical: had the render form
+    been left to the renderer, this gate would have had to invent a form on the
+    spot, which is the prose the whole carrier exists to prevent.
     """
+    choices = [{"label": phrase,
+                "effect": f"the draft is filled from the framework for "
+                          f"'{phrase}'"}
+               for _, phrase in sorted(labels.items())]
     return payload(
         where="Stage 0, before any workspace is minted: the article type "
               "decides which framework the draft is filled from.",
         why="The category set is ratified and closed, so this is a choice "
             "among five, not free text to be matched.",
-        choices=[{"label": phrase,
-                  "effect": f"the draft is filled from the framework for "
-                            f"'{phrase}'"}
-                 for _, phrase in sorted(labels.items())],
+        choices=choices,
+        banner="Choose the article type before drafting starts.",
+        reply_line="Reply with one article type from the list, or describe "
+                   "the piece you have in mind.",
     )

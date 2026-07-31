@@ -165,7 +165,60 @@ def _premise_errors(item, tag):
             yield (f"{tag}.choices[{j}].effect", reason)
 
 
-def validate(payload):
+# The host selection control admits 2-4 options. Mirrors
+# `draft_gates.CONTROL_CAPACITY`, which is the builder's copy; this file is the
+# enforcing one and the carrier check asserts the two agree.
+CONTROL_CAPACITY = 4
+
+
+def _render_errors(item, tag, choices):
+    """Yield (path, reason) for a `render` directive's shape (Story 20.107).
+
+    ABSENCE IS NOT CHECKED HERE. This function validates the directive when one
+    is present; requiring it is `--require-render`'s job, because this
+    validator gates every proposal surface in the repository and the terrain
+    screens do not emit a directive until Story 20.108. Making it mandatory
+    here would have turned one story's tightening into another story's
+    breakage, which is how a carrier acquires a reputation for being in the
+    way.
+    """
+    render = item.get("render")
+    if render is None:
+        return
+    if not isinstance(render, dict):
+        yield (f"{tag}.render", "render is not an object")
+        return
+    control = render.get("control")
+    if control not in ("selection", "block"):
+        yield (f"{tag}.render.control",
+               f"is {control!r}; expected 'selection' or 'block'")
+        return
+    expected = "selection" if len(choices) <= CONTROL_CAPACITY else "block"
+    if control != expected:
+        yield (f"{tag}.render.control",
+               f"is {control!r} but {len(choices)} choices against a capacity "
+               f"of {CONTROL_CAPACITY} make it {expected!r} — control is "
+               "computed from the choice count, never authored")
+    rec = render.get("recommended")
+    if rec is not None:
+        if not isinstance(rec, int) or isinstance(rec, bool):
+            yield (f"{tag}.render.recommended",
+                   "is not an index — a label drifts when wording changes")
+        elif rec != 0:
+            yield (f"{tag}.render.recommended",
+                   f"is {rec}; a recommended option leads, so it is index 0")
+    for field in ("banner", "reply_line"):
+        present = render.get(field)
+        if control == "block" and not present:
+            yield (f"{tag}.render.{field}",
+                   "a block carries its own banner and reply line; without "
+                   "them the renderer composes them itself")
+        if control == "selection" and present:
+            yield (f"{tag}.render.{field}",
+                   "belongs to the block form; this payload fits the control")
+
+
+def validate(payload, require_render=False):
     """Yield (path, reason) for every defect; empty iterator means presentable."""
     if isinstance(payload, dict) and "items" in payload:
         items = payload["items"]
@@ -198,6 +251,11 @@ def validate(payload):
             reason = _truncation_error("effect", effect, BUDGETS["effect"])
             if reason:
                 yield (f"{tag}.choices[{j}].effect", reason)
+        if require_render and item.get("render") is None:
+            yield (f"{tag}.render",
+                   "no render directive — a gate declares how it renders, or "
+                   "the rendering step is free to compose prose from it")
+        yield from _render_errors(item, tag, choices)
 
 
 CAPTURE_FILE = "presented-payloads.jsonl"
@@ -288,6 +346,13 @@ def main(argv=None):
                    "non-empty `selection` string, optional string `free_text`) "
                    "and a blocked answer is never captured; which selection "
                    "VALUES are legal stays with the consuming gate")
+    p.add_argument("--require-render", action="store_true",
+                   help="reject a payload whose item carries no `render` "
+                        "directive (Story 20.107, #1102). Off by default "
+                        "because this validator gates every proposal surface "
+                        "and the terrain screens do not emit one until Story "
+                        "20.108; the carrier check passes it for the gates it "
+                        "covers")
     args = p.parse_args(argv)
 
     raw = sys.stdin.read() if args.payload == "-" else open(args.payload, encoding="utf-8").read()
@@ -314,7 +379,7 @@ def main(argv=None):
         print(json.dumps({"ok": True, "kind": "answer", "ask_id": args.answer}))
         return 0
 
-    defects = list(validate(payload))
+    defects = list(validate(payload, require_render=args.require_render))
     if not defects:
         if args.ws:
             ask_id = _capture_append(args.ws, {"kind": "ask",

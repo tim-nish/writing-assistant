@@ -38,8 +38,11 @@ json.dump(confirmation("20260718T000000-111111", "/ws", {"next_stage": "harvest"
 PY
 
 # EVERY emitted gate passes the SHIPPED validator — not a private mirror of it.
+# --require-render (Story 20.107, #1102) is what turns this from an EXISTENCE
+# assertion into a CONFORMANCE one: a gate must declare how it renders, or the
+# rendering step is free to compose prose from it, which is #1102 exactly.
 for g in intent resume; do
-  if python3 scripts/validate-proposal-payload.py "$work/$g.json" >/dev/null 2>"$work/$g.err"; then
+  if python3 scripts/validate-proposal-payload.py --require-render "$work/$g.json" >/dev/null 2>"$work/$g.err"; then
     ok "the $g gate emits a PRESENTABLE payload (shipped validator, #1081)"
   else
     err "the $g gate's payload is blocked: $(head -2 "$work/$g.err" | tr '\n' ' ')"
@@ -82,6 +85,44 @@ for name in ("intent", "resume"):
 blob = json.dumps(json.load(open(os.path.join(w, "intent.json"))))
 check(not re.search(r"\bf[1-5]\b", blob),
       "#1081: the intent gate's owner-facing text carries no F-alias")
+
+# THE RENDER FORM IS DECLARED, AND IT IS COMPUTED (Story 20.107, #1102).
+# #1081's carrier stopped at "the rendering step quotes it" and never said what
+# a conforming rendering IS, so five gates were still narrated seven minutes
+# after it merged. What is checkable is the composed artifact: that a directive
+# is present, that it AGREES with the choice count, and that a block carries
+# the fields it would otherwise make the renderer invent. No reply prose is
+# read here either — nothing in this repository can.
+sys.path.insert(0, "scripts")
+from draft_gates import CONTROL_CAPACITY as BUILDER_CAP
+from importlib.machinery import SourceFileLoader
+_v = SourceFileLoader("vpp", "scripts/validate-proposal-payload.py").load_module()
+
+check(_v.CONTROL_CAPACITY == BUILDER_CAP,
+      f"#1102: builder and validator agree on the control capacity "
+      f"({BUILDER_CAP})")
+
+for name in ("intent", "resume"):
+    item = json.load(open(os.path.join(w, name + ".json")))["items"][0]
+    r = item.get("render")
+    check(isinstance(r, dict),
+          f"#1102: the {name} gate declares a render form")
+    if not isinstance(r, dict):
+        continue
+    n = len(item["choices"])
+    expected = "selection" if n <= BUILDER_CAP else "block"
+    check(r.get("control") == expected,
+          f"#1102: ...and its control is {expected!r}, computed from "
+          f"{n} choices against a capacity of {BUILDER_CAP}")
+    # A recommendation LEADS. Rank is not pre-selection: the assertion above
+    # that nothing carries a `recommended` key still holds per CHOICE; this is
+    # the directive's index and it can only ever name the first option.
+    check(r.get("recommended") in (None, 0),
+          f"#1102: ...and any recommendation in the {name} gate leads")
+    if r.get("control") == "block":
+        check(bool(r.get("banner")) and bool(r.get("reply_line")),
+              f"#1102: ...and the {name} block carries its own banner and "
+              f"reply line rather than leaving them to the renderer")
 
 sys.exit(1 if fail else 0)
 PY
