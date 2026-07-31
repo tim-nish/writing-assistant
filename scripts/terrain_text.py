@@ -128,6 +128,72 @@ def _brief_iteration_line(n, retained):
             f"retained for comparison, for this sitting only.")
 
 
+# --------------------------------------------------------------------------
+# CANDIDATE THESES and the k-GROUP PROPOSAL — owner-facing wording (Story
+# 20.78, #995 and #988; SPEC-terrain CAP-3, both clauses added 2026-07-31)
+#
+# The gate composed ONE thesis per selection and offered adopt / narrow /
+# restart, so every upstream step was free-form reading and free-form typing
+# and the owner designed the article from scratch in chat. These are the
+# strings for the step that replaces that: article design as a SEQUENCE OF
+# SELECTIONS — a thesis chosen from candidates, then a structure, and onward.
+# They live here, with the lifecycle and loop wording, for the same
+# register-seam reason.
+# --------------------------------------------------------------------------
+
+THESIS_CANDIDATES_OPTION_LABEL = (
+    "choose a thesis — candidates composed over the whole selected set")
+
+PARTITION_OPTION_LABEL = (
+    "propose this selection as k article-scoped groups — approve / modify / "
+    "decline")
+
+
+def _thesis_candidates_line(n_members, lo, hi):
+    """What the gate says it is about to offer, before it offers it.
+
+    The COMPLETE set is named in the same sentence as the count, because the
+    one thing a candidate may not do is quietly be a reading of fewer Strands
+    than the owner selected.
+    """
+    return (f"Choose a thesis: {lo}–{hi} candidates, each a reading of all "
+            f"{n_members} selected Strands — never a narrowing of them. Your "
+            f"own wording wins over every candidate.")
+
+
+def _thesis_state_line(state):
+    """Whether a thesis exists yet, said plainly.
+
+    Before this story the brief string WAS the thesis, so there was no state to
+    report; now the string is a coverage statement until a candidate is
+    adopted, and an owner who is not told that would read the join as the
+    machine's reading of their set.
+    """
+    if state == "adopted":
+        return ("Thesis: adopted from the candidates and pinned to this member "
+                "set.")
+    return ("Thesis: not yet chosen — the brief carries a COVERAGE STATEMENT "
+            "over the members, which is not a reading of them. Choose a "
+            "candidate, or write your own.")
+
+
+def _partition_proposal_line(n, k_min):
+    """The k-group proposal, offered as a proposal.
+
+    States the decline in the offer itself: a proposal whose refusal is not
+    visible at the point of offering is a restructure with a question mark.
+    """
+    return (f"{n} Strands may be several articles rather than one. A proposal "
+            f"of {k_min} or more article-scoped groups is available — approve, "
+            f"modify, or decline; declining changes nothing.")
+
+
+def _backlog_line(k):
+    """Where k accepted briefs go, said once, at the gate that produces them."""
+    return (f"{k} briefs would enter the drafting backlog ONE AT A TIME — "
+            f"never {k} simultaneous publishes.")
+
+
 def _fit(text, budget=BUDGETS["effect"]):
     """A payload field is AUTHORED within its budget, never truncated (#832;
     SPEC-writing-assistant owner-facing proposal contract, clause (e)). This

@@ -107,6 +107,12 @@ Stdlib-only. Subcommands:
   brief-open  --at PATH [--state inspected|adopted]
                                 re-open a written brief, and optionally record
                                 the lifecycle transition the return represents
+  cover       --composed PATH --from PATH
+                                count the placement cover of the COMPOSED
+                                candidate theses (or the proposed partition)
+                                against the brief's member set — every selected
+                                Strand placed, or its omission disclosed; run
+                                AFTER composition (Story 20.78)
 
 Exit codes: 0 ok · 1 refusal (no usable map / no owner wording) · 2 usage.
 """
@@ -130,7 +136,10 @@ from terrain_text import (
     BRIEF_STEP_ID,
     BRIEF_STEP_NAME,
     BUDGETS,
+    PARTITION_OPTION_LABEL,
+    THESIS_CANDIDATES_OPTION_LABEL,
     VIEW_LINE_CHARS,
+    _backlog_line,
     _brief_artifact_line,
     _brief_edit_option_effect,
     _brief_iteration_line,
@@ -145,12 +154,32 @@ from terrain_text import (
     _gloss_disclosure_line,
     _journey_coverage_line,
     _journey_disclosure_line,
+    _partition_proposal_line,
     _pin_display,
     _short_path,
     _substituted_paths,
     _substitution_disclosure_line,
     _terrain_size_line,
+    _thesis_candidates_line,
+    _thesis_state_line,
     _verdict_phrase,
+)
+
+# CANDIDATE THESES over the selected set, and k candidate briefs over a
+# proposed partition (Story 20.78, #995/#988). Its own module, beside the file
+# rather than inside it, for the reason `strand_cover.py` states: new mechanism
+# arrives beside a file at its ratchet. The count it carries is the SAME
+# placement cover the drafting composer already runs, counted at the earlier
+# gate rather than re-invented there.
+from terrain_theses import (  # noqa: E402
+    PARTITION_MIN_GROUPS,
+    PARTITION_OFFER_MIN,
+    THESIS_CANDIDATES_MAX,
+    THESIS_CANDIDATES_MIN,
+    coverage_statement,
+    partition_proposal_block,
+    thesis_candidates_block,
+    verify_cover,
 )
 
 # The candidate-directions layer this surface proposes with (Story 20.56,
@@ -1289,13 +1318,20 @@ def _brief_from_index(answer, cands, map_pin, map_data=None):
         # plus the note verbatim, exactly as before set selection existed.
         base = matches[0]["direction"]
     else:
-        # RECOMPOSED OVER EXACTLY THIS SET. The deterministic wording is a
-        # coverage statement over the selected members, never a narrative
-        # shape; an owner-adopted claim replaces it outright.
-        base = claim or "; ".join(m["direction"] for m in matches)
+        # RECOMPOSED OVER EXACTLY THIS SET, and NO LONGER THE SET'S THESIS
+        # (Story 20.78, #995). This join was the one thesis composed per
+        # selection; it is now what it always literally was — a coverage
+        # statement over the selected members — and the thesis arrives as 2–3
+        # CANDIDATES composed at the gate from the block below. The string is
+        # unchanged byte for byte: what changed is what it claims to be, and
+        # `thesis.state` says so rather than leaving the owner to read a
+        # semicolon-joined list as a reading of their set. An owner-adopted
+        # claim — the candidate they chose — replaces it outright.
+        base = claim or coverage_statement(matches)
     brief = f"{base} — {note}" if note else base
     cov = (map_data or {}).get("coverage", {}) or {}
-    return {"brief": brief,
+    members = [_member_record(m) for m in matches]
+    out = {"brief": brief,
             # The coverage wording is machine-proposed and the owner adopted it
             # by choosing its index; the note is theirs outright. Both are the
             # owner's words under the shipped rule — never a tool-invented scope.
@@ -1307,7 +1343,7 @@ def _brief_from_index(answer, cands, map_pin, map_data=None):
             # completeness invariant follows it into drafting — every selected
             # Strand placed or its omission disclosed — so with no members
             # recorded, omission becomes silent.
-            "members": [_member_record(m) for m in matches],
+            "members": members,
             # Both halves of the pin: the terrain invocation the indexes were
             # read at, and the hub commit the material came from.
             "pins": {"terrain": answer_pin, "hub": cov.get("hub_pin"),
@@ -1326,6 +1362,41 @@ def _brief_from_index(answer, cands, map_pin, map_data=None):
             **({"consultant": _consultant_block(matches, cands, map_data)}
                if len(matches) > 1 else {}),
             "candidate": matches[0]}
+    if len(matches) > 1:
+        # THE THESIS IS A CHOICE FROM CANDIDATES (Story 20.78, #995), and the
+        # gate says which state it is in. Carried for a SET only: one Strand's
+        # served wording is that Strand's, and proposing readings of it would
+        # be a second proposer over a selection with nothing to re-read.
+        out["thesis"] = {
+            "state": "adopted" if claim else "candidates-pending",
+            "text": claim or None,
+            "line": _thesis_state_line(
+                "adopted" if claim else "candidates-pending"),
+            "brief_string_is": (
+                "the owner's adopted candidate" if claim else
+                "a COVERAGE STATEMENT over the members, not a reading of them"),
+        }
+        out["candidate_theses"] = {
+            "label": THESIS_CANDIDATES_OPTION_LABEL,
+            "line": _fit(_thesis_candidates_line(
+                len(matches), THESIS_CANDIDATES_MIN, THESIS_CANDIDATES_MAX)),
+            **thesis_candidates_block(members, answer_pin, claim or None),
+        }
+        # k CANDIDATE BRIEFS OVER A PROPOSED PARTITION (#988) — the same
+        # machinery over a partition, offered only where a selection is large
+        # enough to carry several theses. `None` below the threshold: an
+        # unoffered proposal is absent, never present-and-empty, because an
+        # empty proposal block reads as a proposal that found nothing.
+        part = partition_proposal_block(members, answer_pin, PARTITION_OFFER_MIN)
+        if part:
+            out["partition_proposal"] = {
+                "label": PARTITION_OPTION_LABEL,
+                "line": _fit(_partition_proposal_line(
+                    len(matches), PARTITION_MIN_GROUPS)),
+                "backlog_line": _fit(_backlog_line(PARTITION_MIN_GROUPS)),
+                **part,
+            }
+    return out
 
 
 def brief_from_answer(answer, cands, map_pin=None, map_data=None):
@@ -1658,6 +1729,45 @@ def cmd_brief_open(args):
     return 0
 
 
+def cmd_cover(args):
+    """THE PLACEMENT COUNT, RUN AFTER COMPOSITION (Story 20.78 AC3/AC6).
+
+    ITS OWN INVOCATION, DELIBERATELY. The count cannot live inside the
+    composition it checks — a composer that cannot omit in principle can still
+    omit in fact, and a check reading the composer's own inputs would confirm
+    the composer's own belief about them. So the composed candidates arrive as
+    a FILE, written by whoever composed them, and this reads what was actually
+    emitted against the member set the BRIEF records.
+
+    A refusal returns the WHOLE proposal to its composer. It never drops one
+    candidate and offers the rest: reducing what reaches the owner is the
+    narrowing the second-proposer boundary bars, and it is not made admissible
+    by being done in the name of completeness.
+    """
+    try:
+        with open(args.composed, encoding="utf-8") as fh:
+            composed = json.load(fh)
+    except (OSError, ValueError) as exc:
+        return _err(f"unreadable composed candidates at {args.composed}: {exc}")
+    try:
+        brief = read_brief_artifact(args.from_brief)
+    except (OSError, ValueError) as exc:
+        return _err(
+            f"unreadable brief artifact at {args.from_brief}: {exc}. The cover "
+            "is counted against the OWNER'S selected set, which only the brief "
+            "records — counting against the composition's own idea of the set "
+            "would confirm whatever it believed.")
+    report = verify_cover(composed, brief, os.path.abspath(args.from_brief))
+    report["stage"] = "topic-map-cover"
+    report["counted"] = "after-composition"
+    print(json.dumps(report, indent=2, ensure_ascii=False))
+    if report.get("refusals"):
+        for line in report["refusals"]:
+            print(f"refused: {line}", file=sys.stderr)
+        return 1
+    return 0
+
+
 def cmd_journey_inputs(args):
     """The judgment inputs for the journey-similarity substrate (#891).
 
@@ -1802,10 +1912,24 @@ def main(argv=None):
     bo.add_argument("--state", choices=list(BRIEF_LIFECYCLE[1:]),
                     help="record the transition this return represents "
                          f"({' → '.join(BRIEF_LIFECYCLE)}); forward-only")
+    cv = sub.add_parser("cover",
+                        help="count the placement cover of COMPOSED candidate "
+                             "theses (or a proposed partition) against the "
+                             "brief's member set — after composition")
+    cv.add_argument("--composed", required=True, metavar="PATH",
+                    help="the composed candidates as JSON: `kind` is "
+                         "`candidate-theses` (2–3 candidates, each with its "
+                         "`places`, `omits` and `grounds`) or `partition` "
+                         "(k groups, plus any `dropped` the owner named). "
+                         "Read as EMITTED — never re-derived from the inputs "
+                         "it was composed from.")
+    cv.add_argument("--from", dest="from_brief", required=True, metavar="PATH",
+                    help="the brief artifact whose `members` the cover is "
+                         "counted against (written by `brief --out`)")
     args = p.parse_args(argv)
     return {"candidates": cmd_candidates, "payload": cmd_payload,
             "view": cmd_view, "brief": cmd_brief,
-            "brief-open": cmd_brief_open,
+            "brief-open": cmd_brief_open, "cover": cmd_cover,
             "axis": cmd_axis, "member": cmd_member,
             "report": cmd_report,
             "journey-inputs": cmd_journey_inputs}[args.cmd](args)
