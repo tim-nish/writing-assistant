@@ -77,6 +77,40 @@ def _cwd_toplevel():
         return None
 
 
+def _toplevel_of(path):
+    """The git toplevel containing `path`, realpath'd — or None when `path` is
+    not inside a git repository (or git is unavailable).
+
+    Exists because testing `os.path.isdir(<path>/.git)` is WRONG in a linked
+    git worktree, where `.git` is a regular FILE holding a `gitdir:` pointer
+    (#1005). Every resolver here that needs "is this a repo, and which one"
+    asks git, exactly as `_cwd_toplevel` already did for cwd — the two differ
+    only in which directory the question is asked from.
+
+    The failure this fixes is silent and misattributed: a resolver that decides
+    "not a repo" inside a worktree falls back to the state root, and the
+    breakage surfaces several layers away as an unrelated assertion about
+    where a workspace lives, never as "you are in a worktree".
+
+    `path` need not exist; the nearest existing ancestor is probed instead, so
+    a not-yet-created destination directory still resolves to its repo.
+    """
+    probe = os.path.abspath(path)
+    while not os.path.isdir(probe):
+        parent = os.path.dirname(probe)
+        if parent == probe:
+            return None
+        probe = parent
+    try:
+        top = subprocess.run(
+            ["git", "-C", probe, "rev-parse", "--show-toplevel"],
+            capture_output=True, text=True, check=True,
+        ).stdout.strip()
+        return os.path.realpath(top) if top else None
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return None
+
+
 def host_root(arg_root):
     """The host repo root: explicit --root, else git toplevel of cwd.
 
@@ -159,13 +193,19 @@ def terrain_output_root():
     these artifacts lived before the ruling and remains a correct place for
     them — the ruling moves them TOWARD the human, and a location no human
     opens does not satisfy it.
+
+    "Runs from a working tree" is asked of git, never of `.git`'s file type: a
+    LINKED WORKTREE's `.git` is a regular file, so an `isdir` test read every
+    worktree as an installed clone and sent its artifacts to the state root
+    (#1005). A worktree of this repo is a working tree the owner works in, and
+    resolves here exactly like the main one.
     """
     here = plugin_root()
     installed = os.path.join(os.path.expanduser("~"), ".claude", "plugins")
     if os.path.commonpath([os.path.abspath(here), os.path.abspath(installed)]) \
             == os.path.abspath(installed):
         return state_root()
-    if not os.path.isdir(os.path.join(here, ".git")):
+    if _toplevel_of(here) != os.path.realpath(here):
         return state_root()
     return os.path.join(here, TERRAIN_OUTPUT_DIR)
 
@@ -252,14 +292,10 @@ def articles_repo_root(root):
     if not val:
         return None
     drafts = rws.resolve_drafts_dir(val, root)
-    cur = drafts
-    while True:
-        if os.path.isdir(os.path.join(cur, ".git")):
-            return cur
-        parent = os.path.dirname(cur)
-        if parent == cur:
-            return drafts        # not in a git repo: the destination itself
-        cur = parent
+    # Ask git rather than walking for a `.git` DIRECTORY: in a linked worktree
+    # `.git` is a file, so the walk ran off the top and reported "not in a git
+    # repo", silently answering with the destination itself (#1005).
+    return _toplevel_of(drafts) or drafts
 
 
 def topic_map_view(root):
