@@ -25,7 +25,9 @@ err() { printf 'FAIL: %s\n' "$1" >&2; fail=1; }
 ok()  { printf 'ok:   %s\n' "$1"; }
 
 M="scripts/terrain_map.py"
-D="scripts/topic-map-directions.py"
+# #1036: the renderer lives in terrain_directions.py — loaded from THAT path,
+# never through the entry point's re-export.
+D="scripts/terrain_directions.py"
 
 python3 - "$M" "$D" <<'PYEOF' || fail=1
 import importlib.util, sys
