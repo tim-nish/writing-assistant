@@ -70,6 +70,55 @@ The owner's wording, if they supply any, **is** the brief and the proposal is
 discarded. To record an adopted claim instead of the deterministic wording,
 pass it back as `claim` in the answer.
 
+## The gate is a LOOP over the member set
+
+**Added 2026-07-31** (SPEC-terrain CAP-3, #997). The gate used to offer adopt,
+narrow, or *go back to Screen 2 and pick differently* — so an owner developing
+a thesis by trying members had to leave the gate and lose the composition.
+**Offer the edit-set option class alongside the existing options**, exactly as
+the command hands it to you in `iteration.option` (`label`, `effect`, the
+`editable` set, the answer form). Relay `iteration.line` so the owner sees
+where in the loop they are.
+
+The owner's edit is `+L12 −L3` — what CHANGES, signed. Submit it as the
+answer's `edit` (or `add`/`drop` lists) and run the **same** command with the
+composition being edited named by `--from`:
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/topic-map-directions.py brief \
+  --answer <answer> --map "$WS/map.json" \
+  --from "$WS/brief.json" --out "$WS/brief-2.json"
+```
+
+The artifact's identity is its **path**, so each recomposition is a new name
+in the **same** `$WS` — that is all the loop needs.
+
+**What the loop does not change is most of it.** A set change is a **gate
+event, not a refresh**: the claim recomposes over exactly the edited set and
+is pinned to it, which is the recomposition described above, reached rather
+than repeated. Pin discipline is unchanged — a missing or mismatched pin is
+refused, and so is an edit to a composition pinned elsewhere. **Nothing is
+re-ranked or filtered by an edit**: the owner names what changes, so dropping a
+member that is not in the set and adding one already in it are both refused
+with the current set stated, rather than absorbed as no-ops.
+
+**Prior compositions stay visible** in `iteration.compositions` — each with its
+claim, its member set, its pins and the edit that produced it. Relay them so
+the owner **compares theses across set variants** instead of remembering them.
+
+**Retention is WITHIN-SITTING, and that is not a technicality.** The chain
+lives in this run workspace's own brief artifacts; an edit whose `--from` and
+`--out` are in different workspaces is **refused**. A new invocation mints a
+new `$WS` at Step 0 and therefore starts with an empty chain — nothing is
+carried across invocations, which is exactly what keeps this comparison clear
+of the cross-invocation cache the never-read-back rule forbids.
+
+**Free text still wins here as everywhere.** Owner wording beside an edit
+becomes the brief and the edit is never resolved. And the note — the owner's
+angle — survives an edit they did not restate, disclosed as inherited; an
+adopted **claim** does not, because a claim belongs to the set it was composed
+over.
+
 **The brief gate may carry a coherence CONSULTANT (SPEC-terrain CAP-3, added
 2026-07-30, #939).** When a set of two or more is selected the command returns
 a `consultant` block: the `subject` (the selected members with their cites),
