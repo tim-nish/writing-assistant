@@ -99,13 +99,41 @@ semicolon-joined list as your reading of their set.
    by name, with its reason. Completeness is a **cover counted in placements**.
 3. **Every placement cites the Strand's served rendering at this pin.**
    Nothing from outside the served corpus enters a candidate.
-4. **Enumerate; never rank-and-trim.** Offering the strongest while discarding
-   the rest is the narrowing the owner's own selection already did.
+4. **Never rank-and-trim.** What is barred is ranking *coupled with*
+   discarding: offering the strongest while dropping the rest is the narrowing
+   the owner's own selection already did. **Ranking itself is not barred** —
+   see requirement 6, which requires the comparison this clause was misread as
+   forbidding.
 5. **Free text wins**, here as everywhere — the owner's own thesis is the
    brief, and every candidate is discarded when they write one.
+6. **Offer a RECOMMENDATION beside the candidates** — never instead of any of
+   them. It is machine-**proposed** and never machine-final; it **names the
+   axes** it assessed on and **states what would overturn it**; and rank
+   confers no default: no candidate is trimmed, hidden, reordered away or
+   abbreviated for having ranked lower. Every candidate still arrives whole.
+
+**The axes to reach for** — named defaults, not requirements: **redundancy**
+(do two candidates say the same thing in different words), **consistency**
+(does a candidate hold together across the Strands it places), and **distinct
+Strand relationships** (does it read the set through a relation the others do
+not). These are the owner's own three and they are where to start; they are
+deliberately *not* frozen into the requirements, so a candidate set whose real
+differences lie elsewhere is assessed on those instead. Say which axes you
+used, at the gate, whichever they were.
 
 The assessment itself is again **not a fixed procedure**: what is frozen is
-what must be TRUE of the candidates that arrive, never how you arrive at them.
+what must be TRUE of the candidates that arrive — including that a
+recommendation arrives at all — never how you arrive at them. A narrow
+mechanism would keep reporting success for satisfying its own steps while
+failing what the owner wanted, which is why the axes above are a starting
+point rather than a checklist.
+
+**Cost of that choice, stated rather than discovered:** because the axes are
+declared per sitting rather than frozen, recommendations are guaranteed to be
+*legible* — you can always see what a pick was judged on — but they are **not
+yet comparable across sittings**. If cross-run comparability turns out to be
+what is needed, the axes get frozen and the "not a fixed procedure" guard is
+re-scoped to the consultant where it was earned.
 
 **Then run the count — it is not optional, and it runs AFTER composition:**
 

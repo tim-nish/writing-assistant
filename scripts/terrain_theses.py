@@ -79,6 +79,22 @@ THESIS_REQUIREMENTS = [
     "selection already did and the map does not",
     "free text wins at this step as at every other — the owner's own thesis "
     "is the brief, and every candidate is discarded when they write one",
+    # THE RECOMMENDATION IS CONTRACT (Story 20.89, #1043). Added at the END so
+    # the existing indices are stable — the 2026-07-31 amendment cites
+    # THESIS_REQUIREMENTS[3] by number, and that clause is RETAINED: it bans
+    # ranking COUPLED WITH TRIMMING, which this requirement does not license.
+    # This is a requirement on the ARRIVING RECOMMENDATION, never on how the
+    # assessment is reached — the list's own stated design, `:65` above.
+    #
+    # Why it must be here and not only in a host repository's CLAUDE.md: this
+    # gate ships as a plugin drawn into host repos, which load their own
+    # CLAUDE.md and never this one, so the ranked-recommendation guarantee held
+    # only at home. That is the gap #1043 closes.
+    "a RECOMMENDATION is offered BESIDE the candidates and never instead of "
+    "any of them — machine-proposed and never machine-final; it NAMES THE "
+    "AXES it assessed on and STATES WHAT WOULD OVERTURN it; and rank confers "
+    "no default: no candidate is trimmed, hidden, reordered away, or "
+    "abbreviated for having ranked lower",
 ]
 
 # The same discipline over a partition. The one asymmetry against the list
@@ -136,7 +152,38 @@ def thesis_candidates_block(members, pin, adopted_claim=None):
         "inputs": list(members),
         "pin": pin,
         "composed": False,
-        "ranked": False,
+        # WHAT IS TRUE OF THIS GATE, replacing `"ranked": False` (Story 20.89,
+        # #1043). That field asserted a STRICTLY STRONGER property than the
+        # requirement behind it: THESIS_REQUIREMENTS[3] bans ranked-AND-trimmed,
+        # while `ranked: False` claimed no ordering exists at all. A run that
+        # ranked, retained all three candidates whole and disclosed what would
+        # overturn its pick therefore satisfied the requirement and contradicted
+        # the field — and the field was the false carrier, not the behaviour.
+        #
+        # A STRUCTURED OBJECT rather than a scalar, decided in implementation:
+        # the field's job is to state what the gate GUARANTEES, and four
+        # properties cannot be carried by one boolean without the reader
+        # inferring three of them. There is exactly one shipped reader
+        # (`check-terrain-theses-inner.sh`), so legibility costs one assertion.
+        #
+        # The key is RENAMED, not re-valued: a key called `ranked` holding a
+        # recommendation contract would preserve the vocabulary that made the
+        # false claim readable in the first place.
+        "recommendation": {
+            # Offered beside the candidates, always — a gate presenting options
+            # owes its own comparison, and the hardest input at a fork is the
+            # comparison, not the options.
+            "required": True,
+            # Rank confers NO DEFAULT. Nothing is trimmed, hidden, reordered
+            # away or abbreviated for ranking lower — which is the whole of
+            # what THESIS_REQUIREMENTS[3] bans, retained and unweakened.
+            "trims": False,
+            "declares_axes": True,
+            "declares_overturn": True,
+            # Machine-PROPOSED, never machine-final: the owner chooses, and
+            # nothing is pre-selected. Rank is not pre-selection.
+            "machine_final": False,
+        },
         "requirements": THESIS_REQUIREMENTS,
         # The form the composed candidates come back in, so the gate does not
         # invent one and the count has something fixed to read.

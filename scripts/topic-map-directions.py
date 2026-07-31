@@ -380,6 +380,18 @@ def _consultant_block(matches, cands, map_data):
         "substitution_candidates": [
             _member_record(c) for c in cands
             if c.get("kind") == "element" and c.get("id") not in chosen],
+        # THIS `ranked: False` IS CORRECT AND STAYS (Story 20.89, #1043 AC4).
+        # Two such fields existed and only one was wrong. THIS one is on the
+        # PRE-SELECTION members block: it is exactly where the second-proposer
+        # boundary binds, because a machine ranking upstream of the owner's
+        # selection is the act the boundary exists to prevent. The one that was
+        # corrected is the POST-SELECTION candidate-thesis gate field in
+        # `terrain_theses.py`, where the owner has already narrowed and a
+        # retained-whole ranking narrows nothing further.
+        #
+        # Stated here so a later reader does not "fix" the two into
+        # consistency: they are not two spellings of one property. They are two
+        # different moments, and the boundary falls between them.
         "ranked": False,
         "pin": (map_data or {}).get("coverage", {}).get("pin"),
     }
