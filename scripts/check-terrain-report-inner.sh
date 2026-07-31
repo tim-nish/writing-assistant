@@ -307,20 +307,43 @@ check("_clip_line(" not in fnseg,
       "the report composer calls no clipper — the whole relay is structural, "
       "not a property of today's fixture widths")
 
-# AC2 — and the SIZE-SWITCHED surface is untouched: screen 2's listing still
-# clips at the same budget. A diff that removed clipping globally has overshot
-# this story; this is the assertion that says so.
+# AC2 — and the SIZE-SWITCHED surface is untouched. A diff that removed
+# clipping globally has overshot; this is the assertion that says so.
 #
-# Read from the COMPLETE RENDERING (Story 20.84, #1038). This fixture's member
-# is over the screen budget, so the console is now a summary that has no Strand
-# rows to clip; the surface the size switch governs and that carries the arcs is
-# the View. Asserting clipping on the summary would be asserting it about lines
-# that are not there — the assertion follows its subject.
-listing = open(w + "/member-view.md", encoding="utf-8").read()
-check(f"how it changed: {arc}" not in listing,
-      "screen 2's listing still clips the same over-budget arc")
-check(max(len(ln) for ln in listing.splitlines()) <= mod.VIEW_LINE_CHARS,
-      "screen 2's listing still bounds every line at VIEW_LINE_CHARS")
+# RE-POINTED AT ITS OWN SUBJECT (Story 20.98, #1076). This assertion had been
+# moved onto `member-view.md` when the size switch left the console with no
+# Strand rows to clip — but the View is the surface the spec's "the path holds
+# the whole" clause names, and asserting clipping there is how the truncation
+# #1076 reports was locked in. The subject is the SELECTION SCREEN, so the
+# assertion is written against a screen that has rows: an under-budget member,
+# where the console renders them itself.
+view = open(w + "/member-view.md", encoding="utf-8").read()
+check(f"how it changed: {arc}" in view,
+      "#1076: the View relays the served arc WHOLE — it is the surface that "
+      "holds the whole, and a served rendering is relocatable, never "
+      "re-expressible")
+check(not [ln for ln in view.splitlines()
+           if ln.strip().startswith("how it changed:")
+           and ln.rstrip().endswith("…")],
+      "#1076: ...and no arc on the View ends in a cut this renderer authored")
+
+# THE SELECTION SCREEN STILL CLIPS, asserted on a member small enough to have
+# rows. Same arc, same budget, opposite surface — the two halves are asserted
+# together so the exemption cannot silently widen into the screens.
+small_map = {"kind": "topic-map", "topics": [], "coverage": {"pin": "h@abc1234"},
+             "elements": [{"kind": "lesson", "slug": "s0", "title": "S0",
+                           "gloss": "a gloss", "tags": ["workflow"],
+                           "evidence": [], "consumed": False,
+                           "journey_recorded": True, "journey": arc}]}
+sys.path.insert(0, "scripts")
+from terrain_members import (member_sections as _ms, candidates as _cands,
+                             compose_member_listing as _listing)
+screen = _listing(small_map, "workflow", _cands(small_map))
+check("how it changed:" in screen and f"how it changed: {arc}" not in screen,
+      "#1076: the SELECTION SCREEN still clips the same over-budget arc — the "
+      "exemption is a property of the View file, not of the material")
+check(max(len(ln) for ln in screen.splitlines()) <= mod.VIEW_LINE_CHARS,
+      "#1076: ...and the screen still bounds every line at VIEW_LINE_CHARS")
 
 # AC3 — the journey label is named ON the surface, not left to be inferred.
 check("JOURNEY" in rep and "how it changed:" in rep.split("## ")[0],

@@ -907,7 +907,7 @@ def compose_member_listing(map_data, tag, cands, axis="tag", claims=None,
 
 
 def _compose_member_rendering(map_data, ms, cands, claims=None,
-                              view_path=None, summarise=False):
+                              view_path=None, summarise=False, whole=False):
     """THE complete rendering of one member — the ONE code path both surfaces
     draw from (Story 20.83, #1039).
 
@@ -1126,12 +1126,20 @@ def _compose_member_rendering(map_data, ms, cands, claims=None,
                 claim = el.get("gloss") or el.get("title") or el.get("slug", "")
                 mark = (" — already consumed, still selectable"
                         if el.get("consumed") else "")
-                # THIS SURFACE KEEPS CLIPPING (Story 20.73, #1011). The size
-                # switch binds the selection screens; only the Full Report is a
-                # stated exception to it, so the unclipping done in
-                # `compose_full_report` stops here deliberately. Removing
-                # `_clip_line` from this path would widen that story into the
-                # surfaces the switch governs.
+                # THE SELECTION SCREEN KEEPS CLIPPING (Story 20.73, #1011); the
+                # VIEW FILE does not clip a SERVED rendering (Story 20.98,
+                # #1076). The exemption is a property of the surface, not of
+                # the material, so it is applied here at the consumer and never
+                # in `_journey_arc_line` (which never truncated) or in
+                # VIEW_LINE_CHARS (which still binds the screens).
+                #
+                # The discriminator is COMPOSED versus SERVED. A composed line
+                # always has a shorter authored wording available; a served
+                # rendering has none, because it is relocatable and never
+                # re-expressible — so clipping one is the only cut available,
+                # and it is the worst one: an arc's shape is belief → break →
+                # new position, and a tail cut reliably keeps the belief and
+                # drops the break.
                 _lines.append(_clip_line(f"- **{ident}** — {claim}{mark}"))
                 _lines.append(_clip_line(
                     _strand_context_line(el, ms["member"], subbed)))
@@ -1141,7 +1149,7 @@ def _compose_member_rendering(map_data, ms, cands, claims=None,
                 # its arc together.
                 arc = _journey_arc_line(el)
                 if arc:
-                    _lines.append(_clip_line(arc))
+                    _lines.append(arc if whole else _clip_line(arc))
 
         # THE HIERARCHY RENDERS UNDER THE PARENT CLAIM (Story 20.87 AC1), and
         # ONLY where a subdivision was adopted: an unsubdivided group takes the
@@ -1606,4 +1614,9 @@ def compose_member_view(map_data, ms, cands=None, claims=None):
     """
     if cands is None:
         cands = candidates(map_data)
-    return _compose_member_rendering(map_data, ms, cands, claims)
+    # `whole=True` IS THE ONE THING THIS SURFACE ASKS FOR (Story 20.98, #1076).
+    # Both surfaces still draw from one rendering — this is a parameter, not a
+    # second copy, which is the drift #1039 records. It says only *this output
+    # is the file*, and the file is what the spec's "the path holds the whole"
+    # clause names.
+    return _compose_member_rendering(map_data, ms, cands, claims, whole=True)
