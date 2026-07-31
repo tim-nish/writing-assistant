@@ -122,7 +122,7 @@ clause on this page, and append new amendments there rather than here.
     property only), so it is done here rather than left implicit.
     - **CARRIES:** the owner's selected **member set** with its indexes; each
       member's **served material** (gloss, journey arc, cite) as relocated
-      text; the **pins** (terrain invocation, hub commit); the **harvest
+      text; the **pins** (terrain invocation, hub commit, and the JUDGE — #1090 below); the **harvest
       scope** — the union of the members' `projects:`, per
       `SPEC-article-draft-pipeline` amendments 2026-07-29 (#896) and the owner
       decision record — 2026-07-29 (terrain draft handoff), the brief being
@@ -166,6 +166,44 @@ clause on this page, and append new amendments there rather than here.
     is days old. The contract is the *closure*, not permanence: a field is
     added by amending this clause, which is exactly the visibility whose
     absence let the artifact grow by accretion.
+  - **a per-invocation judged surface carries a JUDGE PIN (added 2026-07-31,
+    #1090).** Every pin in this architecture records *what was judged* and
+    *what it was judged against* — and none recorded *what judged it*. On
+    surfaces regenerated fresh every invocation by design, that makes judge
+    version drift **indistinguishable from ordinary nondeterminism by
+    construction**: the two cases produce identical records. Terrain is the
+    primary site precisely because never-read-back is its design, so
+    "recomputed fresh" silently becomes "recomputed by a different judge" the
+    day the serving model changes.
+    - **What is pinned:** the model-judged surfaces — composed `in common:`
+      claims, thesis candidates and any recommendation, groupings (the
+      journey-similarity substrate and the subgroup layer), consultant
+      assessments, and the brief.
+    - **What is NOT pinned:** ratified hub artifacts. A ratified `gloss:` is
+      frozen by write-once plus the human approval — whatever model proposed
+      it, the **owner** ratified it. Pinning there would record a
+      consequence-free fact and invite the false inference that a ratified
+      line is contingent on its proposing judge.
+    - **The judge is DECLARED, never introspected.** The composing scripts are
+      deterministic Python and cannot know which model served the judgment;
+      only the agent holds that fact, so it is supplied at the boundary that
+      knows it. This is declare-authority-never-infer-it at its own site: a
+      value the code could only guess at is passed in or stated absent.
+    - **Absence is recorded AS absence**, in the three-valued shape this spec
+      already uses for a served arc — never a missing key, and never a guess.
+      A pin that quietly omits the judge is indistinguishable from one taken
+      before the field existed.
+    **The vocabulary is the hub's and is not restated here** (owner decision
+    record — 2026-07-31 (judge provenance)); this is the consumer's emitting
+    half. **The companion is named because a pin alone does not close the
+    loop:** the hub ratified a migration tripwire — on a change of serving
+    judge, re-run one held measurement specimen and put the diff before the
+    owner. The pin makes a judge change *observable*; the tripwire makes it
+    *consequential*, and either alone leaves the loop open.
+    **The nullable-field risk is real and is the stated reopen trigger:** if
+    callers routinely omit the judge, the field measures nothing and the
+    honest response is to make it required, refusing composition of a judged
+    surface without it.
   - **G-ids are owner-facing SHORTHAND that expands at the screen; L-ids are
     the addresses (added 2026-07-31, #996).** Selection previously refused
     group ids outright. The refusal protected the right invariant with the
