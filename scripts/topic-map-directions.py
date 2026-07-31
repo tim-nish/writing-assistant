@@ -1036,6 +1036,70 @@ def _brief_label(payload):
     return " — ".join(parts) or "an unnamed brief"
 
 
+BRIEF_ARTIFACT_NAME = "brief.json"
+
+
+def _resolve_newest_brief(root=None):
+    """The brief a bare `open the brief` reaches (Story 20.92, #1042).
+
+    THE RULE IS STATED AND DETERMINISTIC, never a heuristic the owner cannot
+    predict: the NEWEST terrain run workspace — run ids are timestamps, so the
+    newest is the last one in sorted order, and the `latest` symlink is skipped
+    because it is a shorthand rather than a distinct run — and inside it the
+    artifact named `brief.json`.
+
+    A workspace may hold several brief artifacts: the edit-set iteration loop
+    writes each recomposition to its own name in the same workspace. Those are
+    NOT guessed between. `brief.json` is the composed brief; when it is absent
+    the other brief-shaped artifacts present are NAMED so the owner picks one,
+    which is a stated ambiguity rather than a silent pick.
+
+    Returns `(path, why)`. `path` is None when nothing resolves, and `why` then
+    says so plainly — this never falls through to starting Step 0 and never
+    composes anything.
+    """
+    # THE RESOLVER OWNS THE LAYOUT (D1). No storage path is composed here: the
+    # run root is ASKED FOR, exactly as every other caller asks for it, and
+    # only the run-id ordering and the artifact name are this function's.
+    import subprocess
+    cmd = [sys.executable,
+           os.path.join(os.path.dirname(os.path.realpath(__file__)),
+                        "resolve-paths.py"),
+           "terrain-runs-root"] + (["--root", root] if root else [])
+    try:
+        base = subprocess.run(cmd, capture_output=True, text=True,
+                              check=True).stdout.strip()
+    except (OSError, subprocess.CalledProcessError) as exc:
+        return None, f"the terrain run root could not be resolved ({exc})"
+    if not os.path.isdir(base):
+        return None, ("no terrain run workspace exists yet, so there is no "
+                      "brief to open. A brief comes from a terrain sitting: "
+                      "say `show the terrain` to start one.")
+    runs = sorted(r for r in os.listdir(base)
+                  if not os.path.islink(os.path.join(base, r))
+                  and os.path.isdir(os.path.join(base, r)))
+    if not runs:
+        return None, ("no terrain run workspace exists yet, so there is no "
+                      "brief to open. Say `show the terrain` to start one.")
+    ws = os.path.join(base, runs[-1])
+    path = os.path.join(ws, BRIEF_ARTIFACT_NAME)
+    if os.path.isfile(path):
+        return path, (f"the newest terrain run workspace ({runs[-1]}) and its "
+                      f"{BRIEF_ARTIFACT_NAME}")
+    others = sorted(f for f in os.listdir(ws)
+                    if f.startswith("brief") and f.endswith(".json"))
+    if others:
+        return None, (
+            f"the newest terrain run workspace ({runs[-1]}) holds no "
+            f"{BRIEF_ARTIFACT_NAME}, but it does hold "
+            f"{', '.join(others)}. Those are recompositions from the "
+            "edit-set loop and are not guessed between — name the one you "
+            "want.")
+    return None, (f"the newest terrain run workspace ({runs[-1]}) holds no "
+                  "brief artifact, so there is nothing to open. A brief is "
+                  "written when a selection is composed with `--out`.")
+
+
 def cmd_brief_open(args):
     """Re-open a written brief (Story 20.75 AC4/AC5).
 
@@ -1045,10 +1109,26 @@ def cmd_brief_open(args):
     `composed → inspected → adopted` — a backwards move is refused rather than
     recorded, because a lifecycle that can run backwards states nothing.
     """
+    # THE NAMED TRIGGER'S BARE FORM (Story 20.92, #1042). With no path the
+    # brief is RESOLVED by the stated rule rather than asked for: an owner
+    # holding no path had no words that reached this move at all. Nothing else
+    # about the move changes — this is discovery for an existing capability,
+    # not a new one.
+    at = getattr(args, "at", None)
+    resolved_by = None
+    if not at:
+        at, why = _resolve_newest_brief(getattr(args, "root", None))
+        if not at:
+            # Said PLAINLY, and it does not start Step 0 or compose anything:
+            # a trigger that silently walked the screens would answer a
+            # question the owner did not ask.
+            return _err(f"no brief to open — {why}")
+        resolved_by = why
     try:
-        payload = read_brief_artifact(args.at)
+        payload = read_brief_artifact(at)
     except (OSError, ValueError) as exc:
-        return _err(f"unreadable brief artifact at {args.at}: {exc}")
+        return _err(f"unreadable brief artifact at {at}: {exc}")
+    args.at = at
     life = payload.get("lifecycle") or _brief_lifecycle(BRIEF_LIFECYCLE[0])
     state = life.get("state")
     if args.state:
@@ -1080,7 +1160,21 @@ def cmd_brief_open(args):
     # THE GATE-TIME BLOCKS, recomposed from the retained map (AC3/AC4) — or
     # stated absent, with the reason, when the map is not there to recompose
     # from. Never approximated.
-    payload["recomposed_from_map"] = _recompose_gate_blocks(payload, args.at)
+    payload["recomposed_from_map"] = _recompose_gate_blocks(payload, at)
+    payload["opened"] = {
+        "at": os.path.abspath(at),
+        # How this brief was reached, stated: a resolved open says which rule
+        # resolved it, so the owner can predict the next one.
+        "resolved_by": resolved_by or "the path given",
+        # THE STANDING EXITS (Story 20.92 AC6). An entry INTO the surface
+        # offers what every other gate on it offers — a trigger that landed the
+        # owner somewhere with no way onward would be a side door out of the
+        # surface rather than a door into it.
+        "exits": ["edit the member set — +Lxx −Lyy → recompose",
+                  "back to the member list",
+                  "name your own direction",
+                  "stop here"],
+    }
     print(json.dumps(payload, indent=2, ensure_ascii=False))
     return 0
 
@@ -1305,8 +1399,18 @@ def main(argv=None):
     bo = sub.add_parser("brief-open",
                         help="re-open a written brief, and optionally record "
                              "its lifecycle transition")
-    bo.add_argument("--at", required=True, metavar="PATH",
-                    help="the artifact written by `brief --out`")
+    bo.add_argument("--at", metavar="PATH",
+                    help="the artifact written by `brief --out`. OPTIONAL "
+                         "(Story 20.92, #1042): with no path the newest "
+                         "terrain run workspace's brief.json is resolved by a "
+                         "stated rule — run ids are timestamps, so the newest "
+                         "sorts last, and a workspace holding only "
+                         "recompositions names them rather than guessing "
+                         "between them. With no brief anywhere it says so "
+                         "plainly and starts nothing.")
+    bo.add_argument("--root", metavar="PATH",
+                    help="host-repo root, when resolving the newest brief "
+                         "from somewhere other than the host working tree")
     bo.add_argument("--state", choices=list(BRIEF_LIFECYCLE[1:]),
                     help="record the transition this return represents "
                          f"({' → '.join(BRIEF_LIFECYCLE)}); forward-only")
