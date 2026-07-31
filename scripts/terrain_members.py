@@ -702,10 +702,40 @@ def apply_subgroups(ms, subgroups):
 # report moves the context line to a footnote), not a second implementation of
 # the hierarchy. A second walk is exactly the drift #1039 records.
 
-SUBGROUP_ID_KIND = (
-    "`G<n>-<m>` is a DISPLAY id like `G<n>`: per-screen and per-pin, usable to "
-    "ask for a full report, and conferring no selection authority — selection "
-    "stays by Strand index.")
+# THE SELECTION CONTRACT IS STATED ONCE, HERE (Story 20.96, #1074). The screen
+# used to carry only the refusing half — "conferring no selection authority" —
+# while `skills/terrain/SKILL.md` and `skills/terrain/steps/screens.md` carried
+# the expansion half, so Screen 2 presented an owner with instructions that
+# appeared to contradict each other and no way to tell which was live. The
+# contract itself was never in doubt: `SPEC-terrain` presentation.md states it,
+# and `terrain_select.py:_group_expander` implements it. What was missing was
+# saying the whole of it where the owner reads.
+#
+# The two USES are named as different acts on purpose. "Ask for a full report by
+# group id" selects nothing; "type it where you would type a Strand index" is
+# shorthand that expands. One id serving two acts is what the screen must
+# disambiguate — collapsing them is how the contradiction read as one.
+# EACH LINE STAYS INSIDE THE VIEW LINE BUDGET, so these are separate lines
+# rather than one long sentence: the listing renders one list entry per line and
+# every line is bounded, which `check-terrain-report-inner.sh` asserts.
+GROUP_ID_KIND_LINES = (
+    "`G<n>` is a DISPLAY id: per-screen, per-pin, and NEVER recorded.",
+    "It has two uses, and they are different acts. ASK for a full report by "
+    "group id — that is inspection and selects nothing.",
+    "Or TYPE it where you would type a Strand index — there it expands to its "
+    "members at this screen, and the members are what is recorded.",
+    "Selection is always by Strand index.")
+
+SUBGROUP_ID_KIND_LINES = (
+    "`G<n>-<m>` is a DISPLAY id like `G<n>` and carries the same contract: "
+    "per-screen, per-pin, and never recorded.",
+    "It is askable for a full report and typable as shorthand that expands to "
+    "its members. Selection is always by Strand index.")
+
+# Kept as single strings for callers that render one paragraph; both are the
+# same words as the line forms above, joined — never a second wording.
+GROUP_ID_KIND = " ".join(GROUP_ID_KIND_LINES)
+SUBGROUP_ID_KIND = " ".join(SUBGROUP_ID_KIND_LINES)
 
 
 def _subgroup_claim_line(sub, prefix):
@@ -1013,16 +1043,14 @@ def _compose_member_rendering(map_data, ms, cands, claims=None,
     # render, and printed them with no declaration of their kind. Now that the
     # two surfaces are one rendering, the ids are shown always and the kind is
     # declared always, which is the pairing the rule actually asks for.
-    lines += ["`G<n>` is a DISPLAY id: per-screen and per-pin, usable to "
-              "ask for a full report, and conferring no selection "
-              "authority — selection stays by Strand index.", ""]
+    lines += [*GROUP_ID_KIND_LINES, ""]
     # THE SUBGROUP ID KIND IS DECLARED WHERE IT IS RENDERED (Story 20.87 AC6),
     # beside the `G<n>` declaration above and only on a screen that actually
     # prints one — an id that looks selectable and is not is exactly what
     # retired the `J<n>` namespace, and a declaration for ids the screen does
     # not contain is the same defect #978 names in the other direction.
     if _any_subgroups(ms):
-        lines += [SUBGROUP_ID_KIND, ""]
+        lines += [*SUBGROUP_ID_KIND_LINES, ""]
     if ms["substrate"] != SUBSTRATE_DEFAULT:
         # THE ACQUISITION DISCLOSURE, on the reading surface (Story 20.82,
         # #1031). A judged substrate groups on something the owner cannot
@@ -1173,7 +1201,25 @@ def _compose_member_rendering(map_data, ms, cands, claims=None,
                   "Selection is by Strand index, exactly as on the whole "
                   "listing. Nothing here is capped, truncated or ordered by "
                   "any measure of strength — every group is above, and every "
-                  "Strand is in the View."]
+                  "Strand is in the View.",
+                  # THE ANSWER SHAPE, on the screen where the answer is given
+                  # (Story 20.96, #1074). The owner's question at this gate is
+                  # "do I answer L1, L2, L3 or may I answer G1?" — so the screen
+                  # answers it rather than leaving them to reconcile the id-kind
+                  # paragraph above with the instruction lines.
+                  "You may answer with one index, a set (`L3, L7`), or a group "
+                  "id as shorthand — and you may mix them (`G4 + L26, minus "
+                  "L48`).",
+                  "A group id expands to its members first, so what is "
+                  "recorded is always Strands.",
+                  # THE CLAIM IS PINNED TO ITS SET, so a set the owner changes
+                  # gets its claim recomposed and re-offered rather than
+                  # silently kept — carrying a group claim over absent members
+                  # would assert commonality the material does not support.
+                  "A group's `in common:` claim was composed over its whole "
+                  "membership: change the set and the claim is recomposed and "
+                  "re-offered, never carried over unchanged."]
+
     return "\n".join(lines).rstrip() + "\n"
 
 
@@ -1288,7 +1334,7 @@ def compose_full_report(map_data, tag, cands, group_ids, axis="tag",
     # (Story 20.87 AC6) — the same pairing the `G<n>` declaration follows on
     # the selection screens.
     if any(by_id[g].get("subgroups") for g in group_ids if g in by_id):
-        lines += [SUBGROUP_ID_KIND, "",
+        lines += [*SUBGROUP_ID_KIND_LINES, "",
                   "A subdivided group shows its parent claim first — why "
                   "these Strands share a screen at all — and then each "
                   "subgroup's own claim beneath it. Both are carried verbatim "

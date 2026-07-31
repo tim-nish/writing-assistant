@@ -205,8 +205,13 @@ for label, txt in (("listing", listing), ("View", view), ("report", report)):
           "rather than inventing one")
     # AC6 — the id kind is declared where it is rendered.
     check("`G<n>-<m>` is a DISPLAY id" in txt
-          and "no selection authority" in txt,
+          and "never recorded" in txt,
           f"AC6: the {label} declares what kind G<n>-<m> is, beside G<n>")
+    # Story 20.96 (#1074): the subgroup id carries the SAME whole contract as
+    # its parent — declaring one half here and the other on `G<n>` would
+    # re-create the contradiction at the subgroup level.
+    check("expands to its members" in txt,
+          f"AC6: ...including that it expands when typed, matching G<n>")
 
 # AC6, the other half: a screen with NO subgroup ids does not declare a kind
 # for ids it never prints (#978's rule, applied).
