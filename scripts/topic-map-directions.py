@@ -377,8 +377,20 @@ def _consultant_block(matches, cands, map_data):
         # Unranked and complete. The order is the map's own, which is
         # deterministic within a pin; it is not a ranking and must not be
         # relayed as one.
+        # THE POOL IS NOT WIDENED, AND THIS IS NOT AN OVERSIGHT (Story 20.90,
+        # #1044, AC3). It keeps the four-key record while `subject` above and
+        # the brief's `members` carry the arc, on two grounds that both point
+        # the same way:
+        #   * the pool is OFFERED material, not POINTED-AT material. The
+        #     anti-widening bound applies to it exactly — what the owner
+        #     selected is the scope, and the arc travels because it is the
+        #     selected Strand's own, not because arcs are good to have;
+        #   * the pool is the COMPLETE unselected set at this pin, so widening
+        #     it is an unbounded payload attached to material the owner did not
+        #     choose.
+        # A later reader must not mistake this asymmetry for a missed call site.
         "substitution_candidates": [
-            _member_record(c) for c in cands
+            _member_record(c, arc=False) for c in cands
             if c.get("kind") == "element" and c.get("id") not in chosen],
         # THIS `ranked: False` IS CORRECT AND STAYS (Story 20.89, #1043 AC4).
         # Two such fields existed and only one was wrong. THIS one is on the
