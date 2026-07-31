@@ -88,34 +88,44 @@ def confirmation(run_id, ws, state, why):
     the whole correction: the incident's failure was not a wrong choice but a
     choice nobody was offered.
 
-    Emitted as a QUESTION PAYLOAD rather than prose (#1081). The observed
-    failure was that nobody noticed, and a notice composed into chat is exactly
-    the layer that failed — so the options travel as data and the rendering
-    step quotes them.
+    THE SHAPE IS THE SHIPPED ONE (Story 20.103, #1081). This first emitted its
+    own `ask`/`options`/`free_text` object — which worked, was checked, and was
+    a SECOND payload vocabulary in a codebase whose open defect is precisely
+    that gates lack one carrier. It now builds through `draft_gates.payload`,
+    so it passes the same validator every other proposal surface passes.
     """
+    import importlib.util
+    import os
+    spec = importlib.util.spec_from_file_location(
+        "draft_gates", os.path.join(os.path.dirname(os.path.realpath(__file__)),
+                                    "draft_gates.py"))
+    dg = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(dg)
     started = run_id_started(run_id)
-    return {
+    stage = state.get("next_stage")
+    out = dg.payload(
+        where=f"Stage 0: run {run_id} is in progress and stops at {stage}.",
+        why=f"It {why}, so adopting it silently would resume another "
+            f"sitting's work.",
+        choices=[
+            {"label": "resume it",
+             "effect": "continue that run from its checkpoint; nothing is "
+                       "re-done"},
+            {"label": "start fresh",
+             "effect": "mint a new run; that one is left untouched and stays "
+                       "resumable"},
+        ],
+    )
+    out.update({
         "resumed": False,
         "resume_requires_confirmation": True,
         "candidate_run_id": run_id,
         "candidate_ws": ws,
-        "candidate_next_stage": state.get("next_stage"),
+        "candidate_next_stage": stage,
         "started": started.isoformat() if started else None,
         "why": why,
-        "question": {
-            "ask": (f"Resume run {run_id}? It {why}, and stops at "
-                    f"`{state.get('next_stage')}`."),
-            "options": [
-                {"label": "resume it",
-                 "effect": "continue that run from its checkpoint; nothing is "
-                           "re-done"},
-                {"label": "start fresh",
-                 "effect": "mint a new run; that one is left untouched and "
-                           "stays resumable (pass --fresh)"},
-            ],
-            "free_text": "or say what you want instead",
-        },
-    }
+    })
+    return out
 
 
 def disclosure_line(run_id, ws, state):
