@@ -447,11 +447,60 @@ fs="$hpwork/fs.md"
 mk() { printf '# Fact sheet\n\n## Coverage\n%s\n' "$1" > "$fs"; }
 V() { python3 scripts/validate-fact-sheet.py "$fs" "$@" >"$hpwork/v.out" 2>&1; }
 
+# --- #1009 (Story 20.79): this block asserts only where its input can exist --
+# `V` is the ONLY validator invocation in this check that passes no fixture
+# `--root` (every other one above hands it a `mktemp -d` host), so it resolves
+# THIS tree's own per-repo writing-sources.yaml: validate-fact-sheet.py ->
+# host_root(None) -> the git toplevel of cwd -> sources_path -> repo_key. A
+# LINKED WORKTREE has its own toplevel, hence its own key, hence no config
+# behind it — absence there is an artifact of where the work is happening, not
+# a defect, and it cost four parallel worktrees four red suites on 2026-07-31.
+# In a MAIN tree the same absence IS a real defect and still fails. That
+# asymmetry is the whole decision (SPEC amendment 2026-07-31, #1009); an
+# unconditional skip would go quiet exactly where absence means something.
+#
+# Both branches state the non-assertion rather than running the assertions,
+# because five of them fail loudly on a config-absence exit while three —
+# shaped `V … && err … || ok …` — take the `ok` branch VACUOUSLY. Reporting
+# `ok` for the wrong reason is strictly worse than a red suite that announced
+# itself, so no assertion below runs without its input.
+#
+# Which kind of tree this is comes from GIT, never from pattern-matching a
+# path (#1005; `resolve-paths.py:_toplevel_of` is the precedent): a linked
+# worktree's `--git-dir` is `<main>/.git/worktrees/<name>` while its
+# `--git-common-dir` stays the main `.git`; in a main tree the two name the
+# same directory.
+hp_linked=no
+hp_gd=$(git rev-parse --git-dir 2>/dev/null) || hp_gd=
+hp_cd=$(git rev-parse --git-common-dir 2>/dev/null) || hp_cd=
+if [ -n "$hp_gd" ] && [ -n "$hp_cd" ] && [ -d "$hp_gd" ] && [ -d "$hp_cd" ]; then
+  hp_gd=$(cd "$hp_gd" && pwd -P)
+  hp_cd=$(cd "$hp_cd" && pwd -P)
+  [ "$hp_gd" = "$hp_cd" ] || hp_linked=yes
+fi
+
+# Probe the resolution chain ONCE, before any assertion, with the sheet the
+# first assertion uses: a config-absence exit is validate-fact-sheet.py's own
+# rc=2 diagnostic (`no writing-sources.yaml for host …`), never a verdict
+# about the sheet.
 mk 'pin: abc1234
 harvest: repo=host commit=abc1234 extractor=harvest-1
 matched: 1
 read: docs/a.md (2)
 skipped: none'
+hp_config=yes
+if ! V --require-harvest-pin; then
+  grep -q 'no writing-sources.yaml for host' "$hpwork/v.out" && hp_config=no
+fi
+
+if [ "$hp_config" = no ] && [ "$hp_linked" = yes ]; then
+  # AC1 — a stated non-assertion, not a pass and not a failure.
+  ok "#907 harvest-pin assertions NOT RUN — skipped (no per-repo writing-sources.yaml resolves for this linked git worktree, which has its own git toplevel and therefore its own repo key; absence here is where the work is happening, not a defect — #1009). 8 assertions did not run."
+elif [ "$hp_config" = no ]; then
+  # AC2 — in a MAIN tree the same absence is a real defect and stays loud.
+  err "#907 harvest-pin assertions NOT RUN in a MAIN working tree — no per-repo writing-sources.yaml resolves for it, which is a real defect here rather than a worktree artifact (#1009): $(tail -1 "$hpwork/v.out")"
+else
+
 V --require-harvest-pin \
   && ok "#907: a sheet carrying the full determinism triple validates" \
   || err "#907: a well-formed harvest pin was rejected: $(tail -1 "$hpwork/v.out")"
@@ -507,6 +556,8 @@ skipped: none'
 V \
   && err "#907: a repository declared twice was accepted" \
   || ok "#907: a repository mapping to two roots is rejected as ambiguous"
+
+fi
 
 # AC3/AC4 — no version field is introduced, and the ENTRY grammar is untouched.
 if grep -qE '^\s*(VERSION|SHEET_VERSION|FORMAT_VERSION)\s*=' scripts/validate-fact-sheet.py; then
