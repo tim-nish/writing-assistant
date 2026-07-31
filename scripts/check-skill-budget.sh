@@ -1,6 +1,9 @@
 #!/usr/bin/env sh
 # parallel-safe
 # covers: skills/** specs/**
+# (specs/** is what selects this check on an edit to any specs/**/amendments*.md
+#  path — the amendment-history class below is asserted over from here, so the
+#  declaration must stay at least this wide; Story 20.88, #1046.)
 # check-skill-budget.sh — mechanical skill-size ceiling (Story 19.4, #761;
 # umbrella #744/#740). The packaging invariant
 # (specs/spec-writing-assistant/SPEC.md, 2026-07-26 amendment) says a SKILL.md
@@ -45,12 +48,51 @@ COMP_RATCHETED="skills/draft-article/stages/stage0.md:731 skills/draft-article/s
 # 88 KB in 144 lines and passes any line budget by an order of magnitude.
 # The byte ceiling is a VISIBILITY instrument: a trip directs to a spec
 # decision, never to compacting ratified amendment text.
+#
+# It applies to LIVE CONTRACT documents only. Amendment history is a separate
+# class with its own axis — see the block below (Story 20.88, #1046).
 SPEC_WARN_BYTES=36000   # ~9k tokens
 SPEC_HARD_BYTES=72000   # ~18k tokens
 # First offender at adoption (2026-07-27), RATCHETED — growth past
 # adoption+slack FAILS; shrinkage ratchets the entry down.
 # Format: "<path>:<bytes-at-adoption>", space-separated.
 SPEC_RATCHETED="specs/spec-article-draft-pipeline/SPEC.md:45056"
+
+# --- Amendment-history class (Story 20.88, #1046) -----------------------------
+# Fourth axis of the per-file-class criterion, applied one level finer than the
+# spec-document family above: an amendment companion is an APPEND-ONLY
+# ratification record, not a live contract. The byte ceiling is a visibility
+# instrument whose trip "directs to a spec decision" — but for history the only
+# decision available is compaction, which Story 20.15 (#819) forbids in the same
+# sentence the error string names it. So history leaves the ceiling entirely and
+# gets its own axis: a threshold that schedules the MECHANICAL era split.
+#
+# CLASS MEMBERSHIP IS A NAMING RULE, NOT A LIST (AC2). A file is amendment
+# history when its BASENAME matches `amendments*.md`, anywhere under specs/.
+# The alternative considered was the `companions:` frontmatter key; it was
+# rejected because nothing in skills/, scripts/ or commands/ parses that key
+# today, so a frontmatter rule would make this check its first and only reader —
+# a parser to maintain for a decision the filename already carries, and one that
+# would silently exempt nothing (and mis-classify a suite that forgets the key).
+# The basename convention holds for every companion that exists. A list of paths
+# was rejected outright: a new spec suite would fall outside it in silence.
+#
+# WITHIN the class there are two states:
+#   * the LIVE append target — basename exactly `amendments.md` — measured
+#     against AMEND_ERA_BYTES below;
+#   * a CLOSED era — `amendments-<something>.md`, already renamed by a past
+#     split — reported and never re-cut. The rule is prospective: no already
+#     relocated text moves (AC6).
+#
+# THE THRESHOLD IS DECLARED HERE AND NOWHERE ELSE (AC3) — the spec states the
+# invariant, never a number to keep in sync. Derivation, so it is not a round
+# number someone later "adjusts": one sitting appended 17.8 KB to
+# spec-terrain/amendments.md (42,109 -> 59,929 B, 2026-07-31). Splitting at
+# 46,000 leaves a full sitting of headroom below the 72,000 the class has now
+# left, so the split is always SCHEDULED work rather than a ceiling breach
+# discovered mid-commit — which is the cost #1046 was filed on. The figure
+# appears nowhere under specs/ (AC3) — verified by grep at adoption.
+AMEND_ERA_BYTES=46000
 
 # --- Script-surface family (Story 20.1, #759) --------------------------------
 # Same cost-typed class, second family: scripts/*.py. Thresholds sized from
@@ -139,6 +181,20 @@ for f in $(find specs -name '*.md' | sort); do
   specfound=1
   b=$(wc -c < "$f")
   tok=$(( b / 4 / 1000 ))
+  # Amendment-history class (Story 20.88, #1046): its own axis, never the
+  # ceiling. Reported, never failed — the split is scheduled work, not wrong
+  # work, and a red suite for scheduled work is what breakered a live sitting.
+  case "${f##*/}" in
+    amendments*.md)
+      if [ "${f##*/}" != "amendments.md" ]; then
+        ok "$f is $b bytes (~${tok}k tokens; amendment history, CLOSED era — off the spec ceiling by class, and never re-cut)"
+      elif [ "$b" -gt "$AMEND_ERA_BYTES" ]; then
+        warn "$f is $b bytes (~${tok}k tokens; amendment history past the era-split threshold $AMEND_ERA_BYTES) — the next act is MECHANICAL and is not a decision: rename this file to its own date range (amendments-<first>--<last>.md), open a fresh amendments.md beside it, and update the owning SPEC.md pointer. Ratified text is never compacted, and this never fails the run"
+      else
+        ok "$f is $b bytes (~${tok}k tokens; amendment history, within the era-split threshold $AMEND_ERA_BYTES)"
+      fi
+      continue ;;
+  esac
   ratchet=""
   for entry in $SPEC_RATCHETED; do
     case "$entry" in
