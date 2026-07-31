@@ -123,7 +123,7 @@ for token in 'terrain_map.py assemble' 'topic-map-directions.py axis' \
              'never composes narrative structures' 'single proposer' \
              'topic-map-directions.py view' '--out' 'size switch' \
              'never read back' \
-             'resolve-paths.py topic-map-view' 'destination repository' \
+             'resolve-paths.py terrain-view' 'destination repository' \
              'stable within a pin' 'refused with the mismatch named' \
              'note verbatim' 'machine-composed'; do
   grep -q -- "$token" "$SKILL" && ok "SKILL carries the contract text: $token" \
@@ -185,7 +185,7 @@ scr = importlib.util.module_from_spec(sspec); sspec.loader.exec_module(scr)
 check(len(scr.WHY_TEXT) <= txt.BUDGETS["why"],
       f"WHY_TEXT is authored inside BUDGETS['why'] ({len(scr.WHY_TEXT)}/{txt.BUDGETS['why']})")
 # The summary `where` picks an authored variant beside the path — never slices.
-long_path = "/home/owner/work/some-articles-repo/drafts/topic-map/topic-map-view.md"
+long_path = "/home/owner/work/some-host-repo/.writing-assistant/terrain/terrain-view.md"
 where = txt._fit_with_path(
     ["Terrain at deadbeef: 61 element(s) — each its own Strand — and 3 "
      "topic(s), 61 strand(s); 0 already consumed and still selectable.",
@@ -476,6 +476,86 @@ grep -qE 'journey_recorded' "$MEM" \
 grep -nE 'no-journey' "$MEM" | grep -qE 'journey_shard|\["journey"\]' \
   && err "the no-journey marker is derived from a pointer or the kind discriminator, not the record (#933)" \
   || ok "the no-journey marker is not derived from a pointer or the kind flag"
+
+# --- Story 20.85 (#1040): the View is named in the OWNER'S vocabulary --------
+# The View left #726's machine-key exemption (SPEC-terrain amendments, the
+# 2026-07-31 triage entry) because it is the one artifact this flow writes for
+# a human to open. This block asserts the rename landed WHOLE — the constant,
+# the resolver's verb, and the excluded names that must NOT have moved with it.
+R="scripts/resolve-paths.py"
+S="scripts/terrain_screens.py"
+
+# AC1 — both declarations read the owner's word, and they agree.
+python3 - "$R" "$S" <<'RENAME_EOF' && ok "the View's basename is terrain-view.md in both declarations" \
+  || err "the View's basename is not terrain-view.md in both declarations (AC1)"
+import importlib.util as u, sys
+sr = u.spec_from_file_location("rp", sys.argv[1])
+rp = u.module_from_spec(sr); sr.loader.exec_module(rp)
+ss = u.spec_from_file_location("ts", sys.argv[2])
+ts = u.module_from_spec(ss); ss.loader.exec_module(ts)
+assert rp.TOPIC_MAP_VIEW_BASENAME == "terrain-view.md", rp.TOPIC_MAP_VIEW_BASENAME
+assert ts.VIEW_FILENAME == "terrain-view.md", ts.VIEW_FILENAME
+assert rp.topic_map_view(".").endswith("/terrain-view.md"), rp.topic_map_view(".")
+RENAME_EOF
+
+# AC2 — the verb travels with the filename. A resolver whose verb and answer
+# disagree is the defect this asserts against, so BOTH halves are checked: the
+# new verb resolves, and the old one is GONE rather than aliased (the amendment
+# licenses no compatibility alias — one would create the second name the rename
+# exists to remove).
+python3 "$R" terrain-view --root . >/dev/null 2>&1 \
+  && ok "resolve-paths.py terrain-view resolves" \
+  || err "resolve-paths.py terrain-view does not resolve (AC2)"
+python3 "$R" topic-map-view --root . >/dev/null 2>&1 \
+  && err "the retired topic-map-view subcommand still resolves — no alias is licensed (AC2)" \
+  || ok "the retired topic-map-view subcommand is gone, with no alias"
+
+# AC3 — the dead constant is deleted. It had zero references from the moment
+# #874 stopped composing the `topic-map` directory component.
+grep -qE '^TOPIC_MAP_VIEW_DIR[[:space:]]*=' "$R" \
+  && err "TOPIC_MAP_VIEW_DIR is still declared — it is dead and must be deleted (AC3)" \
+  || ok "the dead TOPIC_MAP_VIEW_DIR constant is gone"
+
+# AC4 — the stale docstring no longer asserts the pre-#874 path or the
+# reasoning the amendment falsified.
+for stale in 'an internal machine key with no owner-facing reading' \
+             'a published-artifact location with live files behind it' \
+             'must supply the migration'; do
+  grep -q -- "$stale" "$R" \
+    && err "resolve-paths.py still carries falsified reasoning: $stale (AC4)" \
+    || ok "the falsified reasoning is gone: $stale"
+done
+
+# AC6 — the EXCLUDED names are untouched. This story re-classifies one member
+# of #726's exemption list, never the list: a script filename is not an
+# artifact the owner opens, so the cut still holds for these.
+#
+# The amendment's exclusion list also names `scripts/topic-map.py` and
+# `config/topic-depth-thresholds.yaml`. NEITHER EXISTS in this repository —
+# both were removed before this story, so there was nothing here for it to
+# leave alone and nothing for a guard to hold. They are named here rather than
+# silently dropped, because the list is the amendment's and a check that
+# quietly narrows it would hide a real rename if either ever returns.
+for keep in scripts/topic-map-directions.py scripts/topic-map.py \
+            config/topic-depth-thresholds.yaml; do
+  if [ -f "$keep" ]; then
+    ok "the excluded name is untouched: $keep"
+  else
+    case "$keep" in
+      scripts/topic-map-directions.py)
+        err "an EXCLUDED name was renamed with the View: $keep (AC6)" ;;
+      *)
+        ok "the excluded name does not exist in this repo, so nothing was renamed: $keep" ;;
+    esac
+  fi
+done
+# The map's INTERNAL grouping keys are excluded too, and unlike the filenames
+# above they are live. #726's inherited rider still binds them: a `topic`
+# grouping key may stay visible, but its wording must not be readable as a
+# Tsurezure Topic.
+grep -qE '"topic"' "$M" \
+  && ok "the map's internal topic grouping key is untouched (AC6)" \
+  || err "the internal grouping key moved with the View — not licensed (AC6)"
 
 # AC7's split guard is NOT here: it reads the served corpus, and this file's
 # declared tier is "no seam, no corpus, no map assembly". It lives in

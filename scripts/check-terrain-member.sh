@@ -985,7 +985,7 @@ check("summarised" not in under["listing"],
       "AC2: no summary wording leaks onto the small branch")
 
 # --- AC3: above the budget — summaries plus the path, and no rows -----------
-VP = "/nonexistent-destination/terrain/topic-map-view.md"
+VP = "/nonexistent-destination/terrain/terrain-view.md"
 d3 = json.loads(member(big_member, "--view", VP,
                        "--claims", '{"G1":"a claim that must not ride along"}').stdout)
 L = d3["listing"]
@@ -1003,7 +1003,7 @@ check(len(heads) == len(d3["sections"]) >= 2,
 check(all(s["group_id"] in L and s["title"] in L
           and f"({len(s['strands'])})" in L for s in d3["sections"]),
       "AC3: each summary carries the group id, its derived title and its count")
-check("topic-map-view.md" in L,
+check("terrain-view.md" in L,
       "AC3: the View path is on the screen")
 check("no-journey" not in L and "carry journey material" not in L,
       "AC3: the row-type legend and the journey coverage denominator stay "

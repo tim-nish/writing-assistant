@@ -73,7 +73,14 @@ from terrain_members import (  # noqa: E402
 # "fixed": it moved every invocation, so a View opened during a sitting could
 # not be reopened. This script still just writes where it is told; the name
 # below is help text and a default basename, never a composed path.
-VIEW_FILENAME = "topic-map-view.md"
+#
+# THE OWNER'S WORD (Story 20.85, #1040; SPEC-terrain amendments, 2026-07-31
+# triage). It read `topic-map-view.md` under #726's machine-key exemption; the
+# View left that exemption because it is the one artifact this flow writes for
+# a human to open, and because the published location whose migration cost #726
+# declined to pay no longer exists. Regenerated per invocation and never read
+# back, so there is nothing to migrate and no alias is kept.
+VIEW_FILENAME = "terrain-view.md"
 
 
 # The screen's shared `why` line — ONE authored copy for both branches, written

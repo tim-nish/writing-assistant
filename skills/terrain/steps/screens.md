@@ -63,7 +63,7 @@ switches on the member's size; passing `--view` is not a claim that it
 overflowed, and you never decide the branch yourself:
 
 ```
-VIEW=$(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-paths.py topic-map-view --root <host-repo>)
+VIEW=$(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-paths.py terrain-view --root <host-repo>)
 python3 ${CLAUDE_PLUGIN_ROOT}/scripts/topic-map-directions.py member \
   --map "$WS/map.json" --tag <member> --axis <tag|topic> --view "$VIEW" \
   > "$WS/terrain-member.json"
@@ -259,7 +259,7 @@ no back button. So navigation is in-invocation and runs over **held state**
   path:
 
   ```
-  VIEW=$(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-paths.py topic-map-view --root <host-repo>)
+  VIEW=$(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-paths.py terrain-view --root <host-repo>)
   python3 ${CLAUDE_PLUGIN_ROOT}/scripts/topic-map-directions.py view \
     --map "$WS/map.json" --tag <member> --out "$VIEW" \
     --substrate <the substrate you composed on> --grouping <the same proposal> \
