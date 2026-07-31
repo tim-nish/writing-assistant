@@ -176,11 +176,86 @@ check("nothing in drafting branches on which producer ran" in end,
       "AC7: drafting gains no knowledge of terrain")
 DRAFT = ["skills/draft-article/SKILL.md",
          "skills/draft-article/stages/stage0.md"]
+
+# WHAT AC7 FORBIDS IS THE ACT, NOT THE WORD (#1070). The first cut of this
+# assertion was `"terrain" not in t.lower()`, and it went red the day story
+# 20.94 (#1050) landed: stage 0 records `brief_provenance: terrain-adopted`, a
+# closed-vocabulary VALUE ratified in specs/spec-article-draft-pipeline/
+# amendments.md (2026-07-31). Recording a label is not importing, resolving or
+# detecting anything — nothing in drafting branches on it, which is the
+# entry-agnostic property AC7 exists to protect — so the bare substring test
+# asserted strictly more than the criterion behind it and made a ratified line
+# a red suite. The neighbouring half of the prohibition, that the recorded
+# pointer must never be FOLLOWED, has its own check
+# (scripts/check-brief-pointer-unresolved.sh) and is not restated here.
+#
+# An exemption list for the ratified line was the other candidate and was
+# rejected: it re-creates the same brittleness one level down, where the next
+# ratified value has to be added to a list nobody remembers exists.
+#
+# The three forbidden acts, as three patterns:
+T_IMPORT = re.compile(
+    r"terrain[-_](?:runs?|map|directions|root)"      # a terrain state location
+    r"|(?:scripts|skills|specs)/terrain"             # a terrain module by path
+    r"|\bterrain[\w-]*\.(?:py|md|json)\b"            # a terrain file by name
+    r"|topic-map-directions",
+    re.I)
+T_RESOLVE = re.compile(
+    r"\b(?:imports?|resolv(?:e|es|ed|ing)|read(?:s|ing)?|open(?:s|ing)?"
+    r"|load(?:s|ing)?|fetch(?:es|ing)?|inspect(?:s|ing)?|follow(?:s|ing)?"
+    r"|quer(?:y|ies|ying)|glob(?:s|bing)?|walk(?:s|ing)?|locat(?:e|es|ing)"
+    r"|discover(?:s|ing)?|consult(?:s|ing)?)\b[^.\n]{0,40}\bterrain\b",
+    re.I)
+T_DETECT = re.compile(
+    r"\bterrain\b\W{0,3}"
+    r"(?:runs?|sitting|workspace|state|artifact|brief|thesis|corpus)\b",
+    re.I)
+T_RULES = (("imports a terrain module or state location", T_IMPORT),
+           ("resolves terrain state", T_RESOLVE),
+           ("detects terrain state", T_DETECT))
+
+
+def terrain_consumer_hits(text):
+    """Lines where drafting would import, resolve or detect terrain state."""
+    out = []
+    for i, line in enumerate(text.splitlines(), 1):
+        for why, rx in T_RULES:
+            if rx.search(line):
+                out.append((i, why, line.strip()[:70]))
+                break
+    return out
+
+
 for p in DRAFT:
     t = open(p, encoding="utf-8").read()
-    check("terrain" not in t.lower(),
+    check(not terrain_consumer_hits(t),
           f"AC7: {p} does not import, resolve or detect terrain — a diff that "
-          "makes drafting a terrain consumer has inverted the dependency")
+          "makes drafting a terrain consumer has inverted the dependency "
+          f"({terrain_consumer_hits(t)[:1]})")
+
+# AC7, POSITIVE: the narrowing must not have disarmed the criterion. Plant a
+# real resolver in the DRAFT file the ratified value lives in, one per
+# forbidden act, and confirm the check fires — then confirm the unplanted file
+# is clean, so the signal came from the plant and not from ambient text.
+S0 = open("skills/draft-article/stages/stage0.md", encoding="utf-8").read()
+PLANTS = [
+    "Read the adopted brief from the newest `terrain-runs` workspace.",
+    "Load `scripts/terrain_map.py` and ask it for the adopted thesis.",
+    "Stage 0 reads the terrain that produced the brief before drafting.",
+    "If a terrain run is present, skip the intent gate.",
+]
+for plant in PLANTS:
+    check(terrain_consumer_hits(S0 + "\n" + plant + "\n"),
+          "AC7 (positive): a planted terrain resolver still FAILS — "
+          f"{plant[:46]!r}")
+check(not terrain_consumer_hits(S0),
+      "AC7 (positive): ...and with the plants removed the file is clean, so "
+      "the narrowing detects the act rather than the word")
+check(not terrain_consumer_hits(
+          "record `brief_provenance`: `owner-authored` when the owner typed "
+          "the brief, `terrain-adopted` when it arrived composed."),
+      "AC7: recording the ratified `terrain-adopted` VALUE is not an import, "
+      "a resolution or a detection (#1050, #1070)")
 
 check("intent gate" in S,
       "the dispatcher's own summary records where the sitting now ends")
