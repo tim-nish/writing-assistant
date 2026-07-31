@@ -113,6 +113,59 @@ clause on this page, and append new amendments there rather than here.
     does not bind here, and the difference is the point:** a View is a
     rendering regenerated per invocation, while the brief is the owner's
     decision — re-opening it is the requirement, not a cache.
+  - **what the brief CARRIES, and what it never carries (added 2026-07-31,
+    #1077/#1078/#1079/#1080).** The clause above settled that the brief is a
+    named artifact; its *content* stayed undocumented, and an undocumented
+    crossing artifact accretes — a five-member brief measured 41 KB across 21
+    top-level keys, none of it decided. Choosing the field set is this
+    consumer's to do (the line above, and the hub ratifies the boundary
+    property only), so it is done here rather than left implicit.
+    - **CARRIES:** the owner's selected **member set** with its indexes; each
+      member's **served material** (gloss, journey arc, cite) as relocated
+      text; the **pins** (terrain invocation, hub commit); the **harvest
+      scope** — the union of the members' `projects:`, per
+      `SPEC-article-draft-pipeline` amendments 2026-07-29 (#896) and the owner
+      decision record — 2026-07-29 (terrain draft handoff), the brief being
+      the only artifact that crosses into drafting and so the one place scope
+      is stated without re-deriving it; the **thesis state**, including the
+      candidates that were **offered** and the recommendation with its
+      declared axes and overturning conditions; the **adopted claim** with the
+      member set it was composed over; and the owner's **free text**.
+    - **NEVER CARRIES, named because each was observed in one artifact:**
+      screen sentences (a rendered UI line stored as data), process
+      self-documentation (the step's own requirements, its compliance
+      self-assertion, the rationale for a design rule), fill-in templates
+      sitting where a consumer reads values, and map-internal working state
+      (`element_kind`, `consumed`, `depth`, `usability`, internal topic
+      vocabulary). **The reason is the boundary property itself:** drafting
+      must not learn Terrain's rendering, invocation or lifetime, and every
+      embedded screen line couples it to exactly those — while being a second
+      copy that drifts, which one already had.
+    - **ONE FACT ONCE.** No key restates another. A pinned decision artifact
+      whose facts appear twice invites the copies to disagree, and the
+      singular/plural pair observed (`candidate` beside `members`,`gap` beside
+      `gaps`) did worse: it left the true record ambiguous, because both names
+      read as "the selection" and one described a single member.
+    - **PROVENANCE IS SCOPED TO WHAT IT DESCRIBES,** and the **owner's slot
+      holds owner text or nothing**. `owner-authored` may not attest a
+      machine-composed string, and the free-text field is `null` when the
+      owner said nothing — never machine prose. Recording absence as absence
+      is what keeps the field first-class: a structured widening is the moment
+      a free-text field quietly becomes optional (owner decision record —
+      2026-07-29 (terrain draft handoff)), and filling the owner's slot with
+      composer commentary inverts it, since a reader can then no longer tell
+      owner speech from machine speech in the one field reserved for it.
+    - **AN ADOPTED THESIS CARRIES WHAT IT WAS CHOSEN FROM.** The
+      composed-elsewhere flow is unchanged and correct — the command emits
+      composition *inputs* and the agent composes — but the artifact may not
+      reach `adopted` while the candidates it adopted from live only in a
+      sibling file nothing points at. Adoption without recorded provenance is
+      the existence-vs-record gap the artifact's own read-back stance assumes
+      away.
+    **This list is amendable and expected to be amended** — the thesis model
+    is days old. The contract is the *closure*, not permanence: a field is
+    added by amending this clause, which is exactly the visibility whose
+    absence let the artifact grow by accretion.
   - **G-ids are owner-facing SHORTHAND that expands at the screen; L-ids are
     the addresses (added 2026-07-31, #996).** Selection previously refused
     group ids outright. The refusal protected the right invariant with the
@@ -358,12 +411,37 @@ clause on this page, and append new amendments there rather than here.
       owner choosing what to write. It stays in `map.json`, where the depth
       harness asserts it — so this is a rendering rule, and the estimate's
       explainability as recorded is unchanged.
-    - **Every View line carries a display budget**, and each per-subtopic
-      block a line cap, the same convention the screen payload's fields
-      already follow: a list renders one item per line, clipped, capped, with
-      an explicit `+N more` remainder. A fallback or placeholder state is
-      named to the owner as **prose that states the remedy**, never as a bare
-      internal enum value in a headline position.
+    - **Every COMPOSED View line carries a display budget** (scoped
+      2026-07-31, #1076), and each per-subtopic block a line cap, the same
+      convention the screen payload's fields already follow: a list renders
+      one item per line, clipped, capped, with an explicit `+N more`
+      remainder. A fallback or placeholder state is named to the owner as
+      **prose that states the remedy**, never as a bare internal enum value in
+      a headline position.
+    - **A SERVED RENDERING is exempt from that budget and renders whole**
+      (added 2026-07-31, #1076) — the journey arc and the group claim. The
+      budget was written for lines the View *composes*, where a shorter
+      authored wording is always available; a served rendering has no shorter
+      form, because it is **relocatable and never re-expressible**. The only
+      sanctioned reduction of one is **first sentence verbatim plus a pointer
+      to the whole**, the tier-1 index's own rule; a mid-text `…` is a third
+      category the contract does not have, and it reliably keeps the belief
+      and drops the break — the differentiating half of an arc whose shape is
+      belief → break → new position.
+      **This resolves a contradiction inside this spec rather than adding a
+      promise.** The clause above holds that *the screen shows summaries; the
+      path holds the whole*, while the line budget clipped the material the
+      path exists to hold: measured on the 2026-07-31 run, 103 of 107 rendered
+      arcs ended mid-sentence in a 64 KB file. Read with **UX defines
+      correctness** (owner decision record — 2026-07-27 (terrain cold-reader
+      verdict)), a surface contracted to hold the whole and unable to show it
+      fails its purpose whether or not a clause forbade the clipping — the
+      identical reasoning that unclipped the Full Report (#986, above), now
+      applied to the surface that clause pointed at.
+      **The exemption is scoped to the View FILE and does not touch the
+      selection screens.** The size switch governs those, and the same row
+      renderer feeds both, so a change made at the renderer rather than at the
+      surface would widen this decision into screens it did not decide.
   - **where the View lives (amended 2026-07-23, #611).** "A fixed path" is
     **the `output.drafts` destination repository**, at a resolver-owned,
     host-qualified path — not a per-run workspace directory. The View is
