@@ -52,9 +52,20 @@ Screen 2 is composed in **two calls**, and the SCRIPT emits the screen you
 relay (Story 20.66, #976/#977). The first call gives you the sections and the
 claim inputs; the second returns the finished screen.
 
+**Relay the screen exactly ONCE per selection** (Story 20.84, #1038). The first
+call's `listing` is a by-product of an **inputs** call and is **not the screen**
+— the response says so in its own `relay` field, which reads `inputs-only` on
+the first call and `whole` on the second. Relaying both is how the identical
+screen reached the owner twice back-to-back.
+
+Resolve the View path first and pass it to **both** calls. The composer
+switches on the member's size; passing `--view` is not a claim that it
+overflowed, and you never decide the branch yourself:
+
 ```
+VIEW=$(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-paths.py topic-map-view --root <host-repo>)
 python3 ${CLAUDE_PLUGIN_ROOT}/scripts/topic-map-directions.py member \
-  --map "$WS/map.json" --tag <member> --axis <tag|topic> \
+  --map "$WS/map.json" --tag <member> --axis <tag|topic> --view "$VIEW" \
   > "$WS/terrain-member.json"
 ```
 
@@ -63,7 +74,7 @@ described below. Then ask for the screen itself, passing those claims back:
 
 ```
 python3 ${CLAUDE_PLUGIN_ROOT}/scripts/topic-map-directions.py member \
-  --map "$WS/map.json" --tag <member> --axis <tag|topic> \
+  --map "$WS/map.json" --tag <member> --axis <tag|topic> --view "$VIEW" \
   --claims '{"G1":"<your claim for G1>", ...}' \
   > "$WS/terrain-screen.json"
 ```
@@ -289,23 +300,30 @@ two-screen navigation shrinks the overload condition without removing it,
 because a single tag can still hold many Strands. The composer switches on
 size; the skill decides nothing here — it relays what comes back:
 
-- **At or under the budget** — the Screen 2 flow above, unchanged. No View
-  file is written and no path appears on the screen.
-- **Above the budget** — the screen becomes a short **summary plus the path
-  of a View file**, rendered by the composer:
+**The budget is over the MEMBER'S Strands** (Story 20.84, #1038): a member of 51
+Strands is over budget even when the terrain is small, and a small member inside
+a large terrain is not. `member` reports which branch it took as data —
+`over_budget` and `screen_budget` — so you relay rather than infer.
 
-  ```
-  VIEW=$(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-paths.py topic-map-view --root <host-repo>)
-  python3 ${CLAUDE_PLUGIN_ROOT}/scripts/topic-map-directions.py view \
-    --map "$WS/map.json" --out "$VIEW"
-  ```
+- **At or under the budget** — the Screen 2 flow above, unchanged, byte for
+  byte. No path appears on the screen. (The View file is still written, as the
+  Screen 2 flow above always writes it; it is simply not named here.)
+- **Above the budget** — the screen the composer returns is already a short
+  **summary plus the View's path**: one line per group — id, derived title,
+  count, and its bound note — then the path, then the standing exits. The
+  per-Strand rows, their `in common:` claims and their journey lines are in the
+  View, which carries the *complete* rendering. You do nothing differently: the
+  same two calls, with `--view "$VIEW"` as always.
 
   The View is written for the owner to *open and read* in the `output.drafts`
   destination repository — the one artifact this flow does not put in the
   workspace. Relay the path as given; selection is **by index** plus a short
   note, recorded exactly as on Screen 2, and the above-budget branch proposes
-  **no less** than the small one. Exit 3 means no destination is declared;
-  relay the error, which names the fix.
+  **no less** than the small one — every standing exit is on it. Exit 3 means no
+  destination is declared; relay the error, which names the fix. **Never work
+  around a failed path resolution by relaying the whole listing instead**: the
+  switch does not fail open, and a screen that says the rendering was written
+  nowhere is the honest state.
 
 The View is at the same status as a debug dump: a **fixed path**, **fully
 regenerated** on every invocation, and **never read back** by any code path.

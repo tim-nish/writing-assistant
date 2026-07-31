@@ -59,14 +59,22 @@ json.dump({"kind": "topic-map", "topics": ["claude-code-ops"],
           open(sys.argv[1], "w"))
 PYEOF
 
-python3 "$D" member --map "$work/map.json" --tag workflow \
-  --claims '{"G1":"a claim","G2":"another claim"}' > "$work/screen.json" 2>"$work/e" \
-  || { err "member --claims failed: $(cat "$work/e")"; exit 1; }
+# THE COMPLETE RENDERING is where the rows are. Story 20.84 (#1038) put the
+# size switch on the member path, and this fixture's member holds 12 Strands —
+# over the screen budget — so the console is a summary and the rows this check
+# is about render in the View. Both surfaces are ONE code path since Story 20.83
+# (#1039), so the property asserted is the same property; it is asserted on the
+# artifact that actually carries the rows rather than vacuously on one that
+# does not.
+python3 "$D" view --map "$work/map.json" --tag workflow \
+  --claims '{"G1":"a claim","G2":"another claim"}' --out "$work/screen.md" \
+  >/dev/null 2>"$work/e" \
+  || { err "view --claims failed: $(cat "$work/e")"; exit 1; }
 
-python3 - "$work/screen.json" <<'PYEOF' || fail=1
-import collections, json, sys
+python3 - "$work/screen.md" <<'PYEOF' || fail=1
+import collections, sys
 
-listing = json.load(open(sys.argv[1]))["listing"]
+listing = open(sys.argv[1], encoding="utf-8").read()
 
 # Collect each Strand's full rendered block (row + context line + any arc),
 # keyed by section, so the same Strand in two sections can be compared whole.
@@ -132,9 +140,9 @@ print(f"ok:   the `no-journey` mark renders wherever its row does "
 PYEOF
 
 # The claim is carried VERBATIM — clipping it would re-create #976 one layer up.
-python3 - "$work/screen.json" <<'PYEOF' && ok "claims are carried verbatim" || err "a claim was altered in transit"
-import json, sys
-listing = json.load(open(sys.argv[1]))["listing"]
+python3 - "$work/screen.md" <<'PYEOF' && ok "claims are carried verbatim" || err "a claim was altered in transit"
+import sys
+listing = open(sys.argv[1], encoding="utf-8").read()
 got = [l[len("in common: "):] for l in listing.splitlines()
        if l.startswith("in common: ")]
 assert "a claim" in got and "another claim" in got, got

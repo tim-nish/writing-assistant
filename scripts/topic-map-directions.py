@@ -996,6 +996,14 @@ def main(argv=None):
                          "Carried VERBATIM, never recomposed; a group whose "
                          "claim is absent says so. Omit for the pre-20.66 "
                          "listing, byte-identical.")
+    mb.add_argument("--view", metavar="PATH",
+                    help="the View file's path, as `resolve-paths.py` resolved "
+                         "it. Pass it ALWAYS: the composer switches on the "
+                         "member's size and names this path only when the "
+                         "member is over the screen budget, so passing it is "
+                         "not a decision that the screen overflowed. Over "
+                         "budget without it, the screen still summarises — the "
+                         "switch never fails open — but the rows are nowhere.")
     mb.add_argument("--grouping", metavar="JSON",
                     help="a model-proposed grouping for a judged substrate: "
                          "[{\"in_common\": str, \"members\": [slug, ...]}]. "

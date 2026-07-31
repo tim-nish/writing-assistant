@@ -45,6 +45,7 @@ from terrain_directions import (  # noqa: E402
 )
 from terrain_text import (
     row_type_legend,  # noqa: E402
+    SCREEN_BUDGET,
     _clip_line,
     _journey_coverage_line,
     _journey_disclosure_line,
@@ -514,8 +515,28 @@ def _journey_arc_line(el):
     return f"  how it changed: not shown — {absent}" if absent else None
 
 
+def member_is_large(ms):
+    """Is THIS MEMBER over the screen budget? (Story 20.84, #1038.)
+
+    The predicate the size switch turns on for Screen 2. The budget was re-based
+    per axis member on 2026-07-27 (#803) — *"the budget is now measured over one
+    axis member's Screen 2, not over the whole terrain"* — and never reached the
+    code: the only predicate was `is_large`, which counts `map_data["elements"]`,
+    the WHOLE terrain, and `compose_member_listing` had no over-budget branch at
+    all. So a member of 51 Strands rendered 51 rows with their context lines,
+    claims and journey arcs, because the terrain around it happened to be small.
+
+    It counts the member's Strands — `count`, the distinct-Strand number the
+    heading discloses, NOT `placements`. A cover places one Strand in several
+    sections, and the reader's cost is the Strands they must read, not the number
+    of times the substrate mentioned them.
+    """
+    return int(ms.get("count") or 0) > SCREEN_BUDGET
+
+
 def compose_member_listing(map_data, tag, cands, axis="tag", claims=None,
-                           substrate=SUBSTRATE_DEFAULT, grouping=None):
+                           substrate=SUBSTRATE_DEFAULT, grouping=None,
+                           view_path=None):
     """Screen 2 as a LISTING: the member's Strands, WHOLE, in sections.
 
     Served whole with the count disclosed — no within-member cap, no
@@ -554,10 +575,13 @@ def compose_member_listing(map_data, tag, cands, axis="tag", claims=None,
     # at the source — faithfully relayed, and wrong.
     ms = member_sections(map_data, tag, axis, substrate=substrate,
                          grouping=grouping)
-    return _compose_member_rendering(map_data, ms, cands, claims)
+    return _compose_member_rendering(map_data, ms, cands, claims,
+                                     view_path=view_path,
+                                     summarise=member_is_large(ms))
 
 
-def _compose_member_rendering(map_data, ms, cands, claims=None):
+def _compose_member_rendering(map_data, ms, cands, claims=None,
+                              view_path=None, summarise=False):
     """THE complete rendering of one member — the ONE code path both surfaces
     draw from (Story 20.83, #1039).
 
@@ -574,28 +598,70 @@ def _compose_member_rendering(map_data, ms, cands, claims=None):
     The split is a split of WHICH surface is shown, never of what the complete
     rendering IS. Keeping one function is therefore the fix: a second copy would
     re-earn the drift the moment either surface gains a line.
+
+    `summarise` IS THE SIZE SWITCH (Story 20.84, #1038), and it is the ONE thing
+    the two surfaces differ on. The console passes `member_is_large(ms)`; the
+    View file never passes it, because the file is the surface that holds the
+    whole — that is the split, not a second rendering. Under budget the console
+    output is byte-identical to what it was before this switch existed
+    (`presentation.md:311-312` names that branch *"the shipped behaviour and must
+    not regress"*), and above it the rows move to the file the summary names.
     """
     by_slug = {c.get("slug"): c for c in cands if c.get("kind") == "element"}
     pin = map_data.get("coverage", {}).get("pin")
     noun = "topic" if ms.get("axis") == "topic" else "tag"
-    lines = [f"# {ms['member']} ({noun}) — {ms['count']} Strand(s), shown whole",
-             "",
-             f"Pin: {_pin_display(map_data)}",
-             "Answer with a Strand's index (for example L3) and a short note",
-             "about the angle you want. Free text always wins.",
-             # Composed from the row types actually on this screen (#978):
-             # a legend naming types the screen does not contain primes the
-             # reader to look for rows that never appear.
-             row_type_legend([e for sec in ms["sections"]
-                              for e in sec["strands"]]),
-             # The codebook pointer (Story 20.26, #861): the words this screen
-             # asks the owner to think in are defined one step away, on a page
-             # they can read. A pointer, never a restatement — one definition
-             # that cannot drift from N paraphrases.
-             f"What the words mean: {OWNER_TERMS_DOC} defines "
-             f"{' and '.join(OWNER_TERMS)}.",
-             ""]
-    if claims is not None:
+    if summarise:
+        lines = [f"# {ms['member']} ({noun}) — {ms['count']} Strand(s), "
+                 f"summarised — over the {SCREEN_BUDGET}-Strand screen budget",
+                 "",
+                 f"Pin: {_pin_display(map_data)}"]
+        # THE PATH IS THE SCREEN'S OTHER HALF, so its absence is stated rather
+        # than papered over. The switch must NOT fail open into the whole dump
+        # it exists to remove: with no path the screen is still a summary, and
+        # it says the complete rendering was not written anywhere.
+        if view_path:
+            lines += [f"The complete rendering — every Strand with its claim, "
+                      f"its `in common:` line and its journey — is in the View "
+                      f"file: {_short_path(view_path)}",
+                      "Open it, then answer with a Strand's index (for example "
+                      "L3) and a short note about the angle you want. Free "
+                      "text always wins."]
+        else:
+            lines += ["NO VIEW PATH WAS GIVEN, so the complete rendering was "
+                      "written nowhere. Re-run `member --view PATH`.",
+                      "Nothing below is narrowed; the Strand rows are simply "
+                      "not on this screen. Selection is still by Strand "
+                      "index, and free text always wins."]
+        lines += [
+            # The codebook pointer (Story 20.26, #861): see the note below.
+            f"What the words mean: {OWNER_TERMS_DOC} defines "
+            f"{' and '.join(OWNER_TERMS)}.",
+            ""]
+        # NO ROW-TYPE LEGEND HERE, deliberately (#978's rule, applied): this
+        # screen contains no Strand rows, and a legend naming row types the
+        # screen does not contain primes the reader to look for rows that never
+        # appear. The legend belongs to the surface that has the rows — the
+        # View file, which composes it from its own.
+    else:
+        lines = [f"# {ms['member']} ({noun}) — {ms['count']} Strand(s), "
+                 f"shown whole",
+                 "",
+                 f"Pin: {_pin_display(map_data)}",
+                 "Answer with a Strand's index (for example L3) and a short note",
+                 "about the angle you want. Free text always wins.",
+                 # Composed from the row types actually on this screen (#978):
+                 # a legend naming types the screen does not contain primes the
+                 # reader to look for rows that never appear.
+                 row_type_legend([e for sec in ms["sections"]
+                                  for e in sec["strands"]]),
+                 # The codebook pointer (Story 20.26, #861): the words this
+                 # screen asks the owner to think in are defined one step away,
+                 # on a page they can read. A pointer, never a restatement —
+                 # one definition that cannot drift from N paraphrases.
+                 f"What the words mean: {OWNER_TERMS_DOC} defines "
+                 f"{' and '.join(OWNER_TERMS)}.",
+                 ""]
+    if claims is not None and not summarise:
         # The authoring class is declared ONCE for the screen, never per line
         # (CAP-2 as amended 2026-07-30, #936): repeating it on every line
         # carries nothing per line and costs attention on all of them.
@@ -641,7 +707,11 @@ def _compose_member_rendering(map_data, ms, cands, claims=None):
     # the other disclosures and above the sections, because it states what the
     # `no-journey` markers below are a fraction of — a marker whose denominator
     # arrives after the rows it qualifies is read as a verdict, not a ratio.
-    cline = _journey_coverage_line(
+    # It travels with the rows, so the summary branch does NOT carry it: on a
+    # screen with no `no-journey` markers the ratio has nothing to be a ratio of,
+    # and it reads as a verdict on the member — the exact misreading #933/#934
+    # placed it above the rows to prevent. It is on the View, with the markers.
+    cline = None if summarise else _journey_coverage_line(
         [e for sec in ms["sections"] for e in sec["strands"]])
     if cline:
         lines += [_clip_line(cline), ""]
@@ -669,6 +739,21 @@ def _compose_member_rendering(map_data, ms, cands, claims=None):
             head = f"## {sec['title']} ({len(sec['strands'])})"
         if sec.get("note"):
             head += f" — {sec['note']}"
+        if summarise:
+            # THE COMPACT GROUP SUMMARY (Story 20.84, #1038): group id, derived
+            # title, count, and the section's own note — one line per group,
+            # which is what makes this readable in a terminal at all.
+            #
+            # AC4, DECIDED AND RECORDED: the `in common:` claims DO NOT ride
+            # along. They are the composer's own sentences, carried verbatim and
+            # deliberately NOT clipped (#976 — clipping one would re-create the
+            # reworded-headline defect one layer up), so N of them is unbounded
+            # screen height. That is precisely the overflow this branch exists
+            # to remove, and the readability constraint AC4 names is what
+            # decides it. Nothing is lost: the claims are in the View this
+            # screen names, one open away, in the same rendering.
+            lines.append(_clip_line(head))
+            continue
         lines.append(head)
         lines.append("")
         if claims is not None:
@@ -721,6 +806,20 @@ def _compose_member_rendering(map_data, ms, cands, claims=None):
             if arc:
                 lines.append(_clip_line(arc))
         lines.append("")
+    if summarise:
+        # THE ABOVE-BUDGET BRANCH PROPOSES NO LESS (AC5; `presentation.md:316`,
+        # *"the size switch changes where the terrain is presented, never
+        # whether the map proposes"*). On the whole listing the standing exits
+        # arrive with the rows on the relayed surface; here the summary IS the
+        # whole of what is relayed, so the exits are composed onto it rather
+        # than left to a relay that has nothing else to carry them.
+        lines += ["",
+                  "Every exit stays open: switch substrate · back to the "
+                  "member list · name your own direction · stop here.",
+                  "Selection is by Strand index, exactly as on the whole "
+                  "listing. Nothing here is capped, truncated or ordered by "
+                  "any measure of strength — every group is above, and every "
+                  "Strand is in the View."]
     return "\n".join(lines).rstrip() + "\n"
 
 
@@ -956,12 +1055,41 @@ def cmd_member(args):
             return _err("--claims must be an object keyed by group id, "
                         'for example {"G1": "..."}')
     cands = candidates(m)
+    view_path = getattr(args, "view", None)
+    over = member_is_large(ms)
     listing = compose_member_listing(
         m, args.tag, cands, axis, claims,
         substrate=getattr(args, "substrate", SUBSTRATE_DEFAULT),
-        grouping=grouping)
+        grouping=grouping, view_path=view_path)
+    if over and not view_path:
+        # Mirrors `cmd_payload`'s warning on the terrain path: the screen has
+        # already switched — it does NOT fail open into the dump — but the half
+        # that holds the whole was never named, so the caller is told at the
+        # only moment it can still fix it.
+        sys.stderr.write(
+            f"warning: {ms['member']!r} holds {ms['count']} Strands, past the "
+            f"screen budget of {SCREEN_BUDGET} — pass --view PATH (resolve it "
+            f"with `resolve-paths.py`) so the complete rendering is written to "
+            f"a View file the owner can open. Without it the screen carries "
+            f"group summaries and the rows are nowhere.\n")
     out = {"kind": "terrain-member", "member": ms["member"], "axis": axis,
            "count": ms["count"],
+           # THE SIZE SWITCH, ASSERTED AS DATA (Story 20.84, #1038). The
+           # composer switches; the skill relays what comes back and decides
+           # nothing — so what it switched on is readable rather than inferred
+           # from the shape of the prose.
+           "over_budget": over,
+           "screen_budget": SCREEN_BUDGET,
+           "view": view_path,
+           # AC6 — THE SCREEN IS COMPOSED AND RELAYED ONCE PER SELECTION. The
+           # two-call flow's FIRST call is an inputs call: it exists to hand
+           # over `background.inputs` so claims can be composed, and its
+           # `listing` is a by-product. Relaying both calls is what produced the
+           # identical screen twice back-to-back in the observed sitting, and
+           # nothing in the response said which one was the screen. Now it does.
+           "relay": "whole" if claims is not None else
+                    "inputs-only — compose the claims and call again; do NOT "
+                    "relay this listing, it is not the screen",
            # The grouping disclosure (Story 20.36, #890): which substrate
            # produced these sections, how many placements it made — the unit
            # the cap is computed against — and its own coverage assertion.
