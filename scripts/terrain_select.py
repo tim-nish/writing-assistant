@@ -40,6 +40,39 @@ from terrain_members import (  # noqa: E402
     member_sections,
 )
 
+def _recording_form(target):
+    """WHERE the recording task lands, declared as data (Story 20.105, #1083).
+
+    THE TRACKER IS THE DEFAULT, and that is what keeps the footprint invariant
+    total. `skills/terrain/steps/gap.md` used to instruct an append into the
+    target repo's journey doc and call it "the one write this flow makes
+    outside the run workspace and the View" — a skill file declaring an
+    exception to an invariant SPEC-writing-assistant states as total, and a
+    dogfood run that stopped before drafting left exactly that residue: a new
+    tracked file in the host tree with no artifact beside it.
+
+    BOTH CONSTRAINTS ARE KEPT, rather than one traded away. The artifact is
+    still minted IN THE SAME RUN — the flywheel holds only if every emitted gap
+    gets its tracking artifact then — but an Issue is not a working-tree write,
+    so no exception is needed. The file append survives as an OWNER-CONSENTED
+    act, which makes it the owner's write rather than the plugin's.
+
+    Emitted as data because the alternative is prose in a skill file, and a
+    rule written there is advisory rather than a carrier.
+    """
+    return {
+        "default": "tracker-issue",
+        "repo": target.get("repo"),
+        "consented_alternative": {
+            "kind": "file-append",
+            "path": target.get("file"),
+            "requires": ("explicit owner consent — this is a write into the "
+                         "host working tree, which the plugin does not make "
+                         "on its own"),
+        },
+    }
+
+
 def _selection_gap(candidate, recording_target):
     """The gap disclosure a non-matched element selection yields (#799).
 
@@ -120,6 +153,7 @@ def _selection_gap(candidate, recording_target):
             "target_repo": target.get("repo"),
             "target_file": target.get("file"),
             "heading": "NEEDS-RECORDING",
+            "form": _recording_form(target),
             "entry": (f"{slug} — selected on the terrain (the hub serves its "
                       "arc; no declared source here carries the episode); "
                       "record the episode here so the next run can match it"),
@@ -148,6 +182,7 @@ def _selection_gap(candidate, recording_target):
         "target_repo": target.get("repo"),
         "target_file": target.get("file"),
         "heading": "NEEDS-RECORDING",
+        "form": _recording_form(target),
         "entry": (f"{slug} — selected on the terrain "
                   f"({verdict}); record the episode here so the next "
                   f"run can match it"),
