@@ -118,15 +118,20 @@ cmp -s "$work/big-payload.json" "$work/big-payload3.json" \
 # --- ONE assertion pass over everything the CLI produced (#950) --------------
 # Sections and messages are unchanged from the pre-batching check; they read
 # the pristine view-1.md so the poison sequence above cannot leak into them.
-python3 - "$work" "$D" <<'PYEOF' || fail=1
+python3 - "$work" "$D" "scripts/terrain_directions.py" <<'PYEOF' || fail=1
 import importlib.util, json, re, sys
-w, dpath = sys.argv[1], sys.argv[2]
+w, dpath, dirpath = sys.argv[1], sys.argv[2], sys.argv[3]
 cands = json.load(open(w + "/big-cands.json"))["candidates"]
 view = open(w + "/view-1.md", encoding="utf-8").read()
 d = json.load(open(w + "/big-map.json"))
 src = open(dpath, encoding="utf-8").read()
 spec = importlib.util.spec_from_file_location("d", dpath)
 mod = importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)
+# #1036: the renderer symbols live in terrain_directions.py — loaded from THAT
+# path, never through the entry point's re-export (`mod` stays the entry: it
+# owns brief_from_answer, and `src` greps its source).
+dspec = importlib.util.spec_from_file_location("dirs", dirpath)
+dirs = importlib.util.module_from_spec(dspec); dspec.loader.exec_module(dirs)
 fail = []
 def check(cond, msg):
     print(("ok:   " if cond else "FAIL: ") + msg, file=sys.stdout if cond else sys.stderr)
@@ -232,7 +237,7 @@ assert len(claim) > 120 and len(claim.split()) >= 5
 strand = {"kind": "lesson", "slug": "verification", "title": claim,
           "gloss": claim, "topic": "engineering", "date": "2026-07-23",
           "evidence": ["LESSONS.md:9@abc1234"]}
-direction = mod._element_direction(strand)
+direction = dirs._element_direction(strand)
 check(claim in direction,
       "the full claim is carried into the DERIVATION, not clipped at 120 chars")
 
@@ -248,10 +253,10 @@ check(claim in brief and brief.endswith("resolved — my angle"),
 # (Story 20.20, #843: the direction quotes the SERVED rendering; the raw
 # topic-line summary is never presented as one, so the no-clip property now
 # attaches to the gloss).
-ed = mod._element_direction({"kind": "reversal", "gloss": claim,
+ed = dirs._element_direction({"kind": "reversal", "gloss": claim,
                              "summary": "raw line", "date": "2026-07-23"})
 check(claim in ed, "a served element rendering is carried whole into its direction too")
-bare = mod._element_direction({"kind": "reversal", "summary": claim,
+bare = dirs._element_direction({"kind": "reversal", "summary": claim,
                                "date": "2026-07-23"})
 check(claim not in bare and "not being served" in bare,
       "an un-served element discloses instead of quoting the raw topic line")
@@ -353,8 +358,8 @@ reading = view
 # The lint's own contract: it FLAGS the pre-#646 line shape and passes the
 # shipped one — a lint that never fires would be a clean bill nobody earned.
 offender = "- **T1.1** — not yet clustered · [##..] seed-only - 4 ptr, 0 unconsumed"
-check(mod.lint_owner_lines([offender]), "the render-boundary lint flags an internal-vocabulary line")
-hits = mod.lint_owner_lines(reading.splitlines())
+check(dirs.lint_owner_lines([offender]), "the render-boundary lint flags an internal-vocabulary line")
+hits = dirs.lint_owner_lines(reading.splitlines())
 check(not hits, f"the reading path carries no internal vocabulary ({hits[:2]})")
 
 # Registration is a contract, not a convenience list: a depth level or source

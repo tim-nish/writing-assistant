@@ -258,7 +258,10 @@ PYEOF
 # carries the SAME not-served disclosure shape lesson rows use — the raw
 # recall-register topic line is never presented as if it were a rendering —
 # and the disclosure retires BY DETECTION the moment a rendering is served.
-python3 - "$D" <<'PYEOF' || fail=1
+# #1036: the renderer lives in terrain_directions.py — loaded from THAT path,
+# never through the entry point's re-export, so deleting it where it lives
+# has to fail here.
+python3 - "scripts/terrain_directions.py" <<'PYEOF' || fail=1
 import importlib.util, sys
 spec = importlib.util.spec_from_file_location("dv", sys.argv[1])
 m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)

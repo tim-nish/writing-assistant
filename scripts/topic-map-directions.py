@@ -169,16 +169,16 @@ from terrain_theses import (  # noqa: E402
 
 # The candidate-directions layer this surface proposes with (Story 20.56,
 # #938). A LEAF layer, imported by name so every call site below reads exactly
-# as it did before the split — the extraction moved code, not behaviour. Its
-# one constant, INTERNAL_VOCAB, travels with `lint_owner_lines`, the only
-# function that reads it.
+# as it did before the split — the extraction moved code, not behaviour.
+# `_element_direction` and `lint_owner_lines` are no longer imported here:
+# after the #1025 inversion nothing in this file used them, and the three
+# checks that reached them through this re-export now load
+# terrain_directions.py directly (#1036).
 from terrain_directions import (  # noqa: E402
     _direction_lines,
-    _element_direction,
     _elements,
     _is_substance_led,
     candidates,
-    lint_owner_lines,
 )
 from terrain_members import (  # noqa: E402
     AXES,
