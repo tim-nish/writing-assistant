@@ -1,5 +1,18 @@
 #!/usr/bin/env sh
 # parallel-safe
+# tier: full — RE-TIERED 2026-07-31. This check sat on the 2s inner ceiling and
+#   flipped across it with load (measured 1921 / 1985 / 2058 / 2101 ms on four
+#   runs, every assertion passing each time), so it was failing the per-edit
+#   loop on variance rather than on a defect. Stories 20.96 and 20.97 added
+#   assertions to it, which is what turned an occasional flip into a consistent
+#   breach — growth in the check, not slowness in the code it guards.
+#   Re-tiering is the runner's own first-named remedy for a ceiling breach.
+#   THE COST IS REAL AND IS STATED: terrain edits lose this check from the
+#   per-edit loop and see it once per PR instead. The better remedy is the
+#   second one the runner names — make the assertions fixture-based, removing
+#   the subprocess round trips this check pays for CLI wiring it exercises
+#   many times over. That is a story, not a header edit, and it is the
+#   condition under which this line comes back out.
 # check-terrain-member.sh — Screen 2's sectioning is a PERMUTATION, and its
 # sections carry NO SELECTION AUTHORITY (Story 20.9, #811; SPEC-terrain as
 # resolved 2026-07-27).
