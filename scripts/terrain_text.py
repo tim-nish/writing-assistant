@@ -91,6 +91,43 @@ def _brief_artifact_line(path):
     return f"Brief artifact: {path}"
 
 
+# --------------------------------------------------------------------------
+# THE ITERATION LOOP's owner-facing wording (Story 20.77, #997; SPEC-terrain
+# CAP-3, the iteration-loop clause added 2026-07-31)
+#
+# The gate offered adopt, narrow, or "go back to Screen 2 and pick
+# differently", so an owner developing a thesis by trying members had to leave
+# the gate and lose the composition. These are the strings for the move that
+# replaces that exit — they live here, with the lifecycle wording above, for
+# the same register-seam reason.
+# --------------------------------------------------------------------------
+
+BRIEF_EDIT_OPTION_LABEL = "edit the member set — +Lxx −Lyy → recompose"
+
+
+def _brief_edit_option_effect():
+    """What the edit-set option DOES, said at the gate. The two halves that
+    make it a loop rather than a restart are both stated: the claim is
+    recomposed over the edited set and pinned to it, and this composition
+    stays beside it to compare against."""
+    return ("recomposes the claim over the edited set and pins it to that "
+            "set; the compositions before it stay visible for comparison")
+
+
+def _brief_iteration_line(n, retained):
+    """Where the owner is in the loop, and what is being held for them.
+
+    States the retention SCOPE in the same breath, because retained-and-
+    unscoped reads as a cache: what is held is held for this sitting.
+    """
+    if retained <= 0:
+        return (f"Composition {n} in this sitting — the first; editing the "
+                f"member set recomposes and keeps this one beside it.")
+    earlier = "composition" if retained == 1 else "compositions"
+    return (f"Composition {n} in this sitting — {retained} earlier {earlier} "
+            f"retained for comparison, for this sitting only.")
+
+
 def _fit(text, budget=BUDGETS["effect"]):
     """A payload field is AUTHORED within its budget, never truncated (#832;
     SPEC-writing-assistant owner-facing proposal contract, clause (e)). This

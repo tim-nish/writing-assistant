@@ -96,7 +96,7 @@ step files cite them and restate nothing.
 | **Step 0 — mint the run workspace** (above; the storage contract) | — (in this file) | `resolve-paths.py new-run --terrain --root <host-repo>` |
 | **Step 1 — assemble the map** (what the map carries; the tag and decision-topic axes; the usability verdict and `needs_recording`) | [`steps/map.md`](steps/map.md) | `terrain_map.py assemble --root <host-repo> > "$WS/map.json"` |
 | **Step 2 — two screens** (Screen 1's axis payload; Screen 2's whole-member listing, group claim, journey markers and set selection; the Full Report over named group ids; navigation over held state; the size switch) | [`steps/screens.md`](steps/screens.md) | `topic-map-directions.py axis --map "$WS/map.json"` then `topic-map-directions.py member --map "$WS/map.json" --tag <member> --axis <tag\|topic>` |
-| **Step 3 — the brief, then a normal run** (brief composition; set recomposition; the coherence consultant's four rules; the named artifact and its lifecycle; the stage-0 handoff) | [`steps/brief.md`](steps/brief.md) | `topic-map-directions.py brief --payloads "$WS/presented-payloads.jsonl" --map "$WS/map.json" --out "$WS/brief.json"` |
+| **Step 3 — the brief, then a normal run** (brief composition; set recomposition; the coherence consultant's four rules; the named artifact and its lifecycle; the edit-set iteration loop and its retained compositions; the stage-0 handoff) | [`steps/brief.md`](steps/brief.md) | `topic-map-directions.py brief --payloads "$WS/presented-payloads.jsonl" --map "$WS/map.json" --out "$WS/brief.json"` |
 | **Step 4 — the gap artifact** (only when the brief carries `gap`) | [`steps/gap.md`](steps/gap.md) | — (a relay plus one write into the target repo) |
 
 **Step routing notes (the dispatcher's whole job):**
@@ -119,7 +119,13 @@ step files cite them and restate nothing.
   `lifecycle.line` at the gate, and re-open it with `brief-open` when the
   owner returns to it. It is the one artifact this surface **reads back** —
   the owner's decision, not a rendering — and that leaves the View's
-  never-read-back rule untouched. The composed brief is handed to the existing
+  never-read-back rule untouched. **The gate is a LOOP**: offer the edit-set
+  option it hands you in `iteration.option` — `+Lxx −Lyy → recompose` — and
+  re-run `brief` with `--from <the composition being edited> --out <a new name
+  in the same $WS>`. Prior compositions stay visible in
+  `iteration.compositions` so the owner compares theses across set variants;
+  retention is **within this sitting**, and an edit across workspaces is
+  refused (`steps/brief.md`). The composed brief is handed to the existing
   stage-0 `--brief` path and the run is an ordinary brief-carrying run.
 - **Step 4:** runs **beside** the draft, never instead of it, and only when
   the brief carries `gap`. A `cannot-determine` gap is relayed as its

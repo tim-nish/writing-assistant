@@ -64,6 +64,19 @@ This artifact is the one thing in this script that IS read back, and the
 contrast with the View is deliberate — see the block above
 `write_brief_artifact` for why the two rules must stay apart.
 
+THE GATE CARRIES AN ITERATION LOOP OVER THE MEMBER SET (Story 20.77, #997)
+--------------------------------------------------------------------------
+The gate offered adopt, narrow, or "go back to Screen 2 and pick differently",
+so an owner developing a thesis by trying members lost the composition every
+time they changed the set. `brief --from <prior brief> --out <next brief>`
+with an answer carrying `{"edit": "+L12 −L3", "pin": ...}` resolves the edit
+to a member set and then takes the ORDINARY indexed path, so the recomposition
+that has existed since Story 20.54 is REACHED rather than re-implemented, with
+its pin discipline and its scope-bounding `recomposition` block intact. Prior
+compositions are retained in `iteration.compositions` — WITHIN THE SITTING,
+carried in this run workspace's own artifacts, so a new invocation begins with
+an empty chain. See the block above `_parse_edit`.
+
 INDEXED SELECTION (Story 18.67, #602)
 -------------------------------------
 From a View, the owner answers `{index: "T3.2", note: "<their angle>", pin:
@@ -84,11 +97,13 @@ Stdlib-only. Subcommands:
                                 renders the View when the map is over budget
   view        --map PATH --out PATH
                                 the View file alone
-  brief       --answer PATH [--map PATH] [--out PATH]
+  brief       --answer PATH [--map PATH] [--out PATH] [--from PATH]
                                 the owner's chosen direction as the brief string
                                 for stage-0 `--brief`; --out also writes it as a
                                 durable, RE-OPENABLE artifact under the run
-                                workspace (Story 20.75)
+                                workspace (Story 20.75), and --from edits that
+                                artifact's member set and recomposes over the
+                                result (Story 20.77)
   brief-open  --at PATH [--state inspected|adopted]
                                 re-open a written brief, and optionally record
                                 the lifecycle transition the return represents
@@ -110,12 +125,15 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
 from terrain_text import (
     row_type_legend,  # noqa: E402
+    BRIEF_EDIT_OPTION_LABEL,
     BRIEF_LIFECYCLE,
     BRIEF_STEP_ID,
     BRIEF_STEP_NAME,
     BUDGETS,
     VIEW_LINE_CHARS,
     _brief_artifact_line,
+    _brief_edit_option_effect,
+    _brief_iteration_line,
     _brief_lifecycle_line,
     _brief_step_line,
     _clip_line,
@@ -414,6 +432,204 @@ def read_brief_artifact(path):
     if not isinstance(payload, dict) or "brief" not in payload:
         raise ValueError("not a brief artifact (no `brief` key)")
     return payload
+
+
+# --------------------------------------------------------------------------
+# THE ITERATION LOOP OVER THE MEMBER SET (Story 20.77, #997; SPEC-terrain
+# CAP-3, the iteration-loop clause added 2026-07-31)
+#
+# THE SEMANTICS WERE ALREADY RATIFIED AND SHIPPED, AND NOTHING HERE
+# RE-IMPLEMENTS THEM: a claim is pinned to the member set it was composed over
+# and RECOMPOSES when that set changes — a set change being a gate EVENT
+# rather than a refresh — which `_brief_from_index` has done since Story
+# 20.54. What was missing was the MOVE. The gate offered adopt, narrow, or "go
+# back to Screen 2 and pick differently", so an owner developing a thesis by
+# trying members had to leave the gate and lose the composition. What is added
+# is therefore ONE option class — `+Lxx −Lyy → recompose` — that RESOLVES TO A
+# MEMBER SET AND THEN TAKES THE EXISTING PATH.
+#
+# That routing is the whole design, and it is what preserves the properties
+# the path already carries: the pin discipline (a missing or mismatched pin
+# refused, with `_which_half_moved` naming which half of the composite pin
+# moved), and the `recomposition` block whose inputs are the selected members'
+# served claims AND NOTHING ELSE, so a composer at the gate cannot widen the
+# scope past what the owner pointed at. An edit changes WHAT the owner pointed
+# at; it does not loosen the rule that only that reaches the composer.
+#
+# AN EDIT NEVER RE-RANKS OR FILTERS. The owner names what changes: an addition
+# nobody asked for is the second proposer, and a silent drop breaks the
+# completeness invariant that follows the member set into drafting. So a drop
+# of a non-member and an add of an existing member are both REFUSED with the
+# current set stated, rather than absorbed as no-ops — a no-op edit means the
+# owner believes something false about the set, and proceeding would compose
+# over that belief.
+#
+# RETENTION IS WITHIN-SITTING, AND THAT IS WHAT KEEPS IT CLEAR OF THE
+# NEVER-READ-BACK RULE (AC4). The chain of prior compositions is carried in
+# the brief artifacts THEMSELVES, inside ONE run workspace: `--from` names the
+# composition being edited and must sit beside the `--out` this one writes.
+# There is no index, no store and no key a later invocation could look up —
+# and a new invocation mints a new workspace at Step 0, so it begins with an
+# empty chain and can carry nothing forward. That is the difference between
+# comparison held for a sitting and a cache, and it is enforced by the
+# same-workspace refusal below rather than left to convention.
+# --------------------------------------------------------------------------
+
+_EDIT_TOKEN = re.compile(r"^([+\-−])(\S+)$")
+
+
+def _parse_edit(answer):
+    """The owner's edit to the member set: `+L12 −L3`, or `add`/`drop` lists.
+
+    An UNSIGNED token is REFUSED rather than guessed at: `L12` on its own
+    could mean add it or select only it, and choosing between those for the
+    owner is the move this option class exists to remove.
+    """
+    adds = [str(x).strip() for x in (answer.get("add") or []) if str(x).strip()]
+    drops = [str(x).strip() for x in (answer.get("drop") or []) if str(x).strip()]
+    raw = str(answer.get("edit") or "").strip()
+    if raw:
+        # The option's own label ends `→ recompose`, so an answer that echoes
+        # the label is naming the option, not a Strand called "recompose".
+        raw = re.sub(r"([+\-−])\s+", r"\1", raw.split("→")[0])
+        for tok in re.split(r"[,\s]+", raw):
+            if not tok:
+                continue
+            m = _EDIT_TOKEN.match(tok)
+            if not m:
+                raise SystemExit(_err(
+                    f"{tok!r} in the edit {answer.get('edit')!r} carries no "
+                    "+ or −. An edit names what CHANGES about the set — "
+                    "`+L12 −L3` — and an unsigned index cannot be told from a "
+                    "fresh selection, so it is refused rather than guessed at."))
+            (adds if m.group(1) == "+" else drops).append(m.group(2))
+    if not adds and not drops:
+        return None
+    return {"add": adds, "drop": drops}
+
+
+def _edited_indexes(base_indexes, edit):
+    """The edited member set: the base set, minus the drops, plus the adds.
+
+    Order is the owner's throughout — the surviving members keep the order
+    they were selected in and the additions land after them, because
+    re-ordering would quietly restate a set they did not restate.
+    """
+    adds, drops = edit["add"], edit["drop"]
+    both = [i for i in adds if i in drops]
+    if both:
+        raise SystemExit(_err(
+            f"{', '.join(both)} is both added and dropped in one edit. An "
+            "edit states what changes, and an index that changes in both "
+            "directions states nothing — name it once."))
+    absent = [i for i in drops if i not in base_indexes]
+    if absent:
+        raise SystemExit(_err(
+            f"{', '.join(absent)} is not in the set being edited "
+            f"({', '.join(base_indexes)}), so dropping it would change "
+            "nothing. An edit names what changes — a drop of a member that is "
+            "not there is a mistake about the set, not a no-op, so it is "
+            "refused with the set stated."))
+    already = [i for i in adds if i in base_indexes]
+    if already:
+        raise SystemExit(_err(
+            f"{', '.join(already)} is already in the set being edited "
+            f"({', '.join(base_indexes)}). Adding it would change nothing, "
+            "and an edit that changes nothing recomposes the same claim over "
+            "the same set — the set is stated here so you can see it."))
+    out = [i for i in base_indexes if i not in drops]
+    for i in adds:
+        if i not in out:
+            out.append(i)
+    if not out:
+        raise SystemExit(_err(
+            "this edit empties the member set, and there is no claim to "
+            "recompose over nothing. Drop fewer members, or stop here — "
+            "stopping is a first-class outcome."))
+    return out
+
+
+def _base_composition_pin(base, map_pin, map_data):
+    """The pin discipline, applied to the composition being EDITED (AC6).
+
+    The answer's own pin is checked by `_brief_from_index` exactly as before.
+    This is the second half the loop makes possible: the base composition was
+    itself pinned, and editing a set composed at a pin the map has since moved
+    past would attach the recomposition to indexes that no longer mean what
+    they meant. Refused, with which half moved named where the artifact
+    recorded the halves.
+    """
+    pins = base.get("pins") or {}
+    base_pin = str(pins.get("terrain") or base.get("pin") or "").strip()
+    if not base_pin:
+        raise SystemExit(_err(
+            "the brief being edited records no pin, so its member set cannot "
+            "be proven to name the same Strands as this map. It is refused "
+            "rather than re-resolved — select afresh from the screens."))
+    if map_pin and base_pin != map_pin:
+        moved = _which_half_moved(
+            {"destination_pin": pins.get("destination"),
+             "hub_pin": pins.get("hub")}, map_data or {})
+        raise SystemExit(_err(
+            f"pin mismatch: the brief being edited was composed at "
+            f"{base_pin}, but this map is at {map_pin}. {moved} Its indexes "
+            "may now name different Strands, so the edit is refused rather "
+            "than re-resolved. Re-run the map and choose from the fresh "
+            "screens."))
+    return base_pin
+
+
+def _composition_record(payload, n, edit=None, artifact=None):
+    """One composition, as the loop retains it (AC3).
+
+    Enough to COMPARE theses across set variants — the claim, the set it was
+    composed over, its pins, the edit that produced it, where it lives — and
+    no more. Never the whole payload: each artifact would then carry every
+    earlier one whole, and a comparison the owner cannot read is not one.
+    """
+    return {"n": n,
+            "brief": payload.get("brief"),
+            "origin": payload.get("origin"),
+            "indexes": list(payload.get("indexes") or []),
+            "members": list(payload.get("members") or []),
+            "pins": payload.get("pins"),
+            "edit": edit,
+            "artifact": artifact}
+
+
+def _iteration_block(out, prior, edit, artifact_path):
+    """The loop's state at the gate: the option (AC1), the chain (AC3), and
+    the scope of the retention (AC4), stated rather than implied."""
+    n = len(prior) + 1
+    record = _composition_record(out, n, edit, artifact_path)
+    return {
+        "n": n,
+        "line": _brief_iteration_line(n, len(prior)),
+        # AC1 — the option class as DATA, so the gate offers it without
+        # inventing either its wording or the form the answer takes. It sits
+        # beside the existing options; nothing it replaces is removed, and
+        # "go back to Screen 2" simply stops being the only way to change the
+        # set.
+        "option": {
+            "label": BRIEF_EDIT_OPTION_LABEL,
+            "effect": _fit(_brief_edit_option_effect()),
+            "editable": list(out.get("indexes") or []),
+            "answer": {"edit": "+<index> −<index>", "pin": out.get("pin")},
+            "command": ("topic-map-directions.py brief --answer <answer> "
+                        "--map <map> --from "
+                        f"{artifact_path or '<this brief, written with --out>'}"
+                        " --out <the next brief in this same workspace>"),
+        },
+        # AC3 — every composition of this sitting, this one last.
+        "compositions": prior + [record],
+        # AC4 — said on the surface, because retention that does not state its
+        # scope reads as a cache.
+        "retention": ("within this sitting only — the chain lives in this run "
+                      "workspace's own brief artifacts, and a new invocation "
+                      "mints a new workspace, so nothing is carried across "
+                      "invocations. Comparison held for the sitting, never a "
+                      "cache"),
+    }
 
 
 def compose_axis_payload(map_data):
@@ -1078,6 +1294,80 @@ def cmd_brief(args):
     map_data = load_map(args.map) if args.map else None
     cands = candidates(map_data) if map_data else []
     map_pin = (map_data or {}).get("coverage", {}).get("pin")
+    # THE ITERATION LOOP (Story 20.77, #997). An edit is resolved to a member
+    # set BEFORE composition, so everything below is the ordinary indexed
+    # path: recomposition is REACHED here, never re-implemented.
+    base, edit, prior, inherited_note = None, None, [], False
+    if not str(answer.get("free_text") or "").strip():
+        # AC5 — free text wins at ANY point in the loop, so an edit is not
+        # even parsed when the owner wrote their own words: the set it would
+        # edit never reaches the brief, and a malformed edit beside free text
+        # must not refuse a brief the owner authored outright.
+        try:
+            edit = _parse_edit(answer)
+        except SystemExit as exc:
+            return exc.code
+        src = getattr(args, "from_brief", None)
+        out_path = getattr(args, "out", None)
+        if edit and not src:
+            return _err(
+                "the recorded answer edits a member set, but nothing names "
+                "the composition it edits: pass --from <the brief artifact "
+                "this recomposes>. An edit is relative to a set, and there is "
+                "no ambient 'current' one — that would be the cross-invocation "
+                "state this loop is built to avoid.")
+        if src and not edit:
+            return _err(
+                f"--from {src} names a composition to edit, but the recorded "
+                "answer carries no edit. Name what changes — `+L12 −L3` — or "
+                "drop --from and compose from a fresh selection.")
+        if edit:
+            if not out_path:
+                return _err(
+                    "an edit-set recomposition is RETAINED for the sitting, "
+                    "and the retention IS the artifacts it writes: pass --out "
+                    "<a path in the same run workspace as --from> so this "
+                    "composition can be compared against the ones before it.")
+            if os.path.abspath(src) == os.path.abspath(out_path):
+                return _err(
+                    f"--from and --out are both {out_path}: this "
+                    "recomposition would overwrite the composition it edits, "
+                    "and the comparison the loop exists for needs both. Write "
+                    "it beside the one it came from — the artifact's identity "
+                    "is its path, so any other name in this workspace will do.")
+            if os.path.dirname(os.path.abspath(src)) != \
+                    os.path.dirname(os.path.abspath(out_path)):
+                return _err(
+                    f"--from {src} and --out {out_path} are in different "
+                    "workspaces. Retention is WITHIN-SITTING: the chain of "
+                    "compositions lives in one run workspace, and an edit "
+                    "reaching across workspaces would be the cross-invocation "
+                    "store the never-read-back rule forbids. Edit a "
+                    "composition from THIS sitting, or select afresh.")
+            try:
+                base = read_brief_artifact(src)
+            except (OSError, ValueError) as exc:
+                return _err(f"unreadable brief artifact at {src}: {exc}")
+            try:
+                _base_composition_pin(base, map_pin, map_data)
+                indexes = _edited_indexes(
+                    list(base.get("indexes") or []), edit)
+            except SystemExit as exc:
+                return exc.code
+            prior = list((base.get("iteration") or {}).get("compositions") or [])
+            # The NOTE is the owner's angle, not a claim over the set, so it
+            # survives an edit they did not restate — with the inheritance
+            # disclosed below. The adopted CLAIM does NOT: a claim belongs to
+            # the set it was composed over (AC2), and carrying one across an
+            # edit would leave a composition attached to a set it was never
+            # composed from. It is recomposed instead.
+            note = str(answer.get("note") or "").strip()
+            if not note:
+                note = str(base.get("note") or "").strip()
+                inherited_note = bool(note)
+            # Built from the ANSWER, never from the base: an adopted claim
+            # the owner did not restate simply is not there to inherit.
+            answer = dict(answer, index=indexes, note=note)
     out = brief_from_answer(answer, cands, map_pin, map_data)
     # Evidence-independence at the hand-off (#799): a selected element's
     # writability gap is DISCLOSED beside the brief — with the tracking
@@ -1119,8 +1409,8 @@ def cmd_brief(args):
     # (D1). NOTHING DOWNSTREAM CHANGES (AC6) — the hand-off is still the brief
     # STRING into the existing stage-0 `--brief` path, and drafting never
     # learns that terrain produced it.
-    if getattr(args, "out", None):
-        path = os.path.abspath(args.out)
+    path = os.path.abspath(args.out) if getattr(args, "out", None) else None
+    if path:
         out["artifact"] = {
             "id": os.path.splitext(os.path.basename(path))[0],
             "path": path,
@@ -1129,6 +1419,29 @@ def cmd_brief(args):
             "read_back": ("by design — this is the owner's decision, not a "
                           "rendering; the never-read-back rule does not bind "
                           "here (CAP-3, 2026-07-31)")}
+    # THE EDIT THAT PRODUCED THIS COMPOSITION (Story 20.77 AC2), recorded
+    # beside the member set it produced, so a recomposition can be read
+    # against the one it came from rather than only compared with it.
+    if edit:
+        out["edit"] = {
+            "add": edit["add"], "drop": edit["drop"],
+            "from": {"artifact": os.path.abspath(getattr(args, "from_brief")),
+                     "indexes": list((base or {}).get("indexes") or []),
+                     "brief": (base or {}).get("brief")},
+            "note": ("inherited from the composition being edited — the note "
+                     "is the owner's angle, not a claim over the set"
+                     if inherited_note else "as recorded in this answer"),
+            "claim": ("recomposed over the edited set; an adopted claim is "
+                      "never carried across an edit, because a claim belongs "
+                      "to the set it was composed over"),
+        }
+    # THE LOOP AT THE GATE (AC1/AC3/AC4). Carried wherever there is a member
+    # set to edit — including the FIRST composition, or the loop could never
+    # start. A free-form brief has no set, and claiming an editable one would
+    # be shape without content.
+    if out.get("indexes"):
+        out["iteration"] = _iteration_block(out, prior, out.get("edit"), path)
+    if path:
         try:
             write_brief_artifact(path, out)
         except OSError as exc:
@@ -1301,6 +1614,12 @@ def main(argv=None):
                    help="with --payloads: select this ask's answer row "
                         "(default: the latest answer row)")
     b.add_argument("--map", help="the same map, so an adopted candidate resolves")
+    b.add_argument("--from", dest="from_brief", metavar="PATH",
+                   help="the composition this one EDITS (Story 20.77): the "
+                        "brief artifact whose member set the answer's `edit` "
+                        "(`+L12 −L3`) applies to. Its `--out` must land in the "
+                        "SAME run workspace — retention is within-sitting, and "
+                        "an edit across workspaces is refused.")
     b.add_argument("--out", metavar="PATH",
                    help=f"write the brief as a durable artifact here — pass "
                         f"the run workspace's {BRIEF_FILENAME} (Story 20.75). "
