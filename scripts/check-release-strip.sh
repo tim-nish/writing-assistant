@@ -74,8 +74,32 @@ surface=$(git ls-files -- skills config .claude-plugin scripts README.md \
           | grep -vE 'release-strip\.sh|check-release-strip\.sh|check-skeleton\.sh')
 # functional reference = a link target or path token, e.g. ](_bmad, ](./_bmad,
 # "_bmad-output/...", .claude/skills/bmad-...  (prose in backticks is not a link).
-if printf '%s\n' "$surface" | xargs -r grep -nE \
-     '\]\((\./)?(_bmad|\.claude/skills/bmad-)|(src|path|dir|file)[^\n]*_bmad-output/' 2>/dev/null \
+# The token alternative spans the path with [^[:space:]]* — a path token carries
+# no whitespace. It must NOT be [^\n]: POSIX ERE has no \n escape inside a
+# bracket expression, so [^\n] reads as "not a backslash and not the letter n",
+# which silently let through every reference with an n in the intervening text
+# (src=main/_bmad-output/, path=gen/_bmad-output/). Issue #1068.
+REFPAT='\]\((\./)?(_bmad|\.claude/skills/bmad-)|(src|path|dir|file)[^[:space:]]*_bmad-output/'
+
+# 5a. Assert the pattern BEFORE trusting it. An inert assertion passes silently,
+#     which is the worst failure mode for a publication-boundary guard: green
+#     reads as evidence of cleanliness. Probes carry an `n` between the token and
+#     _bmad-output/ on purpose — those are exactly the ones [^\n] used to miss.
+for probe in 'src=main/_bmad-output/x' 'path=gen/_bmad-output/y' \
+             'dir=json/_bmad-output/z' 'file=n/_bmad-output/w' \
+             'srcZZZ_bmad-output/q' 'see ](./_bmad/notes.md)'; do
+  printf '%s\n' "$probe" | grep -qE "$REFPAT" \
+    && ok "reference pattern catches: $probe" \
+    || err "reference pattern MISSES a functional reference: $probe"
+done
+for probe in 'prose about the src file and bmad output, no path' \
+             'plain line with no reference at all'; do
+  printf '%s\n' "$probe" | grep -qE "$REFPAT" \
+    && err "reference pattern false-positives on: $probe" \
+    || ok "reference pattern ignores: $probe"
+done
+
+if printf '%s\n' "$surface" | xargs -r grep -nE "$REFPAT" 2>/dev/null \
      | grep -q .; then
   err "a shipped file has a functional reference into a removed path"
 else
