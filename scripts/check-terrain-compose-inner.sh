@@ -248,6 +248,51 @@ strands = [x for x in json.load(open(w + "/big-cands.json"))["candidates"]
            if x["kind"] == "element"]
 check(len(strands) > 3,
       "size switch: above the budget the fixed candidate caps no longer apply")
+
+# EVERY SCREEN DECLARES ITS RENDER FORM (Story 20.108, #1102). screens.md used
+# to instruct "present the validated payload in-conversation" — spec-level text
+# directing the composition the carrier forbids, which is why the screens were
+# outside 20.103's conversion and why no check caught it. The directive is a
+# property of the composed artifact, so it is assertable here; the reply prose
+# is not, and nothing in this repository reads it.
+sys.path.insert(0, "scripts")
+from draft_gates import CONTROL_CAPACITY
+from terrain_screens import (compose_axis_payload, compose_payload,
+                             _compose_summary_payload)
+
+_screens = [
+    ("screen 1", compose_axis_payload(d)),
+    ("screen 2", compose_payload(d, json.load(open(w + "/cands.json"))["candidates"]
+                                 if os.path.exists(w + "/cands.json") else [])),
+    ("the View summary", _compose_summary_payload(d, "/tmp/view.md")),
+]
+for _name, _p in _screens:
+    _it = _p["items"][0]
+    _r = _it.get("render")
+    check(isinstance(_r, dict), f"#1102: {_name} declares a render form")
+    if not isinstance(_r, dict):
+        continue
+    _n = len(_it["choices"])
+    _exp = "selection" if _n <= CONTROL_CAPACITY else "block"
+    check(_r.get("control") == _exp,
+          f"#1102: ...{_name}'s control is {_exp!r}, computed from {_n} "
+          f"choices against a capacity of {CONTROL_CAPACITY}")
+    if _exp == "block":
+        check(bool(_r.get("banner")) and bool(_r.get("reply_line")),
+              f"#1102: ...{_name}'s block carries its own banner and reply "
+              f"line rather than leaving them to the renderer")
+
+# THE BLOCK BRANCH, EXERCISED. The fixture map is small, so every screen above
+# lands inside the capacity — and a branch no test can reach is the shape this
+# repository's own lesson warns about: a suite reporting green without ever
+# having been able to go red. A real screen 1 offers ~50 members.
+_big = compose_payload(d, [{"direction": f"d{i}", "evidence_pointers": 2}
+                           for i in range(6)])["items"][0]
+check(_big["render"]["control"] == "block",
+      "#1102: an over-capacity screen lands on the block form")
+check(bool(_big["render"].get("banner")) and bool(_big["render"].get("reply_line")),
+      "#1102: ...and carries its own banner and reply line")
+
 sys.exit(1 if fail else 0)
 PYEOF
 [ $? -eq 0 ] || fail=1
