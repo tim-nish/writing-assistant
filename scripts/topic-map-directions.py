@@ -411,7 +411,7 @@ def _consultant_block(matches, cands, map_data):
 
 
 def _brief_from_index(answer, cands, map_pin, map_data=None,
-                      composed_block=None):
+                      composed_block=None, judge=None):
     """An INDEXED selection from the View: `{index, note}` (Story 18.67, #602),
     where `index` names a SET (Story 20.54, #937).
 
@@ -589,7 +589,14 @@ def _brief_from_index(answer, cands, map_pin, map_data=None,
             # Both halves of the pin: the terrain invocation the indexes were
             # read at, and the hub commit the material came from.
             "pins": {"terrain": answer_pin, "hub": cov.get("hub_pin"),
-                     "destination": cov.get("destination_pin")},
+                     "destination": cov.get("destination_pin"),
+                     # THE FOURTH COMPONENT (Story 20.106, #1090). The three
+                     # above record what was judged and what it was judged
+                     # against; none records WHAT JUDGED IT, which on a surface
+                     # regenerated fresh every invocation makes judge version
+                     # drift indistinguishable from ordinary nondeterminism by
+                     # construction — the two cases produce identical records.
+                     "judge": _judge_pin(judge)},
             # Recomposition inputs are the selected members' served claims and
             # NOTHING else, so a composer at the gate cannot widen the scope.
             "recomposition": {
@@ -671,7 +678,7 @@ def _brief_from_index(answer, cands, map_pin, map_data=None,
 
 
 def brief_from_answer(answer, cands, map_pin=None, map_data=None,
-                      composed_block=None):
+                      composed_block=None, judge=None):
     """The owner's outcome as the brief string for stage-0 `--brief`.
 
     Free text ALWAYS wins: machine-proposed wording becomes the brief only when
@@ -692,7 +699,7 @@ def brief_from_answer(answer, cands, map_pin=None, map_data=None,
     # proposed direction".
     if _selection_terms(answer):
         return _brief_from_index(answer, cands, map_pin, map_data,
-                                 composed_block)
+                                 composed_block, judge)
     for c in cands:
         if selection == c["direction"]:
             return {"brief": c["direction"], "provenance": "owner-authored",
@@ -812,6 +819,38 @@ def _answer_from_payloads(path, ask_id=None):
         which = f"ask {ask_id}" if ask_id is not None else "any ask"
         raise ValueError(f"no recorded answer row for {which} in {path}")
     return rows[-1]
+
+
+def _judge_pin(spec):
+    """The judge that served a per-invocation judgment (Story 20.106, #1090).
+
+    DECLARED, NEVER INTROSPECTED. This module is deterministic Python and has
+    no way to know which model served the judgment it is recording, so the
+    value is supplied at the boundary that holds it — the agent — and this
+    function only shapes what it was given. A default model name invented here
+    would be the one fact the field exists to record, guessed.
+
+    ABSENCE IS RECORDED AS ABSENCE, in the three-valued shape a served arc
+    already uses: a pin that quietly omitted the judge would be
+    indistinguishable from one taken before the field existed, which is the
+    drift this pin exists to make visible.
+
+    Accepts `model@effort`; a bare value is the model with the effort tier
+    stated absent rather than assumed, because "unknown tier" and "the default
+    tier" are different claims.
+    """
+    raw = str(spec or "").strip()
+    if not raw:
+        return {"model": None, "effort": None, "served": False,
+                "not_served_reason": (
+                    "no judge was declared at this invocation; it is supplied "
+                    "by the agent and never inferred here")}
+    model, sep, effort = raw.partition("@")
+    model = model.strip()
+    effort = effort.strip() if sep else ""
+    return {"model": model or None, "effort": effort or None, "served": True,
+            **({} if effort else {
+                "effort_reason": "no effort tier was declared with the model"})}
 
 
 def _composed_candidates(doc):
@@ -957,7 +996,7 @@ def cmd_brief(args):
             # the owner did not restate simply is not there to inherit.
             answer = dict(answer, index=indexes, note=note)
     out = brief_from_answer(answer, cands, map_pin, map_data,
-                            composed_block)
+                            composed_block, getattr(args, 'judge', None))
     # Evidence-independence at the hand-off (#799): a selected element's
     # writability gap is DISCLOSED beside the brief — with the tracking
     # artifact's content for the target repo — and the run proceeds. There is
@@ -1637,6 +1676,14 @@ def main(argv=None):
                         "(`+L12 −L3`) applies to. Its `--out` must land in the "
                         "SAME run workspace — retention is within-sitting, and "
                         "an edit across workspaces is refused.")
+    b.add_argument("--judge", metavar="MODEL@EFFORT",
+                   help="the judge that served this invocation's model-judged "
+                        "surfaces — model id and effort tier (Story 20.106, "
+                        "#1090). DECLARED by the caller: this script cannot "
+                        "know which model composed the claims it is recording, "
+                        "and a default invented here would be the one fact the "
+                        "pin exists to record, guessed. Omitted, the pin "
+                        "records the absence rather than a guess.")
     b.add_argument("--composed", metavar="PATH",
                    help="the composed candidate theses (the same file `cover` "
                         "reads). ADOPTION REQUIRES THIS (Story 20.101, "

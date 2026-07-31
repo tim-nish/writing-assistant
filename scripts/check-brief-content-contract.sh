@@ -105,6 +105,14 @@ printf '{"index":"L1, L2, L3","pin":"%s","claim":"reading two"}' "$pin" \
   || err "#1079: adopting WITH composed candidates failed: $(cat "$work/err")"
 emit "L1"         "$work/one.json" || { printf '\nFAILED.\n' >&2; exit 1; }
 
+# THE JUDGE PIN (Story 20.106, #1090) — declared, never introspected, and
+# absent-as-absent. Three cases, because the failure being guarded is a pin
+# that cannot tell "no judge declared" from "taken before the field existed".
+printf '{"index":"L1, L2, L3","pin":"%s"}' "$pin" \
+  | python3 "$D" brief --map "$work/map.json" --answer - \
+      --judge "a-model@high" --out "$work/judged.json" > /dev/null 2>"$work/err" \
+  || err "#1090: a declared judge was refused: $(cat "$work/err")"
+
 python3 - "$work" <<'PYEOF' || fail=1
 import json, sys
 w = sys.argv[1]
@@ -153,6 +161,20 @@ RENDERED = {
 s = json.load(open(w + "/set.json"))
 one = json.load(open(w + "/one.json"))
 adopted = json.load(open(w + "/adopted.json"))
+judged = json.load(open(w + "/judged.json"))
+
+# THE JUDGE PIN (#1090): a fourth component beside terrain/hub/destination.
+_jp = (judged.get("pins") or {}).get("judge") or {}
+check(_jp.get("model") == "a-model" and _jp.get("effort") == "high"
+      and _jp.get("served") is True,
+      "#1090: a DECLARED judge is recorded as model + effort tier")
+_up = (s.get("pins") or {}).get("judge") or {}
+check(_up.get("served") is False and _up.get("not_served_reason"),
+      "#1090: ...and an undeclared one records the ABSENCE with its reason — "
+      "never a default model name, which would guess the one fact the pin "
+      "exists to record")
+check(_up.get("model") is None and _up.get("effort") is None,
+      "#1090: ...with no invented value beside it")
 
 # THE ADOPTED BRIEF CARRIES WHAT IT WAS ADOPTED FROM (#1079).
 _ct = adopted.get("candidate_theses") or {}
