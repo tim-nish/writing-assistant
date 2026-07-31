@@ -140,6 +140,14 @@ for a in set set-str set-free one group group-typed mixed mixed-typed; do
     || err "brief from a-$a failed: $(cat "$work/b-$a.err")"
 done
 
+# One run that WRITES the artifact (Story 20.93, #1048/#1049): the artifact and
+# the stdout payload became different objects, so the check needs both from one
+# invocation to compare them.
+python3 "$D" brief --answer "$work/a-set.json" --map "$work/big-map.json" \
+  --out "$work/ws-set/brief.json" > "$work/b-set-written.json" \
+  2>"$work/b-set-written.err" \
+  || err "the writing brief run failed: $(cat "$work/b-set-written.err")"
+
 # A GROUP ID IS TYPED SHORTHAND THAT EXPANDS AT THE SCREEN (Story 20.76,
 # #996; SPEC-terrain CAP-3). It was refused outright until this story, on a
 # ground that survives with a narrower reach: a rendering is not an address,
@@ -349,6 +357,72 @@ check(p_old.returncode == 0,
 if p_old.returncode == 0:
     check((json.loads(p_old.stdout).get("lifecycle") or {}).get("line"),
           "AC6: ...and its lifecycle line is unaffected")
+
+# --- the brief persists the DECISION, not the gate inputs (Story 20.93) -----
+# AC1/AC2/AC8. The artifact and the stdout payload are now different objects,
+# and the whole risk is that shrinking the first shrinks the second.
+written = json.load(open(w + "/ws-set/brief.json"))
+printed = json.load(open(w + "/b-set-written.json"))
+for block in ("consultant", "recomposition"):
+    check(block not in written,
+          f"AC1: the artifact does not carry `{block}` — it is a gate input, "
+          "recomputable from the retained map at the recorded pin")
+    check(block in printed,
+          f"AC2: ...and the GATE still receives `{block}`, undiminished, in "
+          "the command's stdout payload")
+check("inputs" not in (written.get("candidate_theses") or {}),
+      "AC1: the artifact does not carry candidate_theses.inputs — the same "
+      "member records a second time")
+check("inputs" in (printed.get("candidate_theses") or {}),
+      "AC2: ...and the gate still gets them")
+pool_printed = (printed.get("consultant") or {}).get("substitution_candidates")
+check(pool_printed is not None and len(pool_printed) > 0,
+      "AC2: the substitution pool reaching the gate is still the COMPLETE, "
+      "unranked pool — rule 4's completeness is untouched")
+for key in ("brief", "adopted_claim", "thesis", "origin", "members", "pins",
+            "note", "lifecycle", "iteration"):
+    check(key in written,
+          f"AC1: the decision record still carries `{key}`")
+check(os.path.getsize(w + "/ws-set/brief.json") < len(json.dumps(printed)),
+      "AC8: the artifact is the smaller object, as a CONSEQUENCE of AC1 — no "
+      "deduplication mechanism exists, and none is needed")
+
+# AC3/AC7 — re-opening recomposes the gate blocks from the retained map, and
+# names the brief by a DERIVED label.
+import os as _os, subprocess as _sp  # noqa: E402
+_sp.run(["cp", w + "/big-map.json", w + "/ws-set/map.json"], check=True)
+ro = _sp.run(["python3", "scripts/topic-map-directions.py", "brief-open",
+              "--at", w + "/ws-set/brief.json"], capture_output=True, text=True)
+check(ro.returncode == 0, f"AC3: a brief re-opens ({ro.stderr.strip()[:80]!r})")
+if ro.returncode == 0:
+    rp = json.loads(ro.stdout)
+    rec = rp.get("recomposed_from_map") or {}
+    check("consultant" in (rec.get("recomposed") or [])
+          and "recomposition" in (rec.get("recomposed") or []),
+          "AC3: brief-open RECOMPOSES the gate-time blocks from map.json at "
+          f"the recorded pin ({rec.get('recomposed')})")
+    check((rp.get("consultant") or {}).get("substitution_candidates")
+          == (printed.get("consultant") or {}).get("substitution_candidates"),
+          "AC4: the recomposed substitution pool EQUALS the pool the gate "
+          "saw — same members, same completeness, same order")
+    check(rp.get("recomposition") == printed.get("recomposition"),
+          "AC4: ...and so does the recomposition block")
+    check(bool(rp.get("lifecycle", {}).get("line")),
+          "AC3: ...and the lifecycle line is re-presented")
+    check(bool(rp.get("label")) and "label" not in written,
+          f"AC7: the brief is identified by a DERIVED label ({rp.get('label')!r}) "
+          "and no naming store, id field or slug is added to the artifact")
+    # The map moved away: the blocks are stated ABSENT with a reason, never
+    # approximated. A recomposition that is merely plausible is worse than none.
+    _os.remove(w + "/ws-set/map.json")
+    ro2 = _sp.run(["python3", "scripts/topic-map-directions.py", "brief-open",
+                   "--at", w + "/ws-set/brief.json"],
+                  capture_output=True, text=True)
+    rp2 = json.loads(ro2.stdout)
+    check("consultant" not in rp2
+          and (rp2.get("recomposed_from_map") or {}).get("why"),
+          "AC3: with the map no longer retained, the blocks are stated absent "
+          "WITH THE REASON rather than approximated")
 
 sys.exit(1 if fail else 0)
 PYEOF
