@@ -108,8 +108,10 @@ step files cite them and restate nothing.
   third screen. Above the screen budget, Screen 2 becomes a summary plus a
   **View** file path — the composer switches on size and the skill decides
   nothing (`steps/screens.md`). Selection is by Strand index and may be a
-  **set**; naming a group id as a selection is refused with the distinction
-  stated. Naming group ids as an **inspection** is the `report` subcommand —
+  **set**; a group id may be **typed** and expands into its members at the
+  screen that defined it, with `G4 + L26, minus L48` resolved before the brief
+  exists and no G-id ever recorded (`steps/screens.md`). Naming group ids as
+  an **inspection** is the `report` subcommand —
   the Full Report relays those groups whole, selects nothing, and never
   recomposes a claim (`steps/screens.md`).
 - **Step 3:** free text always wins. A set of two or more returns the

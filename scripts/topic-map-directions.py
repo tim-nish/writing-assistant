@@ -732,50 +732,183 @@ def _which_half_moved(answer, map_data):
     return f"Moved: {' and '.join(moved)}."
 
 
-def _selected_indexes(answer):
+# The set operators the selection accepts (Story 20.76, #996; SPEC-terrain
+# CAP-3 §"G-ids are owner-facing SHORTHAND that expands at the screen"). There
+# was no set arithmetic here at all before this story: `minus` is new syntax,
+# added because a selection typed off a Full Report is naturally "that group,
+# without the two that do not belong".
+ADD_OPS = ("+", "plus")
+REMOVE_OPS = ("-", "−", "minus", "without", "except")
+
+
+def _selection_terms(answer):
+    """The owner's typed selection as ORDERED (operator, id) terms.
+
+    `index` is accepted as a list or as one string naming several — the
+    payload shape is the owner's convenience — and the string form is split on
+    the same `[,\\s]+` it always was. What is new is that a token may be a set
+    OPERATOR rather than an id: `G4 + L26, minus L48` reads as add-add-remove.
+
+    An operator token governs every id AFTER it until the next operator, so
+    `minus L48, L50` removes both; the attached forms `+L26` / `-L48` govern
+    their own token only and leave the standing operator alone. Absent any
+    operator the selection reads exactly as it did before this story existed —
+    a plain list of ids, all added.
+    """
+    raw = answer.get("index")
+    parts = raw if isinstance(raw, (list, tuple)) else re.split(
+        r"[,\s]+", str(raw or ""))
+    terms, op = [], "add"
+    for p in parts:
+        p = str(p).strip()
+        if not p:
+            continue
+        low = p.lower()
+        if low in ADD_OPS:
+            op = "add"
+            continue
+        if low in REMOVE_OPS:
+            op = "remove"
+            continue
+        if len(p) > 1 and p[0] in "+-−":
+            terms.append(("remove" if p[0] in "-−" else "add",
+                          p[1:].strip()))
+            continue
+        terms.append((op, p))
+    return terms
+
+
+def _selected_indexes(answer, expand=None):
     """The owner's selection as a SET of Strand indexes, however assembled
-    (Story 20.54, #937).
+    (Story 20.54, #937; set arithmetic and G-id expansion, Story 20.76, #996).
+    Returns `(selected, named)`.
 
     A selection is a set because exploring is how the owner decides what to
     write about: pointing at the Strands that belong together and having the
     brief composed from exactly those is the outcome the terrain exists for,
     and a single index is that set's degenerate case, not a different
-    operation. `index` is therefore accepted as a list or as one string
-    naming several — the payload shape is the owner's convenience, and NO
-    named index is silently dropped or collapsed to the first.
+    operation.
 
-    Order is the owner's, de-duplicated: a repeated index is one member, and
-    reordering their pointers would quietly restate what they chose.
+    EXPAND-THEN-SET-ARITHMETIC (Story 20.76 AC2): `expand` maps one typed
+    token to the ids it names — identity for a Strand index, the group's
+    members for a G-id — and the arithmetic runs over the expanded ids, in
+    order. That order matters: `G4 minus L48` must drop L48 when L48 is one of
+    G4's members, which it can only do if G4 became its members first.
+
+    `selected` is the resulting set in the owner's order, de-duplicated: a
+    repeated index is one member, and reordering their pointers would quietly
+    restate what they chose. `named` is every id the selection MENTIONED,
+    added or removed — carried so a removed id that names no Strand is
+    refused rather than silently doing nothing, which is the same rule as NO
+    named index being silently dropped.
     """
-    raw = answer.get("index")
-    parts = raw if isinstance(raw, (list, tuple)) else re.split(
-        r"[,\s]+", str(raw or ""))
-    out = []
-    for p in parts:
-        p = str(p).strip()
-        if p and p not in out:
-            out.append(p)
-    return out
+    selected, named = [], []
+    for op, token in _selection_terms(answer):
+        for i in (expand(token) if expand else [token]):
+            if i not in named:
+                named.append(i)
+            if op == "remove":
+                if i in selected:
+                    selected.remove(i)
+            elif i not in selected:
+                selected.append(i)
+    return selected, named
 
 
-def _refuse_group_ids(indexes):
-    """A group id addresses INSPECTION, never selection (Story 20.54 AC7).
+def _screen_sections(answer, map_data):
+    """The screen the ids were read at, re-resolved at its own pin.
 
-    `G` is a DISPLAY kind conferring no selection authority (SPEC-terrain, the
-    display-kind clause). Accepting one here would make grouping a gate — the
-    owner would be choosing a machine's partition rather than Strands — so it
-    is refused with the distinction stated rather than resolved to the group's
-    members.
+    A G-id is meaningless without the screen that minted it, so the answer
+    records that screen — `member` (or `tag`) plus `axis`, and `substrate` /
+    `grouping` when the screen used a non-default one. The pin is already
+    proven equal to the map's before this runs, and `member_sections` is
+    deterministic at a pin, so this IS the screen that defined the groups
+    rather than a fresh grouping of the same material.
+
+    Returns `None` when the answer records no screen — the honest answer is
+    that this screen cannot be shown to have defined anything, which the
+    caller turns into a refusal rather than a guess.
     """
-    groups = [i for i in indexes if re.fullmatch(r"G\d+", i)]
-    if not groups:
-        return
-    raise SystemExit(_err(
-        f"{', '.join(groups)} name group(s), and a group id carries no "
-        "selection authority: `G` is a display kind, so it addresses "
-        "INSPECTION (pull a full report for it) and never selection. "
-        "Selection is by Strand index — name the Strands inside the group "
-        "you want, and the claim is recomposed over exactly those."))
+    member = str(answer.get("member") or answer.get("tag") or "").strip()
+    if not member or map_data is None:
+        return None
+    axis = str(answer.get("axis") or "tag").strip() or "tag"
+    substrate = str(answer.get("substrate") or SUBSTRATE_DEFAULT).strip()
+    grouping = answer.get("grouping")
+    try:
+        return member_sections(map_data, member, axis, substrate=substrate,
+                               grouping=grouping)
+    except KeyError:
+        raise SystemExit(_err(
+            f"the selection records substrate {substrate!r}, which names no "
+            f"grouping substrate. The screen's group ids cannot be resolved "
+            "against a substrate that did not produce them."))
+
+
+def _group_expander(answer, cands, map_data):
+    """A typed G-id EXPANDS to its member Strand indexes (Story 20.76, #996).
+
+    The reasoning the old refusal carried survives exactly, re-scoped: `G` is
+    a DISPLAY kind conferring no selection authority (SPEC-terrain, the
+    display-kind clause), addressing INSPECTION and never selection. A group
+    id is per-screen and per-pin and is gone when the screen is — so it may be
+    TYPED and must never be RECORDED. Expansion is therefore a typing
+    convenience over ids the owner just read: from this point only the members
+    exist, the selection stays per-Strand, and nothing downstream can tell an
+    expanded selection from the same one typed member by member. That is what
+    keeps grouping presentation-only instead of a gate — no group is SELECTED
+    here, its members are.
+
+    Expansion happens AT THE SCREEN THAT DEFINED THE GROUP. A G-id this
+    screen and pin did not define is refused with the reason named, exactly as
+    a pin mismatch is: an id resolved against some other grouping would hand
+    the owner a set they never read.
+    """
+    by_slug = {c.get("slug"): c.get("id") for c in cands
+               if c.get("kind") == "element"}
+    state = {}
+
+    def expand(token):
+        if not re.fullmatch(r"G\d+", token):
+            return [token]
+        if "ms" not in state:
+            state["ms"] = _screen_sections(answer, map_data)
+        ms = state["ms"]
+        pin = (map_data or {}).get("coverage", {}).get("pin")
+        if ms is None:
+            raise SystemExit(_err(
+                f"{token} names a group, and a group id is PER-SCREEN and "
+                "PER-PIN — it names members only on the screen that minted "
+                "it. This selection records no screen, so there is nothing "
+                "here that defined "
+                f"{token} and it is refused rather than resolved against some "
+                "other grouping. Record the screen the ids were read at "
+                "(`member` and `axis`) with the selection, or name the "
+                "Strands inside the group."))
+        by_gid = {s.get("group_id"): s for s in ms["sections"]}
+        sec = by_gid.get(token)
+        if sec is None:
+            known = ", ".join(sorted(g for g in by_gid if g)) or "none"
+            raise SystemExit(_err(
+                f"{token} names no group on the screen this selection was "
+                f"made at ({ms['member']} by {ms['axis']}). Group ids are "
+                "PER-SCREEN and PER-PIN — they do not survive a re-run — so "
+                f"this screen's ids are {known} at pin {pin}. It is refused "
+                "rather than re-resolved, exactly as a stale index is. "
+                "Re-read the screen and name the groups from it."))
+        members, unknown = [], []
+        for el in sec["strands"]:
+            ident = by_slug.get(el.get("slug"))
+            (members if ident else unknown).append(ident or el.get("slug"))
+        if unknown:
+            raise SystemExit(_err(
+                f"{token} expands to Strand(s) this map does not offer as an "
+                f"index ({', '.join(str(u) for u in unknown)}). The whole "
+                "selection is refused rather than composed over a group's "
+                "members minus the ones that would not resolve."))
+        return members
+
+    return expand
 
 
 # THE COHERENCE CONSULTANT'S BINDING RULES (Story 20.55, #939; SPEC-terrain
@@ -862,6 +995,15 @@ def _brief_from_index(answer, cands, map_pin, map_data=None):
     the owner pointed at. An owner-adopted `claim` supersedes the deterministic
     wording; free text at the gate supersedes both (`brief_from_answer`).
 
+    A typed G-id is SHORTHAND that expands here into the group's member
+    indexes before anything is composed (Story 20.76, #996), with set
+    arithmetic — `G4 + L26, minus L48` — resolved in the same pass. Only
+    members are recorded: the brief below carries member indexes and pins and
+    no G-id, because a group id is per-screen and per-pin and a rendering is
+    not an address. The result is byte-identical to the same set typed member
+    by member, which is the test that this is ergonomics and not a second kind
+    of address.
+
     An index is meaningless without the map it was read from, so the answer
     must carry the pin the View was rendered at. A mismatch is REFUSED with the
     mismatch named — never silently re-resolved to whatever `L3` happens to
@@ -869,8 +1011,12 @@ def _brief_from_index(answer, cands, map_pin, map_data=None):
     chose. A missing pin is refused for the same reason: it cannot be proven
     not to be stale.
     """
-    indexes = _selected_indexes(answer)
-    index = indexes[0] if len(indexes) == 1 else ", ".join(indexes)
+    # AS TYPED, for the refusals below only: a refusal has to quote what the
+    # owner actually wrote — operators and all — and nothing is expanded
+    # before the pin it was typed against is proven current.
+    raw = answer.get("index")
+    index = ", ".join(str(p).strip() for p in raw) \
+        if isinstance(raw, (list, tuple)) else str(raw or "").strip()
     answer_pin = str(answer.get("pin") or "").strip()
     if not answer_pin:
         raise SystemExit(_err(
@@ -891,17 +1037,34 @@ def _brief_from_index(answer, cands, map_pin, map_data=None):
             f"{moved} That index may now name a different Strand, so it is "
             "refused rather than re-resolved. Re-run the map and choose from "
             "the fresh screens."))
-    _refuse_group_ids(indexes)
+    # EXPAND, THEN THE ARITHMETIC — both entirely before the brief exists
+    # (Story 20.76 AC1/AC2). After this line no G-id exists in the flow: only
+    # member indexes do, so nothing below can record one.
+    indexes, named = _selected_indexes(
+        answer, _group_expander(answer, cands, map_data))
     by_id = {c.get("id"): c for c in cands}
     # EVERY named index is resolved, and an unresolvable one refuses the whole
     # selection: dropping it would compose the brief over a set the owner did
-    # not choose, silently.
-    missing = [i for i in indexes if i not in by_id]
+    # not choose, silently. `named` and not `indexes`, so a subtracted index
+    # that names no Strand is caught too — a `minus` over nothing is a typo
+    # the owner should hear about, not a silent no-op.
+    missing = [i for i in named if i not in by_id]
     if missing:
         raise SystemExit(_err(
             f"index {', '.join(repr(i) for i in missing)} names no Strand in "
             "this map. The indexes come from the screens rendered at this pin "
             "— re-read them and choose again."))
+    if not indexes:
+        raise SystemExit(_err(
+            f"the selection {index!r} subtracts everything it names, so no "
+            "Strand is selected and there is nothing to compose a brief over. "
+            "Name the members you want kept."))
+    # RECOMPUTED FROM THE MEMBERS (Story 20.76 AC3): what is recorded from
+    # here on is the resolved set, never the typed shorthand. A G-id is
+    # per-screen and per-pin, so recording one would make a rendering an
+    # address — which is the invariant this expansion preserves rather than
+    # relaxes.
+    index = indexes[0] if len(indexes) == 1 else ", ".join(indexes)
     matches = [by_id[i] for i in indexes]
     note = str(answer.get("note") or "").strip()
     claim = str(answer.get("claim") or "").strip()
@@ -964,7 +1127,11 @@ def brief_from_answer(answer, cands, map_pin=None, map_data=None):
         raise SystemExit(_err(
             "the owner chose to stop at the map: no brief exists and no run "
             "follows. Stopping is a first-class outcome, not a failure."))
-    if _selected_indexes(answer):
+    # ROUTED ON WHAT WAS TYPED, not on what it resolves to: a selection whose
+    # arithmetic cancels out is an indexed selection with a mistake in it, and
+    # it is refused as one rather than falling through to "that is not a
+    # proposed direction".
+    if _selection_terms(answer):
         return _brief_from_index(answer, cands, map_pin, map_data)
     for c in cands:
         if selection == c["direction"]:

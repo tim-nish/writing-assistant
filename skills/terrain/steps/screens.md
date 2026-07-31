@@ -178,9 +178,23 @@ ending in free text. Pass them as a list or as one comma-separated string; no
 named index is dropped or collapsed to the first, and an index that resolves
 to nothing refuses the whole selection rather than quietly shrinking it.
 Sections stay **presentation-only**: the set is per-Strand multi-select, never
-group-select. Naming a group id (`G2`) as a *selection* is refused with the
-distinction stated — `G` addresses **inspection**, selection is by Strand
-index — because a selectable group would make grouping a gate.
+group-select.
+
+**A GROUP ID MAY BE TYPED — it expands into its members (SPEC-terrain CAP-3,
+added 2026-07-31, #996).** The owner reads a Full Report and composes from
+what they read there, group ids included: `G4` expands to that group's member
+Strand indexes **at the screen that defined it**, and from that moment only
+the members exist. Mixed input composes by **expand-then-set-arithmetic** —
+`G4 + L26, minus L48` (`minus` subtracts every id after it until the next
+`+`) — all of it resolved **before the brief exists**. The composed brief
+records **the member indexes and the pins, never a G-id**: a group id is
+per-screen and per-pin, so a rendering is still not an address. The result is
+indistinguishable from the same set typed member by member, which is the test
+that this is typing convenience and not a new address kind — so this is **not**
+group-select, and grouping still gates nothing. Never key anything else on a
+G-id: recommending "other Lessons from the same group" is expressly declined,
+because it would make a semantic act depend on one invocation's presentation
+grouping.
 
 Record the answer against the `ask_id` the validator returned, with the **pin
 the listing shows**:
@@ -192,6 +206,13 @@ printf '%s' '{"index":"L3","note":"<the owner'\''s angle, their words>","pin":"<
 
 For a set, `index` carries them all — `{"index":["L3","L7","E2.1"], …}` or
 `{"index":"L3, L7, E2.1", …}`.
+
+**When the selection names a group id, record the screen it was read at too** —
+`"member":"<the member>","axis":"tag|topic"` (plus `substrate`/`grouping` when
+the screen used a non-default one). A G-id names members only on the screen
+that minted it, so one submitted with no screen recorded, or one that screen
+did not define, is **refused with the reason named** — exactly as a stale
+index is, and never re-resolved against some other grouping.
 
 The pin is not bookkeeping. Indexes are **stable within a pin**, not across
 repo states, so an index chosen against a stale listing is
