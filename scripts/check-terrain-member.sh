@@ -657,12 +657,35 @@ subprocess.run(["python3", D, "view", "--map", path, "--tag", "agents",
 whole_dc = open(vt).read()
 check("machine-composed" in whole_dc and "in common: shared path X" in whole_dc,
       "composed `in common:` lines are marked machine-composed")
+# LINE-ANCHORED, not a bare substring (tightened by Story 20.96, #1074). What
+# this forbids is a RENDERED claim line on the summarised console; the bare
+# substring test also caught prose that merely NAMES `in common:` while
+# rendering none — which is what the screen must do to explain that a claim is
+# recomposed when the set changes.
 check("machine-composed at render time" not in listing
-      and "in common:" not in listing,
+      and not any(l.lstrip().startswith("in common:")
+                  for l in listing.splitlines()),
       "the summarised console declares no authoring class, because it carries "
       "no composed lines to declare one for")
-check("DISPLAY id" in listing and "no selection authority" in listing,
+check("DISPLAY id" in listing and "NEVER recorded" in listing,
       "the `G` group-id kind is DECLARED on the screen that renders it")
+# Story 20.96 (#1074): the screen states the WHOLE contract, not only its
+# refusing half. It used to say "conferring no selection authority" and stop,
+# while the skill files carried the expansion half — so Screen 2 presented an
+# owner with two instructions and no way to tell which was live. Both halves are
+# asserted together, because either alone is what the defect looked like.
+check("expands to its members" in listing,
+      "#1074: the screen states that a typed group id EXPANDS — the half the "
+      "owner was missing at the gate")
+check("Selection is always by Strand index" in listing,
+      "#1074: ...and that selection is still by Strand index, so expansion "
+      "reads as shorthand rather than as group-select")
+check("expand" in listing.lower() and "selects nothing" in listing,
+      "#1074: the two uses of a group id are named as DIFFERENT acts — asking "
+      "for a report selects nothing; typing one expands")
+check("recomposed and re-offered" in listing,
+      "#1074/AC5: a claim is pinned to the set it was composed over, so a "
+      "changed set re-offers it rather than carrying it silently")
 check("Grouped by: journey-similarity" in listing
       and "none narrowed away" in listing,
       "the judged screen names its substrate and states that nothing was narrowed")
