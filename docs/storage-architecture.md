@@ -129,6 +129,7 @@ classes, split at the resolver:
 |---|---|---|
 | Terrain's **View** (`terrain-view.md`) — the owner-facing full report | the writing-assistant working tree | a human opens it to read; it is the deliverable |
 | **run workspaces** (`runs/<run-id>/`) and **debug artifacts** | the machine state root | machine-readable intermediates, caches and resumable state, which a human never opens by intent |
+| the **brief** (`brief.json` and its recompositions) | the run workspace, in the machine state root | machine-read state — the durable record of a selection decision, re-opened *through* `brief-open` and never by a human editing it. **The owner condition is part of this row and not a footnote to it: no owner act may require the owner to identify or type its filename.** The gate offers the continuation; a brief is named to a person by a DERIVED label (date, member set, thesis first words), never by a stored name and never by its path. The file does **not** move — it is machine-read state, and putting it where a human works would invite the hand-editing its lifecycle exists to replace (Story 20.93, #1048/#1049) |
 
 The split is the one already stated portfolio-wide — human-facing artifacts in
 the working repo, intermediates and resumable state in machine-state dirs

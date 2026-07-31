@@ -85,10 +85,23 @@ def _brief_lifecycle_line(state):
 
 
 def _brief_artifact_line(path):
-    """Where the brief lives, said once, at the gate. The path is the owner's
-    only route back to it — a brief they cannot find is the chat continuation
-    this clause replaced."""
-    return f"Brief artifact: {path}"
+    """Where the brief lives, said once, at the gate.
+
+    THE PATH IS NO LONGER THE OWNER'S CONTINUATION (Story 20.93, #1049). It
+    used to be the only route back, so the gate's closing line handed the owner
+    a machine state-dir path and called it their way forward. A path in a
+    machine state root is an address for the machinery, not a move a person
+    makes: the owner condition on the brief's storage row
+    (`docs/storage-architecture.md`) is that no owner act may require them to
+    identify or type its filename.
+
+    So the path is still STATED — it is true, and a reader who wants it should
+    not have to dig — but it is stated as a location, and the sentence beside
+    it names the move. What the continuation IS at the end of a terrain sitting
+    is issue #1051's to decide and deliberately not restated here.
+    """
+    return (f"Brief artifact (a machine location, not something to type): "
+            f"{path} — say `open the brief` to come back to it.")
 
 
 # --------------------------------------------------------------------------

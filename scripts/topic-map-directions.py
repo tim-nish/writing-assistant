@@ -892,11 +892,148 @@ def cmd_brief(args):
         out["iteration"] = _iteration_block(out, prior, out.get("edit"), path)
     if path:
         try:
-            write_brief_artifact(path, out)
+            # THE ARTIFACT PERSISTS THE DECISION; THE STDOUT PAYLOAD CARRIES
+            # THE GATE (Story 20.93, #1048/#1049). `out` is unchanged and is
+            # what gets printed — the gate sees exactly what it saw before,
+            # undiminished, including the COMPLETE unranked substitution pool
+            # the consultant's rule 4 requires. What is written is the decision
+            # record alone.
+            write_brief_artifact(path, _decision_record(out))
         except OSError as exc:
             return _err(f"could not write the brief artifact at {path}: {exc}")
     print(json.dumps(out, indent=2, ensure_ascii=False))
     return 0
+
+
+# --- The brief persists the DECISION, not the gate inputs (Story 20.93) -------
+#
+# THE GROUND IS CLASS, NOT VOLUME. Measured before deciding: `brief-adopted.json`
+# was 161,693 B of which `consultant.substitution_candidates` was 130,493 B
+# (88.5%), against ~10 KB of decision content. But all terrain runs together
+# total 3.4 MB, so nothing here is justified on disk. The artifact is *the
+# durable record of a selection decision*, and gate INPUTS are not that: they
+# are recomputable from `map.json` at the recorded pin, which
+# `docs/storage-architecture.md` retains in the same workspace ("discharged by
+# relocation, not by GC") — and that retention is exactly what makes dropping
+# them safe.
+#
+# WHAT IS DROPPED, and only this: `consultant` (subject + the complete
+# substitution pool), `candidate_theses.inputs` (the same member records
+# again), and `recomposition` (the members' served claims, a third time). The
+# four-copy duplication one run produced across `brief.json`,
+# `brief-result.json`, `brief-adopted.json` and `brief-adopted-result.json`
+# resolves as a CONSEQUENCE of that (AC8) — no deduplication mechanism exists
+# or is needed, and if one seemed necessary this rule was not fully applied.
+GATE_ONLY_BLOCKS = ("consultant", "recomposition")
+
+
+def _decision_record(payload):
+    """The brief artifact: the decision, and nothing recomputable.
+
+    A shallow copy — the payload printed to stdout is untouched, because the
+    gate must see what it always saw (AC2). Shrinking the artifact must never
+    shrink what reaches the owner.
+    """
+    rec = {k: v for k, v in payload.items() if k not in GATE_ONLY_BLOCKS}
+    ct = rec.get("candidate_theses")
+    if isinstance(ct, dict):
+        rec["candidate_theses"] = {k: v for k, v in ct.items()
+                                   if k != "inputs"}
+    return rec
+
+
+def _recompose_gate_blocks(payload, at):
+    """The dropped gate blocks, recomposed from `map.json` at the recorded pin.
+
+    THE STORY QUESTION IN AC3, DECIDED: `brief-open` RECOMPOSES rather than
+    simply not printing. Not printing is simpler and matches the artifact's new
+    definition, but it makes re-opening a strictly poorer act than it was —
+    and the whole reason dropping the blocks is safe is that `map.json` is
+    retained beside the brief, so a path that never exercises that retention
+    leaves the safety argument untested. Recomposing keeps `brief-open` output
+    equivalent to today's AND turns the premise into a running code path.
+
+    It is CONDITIONAL AND HONEST. The map must sit in the artifact's own
+    workspace and carry the pin the brief recorded; on any other outcome the
+    blocks are stated as absent with the reason, never approximated. A
+    recomposition that is merely plausible is worse than none.
+    """
+    note = {"attempted": True, "recomposed": [], "from": None, "why": None}
+    ws = os.path.dirname(os.path.abspath(at))
+    map_path = os.path.join(ws, "map.json")
+    if not os.path.isfile(map_path):
+        note["why"] = (
+            f"no map.json in this brief's workspace ({ws}), so the gate-time "
+            "blocks cannot be recomposed. They are not printed rather than "
+            "approximated — the artifact records the decision, and the inputs "
+            "are recomputable only where the map they were computed from is "
+            "still retained.")
+        return note
+    try:
+        map_data = load_map(map_path)
+    except SystemExit:
+        note["why"] = f"map.json at {map_path} is unreadable"
+        return note
+    map_pin = (map_data.get("coverage") or {}).get("pin")
+    want = payload.get("pin")
+    if want and map_pin and want != map_pin:
+        note["why"] = (
+            f"the brief was composed at {want} and the retained map is at "
+            f"{map_pin}. Recomposing across a moved pin would present material "
+            "the owner never saw as though they had, so the blocks are stated "
+            "absent instead.")
+        return note
+    cands = candidates(map_data)
+    by_id = {c.get("id"): c for c in cands}
+    indexes = list(payload.get("indexes") or [])
+    matches = [by_id[i] for i in indexes if i in by_id]
+    if len(matches) != len(indexes) or not matches:
+        note["why"] = (
+            "the recorded member set does not fully resolve against the "
+            "retained map, so the blocks are stated absent rather than "
+            "recomposed over a different set.")
+        return note
+    note["from"] = map_path
+    note["pin"] = map_pin
+    if len(matches) > 1:
+        payload["consultant"] = _consultant_block(matches, cands, map_data)
+        note["recomposed"].append("consultant")
+        ct = payload.get("candidate_theses")
+        if isinstance(ct, dict):
+            ct["inputs"] = [_member_record(m) for m in matches]
+            note["recomposed"].append("candidate_theses.inputs")
+    payload["recomposition"] = {
+        "authoring": "machine-composed at render time, marked",
+        "over": [m.get("id") for m in matches],
+        "claims": [m.get("gloss") or m.get("direction") for m in matches]}
+    note["recomposed"].append("recomposition")
+    return note
+
+
+def _brief_label(payload):
+    """An owner-meaningful name for a brief, DERIVED and never stored (AC7).
+
+    Date, member set, and the thesis's first words — every part computed from
+    fields the artifact already carries. No naming store, no id field and no
+    slug is added: a stored name is a second identity to keep in sync with the
+    one the path already provides.
+    """
+    life = payload.get("lifecycle") or {}
+    when = ""
+    for h in reversed(list(life.get("history") or [])):
+        if h.get("at"):
+            when = str(h["at"])[:10]
+            break
+    ids = list(payload.get("indexes") or [])
+    if not ids and payload.get("index"):
+        ids = [payload["index"]]
+    who = ", ".join(str(i) for i in ids[:3]) + ("…" if len(ids) > 3 else "")
+    text = str((payload.get("thesis") or {}).get("text")
+               or payload.get("adopted_claim")
+               or payload.get("brief") or "").strip()
+    words = " ".join(text.split()[:8])
+    parts = [p for p in (when, who and f"[{who}]", words) if p]
+    return " — ".join(parts) or "an unnamed brief"
 
 
 def cmd_brief_open(args):
@@ -936,6 +1073,14 @@ def cmd_brief_open(args):
     else:
         payload["lifecycle"] = _brief_lifecycle(state, life.get("history"))
     payload["lifecycle"]["line"] = _brief_lifecycle_line(state)
+    # THE OWNER-MEANINGFUL LABEL, derived here and never written (AC7): the
+    # transition above wrote the artifact, and this is composed after it so
+    # nothing derived can leak into what is stored.
+    payload["label"] = _brief_label(payload)
+    # THE GATE-TIME BLOCKS, recomposed from the retained map (AC3/AC4) — or
+    # stated absent, with the reason, when the map is not there to recompose
+    # from. Never approximated.
+    payload["recomposed_from_map"] = _recompose_gate_blocks(payload, args.at)
     print(json.dumps(payload, indent=2, ensure_ascii=False))
     return 0
 
