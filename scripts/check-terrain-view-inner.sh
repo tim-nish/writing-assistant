@@ -296,8 +296,11 @@ out = mod.brief_from_answer({"index": eids[0], "note": "the angle I want", "pin"
                             cands, pin)
 check(out["brief"].endswith("— the angle I want"),
       f"an element index composes an ordinary brief with the note VERBATIM ({out['brief'][:60]}…)")
-check(out["provenance"] == "owner-authored" and out["origin"] == "adopted-index",
-      "an adopted element is owner-adopted wording, like any other index")
+# THE RATIFIED VALUE (Story 20.102, #1080) — see the sibling assertion in
+# check-terrain-select-index-inner.sh. `origin` is unchanged: it names HOW the
+# selection was made, which is a different fact from who authored the wording.
+check(out["provenance"] == "terrain-adopted" and out["origin"] == "adopted-index",
+      "an adopted element is TERRAIN-ADOPTED, like any other index (#1080)")
 # A stale pin is refused for an element exactly as for a subtopic.
 try:
     mod.brief_from_answer({"index": eids[0], "note": "x", "pin": "other@dead"}, cands, pin)
