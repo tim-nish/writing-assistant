@@ -127,6 +127,86 @@ printf '%s' "$S" | grep -qi 'q_a' \
   && ok "SKILL: q_a/ stays unreachable (promotion is the only path)" \
   || err "SKILL missing the q_a-stays-unreachable clause"
 
+# --- 7. the brief RECORD carries the journey arcs across the boundary ----------
+# Story 20.91 (#1044): a `--brief` FILE that is a JSON brief record resolves to
+# the brief STRING it carries plus the selected Strands' served arcs, recorded
+# BESIDE `sources` as declared source material at the pin.
+cat > "$work/brief-record.json" <<'EOF'
+{"brief": "cover the retry storm — the cold-start angle",
+ "stage": "topic-map-brief",
+ "pins": {"terrain": "abc123", "hub": "def456"},
+ "members": [
+   {"index": "L2", "slug": "retry-storm", "gloss": "GLOSS-ALPHA", "cite": "x",
+    "journey": {"arc": "ARC-ALPHA the belief inverted after the retro.",
+                "arc_cite": "gloss/journeys/agents.md:6@" ,
+                "served": true, "not_served_reason": null}},
+   {"index": "L1", "slug": "cache-warmth", "gloss": "GLOSS-BETA", "cite": "y",
+    "journey": {"arc": null, "arc_cite": null, "served": false,
+                "not_served_reason": "no journey shard is named for this lesson"}},
+   {"index": "L3", "slug": "team-shape", "gloss": "GLOSS-GAMMA", "cite": "z"}]}
+EOF
+out=$(python3 "$DP" start F2 specs/ --root "$host" --brief "$work/brief-record.json")
+echo "$out" | jget "d.get('brief',{}).get('origin')" | grep -q brief-record \
+  && ok "a JSON brief record is recognised by shape (origin 'brief-record')" \
+  || err "brief record not recognised"
+echo "$out" | jget "d.get('brief',{}).get('text')" | grep -q '^cover the retry storm — the cold-start angle$' \
+  && ok "the brief STRING is the record's own, used unchanged (behaviour uniform)" \
+  || err "brief record text wrong"
+echo "$out" | jget "json.dumps(d.get('journey_arcs',{}).get('at'))" | grep -q def456 \
+  && ok "the arcs are carried AT the recorded pin" || err "arc pin not carried"
+echo "$out" | python3 -c "
+import json, sys
+d = json.load(sys.stdin)
+a = {x['slug']: x for x in d['journey_arcs']['arcs']}
+assert a['retry-storm']['arc'] == 'ARC-ALPHA the belief inverted after the retro.', a
+assert a['retry-storm']['served'] is True and a['retry-storm']['arc_cite'], a
+# AC2: absence keeps its kinds — 'no arc exists' vs 'no arc arrived' vs a
+# record that predates the field. None of the three collapse into the others.
+assert a['cache-warmth']['served'] is False, a
+assert 'no journey shard' in a['cache-warmth']['not_served_reason'], a
+assert a['team-shape']['served'] is False, a
+assert 'predates' in a['team-shape']['not_served_reason'], a
+" && ok "the served arc is quoted verbatim; absence keeps its three kinds" \
+  || err "arc payload wrong"
+# AC3: the arcs arrive ALONGSIDE the sources — the source set is untouched.
+arcsrc=$(echo "$out" | jget 'json.dumps(d["sources"])')
+[ "$base" = "$arcsrc" ] \
+  && ok "arcs never widen the source boundary (repositories stay harvest scope)" \
+  || err "the brief record changed the source set: base=$base with=$arcsrc"
+# The entry request carries the brief TEXT, never the file's path.
+if echo "$out" | jget "d.get('entry',{}).get('request','')" | grep -q 'brief-record.json'; then
+  err "the entry request leaked the brief file path"
+else
+  ok "the entry request carries the brief text, never a machine path"
+fi
+# A plain-text brief file is untouched by all of the above.
+out=$(python3 "$DP" start F2 specs/ --root "$host" --brief "$work/brief.txt")
+echo "$out" | jget "'journey_arcs' in d" | grep -q False \
+  && ok "a plain text brief grows no journey_arcs (format, not producer)" \
+  || err "a plain text brief was read as a record"
+
+# --- 8. the stage-0 surface states the arc contract ----------------------------
+printf '%s' "$S" | grep -qi 'journey_arcs' \
+  && ok "stage0: the run state's journey_arcs is documented" \
+  || err "stage0 missing the journey_arcs contract"
+printf '%s' "$S" | grep -qiE 'alongside the host-repo sources|beside .sources.' \
+  && ok "stage0: arcs arrive alongside the host-repo sources, never in place" \
+  || err "stage0 missing the alongside-the-sources clause"
+printf '%s' "$S" | grep -qiE 'article floor is unchanged|never satisfies it|never a new licence' \
+  && ok "stage0: the article floor is unchanged — an arc is not a Fact" \
+  || err "stage0 missing the article-floor clause"
+printf '%s' "$S" | grep -qi 'NEEDS-RECORDING' \
+  && printf '%s' "$S" | grep -qi 'adjacent, not' \
+  && ok "stage0: NEEDS-RECORDING is adjacent, not subsumed" \
+  || err "stage0 missing the NEEDS-RECORDING relationship"
+printf '%s' "$S" | grep -qi '#1045' \
+  && printf '%s' "$S" | grep -qi 'parked' \
+  && ok "stage0: the incorporation register stays parked (#1045), nothing decided" \
+  || err "stage0 missing the parked-register clause"
+printf '%s' "$S" | grep -qiE 'format and never a producer|never a producer' \
+  && ok "stage0: the record is a format, never a producer (entry-agnosticism)" \
+  || err "stage0 missing the format-not-producer clause"
+
 if [ "$fail" -eq 0 ]; then
   printf '\nAll coverage-brief checks passed.\n'; exit 0
 else

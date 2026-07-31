@@ -372,10 +372,10 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py stage0 <framework> <sour
 ```
 
 The run-state then carries `brief: {"text": …, "provenance": "owner-authored",
-"origin": "inline"|"file"}` — recorded with **owner-authored provenance**, like
-an interview answer; the brief is the owner's words, never a tool-invented
-scope. The brief then shapes three stages, all **inside the existing
-boundaries**:
+"origin": "inline"|"file"|"brief-record"}` — recorded with **owner-authored
+provenance**, like an interview answer; the brief is the owner's words, never a
+tool-invented scope. The brief then shapes three stages, all **inside the
+existing boundaries**:
 
 - **Selection** — the brief **maps to story-element clusters** (CAP-9): each
   brief item selects its matching cluster, disclosed per element exactly as any
@@ -400,6 +400,9 @@ At completion record `brief_provenance` **matching the actual producer** (Story 
 **Nothing reads that pointer and no stage may** — it is never opened, stat'd or followed — and **no stage branches on `brief_provenance`**: the draft, the harvest emphasis and the argument plan are byte-identical either way. Resolving it would oblige this pipeline to know another producer's rendering, invocation and lifetime; a value nothing reads creates no such obligation.
 With **no** `--brief`, the run behaves exactly as before — the brief is an
 optional owner input, never a required gate.
+
+**The brief record and its journey arcs (Story 20.91, #1044).** A `--brief` FILE that is a JSON object carrying a `brief` string is a **brief record**: the string is used unchanged (so every behaviour above is untouched), and the members it was composed over contribute `journey_arcs` to run state — `{"at": <pins>, "arcs": [{index, slug, arc, arc_cite, served, not_served_reason}, …]}` — **beside `sources`**, as declared source material at the recorded pin, **alongside the host-repo sources and never in place of them**. `sources` is untouched: an arc is not a repository, the boundary is not widened, and repositories remain harvest **scope**, never evidence binding. Recognition is by **shape**, which makes this a **format and never a producer** — nothing here detects, names, imports or resolves who wrote the file, an owner can hand-write one, and anything else stays a plain text file read exactly as before. Each arc travels **quoted at its cite in the register it was served in**; no stage rewrites it into a rule, a summary or a claim before the drafting decision. An absent one carries `served: false` with its `not_served_reason`, so *"no arc exists"*, *"no arc arrived"* and *a record predating the field* stay three findings and never collapse into one.
+**The article floor is unchanged**: every article still carries ≥1 Fact — a sourced or derived claim resolving at the ship gate — and **an arc alone never satisfies it**. An arc arriving is new material, not a new licence, and missing per-Strand facts stay disclosure rather than failure. **NEEDS-RECORDING is adjacent, not subsumed**: recording an episode host-side is what eventually feeds evidence, while a served arc is material that already existed and was simply never consumed — neither closes the other, and no stage discharges a recording task because an arc arrived. This makes arcs **available** and decides nothing about prose: whether one enters as a worked example, a short story, or a standalone paragraph is **parked** (#1045) behind the first draft composed with arcs available, and a stage that picks one has decided a parked question. Distinct from the completion-time `brief_source.artifact` pointer above, which is never opened, stat'd or followed — this record is an **input handed to the gate** through the `--brief` contract that has accepted a file since Story 18.24.
 
 ### Plan consultation at draft start (SPEC-article-plan CAP-3, Story 13.57)
 

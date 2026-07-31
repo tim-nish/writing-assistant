@@ -51,6 +51,27 @@ def _selection_gap(candidate, recording_target):
     in the declared journey doc) — and the brief is composed exactly as for a
     matched one. NEVER a refusal: a mechanism that stops drafting here has
     stopped being an assistant (owner ruling, #799).
+
+    AN EPISODE THE SYSTEM IS CARRYING IS NOT AN ABSENT ONE (Story 20.91, #1044
+    AC2). The host-repo journey join is a fact about the HOST REPO and it is
+    KEPT, under `host_join`; what was wrong was REPORTING it as the episode's
+    absence while the hub was serving that very episode as the Strand's arc —
+    three selected Strands were disclosed `episodic-unrecorded` in one sitting
+    with their arcs served the whole time. So a served arc changes what this
+    block SAYS, and changes nothing about what it DOES:
+
+      * the arc is carried, quoted at its cite — never re-expressed here;
+      * `episode.served` and `not_served_reason` keep 20.90's two kinds apart,
+        so *"no arc exists"* and *"no arc arrived"* remain different findings
+        and never collapse into one;
+      * the NEEDS-RECORDING task is still minted (AC4). Recording the episode
+        host-side is what eventually feeds EVIDENCE; the served arc is
+        material that already existed and was simply never consumed. Adjacent,
+        not the fix — neither closes the other, and dropping the task here
+        would quietly make an arc a substitute for evidence;
+      * the article floor is untouched (AC3): an arc is material, not a Fact.
+        Repositories stay harvest scope and never evidence binding, and a
+        served arc satisfies nothing at the ship gate.
     """
     if not candidate or candidate.get("kind") != "element":
         return None
@@ -60,9 +81,50 @@ def _selection_gap(candidate, recording_target):
         return None
     target = recording_target or {}
     slug = str(candidate.get("slug") or "").strip()
+    arc = candidate.get("journey")
+    arc = arc if isinstance(arc, str) and arc.strip() else None
     gap = {"verdict": verdict, "slug": slug,
            "checked": u.get("checked") or [],
            "drafting": "proceeds — the verdict is a disclosure, never a gate"}
+    # The EPISODE's own state, stated beside the host join and never merged
+    # into it. Carried on every gap, including `no-episode` and
+    # `cannot-determine`, so a reader never has to infer which of the two
+    # lookups a silence belongs to.
+    gap["episode"] = {
+        "served": arc is not None,
+        "arc": arc,
+        "arc_cite": candidate.get("journey_cite") if arc else None,
+        "not_served_reason": (None if arc
+                              else candidate.get("journey_unavailable")),
+    }
+    if verdict == "episodic-unrecorded" and arc:
+        # NOT an unrecorded episode. The mechanical host-repo verdict is kept
+        # verbatim where it belongs — as a fact about the host repo — and the
+        # reported finding becomes the true one.
+        gap["verdict"] = "episode-served"
+        gap["host_join"] = {"verdict": verdict,
+                            "checked": u.get("checked") or []}
+        gap["disclosure"] = (
+            "the hub serves this element's episode as its journey arc, and "
+            "the arc crosses into drafting as declared source material at the "
+            "recorded pin — so this is NOT an unrecorded episode. What no "
+            "declared source in the target repo carries is a HOST-SIDE "
+            "recording of it, and that gap is real and unchanged: recording "
+            "the episode there is what eventually feeds evidence, while the "
+            "served arc is material that already existed and was simply never "
+            "consumed. The two are adjacent, not substitutes, and neither "
+            "closes the other. The draft proceeds, and the article floor is "
+            "unchanged — an arc is material, never a Fact.")
+        gap["needs_recording"] = {
+            "slug": slug,
+            "target_repo": target.get("repo"),
+            "target_file": target.get("file"),
+            "heading": "NEEDS-RECORDING",
+            "entry": (f"{slug} — selected on the terrain (the hub serves its "
+                      "arc; no declared source here carries the episode); "
+                      "record the episode here so the next run can match it"),
+        }
+        return gap
     if verdict == "cannot-determine":
         gap["disclosure"] = (
             "the evidence lookup could not determine whether a declared "
