@@ -258,12 +258,12 @@ rm -f "$DEST/stray-artifact.md"
 # destination surface therefore shrinks back to INDEX.md alone, and the check
 # shrinks with it in the same sitting — a permitted-surface list and its check
 # are amended together or the list is not the surface.
-vpath=$(python3 "$root/scripts/resolve-paths.py" topic-map-view --root "$HOST")
+vpath=$(python3 "$root/scripts/resolve-paths.py" terrain-view --root "$HOST")
 case "$vpath" in
   "$DEST"/*) err "View still resolves inside the output.drafts destination repo ($vpath)" ;;
   *) ok "View resolves OUTSIDE the destination repo (#874)" ;;
 esac
-vpath2=$(python3 "$root/scripts/resolve-paths.py" topic-map-view --root "$HOST")
+vpath2=$(python3 "$root/scripts/resolve-paths.py" terrain-view --root "$HOST")
 [ "$vpath" = "$vpath2" ] \
   && ok "View path is FIXED across invocations (not per-run)" \
   || err "View path changed between invocations: [$vpath] vs [$vpath2]"

@@ -266,8 +266,16 @@ def terrain_runs_dir(root):
 # destination path itself is the defect the seam exists to prevent.
 # --------------------------------------------------------------------------
 
-TOPIC_MAP_VIEW_DIR = "topic-map"
-TOPIC_MAP_VIEW_BASENAME = "topic-map-view.md"
+# The View's basename, in the OWNER'S vocabulary (Story 20.85, #1040;
+# SPEC-terrain amendments, 2026-07-31 triage). It left #726's machine-key
+# exemption because both grounds of that exemption are falsified: owner-facing
+# is a type carried by the VALUE, not a property of which file it lives in — and
+# the View is the one artifact this flow writes for the owner to open — while
+# the published-artifact location #726 declined to rename no longer exists.
+#
+# `TOPIC_MAP_VIEW_DIR = "topic-map"` was deleted with it: dead since the #874
+# relocation stopped composing that directory component, with zero references.
+TOPIC_MAP_VIEW_BASENAME = "terrain-view.md"
 # The in-repo directory holding this tool's outputs and debug artifacts
 # (D2, amended 2026-07-28, #874). Ignored by the repo and guarded by a check:
 # a run's intermediates carry hub renderings, and this repository is public.
@@ -299,15 +307,21 @@ def articles_repo_root(root):
 
 
 def topic_map_view(root):
-    """The Terrain View's FIXED path (SPEC-terrain CAP-3, amended
-    2026-07-23): <destination-repo>/topic-map/<repo-key>/topic-map-view.md.
-    None when no destination is declared.
+    """The Terrain View's FIXED path (SPEC-terrain CAP-3, amended 2026-07-23;
+    relocated 2026-07-28, #874): `<host-repo>/.writing-assistant/terrain/
+    terrain-view.md` — inside THIS tool's own output directory in the
+    writing-assistant working tree, which the repository ignores. None when no
+    destination is declared.
 
-    The path keeps the `topic-map` spelling deliberately. It is an internal
-    machine key with no owner-facing reading, and it is a published-artifact
-    location with live files behind it and no discovery mechanism pointing at
-    any other name — so the 2026-07-26 rename (#726) stops at the surfaces a
-    reader reads. Any future change to this path must supply the migration.
+    The basename is the OWNER'S word (Story 20.85, #1040). It read
+    `topic-map-view.md` under #726's machine-key exemption, on two grounds the
+    2026-07-31 amendment falsifies: owner-facing is a type carried by the value
+    rather than a property of which file it lives in, and the View is the one
+    artifact this flow writes for a human to open — so the value was
+    owner-facing all along; and the published-artifact location whose migration
+    cost #726 declined to pay no longer exists, so nothing is owed. The file is
+    regenerated every invocation and never read back, so there is no old name to
+    migrate from and no compatibility alias is written.
 
     Fixed, not per-run: the View is written for the owner to open, and a
     per-run path moves every invocation, so nothing opened during a sitting can
@@ -662,8 +676,11 @@ def main(argv=None):
     sub.add_parser("terrain-output-root",
                    help="print the root this tool's outputs and debug "
                         "artifacts live under (D2, #874)")
-    sp = sub.add_parser("topic-map-view", help="print the topic-map View's fixed path in the "
-                        "output.drafts destination repo (Story 18.72); creates its directory")
+    # THE VERB TRAVELS WITH THE FILENAME (Story 20.85, #1040). It is typed into
+    # an owner-facing procedure document, and a resolver whose verb and answer
+    # disagree manufactures exactly the drift #1039 records.
+    sp = sub.add_parser("terrain-view", help="print the Terrain View's fixed path under this "
+                        "tool's own output root (#874); creates its directory")
     sp.add_argument("--root", help="host-repo root (default: git top-level of cwd; errors outside a git repo)")
 
     sp = sub.add_parser("list-drafts", help="enumerate run workspaces holding a draft.md, "
@@ -686,7 +703,7 @@ def main(argv=None):
         "new-run": cmd_new_run,
         "run-workspace": cmd_run_workspace,
         "terrain-output-root": cmd_terrain_output_root,
-        "topic-map-view": cmd_topic_map_view,
+        "terrain-view": cmd_topic_map_view,
         "list-drafts": cmd_list_drafts,
         "target": cmd_target,
     }[args.cmd](args)

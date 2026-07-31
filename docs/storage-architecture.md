@@ -127,7 +127,7 @@ classes, split at the resolver:
 
 | class | where | why |
 |---|---|---|
-| Terrain's **View** (`topic-map-view.md`) — the owner-facing full report | the writing-assistant working tree | a human opens it to read; it is the deliverable |
+| Terrain's **View** (`terrain-view.md`) — the owner-facing full report | the writing-assistant working tree | a human opens it to read; it is the deliverable |
 | **run workspaces** (`runs/<run-id>/`) and **debug artifacts** | the machine state root | machine-readable intermediates, caches and resumable state, which a human never opens by intent |
 
 The split is the one already stated portfolio-wide — human-facing artifacts in
