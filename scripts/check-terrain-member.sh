@@ -556,6 +556,40 @@ check(d["placements"] == len(placed),
 titles = {s["title"]: s for s in d["sections"]}
 check("shared path X" in titles, "the composer's own grouping is honoured")
 
+# --- #1017: the COMPOSED LISTING renders the same substrate as `sections` ---
+# The defect this catches: `compose_member_listing` called `member_sections`
+# without substrate/grouping, so in composed mode the `listing` rendered
+# CO-TAG sections while `sections` beside it rendered the judged grouping —
+# one response answering the same question two ways.
+#
+# Every assertion above reads `sections`, which was always correct; that is
+# why nothing caught it. The composed listing is the surface an owner actually
+# READS (Story 20.66 made the script compose it end to end precisely so a
+# relay could not reword it), so it is the one that must be checked.
+dc = member(path, "agents", ["--substrate", "journey-similarity",
+                             "--grouping", json.dumps(grouping),
+                             "--claims", json.dumps({"G1": "shared path X"})])
+listing = dc["listing"]
+sec_titles_expected = [s["title"] for s in dc["sections"]]
+check("shared path X" in listing,
+      "the composed listing renders the JUDGED grouping's section title")
+# Assert over HEADINGS, never over the whole body: `(also in: …)` legitimately
+# appears on Strand ROWS on every screen (Screen 2 keeps the context line on
+# the row by design), so a naive substring test over the body passes or fails
+# on fixture co-tagging rather than on the defect.
+heads = [ln for ln in listing.splitlines() if ln.startswith("## ")]
+stray = [h for h in heads if not any(t in h for t in sec_titles_expected)]
+check(not stray,
+      f"every heading in the composed listing belongs to the JUDGED grouping — "
+      f"a co-tag heading here is the #1017 defect, invisible in `sections` ({stray})")
+check(dc["substrate"] == "journey-similarity",
+      f"the response names the substrate it actually rendered ({dc['substrate']})")
+# Same question of both fields: whatever the listing shows, `sections` shows.
+sec_titles = sec_titles_expected
+check(all(t in listing for t in sec_titles),
+      f"every section title in `sections` appears in the composed listing "
+      f"({[t for t in sec_titles if t not in listing]} missing)")
+
 # --- AC6/AC3: residues are NAMED and distinguished -------------------------
 check(m.NO_SHARED_PATH_TITLE in titles
       and sorted(titles[m.NO_SHARED_PATH_TITLE]["strands"]) == ["a2", "a3", "a4", "a5"],
