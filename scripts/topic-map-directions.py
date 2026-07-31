@@ -547,8 +547,24 @@ def _brief_from_index(answer, cands, map_pin, map_data=None):
             # cohere with itself, and a consultant with nothing to assess would
             # be shape without content.
             **({"consultant": _consultant_block(matches, cands, map_data)}
-               if len(matches) > 1 else {}),
-            "candidate": matches[0]}
+               if len(matches) > 1 else {})}
+    # `candidate` IS GONE (Story 20.99, #1077). It carried `matches[0]` — the
+    # raw map element for the FIRST member — beside `members`, so a consumer
+    # reading the plausibly-named key saw a one-Strand brief. Both names read as
+    # "the selection" and only one was the record, which is worse than an
+    # absent field: every future reader had to learn which to distrust.
+    #
+    # It also dragged the map-element schema across the boundary whole —
+    # `element_kind`, `topics`, `subtopics`, `date`, `depth`, `usability`,
+    # `consumed`, `evidence_pointers` — map-internal working state, with
+    # internal topic vocabulary reaching an artifact that crosses into
+    # drafting. Removing the key removes that leak entirely; `_member_record`
+    # was already the clean projection.
+    #
+    # A ONE-MEMBER SELECTION TAKES THE SAME PATH. A set of one is the
+    # degenerate case of a set, not a different operation, so it emits the same
+    # keys — which is what stops the singular from growing back as a
+    # special case.
     if len(matches) > 1:
         # THE THESIS IS A CHOICE FROM CANDIDATES (Story 20.78, #995), and the
         # gate says which state it is in. Carried for a SET only: one Strand's
@@ -822,24 +838,36 @@ def cmd_brief(args):
     # writability gap is DISCLOSED beside the brief — with the tracking
     # artifact's content for the target repo — and the run proceeds. There is
     # no refusal path here on evidence.
-    gap = _selection_gap(out.get("candidate"),
-                         (map_data or {}).get("recording_target"))
-    if gap:
-        out["gap"] = gap
-    # A SET discloses every member's gap, not just the first one's (Story
-    # 20.54): the completeness invariant follows the selected set into
-    # drafting, so a gap disclosed for one member and silent for four would
-    # be exactly the silent omission the member record exists to prevent.
-    if len(out.get("members") or []) > 1:
-        by_id = {c.get("id"): c for c in cands}
-        gaps = []
-        for m in out["members"]:
-            g = _selection_gap(by_id.get(m.get("index")),
-                               (map_data or {}).get("recording_target"))
-            if g:
-                gaps.append(dict(g, index=m.get("index")))
-        if gaps:
-            out["gaps"] = gaps
+    # EVERY member's gap, in `gaps`, at every set size (Story 20.99, #1077).
+    # `gap` — the FIRST member's, computed from the deleted `candidate` — used
+    # to sit beside `gaps`, byte-identical to `gaps[0]` minus its `index`. One
+    # fact twice, under two names that both read as "the gap".
+    #
+    # The size condition went with it. It existed only because `gap` covered
+    # the one-member case, and dropping it without dropping the condition would
+    # have left a single-member selection disclosing no gap at all — the silent
+    # omission the member record exists to prevent, arriving through the fix.
+    by_id = {c.get("id"): c for c in cands}
+    gaps = []
+    for m in out.get("members") or []:
+        g = _selection_gap(by_id.get(m.get("index")),
+                           (map_data or {}).get("recording_target"))
+        if g:
+            gaps.append(dict(g, index=m.get("index")))
+    if gaps:
+        out["gaps"] = gaps
+    elif out.get("candidate"):
+        # THE ADOPTED-CANDIDATE PATH IS UNCHANGED and still discloses its gap.
+        # That path (`:626-629`) is a different brief shape — the owner adopted
+        # a proposed direction string rather than indexes, so it has no member
+        # set — and #1077 is about the SET path, where `candidate` sat beside
+        # `members` claiming to be the selection. Dropping the disclosure here
+        # while removing the key there would fix a naming defect by creating an
+        # evidence one.
+        g = _selection_gap(out["candidate"],
+                           (map_data or {}).get("recording_target"))
+        if g:
+            out["gap"] = g
     out["stage"] = "topic-map-brief"
     # THE NAMED STEP IDENTITY (Story 20.75 AC1): the act that produced this
     # brief, named, so the owner refers to it rather than to "the message

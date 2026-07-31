@@ -603,7 +603,14 @@ import json, sys
 b = json.load(open(sys.argv[1]))
 assert b["brief"].startswith("cover the lesson — GLOSS-BETA"), b["brief"]
 assert b["brief"].endswith("the cold-start angle"), b["brief"]
-gap = b["gap"]
+# `gaps`, NOT `gap` (Story 20.99, #1077). The singular carried member[0]'s
+# record beside the plural and read as "the selection"; a one-member selection
+# is the degenerate case of a set and now takes the same path and the same key.
+# Every assertion below is unchanged — only where the record is read from.
+assert "gap" not in b, sorted(b)
+assert len(b["gaps"]) == 1, b["gaps"]
+gap = b["gaps"][0]
+assert gap["index"] == "L1", gap
 assert gap["verdict"] == "episodic-unrecorded", gap
 assert "never" in gap["drafting"] and "gate" in gap["drafting"], gap
 nr = gap["needs_recording"]
