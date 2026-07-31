@@ -656,6 +656,26 @@ def compose_full_report(map_data, tag, cands, group_ids, axis="tag",
     the elision marker is therefore the served material's own. The surface also
     NAMES ITS JOURNEY LABEL in the header legend, because the owner asked what
     `how it changed:` was and nothing here answered.
+
+    THE DETERMINISTIC CONTEXT LINE LIVES IN A FOOTNOTE (Story 20.74, #987;
+    CAP-3 as amended 2026-07-31). It bundles three fields with three different
+    audiences — cross-group placement, which serves *selection-screen*
+    navigation; the origin pin, which serves verification; and a completeness
+    attestation with no reader action attached — and between a claim and the
+    material it stands for, all three are noise. It is RELOCATED, NEVER
+    DROPPED: the same composed line, unchanged in what it says, is collected
+    verbatim at the end of the report, so the pins the report rendered are
+    still restated (a CAP-3 constraint this story must not regress) and the
+    reading flow no longer pays for them per row. `_strand_context_line` is
+    SHARED with `compose_member_listing`, which keeps the line ON the row —
+    that is the surface it was designed for, where placement is navigation.
+    Only this call site moves.
+
+    The reported "inconsistent presence" is NOT a defect and is not fixed
+    here: presence was never conditional. The composer emits the line for
+    every Strand and only its first field varies — a Strand with no co-tags
+    renders `in no other Topic`. The groups that looked inconsistent differ in
+    CO-TAGGING, not in row contract.
     """
     ms = member_sections(map_data, tag, axis, grouping=grouping)
     by_id = {s.get("group_id"): s for s in ms["sections"]}
@@ -699,8 +719,19 @@ def compose_full_report(map_data, tag, cands, group_ids, axis="tag",
              # in an elision marker is the served material's own.
              "Every line below is relayed whole — this report does not "
              "shorten a gloss, a context line or a journey arc.",
+             # WHERE THE AUDIT METADATA WENT, said before the reader misses it
+             # (amended 2026-07-31, #987). Relocated, never dropped: a reader
+             # who wants the placement, the origin pin or the attestation is
+             # told, at the top, exactly where every one of them is.
+             "Each Strand's placement, origin pin and attestation are "
+             "collected in the FOOTNOTES at the end of this report, out of "
+             "the reading flow and none of them dropped.",
              ""]
     groups = []
+    # Collected as the body renders, emitted once at the end: one entry per
+    # rendered Strand, in the order the report rendered them, so the footnote
+    # is a relocation of the row's own line and not a second derivation of it.
+    footnotes = []
     for gid in group_ids:
         sec = by_id[gid]
         strands = sec["strands"]
@@ -746,7 +777,15 @@ def compose_full_report(map_data, tag, cands, group_ids, axis="tag",
             # (which never truncated) or in VIEW_LINE_CHARS (which still binds
             # the size-switched screens, `compose_member_listing` above).
             lines.append(f"- **{ident}** — {text}{mark}")
-            lines.append(_strand_context_line(el, ms["member"], subbed))
+            # THE CONTEXT LINE IS NOT ON THE ROW HERE (Story 20.74, #987). It
+            # is composed by the SAME function the selection screens use and
+            # carried, byte for byte, into the footnote block below: what it
+            # says is unchanged, only where it lives. Its three fields —
+            # placement, origin pin, attestation — plus the SUBSTITUTED SOURCE
+            # and `no-journey` marks therefore all survive the move.
+            footnotes.append(
+                f"- **{ident}** — {gid} — "
+                f"{_strand_context_line(el, ms['member'], subbed).strip()}")
             arc = _journey_arc_line(el)
             if arc:
                 lines.append(arc)
@@ -756,6 +795,23 @@ def compose_full_report(map_data, tag, cands, group_ids, axis="tag",
                        "claim_carried": bool(claim),
                        "strands": [e.get("slug") for e in strands],
                        "count": len(strands)})
+    # THE FOOTNOTE BLOCK (Story 20.74, #987). One entry per rendered Strand —
+    # never per co-tagged Strand, since the line renders for every Strand and
+    # only its first field varies — carrying exactly what the row used to
+    # carry. It closes the report because that is the point of the move: the
+    # verification material is reachable without standing between the reader
+    # and the material it verifies.
+    if footnotes:
+        lines.append("## Footnotes — placement, origin pins and attestation")
+        lines.append("")
+        lines.append("One entry per Strand rendered above, in the order it "
+                     "was rendered: where else the map places it, where it "
+                     "came from, and whether its reasoning travels with it. "
+                     "Nothing here is new — this is the row context line, "
+                     "moved out of the reading flow.")
+        lines.append("")
+        lines += footnotes
+        lines.append("")
     return {"kind": "terrain-full-report", "member": ms["member"], "axis": axis,
             "pin": map_data.get("coverage", {}).get("pin"),
             "substrate": ms["substrate"],
@@ -763,6 +819,10 @@ def compose_full_report(map_data, tag, cands, group_ids, axis="tag",
             "groups": groups,
             # Inspection, asserted as data as well as said in prose.
             "selected": [], "brief": None, "recomposed": False,
+            # Asserted as data too: the count a consumer can compare against
+            # the rendered Strands, so "relocated, never dropped" is checkable
+            # without parsing prose.
+            "footnotes": len(footnotes),
             "relay": "whole",
             "report": "\n".join(lines).rstrip() + "\n"}
 

@@ -48,6 +48,14 @@ work=$(mktemp -d); trap 'rm -rf "$work"' EXIT
 # with every arc short, a renderer that clips every line is indistinguishable
 # from one that clips none — which is exactly why the violation shipped
 # unnoticed while all four terrain checks passed.
+#
+# ONE member carries NO CO-TAG (Story 20.74, #987). Every fixture Strand used
+# to be co-tagged, which is the only reason the old `count("(also in:") ==
+# len(strands)` assertion passed: it encoded the same wrong premise the issue
+# did — that the context line is emitted per CO-TAGGED Strand. It is emitted
+# per Strand, and a Strand with no co-tags renders `in no other Topic`. The
+# co-tagless member makes that difference observable rather than asserted; the
+# co-tags substrate places it in its own `no shared co-tag` group.
 python3 - "$work" <<'PYEOF'
 import json, sys
 w = sys.argv[1]
@@ -69,16 +77,23 @@ for n in range(12):
         el["journey"] = LONG_ARC
         el["journey_recorded"] = True
     els.append(el)
+els.append({"kind": "lesson", "slug": "w99", "title": "W99",
+            "gloss": "a claim the material makes, number 99",
+            "tags": ["workflow"],
+            "situation": "LESSONS.md:99@abc1234",
+            "evidence": ["LESSONS.md:1@abc1234"], "consumed": False})
 json.dump({"kind": "topic-map", "topics": [],
            "coverage": {"pin": "h@abc1234"}, "elements": els},
           open(w + "/map.json", "w"))
 PYEOF
 
 python3 "$D" member --map "$work/map.json" --tag workflow > "$work/member.json"
-CLAIMS='{"G1":"the agents thread, as the screen said it","G2":"the cost thread, as the screen said it"}'
+CLAIMS='{"G1":"the agents thread, as the screen said it","G2":"the cost thread, as the screen said it","G3":"the uncotagged thread, as the screen said it"}'
 
-# Asked in REVERSE screen order, to prove the order is the owner's.
-python3 "$D" report --map "$work/map.json" --tag workflow --groups "G2,G1" \
+# Asked in REVERSE screen order, to prove the order is the owner's. G3 is the
+# co-tagless group (Story 20.74): it is asked HERE, in the mixed report, so the
+# footnote assertions below run over a set that contains both shapes.
+python3 "$D" report --map "$work/map.json" --tag workflow --groups "G2,G1,G3" \
   --claims "$CLAIMS" > "$work/both.json" 2>"$work/both.err" \
   || err "the full report failed: $(cat "$work/both.err")"
 # One group only: the report covers exactly what was named, never the member.
@@ -136,30 +151,89 @@ b = json.load(open(w + "/both.json"))
 rep = b["report"]
 
 # AC1 — separately, in the order asked, keyed by screen id. Never a union.
-check([g["group_id"] for g in b["groups"]] == ["G2", "G1"],
+check([g["group_id"] for g in b["groups"]] == ["G2", "G1", "G3"],
       "each named group renders separately, in the order asked")
-check(rep.index("## G2 ") < rep.index("## G1 "),
+check(rep.index("## G2 ") < rep.index("## G1 ") < rep.index("## G3 "),
       "the rendered order is the owner's, not the screen's")
-check(b["asked"] == ["G2", "G1"], "the report records what was asked")
+check(b["asked"] == ["G2", "G1", "G3"], "the report records what was asked")
 allslugs = [s for g in b["groups"] for s in g["strands"]]
-check(len(allslugs) == len(set(allslugs)) and len(b["groups"]) == 2,
-      "the groups stay two rendered blocks — never flattened into one union")
+check(len(allslugs) == len(set(allslugs)) and len(b["groups"]) == 3,
+      "the groups stay separate rendered blocks — never flattened into a union")
 
-# AC2 — the claim first, then every member whole: gloss, context line, arc.
-for gid in ("G2", "G1"):
+# AC2 — the claim first, then every member whole: gloss and arc. The context
+# line is NOT on the row any more (Story 20.74, #987) — see the footnote block
+# assertions below, which is where it went.
+CLAIM_WORD = {"G2": "cost", "G1": "agents", "G3": "uncotagged"}
+for gid in ("G2", "G1", "G3"):
     block = rep.split(f"## {gid} ")[1].split("\n## ")[0]
-    claim = f"In common: the {'cost' if gid == 'G2' else 'agents'} thread"
-    check(claim in block, f"{gid} renders its claim")
+    check(f"In common: the {CLAIM_WORD[gid]} thread" in block,
+          f"{gid} renders its claim")
     body = block.split("In common:")[1]
-    # Every member is present, whole, with its context line beneath it.
+    # Every member is present, whole.
     for slug in secs[gid]["strands"]:
         n = slug[1:]
         check(f"a claim the material makes, number {n}" in body,
               f"{gid}: {slug}'s served rendering appears whole")
-    check(body.count("(also in:") == len(secs[gid]["strands"]),
-          f"{gid}: every member carries its deterministic context line")
+    # AC1 of story 20.74: no Strand row carries the context line here. Both
+    # renderings of its first field are excluded, because excluding only
+    # "(also in:" would repeat the premise bug this story exists to fix.
+    check("(also in:" not in body and "in no other Topic" not in body,
+          f"{gid}: no Strand row carries the deterministic context line")
     check(block.index("In common:") < block.index("- **"),
           f"{gid}: the claim appears BEFORE its members")
+
+# --- Story 20.74 (#987): the context line is RELOCATED, never dropped -------
+# It bundles cross-group placement, the audit pin and a completeness
+# attestation — three audiences, none of them the reader of one group read
+# whole — so it leaves the row for a footnote block. CAP-3 still requires the
+# report to restate the pins it rendered, which is why "dropped" would fail
+# this story and every field below is asserted present.
+head, sep, foot = rep.partition("## Footnotes")
+check(sep, "the report carries a footnote block")
+check("FOOTNOTES" in head.split("## ")[0],
+      "the header says WHERE the audit metadata went, before the reader misses it")
+check("\n## " not in foot,
+      "the footnote block is LAST — the verification material never stands "
+      "between the reader and the material it verifies")
+
+# The rows the body actually rendered, in rendered order, with their group.
+rendered = []
+for gid in ("G2", "G1", "G3"):
+    block = rep.split(f"## {gid} ")[1].split("\n## ")[0]
+    rendered += [(ln.split("**")[1], gid) for ln in block.splitlines()
+                 if ln.startswith("- **")]
+entries = [ln for ln in foot.splitlines() if ln.startswith("- **")]
+check(len(entries) == len(rendered) == len(allslugs),
+      f"one footnote entry per RENDERED Strand ({len(entries)} of {len(rendered)})")
+check(b["footnotes"] == len(entries),
+      "the payload declares the footnote count, so 'never dropped' is checkable "
+      "without parsing prose")
+check([(e.split("**")[1], e.split("—")[1].strip()) for e in entries] == rendered,
+      "each entry names its Strand and the group it was rendered under, in "
+      "rendered order")
+
+# THE PREMISE FIX (AC4). The old assertion counted `(also in:` once per Strand
+# and so ASSUMED every Strand is co-tagged; it passed only because every
+# fixture Strand was. The line renders for EVERY Strand and only its first
+# field varies, so the count that holds is over both renderings — and the
+# fixture now contains one of each, which is what makes this falsifiable.
+placed = [e for e in entries if "(also in:" in e]
+unplaced = [e for e in entries if "in no other Topic" in e]
+check(len(placed) + len(unplaced) == len(entries),
+      "every footnote entry carries a placement field, co-tagged or not")
+check(unplaced and placed,
+      f"the fixture exercises BOTH shapes — {len(placed)} co-tagged, "
+      f"{len(unplaced)} co-tagless. Without a co-tagless Strand the assertion "
+      "above is as untested as the premise bug it replaces")
+# All three fields survive the move, plus the two absence marks.
+for e in entries:
+    check("· from LESSONS.md:" in e or "origin not recorded" in e,
+          f"the origin pin survives the move: {e.split('—')[0].strip()}")
+    check("recorded" in e.split("· from")[-1],
+          f"the attestation survives the move: {e.split('—')[0].strip()}")
+check(sum("· no-journey" in e for e in entries) == len(entries) - 1,
+      "the `no-journey` mark travels into the footnote with the Strand it "
+      "qualifies (all but the one fixture Strand with a recorded journey)")
 
 # AC3 — claims are carried, never recomposed, over the FULL unaltered set.
 for g in b["groups"]:
@@ -196,6 +270,9 @@ check([g["group_id"] for g in one["groups"]] == ["G2"],
 check(one["groups"][0]["count"] == len(secs["G2"]["strands"])
       and all(f"number {s[1:]}" in one["report"] for s in one["groups"][0]["strands"]),
       "the one named group is still relayed whole, every member")
+check(one["footnotes"] == len(secs["G2"]["strands"]),
+      "a single-group report footnotes exactly the Strands it rendered — the "
+      "block is bounded by the report, not by the member")
 
 # --- Story 20.73 (#1011): UNTRUNCATED, and the journey label named ----------
 # Whole-relay was already the contract and the renderer was violating it:

@@ -171,6 +171,13 @@ back, here or anywhere. Group ids are per-screen and per-pin, so the report
 restates the pin and each id's definition — `G2` alone is unreadable one
 invocation later.
 
+The deterministic context line does **not** sit on the row here (CAP-3 as
+amended 2026-07-31, #987): placement, origin pin and attestation are collected
+in a **footnote block at the end of the report**, out of the reading flow and
+none of them dropped. That is a property of this surface only — the selection
+screens above keep the line on the row, which is where placement is
+navigation.
+
 **Selection is a SET (SPEC-terrain CAP-3, added 2026-07-30, #937).** The owner
 may name **several** Strand indexes, and the brief is composed from exactly
 that set — exploring is how they decide what to write about, not a detour
