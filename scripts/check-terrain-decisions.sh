@@ -104,6 +104,87 @@ bare = dv._element_direction(dict(els[1], kind="decision"))
 check(els[1]["summary"] not in bare and "abnormal condition" in bare,
       "an unjoined decision row discloses; the raw topic line never poses as "
       "a rendering")
+# --- terrain routes into the EXISTING intent gate (Story 20.95, #1051) -------
+# The boundary where terrain ends and drafting begins. What a text check can
+# hold is exactly the criteria a well-meaning diff breaks: that the gate is
+# ENTERED rather than rebuilt, that no pipeline vocabulary reaches the owner
+# surface, and that the coupling direction is not inverted. Folded into THIS
+# interpreter rather than starting a second one: the assertions are pure text
+# reads, and the terrain family's runtime SUM is budgeted (#944).
+import re  # noqa: E402
+
+B = open("skills/terrain/steps/brief.md", encoding="utf-8").read()
+S = open("skills/terrain/SKILL.md", encoding="utf-8").read()
+DA = open("skills/draft-article/SKILL.md", encoding="utf-8").read()
+end = B.split("The end of the sitting", 1)[-1]
+
+# AC1 — the existing gate is ENTERED, and no second one is introduced.
+check("intent gate" in end and "skills/draft-article/SKILL.md" in end,
+      "AC1: terrain's end points at draft-article's OWN intent gate, by name "
+      "and by file")
+check("Nothing new is built here" in end,
+      "AC1: ...and says so, so a later diff does not 'helpfully' add one")
+check("second gate" in end and "reimplemented the gate" in end,
+      "AC1: a second gate, label set or question shape is barred in terms")
+# The closed label set must live in ONE place. Terrain must not restate it.
+labels = [l for l in re.findall(r'"([^"]+)"', DA)
+          if l.startswith(("introduce the", "share engineering",
+                           "explain the evaluation", "survey a research",
+                           "write a working"))]
+check(labels, f"the gate's label set is where it always was ({len(labels)})")
+check(sum(1 for l in set(labels) if l in end) <= 1,
+      "AC1: terrain does not restate the closed label set — a second copy is "
+      "a second gate wearing the first one's words")
+
+# AC2 — the recommendation is grounded in the adopted thesis and stays one.
+check("grounded in the adopted thesis" in end,
+      "AC2: the recommended intent is grounded in the thesis's own shape")
+check("nothing is pre-selected" in end and "full label set is offered" in end,
+      "AC2: ...and it remains a recommendation")
+
+# AC3 — sources are asked with the run's evidence state attached, and stay the
+# owner's input.
+check("evidence state" in end and "gaps" in end,
+      "AC3: sources are asked with the run's evidence state attached")
+check("never widens scope" in end,
+      "AC3: ...and the brief directs emphasis WITHIN declared sources")
+
+# AC4 — no pipeline vocabulary and no machine path on the owner surface.
+check('"framework"' in end and "never owed one here" not in end
+      or "was never owed one here" in end,
+      "AC4: the vocabulary boundary names `framework` as stage vocabulary")
+check("<sources...>" not in end,
+      "AC4: the `<sources...>` placeholder is gone from the handoff")
+check("stage0 <framework>" not in B,
+      "AC4: the raw `stage0 <framework> ...` relay is gone")
+check("--brief" in end and "never retyped" in end,
+      "AC5: `--brief` is wired from the artifact rather than retyped")
+
+# AC6 — the uniformity clause is scoped to BEHAVIOUR, explicitly.
+check("uniformity is of BEHAVIOUR" in end,
+      "AC6: the uniformity clause is scoped to behaviour")
+check("provenance record" in end and "#1050" in end,
+      "AC6: ...and the provenance record is named as what does distinguish "
+      "the producers, so the text does not contradict story 20.94")
+check("nothing downstream can tell the two apart" not in B,
+      "AC6: the unscoped clause is gone, not merely qualified nearby")
+
+# AC7 — entry-agnosticism, and the direction is the reason.
+check("terrain → the gate → stage 0" in end,
+      "AC7: the coupling direction is stated")
+check("nothing in drafting branches on which producer ran" in end,
+      "AC7: drafting gains no knowledge of terrain")
+DRAFT = ["skills/draft-article/SKILL.md",
+         "skills/draft-article/stages/stage0.md"]
+for p in DRAFT:
+    t = open(p, encoding="utf-8").read()
+    check("terrain" not in t.lower(),
+          f"AC7: {p} does not import, resolve or detect terrain — a diff that "
+          "makes drafting a terrain consumer has inverted the dependency")
+
+check("intent gate" in S,
+      "the dispatcher's own summary records where the sitting now ends")
+
 sys.exit(1 if fail else 0)
 PYEOF
 [ $? -eq 0 ] || fail=1

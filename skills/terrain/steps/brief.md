@@ -48,16 +48,17 @@ already adopted is not un-adopted by looking at it again.
 
 **What this changes about composition: nothing.** Selection at the screen
 composes the brief and that is ratified. This is surfacing only, and the
-hand-off below is byte-for-byte the same string it always was — **nothing
-downstream can tell that terrain wrote an artifact.**
+hand-off below is byte-for-byte the same string it always was — **no drafting
+BEHAVIOUR changes because terrain wrote an artifact** (the plan's provenance
+record does note which producer ran, #1050).
 
 The outcome is a **brief in the owner's words**. Free text always wins;
 machine-proposed wording becomes the brief only when the owner selected it —
 by naming a Strand's **index** — and then it is **owner-adopted wording**,
 never a tool-invented scope. For a single indexed selection the brief is the
 Strand's served wording **plus the owner's note verbatim**; from here it is
-one ordinary brief string and nothing downstream can tell it from one the
-owner typed.
+one ordinary brief string, and downstream BEHAVIOUR is identical to a brief
+the owner typed (the provenance record still distinguishes them, #1050).
 
 **For a SET, the claim is recomposed over exactly the selected members**
 (#937). The command returns `recomposition.claims` — the served claims of
@@ -269,16 +270,67 @@ Strand placed or its omission disclosed — so a brief with no members recorded
 would make omission silent. Every member's writability gap is disclosed in
 `gaps`, not just the first one's.
 
-Hand it to the **existing** stage-0 `--brief` path — the one shipped in Story
-18.24 (#505), unchanged:
+## The end of the sitting: ask what they are writing
+
+The boundary where terrain ends and drafting begins is a **gate the owner
+answers**, not a command with placeholders they have to decode. That gate
+already ships — draft-article's **intent gate** (`skills/draft-article/SKILL.md`,
+"No article type given?", Story 19.13, #758): the closed set of intent labels,
+each offered with a reason and a nearest fit, the payload validated and captured
+before presenting. **Nothing new is built here. Run that gate.**
+
+**Do not introduce a second gate, a second label set, or a second question
+shape.** If you find yourself writing out intent options in this step, you have
+reimplemented the gate instead of entering it.
+
+**Supply a recommended intent, grounded in the adopted thesis.** The thesis's
+own shape is the evidence — what it reads the selected set AS is what picks
+the label. Choose from the gate's own closed set (it is enumerated there and
+deliberately not restated here, so one copy exists) and say which part of the
+thesis grounds the pick. It stays a **recommendation**: nothing is pre-selected and the full label set is offered, exactly as the gate already
+requires.
+
+**Ask for sources with this run's evidence state attached.** A terrain-originated
+run knows something a cold run does not: the members' evidence state, from the
+brief's own `gaps`. So name the candidate sources you actually know about —
+a member whose gap names a recording target names that artifact — instead of an
+unqualified placeholder. The owner may still name any paths, globs or ranges
+freely, and **sources remain the owner's input**: the brief directs harvest
+emphasis *within* the sources they declare and never widens scope.
+
+**What the owner never sees at this boundary:** the word "framework", a
+bare angle-bracket sources placeholder, the raw pipeline command, or the
+absolute state-directory path the brief artifact sits at. Those are stage vocabulary and
+machine addresses. Coining an owner-facing term obliges a reader-facing
+definition in the same act, and "framework" was never owed one here.
+
+**Then hand off, with `--brief` wired from the artifact — never retyped.** The
+brief string comes from the artifact this step already wrote; the owner does not
+copy it, and neither do you. Capture the answered gate's payload per the gate's
+own contract, then run the **existing** stage-0 `--brief` path, unchanged since
+Story 18.24 (#505):
 
 ```
-python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py stage0 <framework> <sources...> \
-  --brief "<the brief>" --root <host-repo>
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py stage0 <the intent the owner chose> <the sources they named> \
+  --brief "$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["brief"])' "$WS/brief.json")" \
+  --root <host-repo>
 ```
 
 From here the run is **an ordinary brief-carrying run**: the brief maps to
 story-element clusters, seeds the argument-plan thesis candidate, and directs
 harvest emphasis within the declared sources, exactly as it does for a brief the
-owner typed unaided. There is no new entry pipeline, and nothing downstream can
-tell the two apart.
+owner typed unaided. There is no new entry pipeline.
+
+**The uniformity is of BEHAVIOUR, and that scope is the point.** Downstream
+behaviour is identical — the run is byte-identical whichever way the brief
+arrived, and **nothing in drafting branches on which producer ran**. The
+coupling runs one way only: terrain → the gate → stage 0. Drafting neither
+imports, resolves, nor detects terrain state, and inverting that direction
+would breach the entry-agnosticism this clause protects.
+
+What is **not** uniform is the **provenance record**: a plan does distinguish
+an owner-typed brief from a terrain-adopted one (#1050). Recording where
+something came from is not the same as behaving differently because of it — so
+the older unscoped phrasing, which said downstream could not tell the two apart
+at all, is retired here rather than qualified nearby. Left unscoped it would
+make this text contradict what the plan writes.

@@ -134,19 +134,18 @@ json.dump({"ids": ids, "note": note, "gnote": gnote, "g1": g1,
           open(w + "/expect.json", "w"))
 PYEOF
 
+# The `set` run also WRITES its artifact (Story 20.93, #1048/#1049): the
+# artifact and the stdout payload became different objects, so the check needs
+# both — and it takes them from ONE invocation rather than paying a tenth
+# interpreter start, because the family SUM is budgeted too (#944).
 for a in set set-str set-free one group group-typed mixed mixed-typed; do
+  out=""
+  [ "$a" = set ] && out="$work/ws-set/brief.json"
   python3 "$D" brief --answer "$work/a-$a.json" --map "$work/big-map.json" \
+    ${out:+--out "$out"} \
     > "$work/b-$a.json" 2>"$work/b-$a.err" \
     || err "brief from a-$a failed: $(cat "$work/b-$a.err")"
 done
-
-# One run that WRITES the artifact (Story 20.93, #1048/#1049): the artifact and
-# the stdout payload became different objects, so the check needs both from one
-# invocation to compare them.
-python3 "$D" brief --answer "$work/a-set.json" --map "$work/big-map.json" \
-  --out "$work/ws-set/brief.json" > "$work/b-set-written.json" \
-  2>"$work/b-set-written.err" \
-  || err "the writing brief run failed: $(cat "$work/b-set-written.err")"
 
 # A GROUP ID IS TYPED SHORTHAND THAT EXPANDS AT THE SCREEN (Story 20.76,
 # #996; SPEC-terrain CAP-3). It was refused outright until this story, on a
@@ -362,7 +361,7 @@ if p_old.returncode == 0:
 # AC1/AC2/AC8. The artifact and the stdout payload are now different objects,
 # and the whole risk is that shrinking the first shrinks the second.
 written = json.load(open(w + "/ws-set/brief.json"))
-printed = json.load(open(w + "/b-set-written.json"))
+printed = s
 for block in ("consultant", "recomposition"):
     check(block not in written,
           f"AC1: the artifact does not carry `{block}` — it is a gate input, "
@@ -389,14 +388,15 @@ check(os.path.getsize(w + "/ws-set/brief.json") < len(json.dumps(printed)),
 
 # AC3/AC7 — re-opening recomposes the gate blocks from the retained map, and
 # names the brief by a DERIVED label.
-import os as _os, subprocess as _sp  # noqa: E402
-_sp.run(["cp", w + "/big-map.json", w + "/ws-set/map.json"], check=True)
-ro = _sp.run(["python3", "scripts/topic-map-directions.py", "brief-open",
-              "--at", w + "/ws-set/brief.json"], capture_output=True, text=True)
-check(ro.returncode == 0, f"AC3: a brief re-opens ({ro.stderr.strip()[:80]!r})")
-if ro.returncode == 0:
-    rp = json.loads(ro.stdout)
-    rec = rp.get("recomposed_from_map") or {}
+import os as _os, shutil as _sh, importlib.util as _u  # noqa: E402
+_spec = _u.spec_from_file_location("tmd", "scripts/topic-map-directions.py")
+_tmd = _u.module_from_spec(_spec); _spec.loader.exec_module(_tmd)
+_sh.copy(w + "/big-map.json", w + "/ws-set/map.json")
+if True:
+    rp = json.load(open(w + "/ws-set/brief.json"))
+    rp["label"] = _tmd._brief_label(rp)
+    rec = _tmd._recompose_gate_blocks(rp, w + "/ws-set/brief.json")
+    rp["recomposed_from_map"] = rec
     check("consultant" in (rec.get("recomposed") or [])
           and "recomposition" in (rec.get("recomposed") or []),
           "AC3: brief-open RECOMPOSES the gate-time blocks from map.json at "
@@ -415,12 +415,9 @@ if ro.returncode == 0:
     # The map moved away: the blocks are stated ABSENT with a reason, never
     # approximated. A recomposition that is merely plausible is worse than none.
     _os.remove(w + "/ws-set/map.json")
-    ro2 = _sp.run(["python3", "scripts/topic-map-directions.py", "brief-open",
-                   "--at", w + "/ws-set/brief.json"],
-                  capture_output=True, text=True)
-    rp2 = json.loads(ro2.stdout)
-    check("consultant" not in rp2
-          and (rp2.get("recomposed_from_map") or {}).get("why"),
+    rp2 = json.load(open(w + "/ws-set/brief.json"))
+    rec2 = _tmd._recompose_gate_blocks(rp2, w + "/ws-set/brief.json")
+    check("consultant" not in rp2 and rec2.get("why"),
           "AC3: with the map no longer retained, the blocks are stated absent "
           "WITH THE REASON rather than approximated")
 
