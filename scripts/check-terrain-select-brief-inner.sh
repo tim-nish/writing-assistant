@@ -1,6 +1,8 @@
 #!/usr/bin/env sh
 # parallel-safe
 # covers: scripts/topic-map-directions.py scripts/terrain_text.py
+#   scripts/terrain_brief.py scripts/terrain_select.py
+#   scripts/terrain_screens.py
 # tier: inner — brief-composition assertions against the committed fixture
 #   map; no seam, no corpus, no assembly. Split from
 #   check-terrain-select-inner.sh (#948): that check carried two subjects its
@@ -140,7 +142,13 @@ r = json.load(open(w + "/brief-reopened.json"))
 check(r["brief"] == b["brief"] and r["step"] == b["step"],
       "a written brief is read back whole — the never-read-back rule does "
       "not bind the owner's own decision")
-src = open("scripts/topic-map-directions.py", encoding="utf-8").read()
+# The composition moved into importable siblings (Story 20.80, #1029) while
+# argparse and dispatch stayed in the hyphenated entry point, so the SURFACE
+# this asserts over is the entry point plus its siblings, read as one text —
+# which keeps the "exactly one reader" claim at least as strong as it was.
+src = "".join(open(p, encoding="utf-8").read() for p in (
+    "scripts/topic-map-directions.py", "scripts/terrain_brief.py",
+    "scripts/terrain_select.py", "scripts/terrain_screens.py"))
 check("def read_brief_artifact(" in src
       and not any(t in src for t in ("read_view(", "load_view(", "VIEW_CACHE")),
       "exactly one reader exists, and it is the brief's — no View reader, "
