@@ -33,6 +33,16 @@ ok()  { printf 'ok:   %s\n' "$1"; }
 
 M="scripts/terrain_map.py"
 D="scripts/topic-map-directions.py"
+# Story 20.81 (#1030): the rendering side is no longer one file. The inversion
+# (Story 20.80, #1029) left `topic-map-directions.py` carrying argparse and
+# dispatch only, and moved composition into importable siblings; three earlier
+# extractions had already moved the direction lines, the member surface and the
+# fitting primitives out. An absence assertion pointed at the file the code LEFT
+# passes vacuously, so the guard names every module the rendering surface is now
+# made of — named owners, never a directory glob, which would assert less.
+RENDER="$D scripts/terrain_screens.py scripts/terrain_directions.py \
+scripts/terrain_members.py scripts/terrain_text.py scripts/terrain_brief.py \
+scripts/terrain_select.py scripts/terrain_theses.py"
 
 # 1. The estimator and its inputs are deleted from the assembler.
 if python3 - "$M" <<'PYEOF'
@@ -48,16 +58,19 @@ then ok "assembler: the estimator, its thresholds and the glance bar are deleted
 else err "depth machinery survives in terrain_map.py"
 fi
 
-# 2. ...and from the rendering side.
-if python3 - "$D" <<'PYEOF'
+# 2. ...and from the rendering side — every module it is now made of.
+# shellcheck disable=SC2086
+if python3 - $RENDER <<'PYEOF'
 import sys
-src = open(sys.argv[1], encoding="utf-8").read()
 gone = ["def _depth_line(", "DEPTH_PREDICATE_MARKER"]
-present = [g for g in gone if g in src]
-assert not present, f"still present: {present}"
+still = []
+for path in sys.argv[1:]:
+    src = open(path, encoding="utf-8").read()
+    still += [f"{path}: {g}" for g in gone if g in src]
+assert not still, f"still present: {still}"
 PYEOF
-then ok "directions: the depth line and the promotion-rule marker are deleted"
-else err "depth rendering survives in topic-map-directions.py"
+then ok "directions: the depth line and the promotion-rule marker are deleted from every rendering module"
+else err "depth rendering survives in the terrain rendering surface"
 fi
 
 # 3. The shipped threshold declaration goes with its only consumer.

@@ -63,7 +63,12 @@ else
     [ -z "${entry:-}" ] && continue
     # An addition is admitted ONLY by an adjacent, human-written exemption on
     # the entry's own source line. Deny, never warn — and name the entry.
-    src=$(grep -rn -F -- "$entry" scripts/topic-map-directions.py scripts/validate-proposal-payload.py 2>/dev/null \
+    # Story 20.81 (#1030): the files searched here must be the ones
+    # scripts/pin-denial-lists.py declares as SOURCES — INTERNAL_VOCAB travelled
+    # to terrain_directions.py with `lint_owner_lines`, so an exemption written
+    # on its own source line was no longer visible to this grep and a legitimate
+    # addition would have been denied.
+    src=$(grep -rn -F -- "$entry" scripts/terrain_directions.py scripts/validate-proposal-payload.py 2>/dev/null \
           | grep -F "$MARKER" | head -1)
     if [ -n "$src" ]; then
       ok "$list gained '$entry' with an adjacent register-exemption naming its leak"

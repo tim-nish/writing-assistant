@@ -203,13 +203,16 @@ check("sitting" in (b3["iteration"].get("retention") or "")
       and "cache" in b3["iteration"]["retention"],
       "the retention states its scope, so it does not read as a cache")
 # The composition moved into importable siblings (Story 20.80, #1029) while
-# argparse and dispatch stayed in the hyphenated entry point, so the SURFACE
-# these assertions are about is the entry point plus its siblings — read as one
-# text, which keeps the absence assertion below at least as strong as it was.
+# argparse and dispatch stayed in the hyphenated entry point. The two halves of
+# this assertion do NOT take the same surface, and Story 20.81 (#1030) splits
+# them for that reason: an ABSENCE claim only gets stronger as more text is read,
+# so it keeps the whole surface; a PRESENCE claim gets WEAKER over a union of
+# four files, so it names the module that owns the reader.
 src = "".join(open(p, encoding="utf-8").read() for p in (
     "scripts/topic-map-directions.py", "scripts/terrain_brief.py",
     "scripts/terrain_select.py", "scripts/terrain_screens.py"))
-check("def read_brief_artifact(" in src
+owner = open("scripts/terrain_brief.py", encoding="utf-8").read()
+check("def read_brief_artifact(" in owner
       and not any(t in src for t in ("read_view(", "load_view(", "VIEW_CACHE")),
       "the loop added no second reader and no rendering cache")
 check(json.load(open(w + "/ws/brief-2.json"))["iteration"]["n"] == 2,

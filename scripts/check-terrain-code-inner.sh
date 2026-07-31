@@ -31,6 +31,11 @@ MEM="scripts/terrain_members.py"
 # guards follow the code they guard rather than staying pointed at the file the
 # code left — the same rule the #832 slice guard below already states.
 SCR="scripts/terrain_screens.py"
+BRF="scripts/terrain_brief.py"
+SEL="scripts/terrain_select.py"
+# Story 20.51 (#933)'s minting guard and the #832 slice guard below both name
+# the module that mints candidate ids; it left this file with `candidates()`.
+DIRS="scripts/terrain_directions.py"
 VP="scripts/validate-proposal-payload.py"
 SKILL=$(mktemp)
 cat skills/terrain/SKILL.md skills/terrain/steps/map.md \
@@ -148,8 +153,12 @@ grep -q 'mixes' "$SKILL" \
 # Both files: the fitting primitives moved to `terrain_text.py` (Story 20.58,
 # #942), so the guard follows the code it guards rather than staying pointed at
 # the file the code left.
+# Story 20.81 (#1030): the composer is now the entry point plus its siblings —
+# the screen compositions, the brief path and the selection path all compose
+# owner-facing text, so each is named. An absence grep gets STRICTLY stronger as
+# files are added, and every one is a named owner rather than a directory glob.
 if grep -nE '\[:(budget|room) *- *1\]' scripts/topic-map-directions.py \
-     scripts/terrain_text.py >/dev/null; then
+     scripts/terrain_text.py "$SCR" "$BRF" "$SEL" "$DIRS" >/dev/null; then
   err "the mid-word slice idiom is back in the terrain composer (#832)"
 else
   ok "no mid-word slice-plus-period idiom in the composer"
@@ -441,8 +450,13 @@ grep -qE 'lessons_index|LESSONS\.md.*open\(|policy_lookup' "$CODE" \
 # stayed for two days — reachable only on a kind the record path never emits,
 # and therefore invisible to every test while still teaching a reader that `J`
 # rows might appear. Grep-asserted like the other absences in this file.
-grep -qE '"journey": *0|prefix *= *"L" if|f"\{prefix\}\{counters' "$D" \
-  && err "the J<n> minting code is back in topic-map-directions.py (#933/#871)" \
+# Story 20.81 (#1030): id minting lives in scripts/terrain_directions.py — it
+# left this file with `candidates()`, so the grep could no longer see the code
+# it guards and passed vacuously. Both files are named, so re-acquiring the
+# minting in EITHER place fails here.
+grep -qE '"journey": *0|prefix *= *"L" if|f"\{prefix\}\{counters' \
+     "$D" "$DIRS" \
+  && err "the J<n> minting code is back in the terrain composer (#933/#871)" \
   || ok "no J<n> minting code remains — an arc is carried by its lesson's row"
 
 # --- journey presence is read from the RECORD, not from a pointer (#933) -----
@@ -451,10 +465,15 @@ grep -qE '"journey": *0|prefix *= *"L" if|f"\{prefix\}\{counters' "$D" \
 # `journey` KIND discriminator (doing so misroutes 109 of 117 lesson
 # renderings). Both wrong sources are named so a future edit cannot pick them
 # by accident.
-grep -qE 'journey_recorded' "$D" "$MEM" \
+# Story 20.81 (#1030): both assertions name terrain_members.py alone. The
+# renderer moved there (Story 20.65, #974) and `$D` contributes no match to
+# either — for the PRESENCE assertion a union over a file with no matches is a
+# WEAKER claim than naming the owner, and for the derivation assertion below the
+# `no-journey` grep found nothing at all, so its second grep could never fire.
+grep -qE 'journey_recorded' "$MEM" \
   && ok "the renderer reads journey presence from the paired record" \
   || err "the renderer no longer reads journey_recorded — presence has lost its carrier (#933)"
-grep -nE 'no-journey' "$D" | grep -qE 'journey_shard|\["journey"\]' \
+grep -nE 'no-journey' "$MEM" | grep -qE 'journey_shard|\["journey"\]' \
   && err "the no-journey marker is derived from a pointer or the kind discriminator, not the record (#933)" \
   || ok "the no-journey marker is not derived from a pointer or the kind flag"
 
