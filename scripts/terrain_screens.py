@@ -31,6 +31,27 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
 # The text and disclosure primitives every screen composes with, and the
 # candidate-direction rendering the View leads with.
+# The render form every screen declares (Story 20.108, #1102). Imported from
+# the builder rather than recomputed here: `control` follows from the choice
+# count against ONE capacity, and a second copy of that arithmetic is how the
+# screens and the gates would drift apart.
+from draft_gates import render_form  # noqa: E402
+
+
+def _render(choices, banner, reply_line):
+    """A screen's render directive.
+
+    A screen is never a two-option question, so it lands on the block form
+    almost always — and a block owes its own banner and reply line, because
+    the alternative is the renderer inventing them, which is the prose #1102
+    reports. `render_form` refuses the block without them, so this cannot be
+    forgotten silently.
+    """
+    n = len(choices)
+    return render_form(choices, banner=banner if n > 4 else None,
+                       reply_line=reply_line if n > 4 else None)
+
+
 from terrain_text import (  # noqa: E402
     row_type_legend,
     BUDGETS,
@@ -304,6 +325,11 @@ def compose_axis_payload(map_data):
                      "is shown whole.",
                      BUDGETS["why"]),
         "choices": choices,
+        "render": _render(
+            choices,
+            "Choose where to look first — one member, by tag or by topic.",
+            "Reply with one member's name, or describe a direction in your "
+            "own words."),
     }]}
 
 
@@ -363,6 +389,10 @@ def compose_payload(map_data, cands, view_path=None):
             f"{consumed} already consumed and still selectable.", BUDGETS["where"]),
         "why": _fit(WHY_TEXT, BUDGETS["why"]),
         "choices": choices,
+        "render": _render(
+            choices,
+            "Choose a direction to draft, or name your own.",
+            "Reply with one direction from the list, or your own wording."),
     }
     return {"items": [item]}
 
@@ -405,5 +435,10 @@ def _compose_summary_payload(map_data, view_path):
         ], view_path, BUDGETS["where"]),
         "why": _fit(WHY_TEXT, BUDGETS["why"]),
         "choices": choices,
+        "render": _render(
+            choices,
+            "Choose a direction from the View, or name your own.",
+            "Reply with an index from the View (for example L3 or T1.2), or "
+            "your own wording."),
     }
     return {"items": [item]}

@@ -41,6 +41,8 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
+# One capacity, imported rather than restated (Story 20.108, #1102).
+from draft_gates import CONTROL_CAPACITY  # noqa: E402
 from strand_cover import cover_report, strand_name  # noqa: E402
 
 # HOW MANY CANDIDATES. Two is the smallest number that makes the step a
@@ -152,6 +154,22 @@ def thesis_candidates_block(members, pin, adopted_claim=None):
         "inputs": list(members),
         "pin": pin,
         "composed": False,
+        # THE SHAPE THE COMPOSED PAYLOAD MUST ARRIVE IN (Story 20.108, #1102).
+        # This is the gate Story 20.103 named as NOT converted, and its reason
+        # survives intact: the candidates do not exist here, so no payload can
+        # be built here either. What CAN be fixed — and what #1102 shows was
+        # missing at every surface — is the render contract the composed
+        # payload owes when it is assembled at the point of composition.
+        # `control` is deliberately not stated as a literal: it is computed
+        # from the choice count the composer produces, and stating it here
+        # would be authoring the one field that must never be authored.
+        "payload_contract": {
+            "render_required": True,
+            "control_capacity": CONTROL_CAPACITY,
+            "rule": "control is computed from the choice count against the "
+                    "capacity; a recommendation leads at index 0; a block "
+                    "carries its own banner and reply line",
+        },
         # WHAT IS TRUE OF THIS GATE, replacing `"ranked": False` (Story 20.89,
         # #1043). That field asserted a STRICTLY STRONGER property than the
         # requirement behind it: THESIS_REQUIREMENTS[3] bans ranked-AND-trimmed,
