@@ -960,15 +960,18 @@ def main(argv=None):
                     help="which axis MEMBER belongs to (default: tag). The two "
                          "vocabularies overlap by name, so this is what keeps "
                          "a member unambiguous.")
-    # The dogfood harness (Story 20.37, #891): the substrate is BUILT and NOT
-    # OFFERED, so it is reachable only by naming it here. `--grouping` carries
-    # the model's proposal; without one every Strand lands in the residue,
-    # which is the honest empty state rather than an invented grouping.
+    # Journey similarity is OFFERED (Story 20.82, #1031) — its measurement gate
+    # ran on 2026-07-31 and the owner verdicted pass, so naming it here is an
+    # ordinary choice rather than a measurement-only reach. `--grouping`
+    # carries the model's proposal; without one every Strand lands in the
+    # residue, which is the honest empty state rather than an invented
+    # grouping. The default is unchanged: offering is not promoting.
     mb.add_argument("--substrate", default=SUBSTRATE_DEFAULT,
                     choices=sorted(set(SUBSTRATES) | set(SUBSTRATES_UNOFFERED)),
-                    help="grouping substrate (default: %(default)s). Substrates "
-                         "outside the offered set are reachable for measurement "
-                         "only, until an owner verdict admits them.")
+                    help="grouping substrate (default: %(default)s). Any "
+                         "substrate still behind the offering gate is "
+                         "reachable for its measurement run only, until an "
+                         "owner verdict admits it.")
     mb.add_argument("--claims", metavar="JSON",
                     help='the `in common:` claims you composed, as {"G1": '
                          '"..."}. Passing them returns the FINAL screen — ids, '

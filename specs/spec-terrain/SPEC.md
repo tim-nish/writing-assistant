@@ -314,8 +314,10 @@ flows into the existing brief/structures path unchanged.**
       - **co-tags** — the manifest's `tags` field. Served as data.
       - **Journey similarity** — over the **served** arc renderings
         (`gloss --tag journeys/<tag>`, the read CAP-1 already issues).
-        Served as data. **Built, but NOT OFFERED until it has been measured
-        once (amended 2026-07-29, #889)** — see the offering gate below.
+        Served as data. Built, and held unoffered until measured once
+        (amended 2026-07-29, #889); **OFFERED since 2026-07-31**, when that
+        measurement run passed its owner verdict — see the offering gate
+        below, which records what was measured.
       - **shared source batch** — served only as prose, inside a shard
         trailer line (a `Source: … · origin: <batch> (<date>) · tags: …` trailer).
         **Not projected**: extracting it is consumer re-derivation of hub
@@ -338,7 +340,7 @@ flows into the existing brief/structures path unchanged.**
       soon as it is built: its output is inspectable by reading the key it
       grouped on. A **model-judged** one is not, because whether its groups
       read as *one shared background* is the very thing at issue, and the
-      owner has not yet seen one. So Journey similarity is **built and
+      owner had not yet seen one. So Journey similarity was **built and
       exercised, and withheld from the offered set**, until:
       - one run over the `agents` member renders its groups in the screen's
         compact form, each with its `in common:` line stating the shared arc;
@@ -353,6 +355,26 @@ flows into the existing brief/structures path unchanged.**
         Pass → it joins the offered set. Fail → the finding (which substrate
         combination, if any, to try next) is the output, and the substrate
         does not ship anyway.
+      **THE GATE RAN ON 2026-07-31 AND PASSED, so Journey similarity IS
+      OFFERED (discharged 2026-07-31, #889 measured, #1031 offered).** The
+      clause above is recorded as written and is not rewritten to match its
+      own outcome: what changed is that its condition was met. The run took
+      the `agents` member (51 Strands), rendered **10** machine-composed
+      shared-path groups in the compact form, placed **48 of 51** Strands and
+      accounted for the remaining **3** explicitly in the two named residues,
+      and checked the permutation mechanically — count-in 51 = count-out 51,
+      no drops, no duplicates, no invented ids. The **owner verdicted PASS**
+      on 2026-07-31, recorded on the measurement issue itself (#889, closed on
+      that verdict; #1018 is the discussion record filed from it) — the
+      verdict-holder the gate named, discharging the gate by the single
+      identifiable act it was written to be dischargeable by.
+      Offering is **not promoting**: co-tags remains the default substrate for
+      a run that names none. What the discharge does **not** license, stated
+      because inheriting a boundary is cheaper than re-arguing it: the
+      hub-wide Journey-coverage figure was **not** re-measured — the run
+      measured 49 of 51 for one member, a different denominator — and no
+      ranking of groups by strength, size or judged quality is admitted; the
+      declared sort key stays presentational.
       **The gate names its own generating mechanism deliberately**, because a
       deferral to data that does not is indefinite by construction and reads
       as patience rather than as a gap: the corpus, the judgment input (the
