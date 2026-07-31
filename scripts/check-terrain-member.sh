@@ -302,15 +302,18 @@ PYEOF
 # the sentence lives in terrain_text.py and each surface calls it. Asserting
 # the call rather than the literal is what keeps a screen from re-acquiring a
 # hard-coded row type the id-minting path never emits.
+# Story 20.80 (#1029): the View's composer moved to terrain_screens.py with the
+# rest of the screen compositions; the assertion follows the call site.
 grep -q "def row_type_legend" scripts/terrain_text.py \
-  && grep -q "row_type_legend(" "$D" \
+  && grep -q "row_type_legend(" scripts/terrain_screens.py \
   && grep -q "row_type_legend(" scripts/terrain_members.py \
   && ok "the row-kind legend is composed for both reading surfaces" \
   || err "the row-kind legend is missing from a reading surface"
 
 # It must never name `J` rows: the namespace was retired with the Journey id
 # (#871/#933), so a legend mentioning it describes a row that cannot exist.
-grep -q "J rows are Journeys" scripts/terrain_text.py scripts/terrain_members.py "$D" \
+grep -q "J rows are Journeys" scripts/terrain_text.py scripts/terrain_members.py \
+     scripts/terrain_screens.py "$D" \
   && err "a reading surface still names J rows — the namespace is retired (#933)" \
   || ok "no reading surface names the retired J row type"
 
@@ -700,7 +703,11 @@ check(open(out).read() == open(out2).read(),
 
 # --- AC5/AC6: never read back; no cross-invocation cache -------------------
 # Grep-shaped, exactly as CAP-3's existing never-read-back rule is enforced.
-src = open(D).read()
+# Story 20.80 (#1029): the View's writer moved to scripts/terrain_screens.py
+# when the hyphenated entry point was inverted into a CLI shim. The rule is a
+# property of the SURFACE, so the entry point and that module are read as one
+# text — the guard follows the code it guards.
+src = "".join(open(p).read() for p in (D, "scripts/terrain_screens.py"))
 after_write = src.split("def write_view(", 1)[1]
 check("open(" not in after_write.split("\ndef ", 1)[0].replace("open(path", "OK"),
       "write_view only writes — it never opens the view for reading")

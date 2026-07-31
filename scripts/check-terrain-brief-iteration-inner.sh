@@ -1,7 +1,8 @@
 #!/usr/bin/env sh
 # parallel-safe
 # covers: scripts/topic-map-directions.py scripts/terrain_text.py
-#   skills/terrain/steps/brief.md
+#   scripts/terrain_brief.py scripts/terrain_select.py
+#   scripts/terrain_screens.py skills/terrain/steps/brief.md
 # tier: inner — the brief gate's ITERATION LOOP (Story 20.77, #997) against a
 #   derived fixture map; no seam, no corpus, no assembly. Its own check rather
 #   than more assertions in check-terrain-select-brief-inner.sh (~1.0s of a 2s
@@ -201,7 +202,13 @@ check((b1["iteration"]["n"], len(b1["iteration"]["compositions"])) == (1, 1),
 check("sitting" in (b3["iteration"].get("retention") or "")
       and "cache" in b3["iteration"]["retention"],
       "the retention states its scope, so it does not read as a cache")
-src = open("scripts/topic-map-directions.py", encoding="utf-8").read()
+# The composition moved into importable siblings (Story 20.80, #1029) while
+# argparse and dispatch stayed in the hyphenated entry point, so the SURFACE
+# these assertions are about is the entry point plus its siblings — read as one
+# text, which keeps the absence assertion below at least as strong as it was.
+src = "".join(open(p, encoding="utf-8").read() for p in (
+    "scripts/topic-map-directions.py", "scripts/terrain_brief.py",
+    "scripts/terrain_select.py", "scripts/terrain_screens.py"))
 check("def read_brief_artifact(" in src
       and not any(t in src for t in ("read_view(", "load_view(", "VIEW_CACHE")),
       "the loop added no second reader and no rendering cache")

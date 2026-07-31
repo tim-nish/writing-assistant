@@ -26,6 +26,11 @@ T="scripts/terrain_text.py"
 # Story 20.65 (#974): the member surface moved to its own module. Renderer
 # assertions grep the FAMILY, so a later move cannot silently satisfy them.
 MEM="scripts/terrain_members.py"
+# Story 20.80 (#1029): the screen compositions and the View moved to their own
+# module when the hyphenated entry point was inverted into a CLI shim. The
+# guards follow the code they guard rather than staying pointed at the file the
+# code left — the same rule the #832 slice guard below already states.
+SCR="scripts/terrain_screens.py"
 VP="scripts/validate-proposal-payload.py"
 SKILL=$(mktemp)
 cat skills/terrain/SKILL.md skills/terrain/steps/map.md \
@@ -53,7 +58,7 @@ python3 -c "import py_compile; py_compile.compile('$T', doraise=True)" 2>/dev/nu
 # NO SECOND PROPOSER: the View renders the directions it is GIVEN. A
 # `candidates()` call inside compose_view would be a second derivation, and the
 # screen and the View could then silently disagree about what was offered.
-python3 - "$D" <<'PYEOF' && ok "the View reuses the derived directions and derives none of its own" || err "compose_view derives its own directions (second proposer)"
+python3 - "$SCR" <<'PYEOF' && ok "the View reuses the derived directions and derives none of its own" || err "compose_view derives its own directions (second proposer)"
 import ast, sys
 src = open(sys.argv[1], encoding="utf-8").read()
 fn = next(n for n in ast.parse(src).body
@@ -64,9 +69,11 @@ sys.exit(1 if "candidates" in calls else 0)
 PYEOF
 
 # Source-level: the View path is written, never read (the --emit-debug rule).
-python3 - "$D" <<'PYEOF' && ok "size switch: no code path reads a View file back" || err "topic-map-directions.py contains a View-reading code path"
+python3 - "$D" "$SCR" <<'PYEOF' && ok "size switch: no code path reads a View file back" || err "the terrain composer contains a View-reading code path"
 import re, sys
-src = open(sys.argv[1], encoding="utf-8").read()
+# The entry point AND the module that now owns the View, read as one text: the
+# never-read-back rule is a property of the surface, not of one file.
+src = "".join(open(p, encoding="utf-8").read() for p in sys.argv[1:])
 reads = re.findall(r'open\((?![^)]*"w")[^)]*\)', src)
 for r in reads:
     assert "view" not in r.lower(), f"a View file is opened for reading: {r}"
@@ -147,7 +154,7 @@ if grep -nE '\[:(budget|room) *- *1\]' scripts/topic-map-directions.py \
 else
   ok "no mid-word slice-plus-period idiom in the composer"
 fi
-python3 - scripts/topic-map-directions.py scripts/terrain_text.py <<'PYEOF' || fail=1
+python3 - scripts/topic-map-directions.py scripts/terrain_text.py "$SCR" <<'PYEOF' || fail=1
 import importlib.util, sys
 fail = []
 def check(cond, msg):
@@ -160,20 +167,24 @@ tmd = importlib.util.module_from_spec(spec); spec.loader.exec_module(tmd)
 # re-export, so a symbol deleted where it now lives fails here.
 tspec = importlib.util.spec_from_file_location("ttext", sys.argv[2])
 txt = importlib.util.module_from_spec(tspec); tspec.loader.exec_module(txt)
+# The screen compositions moved to their own module (Story 20.80, #1029), so
+# the screen's authored copy is exercised through THAT module's path.
+sspec = importlib.util.spec_from_file_location("tscr", sys.argv[3])
+scr = importlib.util.module_from_spec(sspec); sspec.loader.exec_module(scr)
 # Static template text fits its budget BY CONSTRUCTION — measured here, at
 # authoring time, per the owner-facing proposal contract clause (e).
-check(len(tmd.WHY_TEXT) <= tmd.BUDGETS["why"],
-      f"WHY_TEXT is authored inside BUDGETS['why'] ({len(tmd.WHY_TEXT)}/{tmd.BUDGETS['why']})")
+check(len(scr.WHY_TEXT) <= txt.BUDGETS["why"],
+      f"WHY_TEXT is authored inside BUDGETS['why'] ({len(scr.WHY_TEXT)}/{txt.BUDGETS['why']})")
 # The summary `where` picks an authored variant beside the path — never slices.
 long_path = "/home/owner/work/some-articles-repo/drafts/topic-map/topic-map-view.md"
 where = txt._fit_with_path(
     ["Terrain at deadbeef: 61 element(s) — each its own Strand — and 3 "
      "topic(s), 61 strand(s); 0 already consumed and still selectable.",
      "Terrain at deadbeef: 61 Strands, 3 topic(s); 0 consumed.",
-     "Terrain: 61 Strands."], long_path, tmd.BUDGETS["where"])
+     "Terrain: 61 Strands."], long_path, txt.BUDGETS["where"])
 check(where.endswith(long_path), "the View path is never clipped")
-check(len(where) <= tmd.BUDGETS["where"],
-      f"an authored variant fits beside a realistic path ({len(where)}/{tmd.BUDGETS['where']})")
+check(len(where) <= txt.BUDGETS["where"],
+      f"an authored variant fits beside a realistic path ({len(where)}/{txt.BUDGETS['where']})")
 prefix = where[: -len(" Open the View: " + long_path)]
 check(not __import__("re").search(r"\b\w\.$", prefix),
       "the summary prefix is a whole authored wording, not a cut wearing a period")
