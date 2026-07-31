@@ -63,6 +63,22 @@ out = run("workflow")
 check(out.returncode == 0, f"member composes (rc={out.returncode})")
 d = json.loads(out.stdout)
 
+# THE COMPLETE RENDERING, wherever it now lives (Story 20.84, #1038). This
+# fixture's member holds 41 Strands — deliberately, it is the measured worst
+# case — which is over the screen budget, so the CONSOLE is a summary and the
+# whole rendering is in the View file. Every assertion below that is ABOUT the
+# complete rendering follows it to the surface that carries it; that following
+# is the split the size switch exists to produce, not a weakening. Assertions
+# about the console's own summary form live in the size-switch block at the end
+# of this file.
+whole_path = tempfile.mktemp(suffix=".md")
+subprocess.run(["python3", D, "view", "--map", f.name, "--tag", "workflow",
+                "--out", whole_path], capture_output=True, text=True)
+whole = open(whole_path).read()
+os.unlink(whole_path)
+check(d["over_budget"] is True,
+      "the 41-Strand fixture is over budget, so the console summarises")
+
 # --- THE PERMUTATION -------------------------------------------------------
 member_slugs = {e["slug"] for e in els if "workflow" in e["tags"]}
 sectioned = [s for sec in d["sections"] for s in sec["strands"]]
@@ -73,15 +89,15 @@ check(set(sectioned) == member_slugs, "no Strand is dropped and none invented")
 check("other" not in sectioned, "a Strand outside the member never leaks in")
 
 # --- SERVED WHOLE ----------------------------------------------------------
-ids = re.findall(r"^- \*\*((?:L|J)\d+|E\d+\.\d+)\*\* — ", d["listing"], re.M)
-check(len(ids) == 41, f"the listing carries every Strand, whole ({len(ids)} lines)")
-check("41 Strand(s), shown whole" in d["listing"],
-      "the count is disclosed on the listing")
+ids = re.findall(r"^- \*\*((?:L|J)\d+|E\d+\.\d+)\*\* — ", whole, re.M)
+check(len(ids) == 41, f"the rendering carries every Strand, whole ({len(ids)} lines)")
+check("41 Strand(s), shown whole" in whole,
+      "the count is disclosed on the complete rendering")
 
 # --- NO SELECTION AUTHORITY ------------------------------------------------
-check("already consumed, still selectable" in d["listing"],
+check("already consumed, still selectable" in whole,
       "a consumed Strand is marked, never hidden")
-heads = re.findall(r"^## (.+) \(\d+\)(?: — .+)?$", d["listing"], re.M)
+heads = re.findall(r"^## (.+) \(\d+\)(?: — .+)?$", whole, re.M)
 check(len(heads) == len(d["sections"]) >= 2,
       f"sections carry a title and a count — presentation only ({heads[:3]})")
 
@@ -92,7 +108,7 @@ over = [(s["title"], len(s["strands"])) for s in d["sections"]
         if len(s["strands"]) > cap]
 undisclosed = [t for t, _n in over
                if f"{t} ({dict(over)[t]}) — over the one-fifth bound"
-               not in d["listing"]]
+               not in whole]
 check(not undisclosed,
       f"every over-cap section discloses the bound on its title line ({over})")
 # A subdividable fixture: one dominant co-tag whose Strands carry a second
@@ -163,12 +179,17 @@ d5 = json.loads(out5.stdout)
 check(all(len(s["strands"]) >= 1 for s in d5["sections"])
       and len(d5["sections"]) <= 2,
       "the small-member floor prevents one-Strand fragmentation")
-for banned in ("ranked", "top ", "best "):
-    check(banned not in d["listing"].lower(),
-          f"no ranking language on the listing ({banned!r})")
+# Matched as WORDS, not substrings (Story 20.84, #1038). The over-budget screen
+# names the standing exit `stop here`, whose "stop " contains "top " — a
+# substring test reports a ranking claim where there is none, and a check that
+# cries wolf is one nobody reads. The property asserted is unchanged.
+for banned in (r"\branked\b", r"\btop\b", r"\bbest\b"):
+    hits = [s for s in (whole, d["listing"])
+            if re.search(banned, s, re.I)]
+    check(not hits, f"no ranking language on either surface ({banned!r})")
 
 # --- deterministic context fields (Story 20.21, #845) -----------------------
-ctx = re.findall(r"^  \((?:also in: .+|in no other Topic).*$", d["listing"], re.M)
+ctx = re.findall(r"^  \((?:also in: .+|in no other Topic).*$", whole, re.M)
 check(len(ctx) == 41,
       f"every Strand line carries its deterministic context line ({len(ctx)})")
 check(any("in no other Topic" in c for c in ctx),
@@ -182,7 +203,7 @@ check(all("·" in c for c in ctx),
 # (Story 20.51, #933/#934; CAP-2 as amended and corrected 2026-07-30.)
 # The fixture's Strands carry no `journey_recorded`, so EVERY row is thin —
 # which makes the polarity assertable in both directions from one run.
-cov = [ln for ln in d["listing"].split("\n") if "carry journey material" in ln]
+cov = [ln for ln in whole.split("\n") if "carry journey material" in ln]
 check(len(cov) == 1,
       f"the screen states its journey-coverage denominator exactly once ({len(cov)})")
 check(re.search(r"\b0 of \d+ Strands carry journey material", cov[0] or ""),
@@ -239,7 +260,7 @@ check("mark each background line as machine-composed" not in rules,
 
 # --- determinism + selection contract --------------------------------------
 check(out.stdout == run("workflow").stdout, "byte-identical across invocations")
-check(re.search(r"^- \*\*L\d+\*\* — ", d["listing"], re.M),
+check(re.search(r"^- \*\*L\d+\*\* — ", whole, re.M),
       "lines carry the candidate ids selection already resolves")
 
 # --- an empty member is a disclosed refusal --------------------------------
@@ -622,8 +643,24 @@ check(all(t in listing for t in sec_titles),
 # #889 verified four constraints; two of them are surface declarations, and
 # until this story the composed screen 2 carried neither. Asserted here rather
 # than trusted, because an axis now offered to the owner is read by the owner.
-check("machine-composed" in listing,
+# Story 20.84 (#1038): this fixture's member holds 8 Strands, one over the
+# screen budget, so the CONSOLE is a summary and carries no `in common:` lines
+# at all. The authoring declaration is owed by the surface that carries them —
+# the View — and is asserted there. Declaring a class of line the screen does
+# not contain is the same defect as a legend for absent rows (#978).
+vt = tempfile.mktemp(suffix=".md")
+subprocess.run(["python3", D, "view", "--map", path, "--tag", "agents",
+                "--substrate", "journey-similarity",
+                "--grouping", json.dumps(grouping),
+                "--claims", json.dumps({"G1": "shared path X"}),
+                "--out", vt], capture_output=True, text=True)
+whole_dc = open(vt).read()
+check("machine-composed" in whole_dc and "in common: shared path X" in whole_dc,
       "composed `in common:` lines are marked machine-composed")
+check("machine-composed at render time" not in listing
+      and "in common:" not in listing,
+      "the summarised console declares no authoring class, because it carries "
+      "no composed lines to declare one for")
 check("DISPLAY id" in listing and "no selection authority" in listing,
       "the `G` group-id kind is DECLARED on the screen that renders it")
 check("Grouped by: journey-similarity" in listing
@@ -768,9 +805,27 @@ ids = re.findall(r"^- \*\*(L\d+)\*\* — ", body, re.M)
 check(len(ids) == 8,
       f"AC1: every row carries its `L` display index — selection is by index "
       f"and a View without indexes cannot be selected from ({len(ids)})")
-check(sorted(ids) == sorted(re.findall(r"^- \*\*(L\d+)\*\* — ",
-                                       mem["listing"], re.M)),
-      "AC1: the file's indexes are the SAME ids the composed screen assigns")
+# The screen this fixture's member produces is a SUMMARY (8 Strands, over the
+# budget — Story 20.84, #1038), so the id-agreement half is asserted on a
+# member small enough for the console to carry rows: it is the two SURFACES
+# that must agree, and only an under-budget member has both in one place.
+small = {"kind": "topic-map", "topics": [], "coverage": {"pin": "h@abc1234"},
+         "elements": els[:4]}
+fs = tempfile.NamedTemporaryFile("w", suffix=".json", delete=False)
+json.dump(small, fs); fs.close()
+vs = tempfile.mktemp(suffix=".md")
+subprocess.run(["python3", D, "view", "--map", fs.name, "--tag", "agents",
+                "--out", vs], capture_output=True, text=True)
+small_screen = json.loads(subprocess.run(
+    ["python3", D, "member", "--map", fs.name, "--tag", "agents"],
+    capture_output=True, text=True).stdout)
+pat = r"^- \*\*(L\d+)\*\* — "
+check(re.findall(pat, open(vs).read(), re.M)
+      == re.findall(pat, small_screen["listing"], re.M)
+      and len(re.findall(pat, open(vs).read(), re.M)) == 4,
+      "AC1: the file's indexes are the SAME ids the composed screen assigns, "
+      "in the same order")
+os.unlink(vs)
 check("Pin: " in body, "AC2: the View states the pin, so it joins to its screen")
 check(all(f"how it changed: arc {n}" in body for n in range(8)),
       "AC4: the journey material reaches the file, per row")
@@ -854,6 +909,144 @@ for p in (out, out2):
     os.path.exists(p) and os.unlink(p)
 sys.exit(1 if fail else 0)
 NAV_EOF
+[ $? -eq 0 ] || fail=1
+
+# --- Story 20.84 (#1038): THE SIZE SWITCH FIRES ON THE MEMBER PATH ----------
+# The budget was re-based per axis member on 2026-07-27 (#803) and never
+# reached the code: the only predicate counted `map_data["elements"]` — the
+# whole terrain — and `compose_member_listing` had no over-budget branch at
+# all, so a member of 51 Strands rendered 51 rows because the terrain around it
+# was small. Each assertion below is keyed to the criterion it discharges.
+python3 - <<'SIZE_EOF'
+import json, subprocess, sys, tempfile
+
+D = "scripts/topic-map-directions.py"
+fail = 0
+
+
+def check(cond, msg):
+    global fail
+    if cond:
+        print(f"ok:   {msg}")
+    else:
+        print(f"FAIL: {msg}", file=sys.stderr)
+        fail = 1
+
+
+def mk(n, extra_els=()):
+    els = [{"kind": "lesson", "slug": f"w{i}", "title": f"W{i}",
+            "gloss": f"claim {i}",
+            "tags": ["workflow", "agents" if i % 2 else "cost"],
+            "evidence": [], "consumed": False,
+            "journey_recorded": True, "journey": f"arc {i}"}
+           for i in range(n)]
+    els += list(extra_els)
+    m = {"kind": "topic-map", "topics": [],
+         "coverage": {"pin": "h@abc1234"}, "elements": els}
+    f = tempfile.NamedTemporaryFile("w", suffix=".json", delete=False)
+    json.dump(m, f); f.close()
+    return f.name
+
+
+def member(path, *extra):
+    return subprocess.run(
+        ["python3", D, "member", "--map", path, "--tag", "workflow"]
+        + list(extra), capture_output=True, text=True)
+
+
+budget = json.loads(member(mk(3)).stdout)["screen_budget"]
+check(budget == 7, f"the budget is read from its one declaration ({budget})")
+
+# --- AC1: the predicate counts THIS MEMBER'S Strands ------------------------
+# A big member in a small terrain, and a small member in a big terrain. The old
+# predicate would answer identically for both; the re-based one must not.
+big_member = mk(budget + 5)
+d_big = json.loads(member(big_member).stdout)
+check(d_big["over_budget"] is True,
+      f"AC1: a member above the budget is over budget ({d_big['count']} "
+      f"Strands vs a budget of {budget})")
+noise = [{"kind": "lesson", "slug": f"n{i}", "title": f"N{i}", "gloss": "x",
+          "tags": ["elsewhere"], "evidence": [], "consumed": False}
+         for i in range(60)]
+small_in_big = mk(3, noise)
+d_small = json.loads(member(small_in_big).stdout)
+check(d_small["over_budget"] is False,
+      "AC1: a SMALL member inside a LARGE terrain is NOT over budget — the "
+      "budget is measured per axis member, never over map_data['elements']")
+check(len(json.load(open(small_in_big))["elements"]) > budget,
+      "AC1: ...and that terrain really is over the old whole-terrain predicate")
+
+# --- AC2: at or under the budget, nothing changes ---------------------------
+under = json.loads(member(small_in_big, "--claims", '{"G1":"c"}').stdout)
+check("shown whole" in under["listing"]
+      and "- **L1**" in under["listing"],
+      "AC2: the at-or-under branch is the shipped whole listing, rows and all")
+check("summarised" not in under["listing"],
+      "AC2: no summary wording leaks onto the small branch")
+
+# --- AC3: above the budget — summaries plus the path, and no rows -----------
+VP = "/nonexistent-destination/terrain/topic-map-view.md"
+d3 = json.loads(member(big_member, "--view", VP,
+                       "--claims", '{"G1":"a claim that must not ride along"}').stdout)
+L = d3["listing"]
+check("- **L" not in L,
+      "AC3: the over-budget console carries NO per-Strand rows")
+check("how it changed:" not in L,
+      "AC3: ...and no journey lines")
+check("in common: a claim that must not ride along" not in L,
+      "AC4 (decided): the `in common:` claims do NOT ride along with the "
+      "summaries — they are unclipped composer prose, which is unbounded "
+      "screen height, and they are in the View one open away")
+heads = [l for l in L.splitlines() if l.startswith("## ")]
+check(len(heads) == len(d3["sections"]) >= 2,
+      f"AC3: one compact summary line per group, all of them ({len(heads)})")
+check(all(s["group_id"] in L and s["title"] in L
+          and f"({len(s['strands'])})" in L for s in d3["sections"]),
+      "AC3: each summary carries the group id, its derived title and its count")
+check("topic-map-view.md" in L,
+      "AC3: the View path is on the screen")
+check("no-journey" not in L and "carry journey material" not in L,
+      "AC3: the row-type legend and the journey coverage denominator stay "
+      "with the rows they qualify (#978, #933/#934) — a legend for rows the "
+      "screen does not contain primes the reader for rows that never appear")
+
+# --- AC5: the above-budget branch proposes NO LESS --------------------------
+for exit_name in ("switch substrate", "back to the member list",
+                  "name your own direction", "stop here"):
+    check(exit_name in L,
+          f"AC5: the standing exit '{exit_name}' is on the over-budget screen")
+check("Selection is by Strand index" in L,
+      "AC5: selection stays BY INDEX on the over-budget screen")
+check("capped, truncated or ordered by any measure of strength" in L,
+      "AC5: the screen states that nothing was narrowed away")
+
+# --- AC7: the switch never fails open ---------------------------------------
+r7 = member(big_member)
+d7 = json.loads(r7.stdout)
+check("- **L" not in d7["listing"],
+      "AC7: over budget with NO view path, the screen still summarises — the "
+      "switch does not fail open into the whole-screen dump")
+check("NO VIEW PATH WAS GIVEN" in d7["listing"],
+      "AC7: ...and it states that the complete rendering was written nowhere")
+check("--view" in r7.stderr and str(budget) in r7.stderr,
+      f"AC7: the caller is warned, naming the fix ({r7.stderr.strip()[:60]!r})")
+
+# --- AC6: the screen is composed and relayed ONCE per selection -------------
+# The two-call flow's first call is an INPUTS call. Nothing in the response
+# said so, and the identical screen was relayed twice back-to-back.
+d_in = json.loads(member(big_member, "--view", VP).stdout)
+check(d_in["relay"].startswith("inputs-only"),
+      "AC6: the first (no-claims) call declares itself inputs-only")
+check("do NOT relay" in d_in["relay"],
+      "AC6: ...and says so in the imperative the relaying skill needs")
+check(d3["relay"] == "whole",
+      "AC6: the second (claims) call is the one screen, marked whole")
+sk = open("skills/terrain/steps/screens.md").read()
+check("exactly ONCE per selection" in sk,
+      "AC6: the relay-once rule is on the presenting surface too")
+
+sys.exit(1 if fail else 0)
+SIZE_EOF
 [ $? -eq 0 ] || fail=1
 
 [ "$fail" -eq 0 ] || { printf '\nFAILED.\n' >&2; exit 1; }

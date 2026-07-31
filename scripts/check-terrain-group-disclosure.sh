@@ -46,23 +46,30 @@ json.dump({"kind": "topic-map", "topics": ["claude-code-ops"],
           open(sys.argv[1], "w"))
 PYEOF
 
-run() {  # $1 = --claims JSON or empty
+# THE COMPLETE RENDERING is what carries `in common:` lines. Story 20.84
+# (#1038) put the size switch on the member path, and this fixture's member
+# holds 12 Strands — over the screen budget — so the console is a summary and
+# the claim states render in the View. The check follows the lines it is about
+# to the surface that carries them; the three states, and the invariance of the
+# grouping across them, are exactly as they were.
+run() {  # $1 = --claims JSON or empty, $2 = out path
   if [ -n "$1" ]; then
-    python3 "$D" member --map "$work/map.json" --tag workflow --claims "$1"
+    python3 "$D" view --map "$work/map.json" --tag workflow --claims "$1" \
+      --out "$2" >/dev/null
   else
-    python3 "$D" member --map "$work/map.json" --tag workflow
+    python3 "$D" view --map "$work/map.json" --tag workflow --out "$2" >/dev/null
   fi
 }
 
-run '{"G1":"a stated commonality","G2":null}' > "$work/mixed.json" 2>"$work/e" \
-  || { err "member --claims failed: $(cat "$work/e")"; exit 1; }
-run '{"G1":"a stated commonality","G2":"also stated"}' > "$work/both.json" 2>/dev/null
-run '{}'                                              > "$work/none.json" 2>/dev/null
+run '{"G1":"a stated commonality","G2":null}' "$work/mixed.md" 2>"$work/e" \
+  || { err "view --claims failed: $(cat "$work/e")"; exit 1; }
+run '{"G1":"a stated commonality","G2":"also stated"}' "$work/both.md" 2>/dev/null
+run '{}'                                               "$work/none.md" 2>/dev/null
 
-python3 - "$work/mixed.json" "$work/both.json" "$work/none.json" <<'PYEOF' || fail=1
-import json, sys
+python3 - "$work/mixed.md" "$work/both.md" "$work/none.md" <<'PYEOF' || fail=1
+import sys
 
-def listing(p): return json.load(open(p))["listing"]
+def listing(p): return open(p, encoding="utf-8").read()
 
 def sections(text):
     """(title, [row idents]) per section — the grouping, without any prose."""

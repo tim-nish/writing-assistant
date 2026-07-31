@@ -88,6 +88,10 @@ json.dump({"kind": "topic-map", "topics": [],
 PYEOF
 
 python3 "$D" member --map "$work/map.json" --tag workflow > "$work/member.json"
+# The complete rendering for the same member — the surface that carries the
+# Strand rows once the size switch (Story 20.84, #1038) summarises the console.
+python3 "$D" view --map "$work/map.json" --tag workflow \
+  --out "$work/member-view.md" >/dev/null
 CLAIMS='{"G1":"the agents thread, as the screen said it","G2":"the cost thread, as the screen said it","G3":"the uncotagged thread, as the screen said it"}'
 
 # Asked in REVERSE screen order, to prove the order is the owner's. G3 is the
@@ -306,7 +310,13 @@ check("_clip_line(" not in fnseg,
 # AC2 — and the SIZE-SWITCHED surface is untouched: screen 2's listing still
 # clips at the same budget. A diff that removed clipping globally has overshot
 # this story; this is the assertion that says so.
-listing = mem["listing"]
+#
+# Read from the COMPLETE RENDERING (Story 20.84, #1038). This fixture's member
+# is over the screen budget, so the console is now a summary that has no Strand
+# rows to clip; the surface the size switch governs and that carries the arcs is
+# the View. Asserting clipping on the summary would be asserting it about lines
+# that are not there — the assertion follows its subject.
+listing = open(w + "/member-view.md", encoding="utf-8").read()
 check(f"how it changed: {arc}" not in listing,
       "screen 2's listing still clips the same over-budget arc")
 check(max(len(ln) for ln in listing.splitlines()) <= mod.VIEW_LINE_CHARS,

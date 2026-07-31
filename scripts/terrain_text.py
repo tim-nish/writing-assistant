@@ -227,6 +227,25 @@ def _elide(text, room):
 # unnoticed.
 VIEW_LINE_CHARS = 200
 
+# THE SCREEN BUDGET (Story 18.66, #601; SPEC-terrain CAP-3 size switch).
+# Past this many units one screen stops showing what the map exists to show,
+# and the terrain moves into a View file the owner opens while the screen
+# becomes a summary.
+#
+# DECLARED IN EXACTLY ONE PLACE, deliberately: the number is the issue's
+# estimate of a screen, not a measurement, so it must be movable by editing this
+# line alone. Nothing else — no skill, no harness, no second script — restates
+# it.
+#
+# IT LIVES HERE AS OF STORY 20.84 (#1038) because it now has TWO readers, and
+# the family's rule is that a budget travels with the code that reads it. It was
+# declared beside `is_large` in `terrain_screens.py` while that was its only
+# reader; the size switch was re-based per axis member on 2026-07-27 (#803), so
+# the member surface reads it too — and `terrain_screens.py` imports
+# `terrain_members.py`, which makes the leaf the only place both can reach. The
+# value is unchanged and is NOT this story's to change.
+SCREEN_BUDGET = 7
+
 
 def _clip_line(line):
     """Bound one View line, preserving its indentation and leaving blank lines

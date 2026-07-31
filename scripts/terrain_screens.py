@@ -34,6 +34,7 @@ sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
 from terrain_text import (  # noqa: E402
     row_type_legend,
     BUDGETS,
+    SCREEN_BUDGET,
     _clip_line,
     _element_coverage_line,
     _fit,
@@ -57,16 +58,11 @@ from terrain_members import (  # noqa: E402
     axis_members,
 )
 
-# THE SCREEN BUDGET (Story 18.66, #601; SPEC-terrain CAP-3 size switch).
-# Past this many subtopics one screen stops showing what the map exists to
-# show, and the terrain moves into a View file the owner opens while the
-# screen becomes a summary.
-#
-# DECLARED IN EXACTLY ONE PLACE, deliberately: the number is the issue's
-# estimate of a screen, not a measurement, so it must be movable by editing
-# this line alone. Nothing else — no skill, no harness, no second script —
-# restates it.
-SCREEN_BUDGET = 7
+# THE SCREEN BUDGET moved to `terrain_text.py` in Story 20.84 (#1038), where
+# both of its readers can reach it — `is_large` here and `member_is_large` on
+# the member path, which `terrain_screens.py` imports and therefore cannot be
+# imported by. It is imported back above, so it is still declared in exactly
+# one place and every call site reads as it did.
 
 # The View's filename. "Fixed path" is the CAP-3 property that makes the View
 # safe: fully regenerated every invocation, never read back.
