@@ -306,6 +306,28 @@ case "$tws" in
   "$root"/*) err "Terrain run workspace is INSIDE the plugin working tree ($tws)" ;;
   *) ok "Terrain run workspace is outside the plugin working tree" ;;
 esac
+# THE BRIEF ARTIFACT (Story 20.75, #994) is written INTO that workspace, so it
+# inherits every property just asserted — but the story's AC3 is about the act,
+# not the directory, so the write is actually performed here against a clean
+# host repo. The brief is the one terrain artifact that is read back, which is
+# exactly why "it lands outside every tree" must be checked rather than assumed.
+printf '{"free_text": "a footprint probe brief"}\n' > "$work/brief-answer.json"
+# The plugin tree is compared BEFORE against AFTER, never against empty: this
+# check runs from a developer's working tree, so "clean" is the wrong test and
+# "unchanged by this write" is the right one.
+plugin_before=$(git -C "$root" status --porcelain)
+python3 "$root/scripts/topic-map-directions.py" brief \
+  --answer "$work/brief-answer.json" --out "$tws/brief.json" >/dev/null 2>&1 \
+  && [ -f "$tws/brief.json" ] \
+  && ok "the brief artifact is written into the Terrain run workspace" \
+  || err "the brief artifact was not written into the run workspace"
+clean && ok "composing a brief leaves the host tree clean" || {
+  err "the brief artifact leaked into the host tree:"
+  git -C "$HOST" status --porcelain >&2
+}
+[ "$(git -C "$root" status --porcelain)" = "$plugin_before" ] \
+  && ok "composing a brief leaves the plugin working tree unchanged" \
+  || err "the brief artifact dirtied the plugin working tree"
 vdir=$(dirname "$vpath")
 mkdir -p "$vdir"
 printf '# probe view\n' > "$vpath"

@@ -7,8 +7,49 @@ commands.
 
 ```
 python3 ${CLAUDE_PLUGIN_ROOT}/scripts/topic-map-directions.py brief \
-  --payloads "$WS/presented-payloads.jsonl" --map "$WS/map.json"
+  --payloads "$WS/presented-payloads.jsonl" --map "$WS/map.json" \
+  --out "$WS/brief.json"
 ```
+
+## The brief is a NAMED ARTIFACT with a visible lifecycle
+
+**Added 2026-07-31** (SPEC-terrain CAP-3, #994). The brief used to arrive as a
+chat continuation, so the owner could not tell when a brief began existing,
+where it lived, or how to return to one. Three things are now on the surface,
+and the command returns all three — **relay them, never paraphrase**:
+
+- **the named step** (`step.line`) — the act that produced the brief, so the
+  owner refers to it rather than to "the message above";
+- **the artifact path** (`artifact.line`) — `--out` writes the composed brief
+  to `$WS/brief.json`. `$WS` came from the path resolver in Step 0 and is
+  **outside every working tree**; nothing is written into the host repo, and
+  the artifact is the owner's route back to what this step decided;
+- **the lifecycle** (`lifecycle.line`) — `composed → inspected → adopted`,
+  with the current state legible. It is `composed` the moment the artifact is
+  written.
+
+**Re-opening is a first-class move, and this artifact is the one thing the
+terrain surface reads back:**
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/topic-map-directions.py brief-open \
+  --at "$WS/brief.json" [--state inspected|adopted]
+```
+
+**This does not weaken the never-read-back rule, and the difference is the
+point.** A View is a *rendering* regenerated per invocation — nothing reads it
+back, and deleting it loses nothing, because it recomposes from the map. The
+brief is *the owner's decision*, which nothing can recompose. Re-opening it is
+the requirement, not a cache; no rendering is cached across invocations.
+
+`--state` records the transition the return represents, and the lifecycle
+moves **forward only** — a rewind is refused, because a brief the owner
+already adopted is not un-adopted by looking at it again.
+
+**What this changes about composition: nothing.** Selection at the screen
+composes the brief and that is ratified. This is surfacing only, and the
+hand-off below is byte-for-byte the same string it always was — **nothing
+downstream can tell that terrain wrote an artifact.**
 
 The outcome is a **brief in the owner's words**. Free text always wins;
 machine-proposed wording becomes the brief only when the owner selected it —
