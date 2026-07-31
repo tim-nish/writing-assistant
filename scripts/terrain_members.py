@@ -492,7 +492,8 @@ def _journey_arc_line(el):
     return f"  how it changed: not shown — {absent}" if absent else None
 
 
-def compose_member_listing(map_data, tag, cands, axis="tag", claims=None):
+def compose_member_listing(map_data, tag, cands, axis="tag", claims=None,
+                           substrate=SUBSTRATE_DEFAULT, grouping=None):
     """Screen 2 as a LISTING: the member's Strands, WHOLE, in sections.
 
     Served whole with the count disclosed — no within-member cap, no
@@ -512,7 +513,21 @@ def compose_member_listing(map_data, tag, cands, axis="tag", claims=None):
     one invented. With `claims=None` the output is byte-identical to the
     pre-20.66 listing.
     """
-    ms = member_sections(map_data, tag, axis)
+    # The substrate and grouping are THREADED, not defaulted (#1017). This
+    # call used to be `member_sections(map_data, tag, axis)`, so a judged
+    # substrate reached the JSON `sections` field correctly while the composed
+    # `listing` beside it rendered CO-TAG sections — two answers to one
+    # question, from one response. It went unnoticed because every fixture
+    # exercised the co-tag axis, where omitting the arguments happens to
+    # produce the right answer, so no check could see it; the journey-similarity
+    # measurement (#889) was the first run to ask for anything else.
+    #
+    # This matters most exactly where it is least visible: Story 20.66 made the
+    # script compose the screen end to end so a hand-relay could not reword a
+    # row. A screen composed from the wrong substrate is that remedy defeated
+    # at the source — faithfully relayed, and wrong.
+    ms = member_sections(map_data, tag, axis, substrate=substrate,
+                         grouping=grouping)
     by_slug = {c.get("slug"): c for c in cands if c.get("kind") == "element"}
     pin = map_data.get("coverage", {}).get("pin")
     noun = "topic" if axis == "topic" else "tag"
@@ -853,7 +868,10 @@ def cmd_member(args):
             return _err("--claims must be an object keyed by group id, "
                         'for example {"G1": "..."}')
     cands = candidates(m)
-    listing = compose_member_listing(m, args.tag, cands, axis, claims)
+    listing = compose_member_listing(
+        m, args.tag, cands, axis, claims,
+        substrate=getattr(args, "substrate", SUBSTRATE_DEFAULT),
+        grouping=grouping)
     out = {"kind": "terrain-member", "member": ms["member"], "axis": axis,
            "count": ms["count"],
            # The grouping disclosure (Story 20.36, #890): which substrate
