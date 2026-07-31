@@ -49,6 +49,21 @@ indistinguishable from one whose brief the owner typed unaided.
 Free-form is offered EVERY time, not only on rejection: the owner naming their
 own direction or combination axis is a first-class outcome, not a fallback.
 
+THE BRIEF IS A NAMED ARTIFACT WITH A LIFECYCLE (Story 20.75, #994)
+------------------------------------------------------------------
+The hand-off above is unchanged — the brief string still goes into the same
+stage-0 path and drafting stays entry-agnostic. What is added is consumer-side
+surfacing that was missing entirely: the gate names the STEP that produced the
+brief, `brief --out` writes it as a DURABLE ARTIFACT under the run workspace,
+and its LIFECYCLE — composed → inspected → adopted — is carried with it so the
+state is legible at the gate. `brief-open` re-opens one and records forward
+transitions. WHAT COMPOSES THE BRIEF IS UNTOUCHED: selection at the screen
+composes it, which is ratified and out of scope here.
+
+This artifact is the one thing in this script that IS read back, and the
+contrast with the View is deliberate — see the block above
+`write_brief_artifact` for why the two rules must stay apart.
+
 INDEXED SELECTION (Story 18.67, #602)
 -------------------------------------
 From a View, the owner answers `{index: "T3.2", note: "<their angle>", pin:
@@ -69,9 +84,14 @@ Stdlib-only. Subcommands:
                                 renders the View when the map is over budget
   view        --map PATH --out PATH
                                 the View file alone
-  brief       --answer PATH [--map PATH]
+  brief       --answer PATH [--map PATH] [--out PATH]
                                 the owner's chosen direction as the brief string
-                                for stage-0 `--brief`
+                                for stage-0 `--brief`; --out also writes it as a
+                                durable, RE-OPENABLE artifact under the run
+                                workspace (Story 20.75)
+  brief-open  --at PATH [--state inspected|adopted]
+                                re-open a written brief, and optionally record
+                                the lifecycle transition the return represents
 
 Exit codes: 0 ok · 1 refusal (no usable map / no owner wording) · 2 usage.
 """
@@ -90,8 +110,14 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
 from terrain_text import (
     row_type_legend,  # noqa: E402
+    BRIEF_LIFECYCLE,
+    BRIEF_STEP_ID,
+    BRIEF_STEP_NAME,
     BUDGETS,
     VIEW_LINE_CHARS,
+    _brief_artifact_line,
+    _brief_lifecycle_line,
+    _brief_step_line,
     _clip_line,
     _element_coverage_line,
     _elide,
@@ -310,6 +336,84 @@ def write_view(path, text):
     _ensure_view_dir(path)
     with open(path, "w", encoding="utf-8") as fh:
         fh.write(text)
+
+
+# --------------------------------------------------------------------------
+# THE BRIEF ARTIFACT (Story 20.75, #994; SPEC-terrain CAP-3, the named-artifact
+# clause added 2026-07-31)
+#
+# READ THIS BESIDE `write_view` ABOVE, BECAUSE THE CONTRACTS ARE OPPOSITE.
+# Every neighbouring artifact this script emits is write-only by contract: the
+# View is a RENDERING regenerated per invocation, never read back, and deleting
+# it loses nothing, because it can always be recomposed from the map.
+#
+# The brief is not a rendering. It is THE OWNER'S DECISION — what they selected
+# and what they said about it — and it cannot be recomposed from anything: the
+# map does not contain it. So **re-opening it is the requirement, not a cache**
+# (CAP-3: "The never-read-back rule does not bind here, and the difference is
+# the point"). `read_brief_artifact` below is a sanctioned reader, and its
+# existence is the difference, stated here so nobody "fixes" it into agreement
+# with its neighbours.
+#
+# What is NOT licensed by that difference, so the two rules stay apart:
+#   * no rendering is cached across invocations — screens, Views and reports
+#     are still recomposed every time, and nothing here reads one back;
+#   * the artifact never becomes an index or a lookup — it is read by the
+#     owner returning to their own brief, addressed by the path they were told.
+#
+# WHERE IT LIVES: the per-run workspace, minted by
+# `resolve-paths.py new-run --terrain` (D1 — the resolver owns every storage
+# path; this script still just writes where it is told, exactly as `--view`
+# does). That is machine state, outside every working tree, which is also what
+# keeps the publication boundary intact: the artifact carries `pins.hub`, a
+# real hub sha, and #935 relocated Terrain's run workspaces out of this public
+# repository for precisely that reason.
+# --------------------------------------------------------------------------
+
+# The artifact's default basename. A caller may pass any path under the run
+# workspace — Story 20.77's iteration loop holds several briefs in one sitting,
+# one per member-set variant — so the NAME is the artifact's identity and this
+# is only the default. Declared once, like VIEW_FILENAME.
+BRIEF_FILENAME = "brief.json"
+
+
+def _brief_lifecycle(state, history=None):
+    """The lifecycle block carried inside the artifact and printed at the gate.
+
+    Carries the whole ordered sequence and not just the current state: AC5's
+    "composed → inspected → adopted" is legible only if the owner can see what
+    follows what.
+    """
+    return {"state": state, "states": list(BRIEF_LIFECYCLE),
+            "line": _brief_lifecycle_line(state),
+            "history": list(history or [{"state": state}])}
+
+
+def write_brief_artifact(path, payload):
+    """Write the brief artifact. READ BACK BY DESIGN — see the block above.
+
+    Deliberately not `write_view`'s `_ensure_view_dir`: that helper drops a
+    self-ignoring `.gitignore` because the View lands inside a working tree.
+    This lands in a run workspace under the machine state root, where there is
+    no tree to keep clean and an ignore file would be noise.
+    """
+    d = os.path.dirname(path)
+    if d:
+        os.makedirs(d, exist_ok=True)
+    with open(path, "w", encoding="utf-8") as fh:
+        json.dump(payload, fh, indent=2, ensure_ascii=False)
+        fh.write("\n")
+    return path
+
+
+def read_brief_artifact(path):
+    """Re-open a written brief (AC4). The sanctioned reader — see the block
+    above for why one exists here and nowhere else in this script."""
+    with open(path, encoding="utf-8") as fh:
+        payload = json.load(fh)
+    if not isinstance(payload, dict) or "brief" not in payload:
+        raise ValueError("not a brief artifact (no `brief` key)")
+    return payload
 
 
 def compose_axis_payload(map_data):
@@ -998,9 +1102,79 @@ def cmd_brief(args):
         if gaps:
             out["gaps"] = gaps
     out["stage"] = "topic-map-brief"
+    # THE NAMED STEP IDENTITY (Story 20.75 AC1): the act that produced this
+    # brief, named, so the owner refers to it rather than to "the message
+    # above". Owner-facing wording comes from the register seam.
+    out["step"] = {"id": BRIEF_STEP_ID, "name": BRIEF_STEP_NAME,
+                   "line": _brief_step_line()}
+    # THE LIFECYCLE (AC5), stated whether or not an artifact is written: a
+    # brief that was composed and not written is still `composed`, and saying
+    # so is more honest than omitting the field.
+    out["lifecycle"] = _brief_lifecycle(BRIEF_LIFECYCLE[0])
     out["next"] = ("draft-pipeline.py stage0 <framework> <sources...> --brief "
                    "<this brief> — the existing stage-0 path, unchanged")
+    # THE DURABLE ARTIFACT (AC2/AC4). Written only when the caller passes a
+    # path, exactly as `--view` works: the resolver owns the workspace and
+    # this script writes where it is told, so no storage path is composed here
+    # (D1). NOTHING DOWNSTREAM CHANGES (AC6) — the hand-off is still the brief
+    # STRING into the existing stage-0 `--brief` path, and drafting never
+    # learns that terrain produced it.
+    if getattr(args, "out", None):
+        path = os.path.abspath(args.out)
+        out["artifact"] = {
+            "id": os.path.splitext(os.path.basename(path))[0],
+            "path": path,
+            "line": _brief_artifact_line(path),
+            "reopen": f"topic-map-directions.py brief-open --at {path}",
+            "read_back": ("by design — this is the owner's decision, not a "
+                          "rendering; the never-read-back rule does not bind "
+                          "here (CAP-3, 2026-07-31)")}
+        try:
+            write_brief_artifact(path, out)
+        except OSError as exc:
+            return _err(f"could not write the brief artifact at {path}: {exc}")
     print(json.dumps(out, indent=2, ensure_ascii=False))
+    return 0
+
+
+def cmd_brief_open(args):
+    """Re-open a written brief (Story 20.75 AC4/AC5).
+
+    The re-entry point the gate advertises: the owner returns to a brief by
+    the path they were told, and optionally records the lifecycle transition
+    the return represents. Transitions are FORWARD-ONLY along
+    `composed → inspected → adopted` — a backwards move is refused rather than
+    recorded, because a lifecycle that can run backwards states nothing.
+    """
+    try:
+        payload = read_brief_artifact(args.at)
+    except (OSError, ValueError) as exc:
+        return _err(f"unreadable brief artifact at {args.at}: {exc}")
+    life = payload.get("lifecycle") or _brief_lifecycle(BRIEF_LIFECYCLE[0])
+    state = life.get("state")
+    if args.state:
+        try:
+            now = BRIEF_LIFECYCLE.index(state)
+        except ValueError:
+            now = -1
+        if BRIEF_LIFECYCLE.index(args.state) < now:
+            return _err(
+                f"the brief is already `{state}`; `{args.state}` is earlier in "
+                f"{' → '.join(BRIEF_LIFECYCLE)}. The lifecycle only moves "
+                f"forward — compose a new brief instead of rewinding this one.")
+        history = list(life.get("history") or [])
+        if args.state != state:
+            history.append({"state": args.state})
+        state = args.state
+        payload["lifecycle"] = _brief_lifecycle(state, history)
+        try:
+            write_brief_artifact(args.at, payload)
+        except OSError as exc:
+            return _err(f"could not record the transition at {args.at}: {exc}")
+    else:
+        payload["lifecycle"] = _brief_lifecycle(state, life.get("history"))
+    payload["lifecycle"]["line"] = _brief_lifecycle_line(state)
+    print(json.dumps(payload, indent=2, ensure_ascii=False))
     return 0
 
 
@@ -1127,9 +1301,25 @@ def main(argv=None):
                    help="with --payloads: select this ask's answer row "
                         "(default: the latest answer row)")
     b.add_argument("--map", help="the same map, so an adopted candidate resolves")
+    b.add_argument("--out", metavar="PATH",
+                   help=f"write the brief as a durable artifact here — pass "
+                        f"the run workspace's {BRIEF_FILENAME} (Story 20.75). "
+                        f"Unlike the View, this artifact IS read back: it is "
+                        f"the owner's decision, and re-opening it with "
+                        f"`brief-open` is the requirement, not a cache. The "
+                        f"stage-0 hand-off is unchanged either way.")
+    bo = sub.add_parser("brief-open",
+                        help="re-open a written brief, and optionally record "
+                             "its lifecycle transition")
+    bo.add_argument("--at", required=True, metavar="PATH",
+                    help="the artifact written by `brief --out`")
+    bo.add_argument("--state", choices=list(BRIEF_LIFECYCLE[1:]),
+                    help="record the transition this return represents "
+                         f"({' → '.join(BRIEF_LIFECYCLE)}); forward-only")
     args = p.parse_args(argv)
     return {"candidates": cmd_candidates, "payload": cmd_payload,
             "view": cmd_view, "brief": cmd_brief,
+            "brief-open": cmd_brief_open,
             "axis": cmd_axis, "member": cmd_member,
             "report": cmd_report,
             "journey-inputs": cmd_journey_inputs}[args.cmd](args)

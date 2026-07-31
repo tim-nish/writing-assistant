@@ -40,6 +40,57 @@ Stdlib-only, and imported only. It has no CLI: nothing here is a command.
 BUDGETS = {"where": 240, "why": 200, "effect": 140}
 
 
+# --------------------------------------------------------------------------
+# The brief's NAMED STEP IDENTITY and its LIFECYCLE (Story 20.75, #994;
+# SPEC-terrain CAP-3, the named-artifact clause added 2026-07-31)
+#
+# Owner-facing strings, so they live HERE with `_verdict_phrase` and
+# `_pin_display` rather than inline at the composer — the same register seam
+# every other owner-facing rendering goes through. The brief previously
+# arrived as a chat continuation with no name, so the owner could refer to it
+# only as "the message above"; naming the act that produced it is the whole
+# point of the identity.
+#
+# The composer chooses the format and the step's name — the hub ratified the
+# boundary property only (CAP-3: "Format, artifact path and the step's name
+# are this consumer's to choose").
+# --------------------------------------------------------------------------
+
+BRIEF_STEP_ID = "terrain/step-3-compose-the-brief"
+BRIEF_STEP_NAME = "Step 3 — compose the brief"
+
+# The three states, IN ORDER. The order is the contract: a lifecycle is only
+# legible if the owner can see which state follows which, and transitions are
+# forward-only for the same reason (`inspected` after `adopted` is not a
+# state of anything).
+BRIEF_LIFECYCLE = ("composed", "inspected", "adopted")
+
+
+def _brief_step_line():
+    """The gate's named step identity (CAP-3, 2026-07-31): the act the owner
+    can refer to, instead of "the message above"."""
+    return f"{BRIEF_STEP_NAME} ({BRIEF_STEP_ID})"
+
+
+def _brief_lifecycle_line(state):
+    """The lifecycle, stated on the surface with the current state legible —
+    never the current state alone, because one word out of three tells the
+    owner nothing about what comes next."""
+    if state not in BRIEF_LIFECYCLE:
+        return (f"Lifecycle: {' → '.join(BRIEF_LIFECYCLE)} — current state "
+                f"UNKNOWN ({state!r}); this is a condition to fix, not a state.")
+    rendered = " → ".join(
+        f"[{s}]" if s == state else s for s in BRIEF_LIFECYCLE)
+    return f"Lifecycle: {rendered} — now: {state}."
+
+
+def _brief_artifact_line(path):
+    """Where the brief lives, said once, at the gate. The path is the owner's
+    only route back to it — a brief they cannot find is the chat continuation
+    this clause replaced."""
+    return f"Brief artifact: {path}"
+
+
 def _fit(text, budget=BUDGETS["effect"]):
     """A payload field is AUTHORED within its budget, never truncated (#832;
     SPEC-writing-assistant owner-facing proposal contract, clause (e)). This

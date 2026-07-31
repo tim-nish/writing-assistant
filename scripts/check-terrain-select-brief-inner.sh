@@ -1,5 +1,6 @@
 #!/usr/bin/env sh
 # parallel-safe
+# covers: scripts/topic-map-directions.py scripts/terrain_text.py
 # tier: inner — brief-composition assertions against the committed fixture
 #   map; no seam, no corpus, no assembly. Split from
 #   check-terrain-select-inner.sh (#948): that check carried two subjects its
@@ -7,7 +8,8 @@
 #   combined CLI invocations (~11 x ~150ms) sat at ~90% of INNER_MS, failing
 #   intermittently on load variance. Each subject now holds its own check with
 #   headroom; assertion content is unchanged. Measured 2026-07-30 at split:
-#   ~0.9s (ceiling 2s).
+#   ~0.9s (ceiling 2s); ~1.0s after Story 20.75 added the artifact-lifecycle
+#   block (three more CLI runs, still well inside the ceiling).
 # removal-signal: the terrain checks are retired or re-shaped under the #910
 #   retention sweep (a check provably subsumed by the #857/#858 seam, or the
 #   full-tier terrain harnesses rebuilt fixture-based), which re-places these
@@ -48,7 +50,34 @@ PYEOF
 # --- the CLI under test: candidates, then the three brief scenarios ---------
 python3 "$D" candidates --map "$work/map.json" > "$work/cands.json"
 python3 "$D" brief --answer "$work/answer-free.json" --map "$work/map.json" \
-  > "$work/brief-free.json"
+  --out "$work/ws/brief.json" > "$work/brief-free.json"
+
+# The NAMED ARTIFACT's lifecycle (Story 20.75, #994): re-open it, record the
+# forward transition, and prove the rewind is refused. Two extra CLI runs,
+# batched here beside the composition runs for the same INNER_MS reason the
+# header records.
+python3 "$D" brief-open --at "$work/ws/brief.json" --state inspected \
+  > "$work/brief-reopened.json"
+if python3 "$D" brief-open --at "$work/ws/brief.json" --state inspected \
+     > "$work/brief-rewind.json" 2>&1; then
+  ok "a same-state re-open is not a rewind"
+else
+  err "re-opening at the current state was refused: $(cat "$work/brief-rewind.json")"
+fi
+if python3 "$D" brief-open --at "$work/ws/brief.json" --state adopted \
+     > "$work/brief-adopted.json" 2>&1; then
+  ok "the lifecycle advances to adopted"
+else
+  err "adopting was refused: $(cat "$work/brief-adopted.json")"
+fi
+if python3 "$D" brief-open --at "$work/ws/brief.json" --state inspected \
+     > "$work/brief-back.json" 2>&1; then
+  err "the lifecycle ran BACKWARDS from adopted to inspected"
+else
+  grep -q 'only moves forward' "$work/brief-back.json" \
+    && ok "a backwards transition is refused, with the reason named" \
+    || err "wrong rewind behaviour: $(cat "$work/brief-back.json")"
+fi
 
 # The selected-candidate answer derives from the candidates output, so it is
 # written between CLI calls — one short run, then the brief call it feeds.
@@ -72,7 +101,7 @@ fi
 
 # --- one assertion run over the produced files (#950 batching) --------------
 python3 - "$work" <<'PYEOF' || fail=1
-import json, sys
+import json, os, sys
 w = sys.argv[1]
 fail = []
 def check(cond, msg):
@@ -91,6 +120,47 @@ check(b["origin"] == "adopted-candidate",
       "machine-proposed text the owner accepts records origin adopted-candidate")
 check(b["provenance"] == "owner-authored",
       "an adopted candidate becomes OWNER-ADOPTED wording")
+
+# --- Story 20.75 (#994): the brief is a NAMED ARTIFACT with a lifecycle -----
+b = json.load(open(w + "/brief-free.json"))
+# AC1 — the gate names the step that produced the brief.
+check(bool((b.get("step") or {}).get("name"))
+      and (b["step"].get("line") or "").startswith(b["step"]["name"]),
+      "the brief names the STEP that produced it, not 'the message above'")
+# AC2 — a durable artifact, at the stated path, actually on disk.
+art = b.get("artifact") or {}
+check(art.get("path") == os.path.join(w, "ws", "brief.json")
+      and os.path.isfile(art["path"]),
+      "the composed brief is WRITTEN, and the path is stated to the owner")
+check(art.get("id") == "brief" and "brief-open" in (art.get("reopen") or ""),
+      "the artifact carries its identity and how to re-open it")
+# AC4 — re-openable. The contrast with the View is the point, so assert the
+# reader exists AND that no rendering gained a cache alongside it.
+r = json.load(open(w + "/brief-reopened.json"))
+check(r["brief"] == b["brief"] and r["step"] == b["step"],
+      "a written brief is read back whole — the never-read-back rule does "
+      "not bind the owner's own decision")
+src = open("scripts/topic-map-directions.py", encoding="utf-8").read()
+check("def read_brief_artifact(" in src
+      and not any(t in src for t in ("read_view(", "load_view(", "VIEW_CACHE")),
+      "exactly one reader exists, and it is the brief's — no View reader, "
+      "no rendering cache")
+# AC5 — the lifecycle is legible: the whole ordered sequence, current state
+# marked. Not the current state alone, which says nothing about what follows.
+for tag, payload, want in (("composed", b, "composed"),
+                           ("reopened", r, "inspected"),
+                           ("adopted", json.load(open(w + "/brief-adopted.json")),
+                            "adopted")):
+    life = payload.get("lifecycle") or {}
+    check(life.get("state") == want
+          and life.get("states") == ["composed", "inspected", "adopted"]
+          and f"[{want}]" in (life.get("line") or ""),
+          f"the {tag} brief states its lifecycle with {want} current")
+# AC6 — nothing downstream can tell the difference: the hand-off is still the
+# brief STRING, and no new field reaches the stage-0 path.
+check(r["brief"] == "connect the retry storm to on-call load, through the retro"
+      and "--brief" in b.get("next", ""),
+      "the stage-0 hand-off is the same brief string — no new entry pipeline")
 sys.exit(1 if fail else 0)
 PYEOF
 [ $? -eq 0 ] || fail=1
