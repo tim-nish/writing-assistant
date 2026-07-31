@@ -1162,18 +1162,35 @@ check(dn["leaf_covered"] is True,
       "AC5/AC6: the leaf cover is counted at the DEEPEST parts, not the "
       "intermediate ones")
 
-# The CLI wiring, once: `--subgroups` reaches the layer, and an unsubdivided
-# run's composed listing is byte-identical to today's (AC8).
+# THE COMMAND WIRING, once. `cmd_member` is called directly rather than through
+# a tenth interpreter start: the family SUM is budgeted (#944), and what is
+# being asserted is that `--subgroups` reaches the layer and the payload
+# carries the ids — argparse's own declaration is asserted by
+# check-check-declarations.sh, not here.
+import io  # noqa: E402
+from contextlib import redirect_stdout  # noqa: E402
+from terrain_members import cmd_member  # noqa: E402
+
+
+class _Args:
+    pass
+
+
 f = tempfile.NamedTemporaryFile("w", suffix=".json", delete=False)
 json.dump(m, f); f.close()
-cli = subprocess.run(
-    ["python3", D, "member", "--map", f.name, "--tag", "workflow",
-     "--claims", '{"G1":"the parent claim"}', "--subgroups",
-     json.dumps({gid: [{"claim": "a", "strands": slugs[:3]},
-                       {"claim": "b", "strands": slugs[3:]}]})],
-    capture_output=True, text=True)
-dc = json.loads(cli.stdout)
-check(cli.returncode == 0 and dc["subdivided"] == [gid]
+a = _Args()
+a.map, a.tag, a.axis = f.name, "workflow", "tag"
+a.claims = '{"G1":"the parent claim"}'
+a.subgroups = json.dumps({gid: [{"claim": "a", "strands": slugs[:3]},
+                                {"claim": "b", "strands": slugs[3:]}]})
+a.grouping = a.view = None
+a.substrate = "co-tags"
+buf = io.StringIO()
+with redirect_stdout(buf):
+    rc = cmd_member(a)
+dc = json.loads(buf.getvalue())
+check(rc == 0, "the member command runs with --subgroups")
+check(dc["subdivided"] == [gid]
       and dc["sections"][0]["subgroups"][0]["subgroup_id"] == f"{gid}-1",
       "AC4: --subgroups reaches the layer through the CLI and the payload "
       "carries the ids and claims as data")
