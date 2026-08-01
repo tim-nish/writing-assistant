@@ -113,12 +113,16 @@ check(not re.search(r"\bf[1-5]\b", blob),
 # read here either — nothing in this repository can.
 sys.path.insert(0, "scripts")
 from draft_gates import CONTROL_CAPACITY as BUILDER_CAP
+from draft_gates import OVERFLOW_MARGIN as BUILDER_MARGIN
 from importlib.machinery import SourceFileLoader
 _v = SourceFileLoader("vpp", "scripts/validate-proposal-payload.py").load_module()
 
 check(_v.CONTROL_CAPACITY == BUILDER_CAP,
       f"#1102: builder and validator agree on the control capacity "
       f"({BUILDER_CAP})")
+check(_v.OVERFLOW_MARGIN == BUILDER_MARGIN,
+      f"#1206: builder and validator agree on the overflow margin "
+      f"({BUILDER_MARGIN})")
 
 for name in ("intent", "resume", "sources", "harvest-entry"):
     item = json.load(open(os.path.join(w, name + ".json")))["items"][0]
@@ -128,10 +132,11 @@ for name in ("intent", "resume", "sources", "harvest-entry"):
     if not isinstance(r, dict):
         continue
     n = len(item["choices"])
-    expected = "selection" if n <= BUILDER_CAP else "block"
+    expected = "selection" if n <= BUILDER_CAP + BUILDER_MARGIN else "block"
     check(r.get("control") == expected,
           f"#1102: ...and its control is {expected!r}, computed from "
-          f"{n} choices against a capacity of {BUILDER_CAP}")
+          f"{n} choices against a capacity of {BUILDER_CAP} "
+          f"(margin {BUILDER_MARGIN}, #1206)")
     # A recommendation LEADS. Rank is not pre-selection: the assertion above
     # that nothing carries a `recommended` key still holds per CHOICE; this is
     # the directive's index and it can only ever name the first option.
@@ -141,6 +146,58 @@ for name in ("intent", "resume", "sources", "harvest-entry"):
         check(bool(r.get("banner")) and bool(r.get("reply_line")),
               f"#1102: ...and the {name} block carries its own banner and "
               f"reply line rather than leaving them to the renderer")
+
+# A SMALL OVERFLOW IS A DISCLOSED SELECTION (#1206). The intent gate's closed
+# set is five against a capacity of four, so block form was its permanent fate
+# by construction. Within the margin the control is a selection: the tail past
+# the capacity is DECLARED in `render.overflow`, each member is NAMED in the
+# question text the owner reads, and the recommendation still leads. Above the
+# margin nothing is reopened, and declaring an overflow there is refused.
+it = json.load(open(os.path.join(w, "intent.json")))["items"][0]
+r = it["render"]
+check(r["control"] == "selection",
+      "#1206: the five-label intent gate renders as a selection, not a "
+      "permanent block")
+over = r.get("overflow")
+check(over == [c["label"] for c in it["choices"][BUILDER_CAP:]],
+      "#1206: ...its overflow is exactly the ordered tail past the capacity")
+question = it["where"] + " " + it["why"]
+check(bool(over) and all(lbl in question for lbl in over),
+      "#1206: ...each overflow member is named in the question text — "
+      "disclosed, never hidden")
+check(r.get("recommended") in (None, 0),
+      "#1206: ...and any recommendation still leads")
+check(it.get("free_text") is True,
+      "#1206: ...with the free-text entry the overflow member is reached by")
+
+
+def _refused(item):
+    return any("overflow" in path for path, _ in
+               _v.validate({"items": [item]}, require_render=True))
+
+
+check(_refused({"where": "w", "why": "y",
+                "choices": [{"label": f"c{i}", "effect": "e"}
+                            for i in range(BUILDER_CAP + BUILDER_MARGIN + 1)],
+                "render": {"control": "block", "recommended": None,
+                           "banner": "b", "reply_line": "r",
+                           "overflow": ["c6"]},
+                "free_text": True}),
+      "#1206: declaring an overflow ABOVE the margin is refused")
+check(_refused({"where": "w", "why": "y",
+                "choices": [{"label": f"c{i}", "effect": "e"}
+                            for i in range(3)],
+                "render": {"control": "selection", "recommended": None,
+                           "overflow": ["c2"]},
+                "free_text": True}),
+      "#1206: declaring an overflow WITHIN the capacity is refused")
+check(_refused({"where": "w", "why": "y",
+                "choices": [{"label": f"c{i}", "effect": "e"}
+                            for i in range(BUILDER_CAP + 1)],
+                "render": {"control": "selection", "recommended": None,
+                           "overflow": [f"c{BUILDER_CAP}"]},
+                "free_text": True}),
+      "#1206: an overflow member unnamed in the question text is refused")
 
 # THE SOURCES GATE ASKS A SCOPE (Story 20.109, #1103). The observed gate listed
 # candidate FILES and expected them typed back. The owner's decision is where

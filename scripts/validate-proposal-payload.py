@@ -170,6 +170,12 @@ def _premise_errors(item, tag):
 # enforcing one and the carrier check asserts the two agree.
 CONTROL_CAPACITY = 4
 
+# A choice set exceeding the capacity by at most this margin is still a
+# selection, with the members past the capacity declared in `render.overflow`
+# and named in the question text (amended 2026-08-02, #1206). Mirrors
+# `draft_gates.OVERFLOW_MARGIN`; the carrier check asserts the two agree.
+OVERFLOW_MARGIN = 2
+
 
 def _render_errors(item, tag, choices):
     """Yield (path, reason) for a `render` directive's shape (Story 20.107).
@@ -193,12 +199,46 @@ def _render_errors(item, tag, choices):
         yield (f"{tag}.render.control",
                f"is {control!r}; expected 'selection' or 'block'")
         return
-    expected = "selection" if len(choices) <= CONTROL_CAPACITY else "block"
+    n = len(choices)
+    expected = ("selection" if n <= CONTROL_CAPACITY + OVERFLOW_MARGIN
+                else "block")
     if control != expected:
         yield (f"{tag}.render.control",
-               f"is {control!r} but {len(choices)} choices against a capacity "
-               f"of {CONTROL_CAPACITY} make it {expected!r} — control is "
+               f"is {control!r} but {n} choices against a capacity "
+               f"of {CONTROL_CAPACITY} (margin {OVERFLOW_MARGIN}) make it "
+               f"{expected!r} — control is "
                "computed from the choice count, never authored")
+    # A small overflow is DISCLOSED, never hidden (#1206): declared only
+    # within the margin, matching the tail of the ordered choice set, each
+    # member named in the question text the owner reads.
+    overflow = render.get("overflow")
+    if overflow is not None:
+        if control == "block" or n <= CONTROL_CAPACITY:
+            yield (f"{tag}.render.overflow",
+                   "is declared outside the margin — overflow belongs only "
+                   "to a selection whose choices exceed the capacity by at "
+                   f"most {OVERFLOW_MARGIN}")
+        elif not isinstance(overflow, list):
+            yield (f"{tag}.render.overflow", "is not a list of labels")
+        else:
+            tail = [str((c or {}).get("label", "")) if isinstance(c, dict)
+                    else "" for c in choices[CONTROL_CAPACITY:]]
+            if overflow != tail:
+                yield (f"{tag}.render.overflow",
+                       f"is {overflow!r} but the members past the capacity "
+                       f"are {tail!r} — overflow is the ordered tail, never "
+                       "authored")
+            question = f"{item.get('where', '')} {item.get('why', '')}"
+            for label in overflow:
+                if label and label not in question:
+                    yield (f"{tag}.render.overflow",
+                           f"member {label!r} is not named in the question "
+                           "text — an overflow is disclosed, never hidden")
+    elif control == "selection" and n > CONTROL_CAPACITY:
+        yield (f"{tag}.render.overflow",
+               f"is missing — {n} choices against a capacity of "
+               f"{CONTROL_CAPACITY} put the tail past the control, and an "
+               "undeclared tail is hidden, not overflowed")
     rec = render.get("recommended")
     if rec is not None:
         if not isinstance(rec, int) or isinstance(rec, bool):
