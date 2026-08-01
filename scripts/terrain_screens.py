@@ -35,6 +35,7 @@ sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
 # the builder rather than recomputed here: `control` follows from the choice
 # count against ONE capacity, and a second copy of that arithmetic is how the
 # screens and the gates would drift apart.
+from draft_gates import CONTROL_CAPACITY, OVERFLOW_MARGIN  # noqa: E402
 from draft_gates import emit, render_form  # noqa: E402
 
 
@@ -45,11 +46,28 @@ def _render(choices, banner, reply_line):
     almost always — and a block owes its own banner and reply line, because
     the alternative is the renderer inventing them, which is the prose #1102
     reports. `render_form` refuses the block without them, so this cannot be
-    forgotten silently.
+    forgotten silently. The block threshold is the margin's, not the bare
+    capacity (#1206): a set within `OVERFLOW_MARGIN` of the capacity is a
+    selection and refuses the banner.
+    """
+    over = len(choices) > CONTROL_CAPACITY + OVERFLOW_MARGIN
+    return render_form(choices, banner=banner if over else None,
+                       reply_line=reply_line if over else None)
+
+
+def _overflow_note(choices):
+    """The margin band's disclosure (#1206), or None outside it.
+
+    A member past the control's capacity is entered through the free-text
+    channel, so it is NAMED where the owner reads the question — an unnamed
+    member is hidden, not overflowed. On these screens the tail is always the
+    fixed free-form and stop options, because stop stays last by contract.
     """
     n = len(choices)
-    return render_form(choices, banner=banner if n > 4 else None,
-                       reply_line=reply_line if n > 4 else None)
+    if not CONTROL_CAPACITY < n <= CONTROL_CAPACITY + OVERFLOW_MARGIN:
+        return None
+    tail = "; ".join(f"'{c['label']}'" for c in choices[CONTROL_CAPACITY:])
+    return f"Entered as free text, not shown as options: {tail}."
 
 
 from terrain_text import (  # noqa: E402
@@ -315,6 +333,9 @@ def compose_axis_payload(map_data, ws=None):
                       f"both listings — name one at free-form to reach it.",
                       f"{axis['unreachable_strands']} Strand(s) sit outside "
                       f"both — reach one at free-form."])
+    note = _overflow_note(choices)
+    if note:
+        parts.append([note])
     where = _fit_parts(parts, BUDGETS["where"])
     return emit({"items": [{
         "where": _fit(where, BUDGETS["where"]),
@@ -377,12 +398,14 @@ def compose_payload(map_data, cands, view_path=None, ws=None):
     })
 
     els = map_data.get("elements", [])
+    note = _overflow_note(choices)
     item = {
         "where": _fit(
             f"Terrain at {_pin_display(map_data)}: "
             f"{len(els)} element(s) — each its own Strand — and "
             f"{len(topics)} topic(s), {terrain}; "
-            f"{consumed} already consumed and still selectable.", BUDGETS["where"]),
+            f"{consumed} already consumed and still selectable."
+            + (f" {note}" if note else ""), BUDGETS["where"]),
         "why": _fit(WHY_TEXT, BUDGETS["why"]),
         "choices": choices,
         "render": _render(

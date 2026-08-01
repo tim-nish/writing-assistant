@@ -70,6 +70,9 @@ grep -q 'owner_surface as o' skills/completion-summary.md \
 # control renders as a block and carries its own banner and reply line, so the
 # relay has nothing to invent. A selection-control gate deliberately has none —
 # the host renders its own frame — and `render_form` refuses them there.
+# The block threshold is the margin's (#1206): the five-option intent gate is
+# a selection with its overflow disclosed, and only a set above the margin
+# still owes the block's own fields.
 python3 - <<'PY' || fail=1
 import sys
 sys.path.insert(0, "scripts")
@@ -78,8 +81,19 @@ import draft_gates as dg
 bad = []
 labels = {f"f{i}": f"type {i}" for i in range(1, 6)}
 item = dg.intent_gate(labels)["items"][0]
+if item["render"]["control"] != "selection":
+    bad.append("the five-option intent gate no longer renders as a selection "
+               "with a disclosed overflow (#1206)")
+if item["render"].get("overflow") != ["type 5"]:
+    bad.append("the intent gate's fifth label is not the declared overflow")
+big = dg.payload(where="w", why="y",
+                 choices=[{"label": f"c{i}", "effect": "e"}
+                          for i in range(7)],
+                 banner="Choose one.", reply_line="Reply with one.")
+item = big["items"][0]
 if item["render"]["control"] != "block":
-    bad.append("the five-option intent gate no longer renders as a block")
+    bad.append("a seven-option gate no longer renders as a block — the "
+               "above-margin case is not reopened (#1206)")
 for k in ("banner", "reply_line"):
     if not item["render"].get(k):
         bad.append(f"a block gate reached the owner with no {k} — the relay "

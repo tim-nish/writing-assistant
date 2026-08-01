@@ -59,6 +59,15 @@ import os
 # check rather than restated in it.
 CONTROL_CAPACITY = 4
 
+# A closed set overflowing the capacity by AT MOST this margin still renders
+# as a selection, with the members past the capacity declared in
+# `render.overflow` and named in the question text (amended 2026-08-02,
+# #1206). Block form was written for the ≈50-Strand terrain listing and
+# silently claimed the intent gate, whose ratified closed set is exactly
+# five — permanently above capacity by one, by construction. Above the
+# margin, block form stands unchanged.
+OVERFLOW_MARGIN = 2
+
 # Mirrors validate-proposal-payload.py, which is the enforcing copy. Kept here
 # so a builder can refuse before emitting rather than after; the validator
 # stays the authority and the check asserts the two agree.
@@ -102,8 +111,17 @@ def render_form(choices, recommended=None, banner=None, reply_line=None):
     it, so the fields a decision block needs are carried BY the payload — if
     the renderer had to invent them, the block would be exactly the free-form
     composition this whole carrier exists to remove.
+
+    A SMALL OVERFLOW IS STILL A SELECTION (amended 2026-08-02, #1206). A set
+    exceeding the capacity by at most `OVERFLOW_MARGIN` declares `overflow`:
+    the top-ranked members fill the control with the recommendation first,
+    and the remainder are full citizens of the choice whose only difference
+    is the entry path — the control's built-in free-text entry, with each
+    member named in the question text (which `payload` enforces). Above the
+    margin, the block form stands exactly as #1102 wrote it.
     """
-    control = "selection" if len(choices) <= CONTROL_CAPACITY else "block"
+    n = len(choices)
+    control = "selection" if n <= CONTROL_CAPACITY + OVERFLOW_MARGIN else "block"
     form = {"control": control, "recommended": None}
     if recommended is not None:
         if not isinstance(recommended, int) or isinstance(recommended, bool):
@@ -115,6 +133,16 @@ def render_form(choices, recommended=None, banner=None, reply_line=None):
         # The recommended option leads. Rank is not pre-selection: nothing is
         # selected, and the free-text channel is untouched.
         form["recommended"] = 0
+    if control == "selection" and n > CONTROL_CAPACITY:
+        # Computed from the recommendation-first order, never authored: the
+        # members past the capacity are exactly the tail of the ordered set.
+        ordered = choices
+        if recommended:
+            ordered = [choices[recommended]] + [c for i, c in
+                                                enumerate(choices)
+                                                if i != recommended]
+        form["overflow"] = [" ".join(str(c["label"]).split())
+                            for c in ordered[CONTROL_CAPACITY:]]
     if control == "block":
         if not banner or not reply_line:
             raise ValueError(
@@ -337,6 +365,21 @@ def payload(where, why, choices, free_text=True, recommended=None,
                     for c in choices],
         "render": form,
     }
+    if form.get("overflow"):
+        # DISCLOSED, NEVER HIDDEN (#1206): an overflow member's entry path is
+        # the free-text channel, so the channel must exist and the member must
+        # be named where the owner reads the question — otherwise the option
+        # is hidden, not overflowed.
+        if not free_text:
+            raise ValueError("an overflow member is reachable only through "
+                             "the free-text entry; free_text cannot be "
+                             "disabled on an overflowing selection")
+        question = f"{item['where']} {item['why']}"
+        for label in form["overflow"]:
+            if label not in question:
+                raise ValueError(f"the overflow member {label!r} is not named "
+                                 "in the question text — an overflow is "
+                                 "disclosed, never hidden")
     if free_text:
         # Recorded on the item so the renderer cannot drop the override
         # channel while faithfully quoting everything else.
@@ -393,27 +436,31 @@ def intent_gate(labels, ws=None):
     implementation and would have shipped the alias to the one surface it is
     barred from.
 
-    THIS GATE IS THE CAPACITY BOUNDARY'S FIRST INSTANCE (Story 20.107, #1102).
-    The closed set has FIVE members and the host control admits four, so the
-    gate 20.103 converted is itself over capacity and renders as a block. That
-    is the boundary being real rather than hypothetical: had the render form
-    been left to the renderer, this gate would have had to invent a form on the
-    spot, which is the prose the whole carrier exists to prevent.
+    THIS GATE IS THE CAPACITY BOUNDARY'S FIRST INSTANCE (Story 20.107, #1102),
+    AND THE MARGIN'S (amended 2026-08-02, #1206). The closed set has FIVE
+    members and the host control admits four, so #1102 made block form this
+    gate's permanent fate — not a degraded path but the only path, on every
+    run, by construction. Within the margin the selection stands: the first
+    four labels fill the control and the remainder ride in `render.overflow`,
+    each named in the question text and entered through the control's own
+    free-text channel.
     """
+    ordered = [phrase for _, phrase in sorted(labels.items())]
     choices = [{"label": phrase,
                 "effect": f"the draft is filled from the framework for "
                           f"'{phrase}'"}
-               for _, phrase in sorted(labels.items())]
+               for phrase in ordered]
+    why = (f"The category set is ratified and closed, so this is a choice "
+           f"among {len(ordered)}, not free text to be matched.")
+    if CONTROL_CAPACITY < len(ordered) <= CONTROL_CAPACITY + OVERFLOW_MARGIN:
+        named = "; ".join(f"'{p}'" for p in ordered[CONTROL_CAPACITY:])
+        why += f" Also on offer, entered as free text: {named}."
     return payload(
         where="Stage 0, before any workspace is minted: the article type "
               "decides which framework the draft is filled from.",
-        why="The category set is ratified and closed, so this is a choice "
-            "among five, not free text to be matched.",
+        why=why,
         choices=choices,
         gate="intent", ws=ws,
-        banner="Choose the article type before drafting starts.",
-        reply_line="Reply with one article type from the list, or describe "
-                   "the piece you have in mind.",
     )
 
 

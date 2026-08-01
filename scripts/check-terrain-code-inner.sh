@@ -300,11 +300,19 @@ check(labels[2] == "by topic — articles (1 Strand)"
       f"the topic axis's members are offered too, kind-labelled ({labels[2:4]})")
 check(labels[-2:] == ["name your own direction or combination axis", "stop here"],
       "free-form is offered and stop stays last")
-check("outside both listings" in item["where"],
+# This six-choice fixture sits in the margin band (#1206): the tail past the
+# control's capacity is declared and NAMED in the question text, which costs
+# the other where parts their longest wordings — disclosures degrade to their
+# terse authored variants, never drop.
+check(item["render"].get("overflow") == labels[-2:],
+      "the margin band declares its tail as overflow (#1206)")
+check(all(lbl in item["where"] + " " + item["why"] for lbl in labels[-2:]),
+      "each overflow member is named in the question text (#1206)")
+check("outside both" in item["where"],
       "the outside-every-axis disclosure is a line on the screen")
 check("no served tag" not in item["where"],
       "the retired untagged-strand line is gone, not reworded")
-check("tag(s) and" in item["where"] and "topic(s)" in item["where"],
+check("tag(s)" in item["where"] and "topic(s)" in item["where"],
       f"the denominator is stated per axis, never pooled ({item['where'][:70]})")
 tag_labels = [x for x in labels if x.startswith("by tag")]
 check(all("topic" not in x for x in tag_labels),
