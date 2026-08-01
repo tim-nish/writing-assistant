@@ -99,9 +99,31 @@ def _brief_artifact_line(path):
     not have to dig — but it is stated as a location, and the sentence beside
     it names the move. What the continuation IS at the end of a terrain sitting
     is issue #1051's to decide and deliberately not restated here.
+
+    THE PATH IS ON ITS OWN LINE (Story 20.115, #1117). This used to read
+    `…not something to type): {path} — say `open the brief`…`, with the path
+    inline between two clauses — and on the 2026-08-01 run the owner reported
+    "Path to brief file is truncated. So I can't investigate its correctness",
+    which made the sitting's central artifact uninspectable by the person whose
+    adoption it records. #1073 fixed the SHORTENING of paths; what remained was
+    the inline PLACEMENT, which is what a wrap or an elision acts on. The
+    sentence that named the move now comes after the path instead of around it.
     """
-    return (f"Brief artifact (a machine location, not something to type): "
-            f"{path} — say `open the brief` to come back to it.")
+    return _owner_surface().artifact_block(
+        "Brief artifact (a machine location, not something to type)", path,
+        note="Say `open the brief` to come back to it.")
+
+
+def _owner_surface():
+    """The seam module, loaded the way this package loads its siblings."""
+    import importlib.util
+    import os
+    here = os.path.dirname(os.path.realpath(__file__))
+    spec = importlib.util.spec_from_file_location(
+        "owner_surface", os.path.join(here, "owner_surface.py"))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
 
 
 # --------------------------------------------------------------------------

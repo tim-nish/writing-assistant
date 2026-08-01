@@ -50,6 +50,7 @@ from terrain_text import (
     _clip_line,
     _journey_coverage_line,
     _journey_disclosure_line,
+    _owner_surface,
     _pin_display,
     _short_path,
     _substituted_paths,
@@ -1032,12 +1033,19 @@ def _compose_member_rendering(map_data, ms, cands, claims=None,
             # instruction to the owner; `_fit_with_path` states the same rule
             # for the summary payload — shorten the PREFIX, never the path,
             # because a clipped path is an unopenable View.
-            lines += [f"The complete rendering — every Strand with its claim, "
-                      f"its `in common:` line and its journey — is in the View "
-                      f"file: {view_path}",
-                      "Open it, then answer with a Strand's index (for example "
-                      "L3) and a short note about the angle you want. Free "
-                      "text always wins."]
+            # AND IT IS ON ITS OWN LINE (Story 20.115, #1117). Rendering it
+            # whole was necessary and not sufficient: the path still sat
+            # inline between two clauses of a sentence, and on the 2026-08-01
+            # run it reached the owner cut mid-path anyway. A path alone on
+            # its line is the form that survives composition and wrapping —
+            # which is why the rule is "on its own line", not merely "whole".
+            lines += [_owner_surface().artifact_block(
+                "The complete rendering — every Strand with its claim, its "
+                "`in common:` line and its journey — is in the View file",
+                view_path,
+                note="Open it, then answer with a Strand's index (for example "
+                     "L3) and a short note about the angle you want. Free "
+                     "text always wins.")]
         else:
             lines += ["NO VIEW PATH WAS GIVEN, so the complete rendering was "
                       "written nowhere. Re-run `member --view PATH`.",
