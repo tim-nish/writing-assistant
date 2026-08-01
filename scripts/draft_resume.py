@@ -116,6 +116,39 @@ def candidate_state(run_dir, checkpoint_file):
         return None
 
 
+def brief_mismatch(state, brief):
+    """Same-brief-only on a brief-carrying entry (amended 2026-08-02, #1207).
+
+    True when the entry carries a brief and the candidate run's checkpoint
+    records a different one — or none. Identity is `draft_brief.brief_pin`,
+    the recorded artifact, never text similarity: the terrain handoff arrives
+    holding a just-adopted brief, and auto-resuming a run minted from any
+    other brief discards the sitting's own output in favor of stale state. A
+    cold entry (no brief) never mismatches, so the ratified cold default —
+    automatic, not opt-in — is untouched.
+    """
+    if not brief:
+        return False
+    import os
+    import sys
+    sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
+    import draft_brief
+    return (draft_brief.brief_pin((state or {}).get("brief"))
+            != draft_brief.brief_pin(brief))
+
+
+def fresh_note(run_id, other_brief):
+    """The skip's one-line receipt. Both branches say what is KEPT: skipping
+    is `--fresh`'s semantics — by owner keystroke, or by brief data (#1207) —
+    and nothing is deleted on either."""
+    if other_brief:
+        return (f"same-brief-only (#1207): minted a new run; in-progress run "
+                f"{run_id} was minted from a different brief and left "
+                "untouched (resumable later; nothing deleted)")
+    return (f"--fresh: minted a new run; in-progress run {run_id} "
+            "left untouched (resumable later; nothing deleted)")
+
+
 def confirmation(run_id, ws, state, why):
     """The run is NOT adopted; the caller is handed the question instead.
 

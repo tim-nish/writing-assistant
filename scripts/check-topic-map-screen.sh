@@ -273,7 +273,10 @@ assert b.get('provenance')=='owner-authored', b
 # byte-for-byte the same record the SAME string typed unaided produces: the
 # index, the note and the pin exist only in the composer's output, never here
 assert b==t, (b,t)
-assert 'index' not in b and 'pin' not in b and 'note' not in b, b
+# the record's own content pin (#1207) is uniform across entry paths —
+# identity, never a trace; the composer-only keys stay barred
+assert 'index' not in b and 'note' not in b, b
+assert b.get('pin','').startswith('sha256:'), b
 " && ok "indexed selection: downstream cannot distinguish an indexed selection from a typed brief" \
   || err "an indexed selection left a downstream trace"
 
