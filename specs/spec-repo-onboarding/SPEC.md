@@ -30,6 +30,26 @@ transcript and folded into Constraints below.
 > plausible episode-record file, and the config writer (CAP-2) persists it — an
 > absent `journey:` key is valid and changes nothing.
 
+> **Amended 2026-08-01 (triage, #1193; the mechanism's retirement is recorded in
+> `../spec-writing-assistant/amendments-2026-07-24--2026-08-01.md`, #1183) — the
+> 2026-07-24 (#671) `journey:` clause above is RETIRED.** The key no longer
+> exists: `get_journey`, `cmd_journey`, the `journey` subparser, the
+> `JOURNEY_MALFORMED` exit code and the declared-prose read in `cmd_files` were
+> all removed when the host-repo episode join was retired. **The onboarding
+> surface is where this mattered most, which is why it is amended rather than
+> left to rot:** CAP-1's `setup` skill was instructed to *offer* the declaration
+> to a new repo's owner, and CAP-2's writer to persist it — so an owner who
+> accepted the offer would have written a block nothing reads, which is the
+> silent-substrate shape (a value written in good faith into a file the system
+> reads and then ignores for that key is indistinguishable from one that took
+> effect). **Setup offers no `journey:` declaration, the writer persists none,
+> and `validate-config` lints none.** A host repo that keeps a hand-written
+> episode journal declares it under `sources:` like any other prose, where it is
+> read as `time_axis: false` — state claims only, per the 2026-08-01
+> #1182/#1184/#1185 amendment. Found by story 20.134 while implementing the
+> retirement, and deliberately not fixed there: amending a spec is a spec-lane
+> act, and a story implements a decision rather than making one.
+
 ## Problem
 
 Preparing a repository for the article pipeline today requires manual YAML
