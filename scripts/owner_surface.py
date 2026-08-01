@@ -36,7 +36,8 @@ form that survives wrapping, which is the whole reason the rule is "on its own
 line" rather than merely "whole".
 """
 
-__all__ = ["ArtifactPath", "artifact_block", "is_elided"]
+__all__ = ["ArtifactPath", "artifact_block", "is_elided",
+           "completion_summary", "BUCKETS"]
 
 # The visible cut used everywhere in this codebase for a deliberate truncation.
 # An artifact path may never carry it: a path with a cut in it is unopenable,
@@ -112,3 +113,54 @@ def is_elided(text):
             if before == "/" or after == "/":
                 return True
     return False
+
+# --- The composed block (Story 20.123, #1137) --------------------------------
+#
+# THE TYPED VALUE WAS NECESSARY AND NOT SUFFICIENT. `ArtifactPath` guarantees
+# how a path renders; it cannot stop a relay composing a sentence AROUND it,
+# and on 2026-08-01 exactly that happened — the brief path reached the owner
+# elided *after* #1117 merged, "all declared sources" was relayed as "all of
+# it", and a completion summary was headed "Three things you should know", a
+# phrase that exists nowhere in this repository.
+#
+# THE REMEDY IS THE ONE THE SERVED POSITION NAMES: shrink the free-form surface
+# rather than lint it. A surface composed as ONE BLOCK leaves no string for a
+# relay to rewrite, and the skill's instruction becomes *print this block*.
+# Screen 2 has worked this way since #976/#977, for this exact failure; this
+# is that shape made available to the surfaces still assembled in prose.
+#
+# HONEST LIMIT, restated because it bounds the claim: a block can still be
+# paraphrased. What this removes is the EXCUSE, not the ability — the
+# measurable property is that every owner surface has a composed block behind
+# it, not that no leak can occur.
+
+# The three labelled buckets `skills/completion-summary.md` mandates. Declared
+# here so the composer cannot be called with a fourth, and so the headings are
+# one string rather than N paraphrases.
+BUCKETS = ("informational notes", "publish blockers", "optional cleanup")
+
+
+def completion_summary(stage, notes=(), blockers=(), cleanup=(), next_step=None):
+    """The completion summary, composed — never assembled in chat.
+
+    Every bucket renders, including an empty one: "publish blockers: none" is a
+    fact the owner needs, and a bucket that disappears when empty is
+    indistinguishable from a bucket nobody filled. That is the same
+    non-member-disclosure rule the rest of this surface follows.
+
+    `next_step` is the in-conversation choice the interaction contract requires
+    (CAP-6, #226). It is rendered as a line here and asked through the gate
+    carrier; this composer states it, it does not ask it.
+    """
+    lines = [f"{stage} — complete.", ""]
+    for label, items in zip(BUCKETS, (notes, blockers, cleanup)):
+        items = [str(i).strip() for i in items if str(i).strip()]
+        if items:
+            lines.append(f"{label}:")
+            lines += [f"  - {i}" for i in items]
+        else:
+            lines.append(f"{label}: none")
+        lines.append("")
+    if next_step:
+        lines.append(str(next_step).strip())
+    return "\n".join(lines).rstrip() + "\n"
