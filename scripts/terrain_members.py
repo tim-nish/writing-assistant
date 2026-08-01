@@ -1944,6 +1944,18 @@ def _member_record(match, arc=True):
            # The served rendering, as served — never re-expressed here.
            "gloss": match.get("gloss"),
            "cite": match.get("situation")}
+    # The served `projects:` attribution (Story 20.144, #1097), in the same
+    # three-valued shape the arc uses: the brief's harvest scope is the union
+    # of these per member, and the per-member record is what lets a later
+    # refusal name its Strand. A served empty list is "no projects" — a
+    # different fact from a record that does not carry the field.
+    projs = match.get("projects")
+    rec["projects"] = {
+        "values": [str(p) for p in projs] if isinstance(projs, list) else None,
+        "served": isinstance(projs, list),
+        **({} if isinstance(projs, list) else {"not_served_reason": (
+            "the element record at this pin carries no `projects:` field")}),
+    }
     if arc:
         served = match.get("journey")
         served = served if isinstance(served, str) and served.strip() else None

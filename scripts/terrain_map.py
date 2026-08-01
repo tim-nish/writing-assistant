@@ -602,6 +602,14 @@ def strand_entries(root):
             # impersonates a served one.
             "gloss": (text or {}).get("gloss") or None,
             "tags": [str(t) for t in (r.get("tags") or [])],
+            # THE SERVED `projects:` ATTRIBUTION (Story 20.144, #1097), read
+            # from the record as served — never re-derived from lesson bodies.
+            # An older pin whose records carry no such field composes None, so
+            # downstream renders the absence with a reason true of that pin;
+            # a served empty list stays [] — "no projects" and "not served"
+            # are different facts.
+            "projects": ([str(p) for p in r["projects"]]
+                         if isinstance(r.get("projects"), list) else None),
             "cite": (text or {}).get("cite") or r["cite"],
             # KIND DISCRIMINATOR — "this entry IS an arc rendering" — and the
             # literal is CORRECT here: on the record path every composed entry
@@ -1333,6 +1341,10 @@ def lesson_elements(topics, gloss_info, consumption):
                     (gloss_info["reason"] if not gloss_info["served"] else
                      "the served gloss index carries no rendering for this lesson")),
                 "tags": entry["tags"] if entry else [],
+                # The served `projects:` attribution, carried through from the
+                # record path (Story 20.144, #1097); the tier-1 fallback
+                # serves none, and None keeps that absence disclosable.
+                "projects": entry.get("projects") if entry else None,
                 # Presence travels with the Strand so the row can mark its
                 # ABSENCE (#933/#934). Read from the paired record upstream,
                 # never re-derived here from the rendering or the pointer.

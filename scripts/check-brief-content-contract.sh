@@ -46,15 +46,22 @@ work=$(mktemp -d); trap 'rm -rf "$work"' EXIT
 python3 - "$work" <<'PYEOF'
 import json, sys
 w = sys.argv[1]
+projects = [["repo-a"], ["repo-a", "repo-b"], ["portfolio-wide"], []]
 els = [{"kind": "lesson", "slug": f"s{n}", "title": f"S{n}",
         "gloss": f"a claim the material makes, number {n}",
         "tags": ["workflow"], "situation": f"LESSONS.md:{n}@abc1234",
         "evidence": ["LESSONS.md:1@abc1234"], "consumed": False,
+        "projects": projects[n],
         "journey_recorded": True, "journey": f"the position changed, {n}"}
        for n in range(4)]
 json.dump({"kind": "topic-map", "topics": [],
            "coverage": {"pin": "h@abc1234", "hub_pin": "hub@def5678"},
            "elements": els}, open(w + "/map.json", "w"))
+# An OLDER PIN whose element records do not carry `projects:` (#1097 AC4).
+json.dump({"kind": "topic-map", "topics": [],
+           "coverage": {"pin": "h@abc1234", "hub_pin": "hub@def5678"},
+           "elements": [{k: v for k, v in e.items() if k != "projects"}
+                        for e in els]}, open(w + "/map-old.json", "w"))
 PYEOF
 
 pin=$(python3 -c "import json,sys;print(json.load(open('$work/map.json'))['coverage']['pin'])")
@@ -104,6 +111,13 @@ printf '{"index":"L1, L2, L3","pin":"%s","claim":"reading two"}' "$pin" \
       > /dev/null 2>"$work/err" \
   || err "#1079: adopting WITH composed candidates failed: $(cat "$work/err")"
 emit "L1"         "$work/one.json" || { printf '\nFAILED.\n' >&2; exit 1; }
+
+# The OLDER-PIN composition (#1097 AC4): same selection, records without
+# `projects:`, so the scope must render the three-valued absence shape.
+printf '{"index":"L1, L2, L3","pin":"%s"}' "$pin" \
+  | python3 "$D" brief --map "$work/map-old.json" --answer - \
+      --out "$work/old.json" > /dev/null 2>"$work/err" \
+  || err "#1097: composing at an older pin failed: $(cat "$work/err")"
 
 # THE JUDGE PIN (Story 20.106, #1090) — declared, never introspected, and
 # absent-as-absent. Three cases, because the failure being guarded is a pin
@@ -242,10 +256,34 @@ for name, b in (("a 3-member set", s), ("a 1-member set", one)):
     check(b.get("provenance") == "terrain-adopted",
           f"{name}: `provenance` is the RATIFIED value for a brief composed at "
           f"the gate — `owner-authored` is the owner's own free-form words")
-    hs = b.get("harvest_scope") or {}
-    check(hs.get("served") is False and hs.get("not_served_reason"),
-          f"{name}: harvest scope states WHY it is absent — `projects:` is not "
-          f"served by the element manifest, and it is never re-derived here")
+
+# HARVEST SCOPE IS THE UNION OF THE MEMBERS' SERVED `projects:` (#1097). Read
+# from the served records, never re-derived from lesson bodies; the interim
+# `served: false` branch and its manifest-falsified reason are GONE from the
+# served case, and per-member provenance survives the union so a later
+# refusal can name its Strand.
+hs = s.get("harvest_scope") or {}
+check(hs.get("served") is True
+      and hs.get("projects") == ["repo-a", "repo-b", "portfolio-wide"],
+      "#1097: harvest scope is the union of the selected members' served "
+      "`projects:` values, as served")
+check("not_served_reason" not in hs,
+      "#1097: the served case carries no `not_served_reason` — the stale "
+      "claim can no longer be written")
+check(hs.get("by_member") == [{"index": "L1", "projects": ["repo-a"]},
+                              {"index": "L2", "projects": ["repo-a", "repo-b"]},
+                              {"index": "L3", "projects": ["portfolio-wide"]}],
+      "#1097: per-member provenance survives the union — which member "
+      "contributed which values")
+hs1 = one.get("harvest_scope") or {}
+check(hs1.get("served") is True and hs1.get("projects") == ["repo-a"],
+      "#1097: a 1-member selection unions its one member's values")
+old = json.load(open(w + "/old.json"))
+ho = old.get("harvest_scope") or {}
+check(ho.get("served") is False and ho.get("projects") is None
+      and "predates" in (ho.get("not_served_reason") or ""),
+      "#1097: at an older pin with no served `projects:` the three-valued "
+      "absence shape renders, with a reason true of that pin")
 
 # NO RENDERED SENTENCE OR PROCESS DOC IS STORED (#1078). Each is a second copy
 # that drifts — one already had, the stored line reading "2-3 candidates" while
@@ -290,7 +328,7 @@ for leak in ("element_kind", "usability", "evidence_pointers", "subtopics",
 
 # EACH MEMBER IS THE CLEAN PROJECTION, not a raw map element.
 for m in s.get("members") or []:
-    check(set(m) <= {"index", "slug", "gloss", "cite", "journey"},
+    check(set(m) <= {"index", "slug", "gloss", "cite", "journey", "projects"},
           f"member {m.get('index')} carries only the recorded projection")
 
 sys.exit(1 if fail else 0)
