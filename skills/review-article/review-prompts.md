@@ -24,6 +24,14 @@ table. The finding format is:
 - A **blocker** is publication-stopping: an open rubric-mapped blocker (or a
   configuration blocker) means review does **not** report the draft
   "publishable" (Story 12.2).
+- **Style-contract conformance findings are OUTSIDE this table** (Story 20.140,
+  #1202): they carry the class `conformance`, never a severity from it, and
+  they **never block**. A conformance miss and a factual error are different
+  *kinds*, not different severities, and a style finding wearing a severity tag
+  is indistinguishable from a correctness one — which is what the taste
+  prohibition exists to prevent. Their criterion is the cited contract clause,
+  not a row above; the whole contract is
+  [`style-conformance.md`](style-conformance.md) and is not restated here.
 - A finding whose severity does not map to a row above — or that omits the
   `Why {severity}:` field — is a **contract violation**: it is re-authored to
   name its criterion, or dropped.

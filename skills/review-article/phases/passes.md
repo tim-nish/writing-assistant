@@ -295,6 +295,18 @@ Open with the shared reviewer preamble, then apply this rubric:
    [`review-prompts.md`](review-prompts.md) §"Declared-convention conformance"
    — read it there; it is not restated here.
 
+8. **Style-contract conformance — the ONE style dimension** (Story 20.140,
+   #1202). Measure the draft against the owner's one versioned style contract,
+   **citing the clause**: `REGISTER` and `STRUCTURAL VOICE` only, never
+   `LEXICON` (the existing coinage lint carries it mechanically) and **never a
+   finding against `SYNTAX PROFILE`** (no instrument, by ratified decision). A
+   finding that cannot cite a clause is **not emitted, because it is taste**.
+   Conformance findings are **their own class outside blocker/should/nit and
+   never block**; with no contract configured the dimension **states that it did
+   not run and why**. Full contract:
+   [`../style-conformance.md`](../style-conformance.md) — read it on entry to
+   this pass; it is not restated here.
+
 Emit findings in the standard contract format (severity, location, issue, fix),
 capped at 10, highest-leverage change first. **No rewrites** — name the prose
 issue and a one-line fix; the owner edits.
