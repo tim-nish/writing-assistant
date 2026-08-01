@@ -40,13 +40,20 @@ cp "$FIX" "$work/map.json"
 # One prep run writes the static answer fixtures (#950 batching: same data,
 # fewer interpreter starts).
 python3 - "$work" <<'PYEOF'
-import json, sys
+import json, os, sys
 w = sys.argv[1]
 json.dump({"selection": "name your own direction or combination axis",
            "free_text": "connect the retry storm to on-call load, through the retro"},
           open(w + "/answer-free.json", "w"))
 json.dump({"selection": "stop here", "free_text": ""},
           open(w + "/answer-stop.json", "w"))
+# A pre-#1208 artifact whose two carriers disagree (Story 20.141).
+os.makedirs(w + "/ws2", exist_ok=True)
+json.dump({"brief": "b", "thesis": {"state": "adopted"},
+           "lifecycle": {"state": "composed",
+                         "states": ["composed", "inspected", "adopted"],
+                         "history": [{"state": "composed"}]}},
+          open(w + "/ws2/brief.json", "w"))
 PYEOF
 
 # --- the CLI under test: candidates, then the three brief scenarios ---------
@@ -85,40 +92,12 @@ fi
 # lifecycle — the adoption act used to write one carrier without the other.
 # `brief-open` DISCLOSES the disagreement per axis rather than silently
 # preferring either carrier, and the disclosure is never stored
-# (Story 20.141, #1208).
-python3 - "$work" <<'PYEOF'
-import json, os, sys
-w = sys.argv[1]
-os.makedirs(w + "/ws2", exist_ok=True)
-json.dump({"brief": "b", "thesis": {"state": "adopted"},
-           "lifecycle": {"state": "composed",
-                         "states": ["composed", "inspected", "adopted"],
-                         "history": [{"state": "composed"}]}},
-          open(w + "/ws2/brief.json", "w"))
-PYEOF
-if python3 "$D" brief-open --at "$work/ws2/brief.json" \
-     > "$work/brief-mismatch.json" 2>&1; then
-  python3 - "$work" <<'PYEOF' && ok "disagreeing carriers on a pre-fix artifact are disclosed, per axis" || fail=1
-import json, sys
-w = sys.argv[1]
-p = json.load(open(w + "/brief-mismatch.json"))
-cm = (p.get("lifecycle") or {}).get("carrier_mismatch") or {}
-bad = []
-if not (cm.get("thesis_state") == "adopted"
-        and cm.get("lifecycle_state") == "composed"):
-    bad.append("a pre-#1208 artifact's disagreeing carriers are not disclosed")
-if "per axis" not in (cm.get("precedence") or ""):
-    bad.append("the disclosure does not state per-axis precedence")
-if "carrier_mismatch" in (json.load(open(w + "/ws2/brief.json"))
-                          .get("lifecycle") or {}):
-    bad.append("the disclosure leaked into the stored artifact")
-for m in bad:
-    print("FAIL: %s" % m, file=sys.stderr)
-sys.exit(1 if bad else 0)
-PYEOF
-else
-  err "opening a pre-#1208 artifact failed: $(cat "$work/brief-mismatch.json")"
-fi
+# (Story 20.141, #1208). The artifact is written by the prep run above and
+# the disclosure asserted in the batched run below (#950): only the CLI run
+# itself is added here.
+python3 "$D" brief-open --at "$work/ws2/brief.json" \
+  > "$work/brief-mismatch.json" 2>&1 \
+  || err "opening a pre-#1208 artifact failed: $(cat "$work/brief-mismatch.json")"
 
 # The selected-candidate answer derives from the candidates output, so it is
 # written between CLI calls — one short run, then the brief call it feeds.
@@ -214,6 +193,17 @@ for tag, payload, want in (("composed", b, "composed"),
 check(r["brief"] == "connect the retry storm to on-call load, through the retro"
       and "--brief" in b.get("next", ""),
       "the stage-0 hand-off is the same brief string — no new entry pipeline")
+# Story 20.141 (#1208) — a pre-fix artifact's disagreeing carriers are
+# disclosed per axis, and the disclosure never reaches the stored artifact.
+cm = (json.load(open(w + "/brief-mismatch.json")).get("lifecycle")
+      or {}).get("carrier_mismatch") or {}
+check(cm.get("thesis_state") == "adopted"
+      and cm.get("lifecycle_state") == "composed"
+      and "per axis" in (cm.get("precedence") or ""),
+      "disagreeing carriers on a pre-fix artifact are disclosed, per axis")
+check("carrier_mismatch" not in (json.load(open(w + "/ws2/brief.json"))
+                                 .get("lifecycle") or {}),
+      "...and the disclosure is composed at read time, never stored")
 sys.exit(1 if fail else 0)
 PYEOF
 [ $? -eq 0 ] || fail=1
