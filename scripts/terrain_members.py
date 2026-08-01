@@ -736,6 +736,38 @@ SUBGROUP_ID_KIND_LINES = (
 
 # Kept as single strings for callers that render one paragraph; both are the
 # same words as the line forms above, joined — never a second wording.
+# --- What Screen 2 may carry (Story 20.124, #1138) ---------------------------
+#
+# AN ALLOWLIST, NOT A SET OF MUST-SHOW RULES. The instruction block was asked
+# about once before and answered by RELOCATION — moved after the groups rather
+# than removed — because four shipped amendments each mandate one of its lines
+# (#1031/#1039, 20.87 AC6, #1075/#936, #1074). The owner's verdict on the
+# result: it "has never been useful to me". That is requirement-accretion, and
+# a per-line must-show rule cannot be argued down one line at a time, because
+# each line is individually defensible. The amendment of 2026-08-01 inverts the
+# contract: the screen carries the MATERIAL, and a line class not named here
+# does not render on it.
+#
+# The receivers are named in the same act, so a reader can tell relocation from
+# deletion: every class below marked `-> View` is stated in the View, which the
+# owner opens and which #1115 already made self-sufficient.
+SCREEN_LINE_CLASSES = (
+    "header",            # member, count, and why it is summarised
+    "pin",               # the composite pin the selection is made against
+    "view-pointer",      # the artifact block naming the complete rendering
+    "authoring-class",   # the once-per-surface machine-composed declaration
+    "group-heading",     # `## G4 — <title> (N: ids)`
+    "group-claim",       # the `in common:` line
+    "subgroup",          # subgroup id, claim and ids
+    "disclosure",        # substitution / journey / coverage denominator
+    "exits",             # the standing exits — the summary is all that is relayed
+)
+# Relocated to the View by this story, each with its receiver:
+#   owner-terms pointer   -> View (already emitted there)
+#   placement count       -> View
+#   G/G-n id contract     -> View (already emitted there for subgroups)
+#   answer-shape lines    -> View
+
 GROUP_ID_KIND = " ".join(GROUP_ID_KIND_LINES)
 SUBGROUP_ID_KIND = " ".join(SUBGROUP_ID_KIND_LINES)
 
@@ -1193,11 +1225,11 @@ def _compose_member_rendering(map_data, ms, cands, claims=None,
                       "Nothing below is narrowed; the Strand rows are simply "
                       "not on this screen. Selection is still by Strand "
                       "index, and free text always wins."]
-        lines += [
-            # The codebook pointer (Story 20.26, #861): see the note below.
-            f"What the words mean: {OWNER_TERMS_DOC} defines "
-            f"{' and '.join(OWNER_TERMS)}.",
-            ""]
+        # THE CODEBOOK POINTER IS NOT A SCREEN CLASS (Story 20.124, #1138):
+        # it is reference material, and `SCREEN_LINE_CLASSES` does not name it.
+        # Its receiver is the View, which emits its own copy in the branch
+        # below — so this is a relocation, not a deletion.
+        lines += [""]
         # NO ROW-TYPE LEGEND HERE, deliberately (#978's rule, applied): this
         # screen contains no Strand rows, and a legend naming row types the
         # screen does not contain primes the reader to look for rows that never
@@ -1300,17 +1332,22 @@ def _compose_member_rendering(map_data, ms, cands, claims=None,
         [e for sec in ms["sections"] for e in sec["strands"]])
     if cline:
         lines += [_clip_line(cline), ""]
-    # The placement disclosure, carried onto BOTH surfaces (Story 20.83, #1039).
-    # It was the one line the View had and the console did not — and under a
-    # multi-valued substrate placements exceed the Strand count, so a reader
-    # counting rows against the heading needs it wherever the rows are.
-    lines += [_clip_line(f"{ms['placements']} placement(s) across "
-                         f"{len(ms['sections'])} group(s); "
-                         + ("every Strand is placed at least once."
-                            if ms.get("covered")
-                            else "NOT every Strand was placed — the substrate "
-                                 "dropped one, which is a defect, not a "
-                                 "narrowing you may rely on.")), ""]
+    # The placement disclosure. Story 20.83 (#1039) put it on BOTH surfaces,
+    # because under a multi-valued substrate placements exceed the Strand count
+    # and a reader counting rows against the heading needs it wherever the rows
+    # are. THAT REASON IS THE SCOPE (Story 20.124, #1138): the rows are in the
+    # View, so the count goes with them. It is audit arithmetic rather than
+    # material, `SCREEN_LINE_CLASSES` does not name it, and it renders
+    # unchanged on the surface that has what it counts.
+    if not summarise:
+        lines += [_clip_line(f"{ms['placements']} placement(s) across "
+                             f"{len(ms['sections'])} group(s); "
+                             + ("every Strand is placed at least once."
+                                if ms.get("covered")
+                                else "NOT every Strand was placed — the "
+                                     "substrate dropped one, which is a "
+                                     "defect, not a narrowing you may rely "
+                                     "on.")), ""]
     for sec in ms["sections"]:
         gid = sec.get("group_id")
         # The id is rendered by the SCRIPT, in the shape the View and report
@@ -1439,35 +1476,52 @@ def _compose_member_rendering(map_data, ms, cands, claims=None,
         lines += ["",
                   "Every exit stays open: switch substrate · back to the "
                   "member list · name your own direction · stop here.",
-                  "Selection is by Strand index, exactly as on the whole "
-                  "listing. Nothing here is capped, truncated or ordered by "
-                  "any measure of strength — every group is above, and every "
-                  "Strand is in the View.",
-                  # THE ANSWER SHAPE, on the screen where the answer is given
-                  # (Story 20.96, #1074). The owner's question at this gate is
-                  # "do I answer L1, L2, L3 or may I answer G1?" — so the screen
-                  # answers it rather than leaving them to reconcile the id-kind
-                  # paragraph above with the instruction lines.
-                  "You may answer with one index, a set (`L3, L7`), or a group "
-                  "id as shorthand — and you may mix them (`G4 + L26, minus "
-                  "L48`).",
-                  "A group id expands to its members first, so what is "
-                  "recorded is always Strands.",
-                  # THE CLAIM IS PINNED TO ITS SET, so a set the owner changes
-                  # gets its claim recomposed and re-offered rather than
-                  # silently kept — carrying a group claim over absent members
-                  # would assert commonality the material does not support.
-                  "A group's `in common:` claim was composed over its whole "
-                  "membership: change the set and the claim is recomposed and "
-                  "re-offered, never carried over unchanged."]
+                  # WHAT STAYS IS THE EXITS AND THIS SCREEN'S OWN DISCLOSURE
+                  # (Story 20.124, #1138). The selection contract, the answer
+                  # shape (#1074) and the claim-pinning note were reference
+                  # material standing between the owner and the groups;
+                  # `SCREEN_LINE_CLASSES` names `exits` and `disclosure`, not
+                  # those, and their receiver is the View — #1115's
+                  # self-sufficiency clause.
+                  #
+                  # The narrowing line below is a DISCLOSURE about this screen
+                  # rather than reference material: it states that the summary
+                  # withheld nothing, which is #1038 AC5's own promise that the
+                  # over-budget branch proposes no less than the small one. A
+                  # reader cannot get it from the View, because it is a claim
+                  # about what they are looking at now.
+                  "Nothing here is capped, truncated or ordered by any measure "
+                  "of strength — every group is above, and every Strand is in "
+                  "the View.",
+                  ]
 
     # AND THE DECLARATIONS LAND HERE (#1115 AC1) — after the groups, never
     # before them. See the note where `declarations` is built: the content is
     # unchanged and all four amendments requiring these lines on this screen
     # still hold; only their position moved, which is what the owner's
     # complaint was actually about.
-    if declarations:
-        lines += ["", *declarations]
+    # THE DECLARATIONS ARE A VIEW CLASS (Story 20.124, #1138). #1115 already
+    # ruled the instruction block "stated once, in the View, never on the
+    # screen"; the code moved it after the groups instead, because four
+    # amendments each mandated one of its lines. The allowlist settles that:
+    # the classes are named, these are not among them, and every one of them
+    # renders here — on the surface the owner opens to read.
+    if not summarise and declarations:
+        lines += ["", *declarations,
+                  # RELOCATED FROM THE SCREEN with the rest of the contract, so
+                  # the owner meets the answer shape where the ids it talks
+                  # about are actually listed (#1074's requirement, on #1115's
+                  # surface).
+                  "You may answer with one index, a set (`L3, L7`), or a group "
+                  "id as shorthand — and you may mix them (`G4 + L26, minus "
+                  "L48`).",
+                  "A group id expands to its members first, so what is "
+                  "recorded is always Strands.",
+                  "Selection is by Strand index. Nothing here is capped, "
+                  "truncated or ordered by any measure of strength.",
+                  "A group's `in common:` claim was composed over its whole "
+                  "membership: change the set and the claim is recomposed and "
+                  "re-offered, never carried over unchanged."]
 
     return "\n".join(lines).rstrip() + "\n"
 
