@@ -940,6 +940,39 @@ def _strand_context_line(el, member_tag, substituted=()):
     return f"  ({topics} · {where} · {reasoning}{mark})"
 
 
+def _cotags_replace_if_redundant(context_line, group_title):
+    """Replace the footnote's co-tag LIST with a pointer to the group's axis
+    when the two are the same set (#1129).
+
+    THE FIELD SURVIVES; THE REPETITION DOES NOT. Dropping the list outright was
+    implemented first and reverted: `check-terrain-report-inner.sh` requires
+    *"every footnote entry carries a placement field, co-tagged or not"*
+    unconditionally (#987), and #987 made the footnote a SELF-CONTAINED
+    relocation of the row's context line — a footnote missing a field is no
+    longer that. The amendment's justification (the group heading already
+    carries the axis) is true of the HEADING and does not reach the footnote's
+    own contract.
+
+    So the placement field stays and stops restating what the heading says. A
+    Strand whose tags reach BEYOND the group's axis keeps its list whole: that
+    is information the heading does not have.
+
+    Comparison is on the SET, never on rendered text — the heading joins with
+    `+` and the footnote with `,`, so a string compare would silently keep
+    everything. Anything unparseable is kept: a footnote is not worth losing to
+    a title format this does not recognise.
+    """
+    m = re.match(r"^\(also in: (.+?) ·", context_line)
+    if not m:
+        return context_line
+    strand_tags = {t.strip() for t in m.group(1).split(",") if t.strip()}
+    axis = {t.strip() for t in re.split(r"[+,]", str(group_title).replace(
+        "also ", "", 1)) if t.strip()}
+    if not axis or not strand_tags <= axis:
+        return context_line
+    return context_line[:m.start(1)] + "(group axis)" + context_line[m.end(1):]
+
+
 PIN_IN_POINTER = re.compile(r"@([0-9a-f]{7,40})\b")
 
 
@@ -1178,14 +1211,26 @@ def _compose_member_rendering(map_data, ms, cands, claims=None,
     # render, and printed them with no declaration of their kind. Now that the
     # two surfaces are one rendering, the ids are shown always and the kind is
     # declared always, which is the pairing the rule actually asks for.
-    lines += [*GROUP_ID_KIND_LINES, ""]
-    # THE SUBGROUP ID KIND IS DECLARED WHERE IT IS RENDERED (Story 20.87 AC6),
-    # beside the `G<n>` declaration above and only on a screen that actually
-    # prints one — an id that looks selectable and is not is exactly what
-    # retired the `J<n>` namespace, and a declaration for ids the screen does
-    # not contain is the same defect #978 names in the other direction.
+    # HELD BACK, NOT REMOVED (#1115 AC1). The owner reports this block
+    # separating them from the groups they are choosing among — *"drop the
+    # instruction boilerplate from the Display view"*. Dropping it was checked
+    # against the record and refused: FOUR shipped amendments require these
+    # lines on this screen, each written against an observed defect — the
+    # `G<n>` kind declaration is UNCONDITIONAL (#1031/#1039: *"an id that looks
+    # selectable and is not is exactly what retired the `J<n>` namespace"*),
+    # the subgroup kind is declared where it is rendered (20.87 AC6), the
+    # claim-recomposition notice is announced iff rendered (#1075/#936), and
+    # BOTH halves of the selection contract are asserted together (#1074,
+    # *"because either alone is what the defect looked like"*).
+    #
+    # So the ORDER changes and the content does not: every declaration still
+    # reaches the owner on this screen, after the groups instead of in front of
+    # them. That answers the complaint — the boilerplate is no longer between
+    # the owner and their judgment — while all four amendments hold, which no
+    # amount of deleting could have done.
+    declarations = [*GROUP_ID_KIND_LINES, ""]
     if _any_subgroups(ms):
-        lines += [*SUBGROUP_ID_KIND_LINES, ""]
+        declarations += [*SUBGROUP_ID_KIND_LINES, ""]
     if ms["substrate"] != SUBSTRATE_DEFAULT:
         # THE ACQUISITION DISCLOSURE, on the reading surface (Story 20.82,
         # #1031). A judged substrate groups on something the owner cannot
@@ -1380,6 +1425,14 @@ def _compose_member_rendering(map_data, ms, cands, claims=None,
                   "membership: change the set and the claim is recomposed and "
                   "re-offered, never carried over unchanged."]
 
+    # AND THE DECLARATIONS LAND HERE (#1115 AC1) — after the groups, never
+    # before them. See the note where `declarations` is built: the content is
+    # unchanged and all four amendments requiring these lines on this screen
+    # still hold; only their position moved, which is what the owner's
+    # complaint was actually about.
+    if declarations:
+        lines += ["", *declarations]
+
     return "\n".join(lines).rstrip() + "\n"
 
 
@@ -1561,7 +1614,7 @@ def compose_full_report(map_data, tag, cands, group_ids, axis="tag",
                 # survive the move.
                 footnotes.append(
                     f"- **{ident}** — {_gid} — "
-                    f"{_strand_context_line(el, ms['member'], subbed).strip()}")
+                    f"{_cotags_replace_if_redundant(_strand_context_line(el, ms['member'], subbed).strip(), sec['title'])}")
                 arc = _journey_arc_line(el)
                 if arc:
                     lines.append(arc)

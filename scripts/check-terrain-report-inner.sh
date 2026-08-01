@@ -394,16 +394,33 @@ check(all("@" in ln for ln in out2),
       "every line keeps its own pin when the report is not single-pinned — the "
       "single-pin property is measured, never assumed")
 
-# AC4 (dropping `also in:` where it restates the group's axis) is NOT
-# implemented, and its absence is asserted rather than left silent: the
-# footnote's placement field is required unconditionally by #987 above, and
-# removing it for the subset case would delete a disclosure this same check
-# asserts. The amendment's reasoning (the heading already carries the axis) is
-# about the HEADING and does not reach the footnote's own contract. Routed back
-# to #1116 rather than resolved here.
-check("_drop_redundant_cotags" not in open(
-          "scripts/terrain_members.py", encoding="utf-8").read(),
-      "AC4 stays unimplemented until #1116 reconciles it with #987's "
-      "unconditional placement field — not silently half-done")
+# THE CO-TAG LIST IS REPLACED, NOT DROPPED (#1129). Dropping it was tried and
+# reverted: the placement field is required unconditionally by #987 above, and
+# #987 made the footnote a SELF-CONTAINED relocation of the row's context line.
+# Replacing the list with a pointer to the group's axis keeps the field and
+# stops the repetition — the option nobody considered when the amendment was
+# written.
+rep = tm._cotags_replace_if_redundant
+subset = rep("(also in: architecture, method · from LESSONS.md:25 · x)",
+             "also architecture + method")
+check("also in:" in subset and "(group axis)" in subset,
+      "#1129: a co-tag list matching the group's axis is REPLACED by a pointer "
+      "to it — the placement field #987 requires survives, the repetition does "
+      "not")
+check("architecture, method" not in subset,
+      "#1129: ...and the redundant tag list itself is gone")
+beyond = rep("(also in: architecture, reporting · from L.md:1 · x)",
+             "also architecture + method")
+check("architecture, reporting" in beyond,
+      "#1129: a Strand whose tags reach BEYOND the group's axis keeps its list "
+      "whole — that is information the heading does not have")
+none = rep("(in no other Topic · from L.md:9 · x)", "also architecture + method")
+check("in no other Topic" in none,
+      "#1129: a co-tagless Strand still states the absence, never a guess")
+unparseable = "(some other shape entirely, no co-tag field)"
+check(rep(unparseable, "also architecture") == unparseable,
+      "#1129: a context line this does not recognise is kept untouched — a "
+      "footnote is not worth losing to a format the matcher misses")
+
 sys.exit(fail)
 PY

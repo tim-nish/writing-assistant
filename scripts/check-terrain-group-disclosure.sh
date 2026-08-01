@@ -277,16 +277,30 @@ check(not any(l.strip().startswith("G3-") and "Strand(s)" in l for l in o2),
       "the subgroup head and its index list are separate lines — the head is "
       "the claim surface, the list is the mapping")
 
-# AC1 is NOT implemented and its absence is asserted, not left silent: removing
-# the instruction block from Screen 2 contradicts four shipped amendments —
-# #1031/#1039 (the `G<n>` kind declaration, UNCONDITIONAL), 20.87 AC6 (the
-# subgroup kind, declared where rendered), #1075/#936 (announced iff rendered)
-# and #1074 (both halves of the selection contract asserted together, "because
-# either alone is what the defect looked like"). Routed to #1115, still open.
-src = open("scripts/terrain_members.py", encoding="utf-8").read()
-check("Selection is always by Strand index." in src,
-      "AC1 stays unimplemented — the selection contract remains on the screen "
-      "until #1115 reconciles its removal with #1074/#1031/#1039/20.87/#1075")
+# AC1 RESOLVED BY REORDERING, not by deleting (#1115). Removing the block would
+# contradict four shipped amendments — #1031/#1039 (the `G<n>` kind
+# declaration, UNCONDITIONAL), 20.87 AC6 (subgroup kind declared where
+# rendered), #1075/#936 (announced iff rendered) and #1074 (both halves of the
+# selection contract asserted together, "because either alone is what the
+# defect looked like"). Held back below the groups keeps every one of them.
+els = [{"kind": "lesson", "slug": "s%d" % i, "title": "t%d" % i,
+        "tags": ["workflow"], "gloss": "g%d" % i} for i in range(4)]
+MAP = {"kind": "topic-map", "topics": [], "coverage": {"pin": "h@abc1234"},
+       "elements": els}
+from terrain_directions import candidates as _cands  # noqa: E402
+listing2 = tm.compose_member_listing(MAP, "workflow", _cands(MAP), "tag",
+                                     {"G1": "the parent claim"})
+gid_at = listing2.find("`G<n>` is a DISPLAY id")
+first_group = listing2.find("## G")
+check(gid_at != -1,
+      "#1115: the `G<n>` kind declaration is still on the screen — #1031/#1039 "
+      "made it UNCONDITIONAL, and deleting it is what retired `J<n>`")
+check("Selection is always by Strand index." in listing2,
+      "#1115: both halves of the selection contract are still present (#1074)")
+check(first_group != -1 and first_group < gid_at,
+      "#1115 AC1: the declarations must come AFTER the groups — the owner's "
+      "complaint is that boilerplate stands between them and what they are "
+      "choosing among, and reordering answers it where deleting could not")
 sys.exit(fail)
 PY
 
