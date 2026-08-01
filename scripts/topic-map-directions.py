@@ -142,6 +142,7 @@ from terrain_text import (  # noqa: E402
     _brief_iteration_line,
     _brief_lifecycle_line,
     _brief_step_line,
+    _brief_transition_banner,
     _elide,
     _fit,
     _partition_proposal_line,
@@ -1043,6 +1044,11 @@ def cmd_brief(args):
     out["lifecycle"] = _brief_lifecycle(BRIEF_LIFECYCLE[0])
     out["next"] = ("draft-pipeline.py stage0 <framework> <sources...> --brief "
                    "<this brief> — the existing stage-0 path, unchanged")
+    # THE TRANSITION IS ANNOUNCED (Story 20.116, #1113). The step identity, the
+    # lifecycle and the artifact were each already emitted as separate fields;
+    # what did not exist was a surface saying THIS JUST HAPPENED. Composed
+    # after the artifact block below sets the path, so it quotes the path that
+    # was actually written rather than the one that was intended.
     # THE DURABLE ARTIFACT (AC2/AC4). Written only when the caller passes a
     # path, exactly as `--view` works: the resolver owns the workspace and
     # this script writes where it is told, so no storage path is composed here
@@ -1059,6 +1065,19 @@ def cmd_brief(args):
             "read_back": ("by design — this is the owner's decision, not a "
                           "rendering; the never-read-back rule does not bind "
                           "here (CAP-3, 2026-07-31)")}
+    # THE BANNER LIVES ON `lifecycle` (Story 20.116, #1113), and the two homes
+    # it does NOT have are recorded because each was tried and each was wrong.
+    # A new top-level `transition` key violates the brief payload's CLOSED key
+    # contract (`check-brief-content-contract.sh`). `step` is asserted
+    # INVARIANT across a re-open (`r["step"] == b["step"]`) because it is pure
+    # identity — id, name, line — and a banner quoting the current state is
+    # state-DEPENDENT by construction, so parking it there makes an invariant
+    # block vary. `lifecycle` is the block the banner varies with, which is
+    # what makes it the honest home rather than merely an available one.
+    out["lifecycle"]["banner"] = _brief_transition_banner(
+        out["lifecycle"]["state"],
+        artifact_path=path,
+        workspace=os.path.dirname(path) if path else None)
     # THE EDIT THAT PRODUCED THIS COMPOSITION (Story 20.77 AC2), recorded
     # beside the member set it produced, so a recomposition can be read
     # against the one it came from rather than only compared with it.
@@ -1150,7 +1169,7 @@ GATE_ONLY_BLOCKS = ("consultant", "recomposition",
 RENDERED_KEYS = {
     "step": ("line",),
     "artifact": ("line", "read_back"),
-    "lifecycle": ("line",),
+    "lifecycle": ("line", "banner"),
     "iteration": ("line",),
     "thesis": ("line", "brief_string_is"),
     "candidate_theses": ("line", "label", "requirements", "recommendation",
@@ -1205,6 +1224,17 @@ def _rehydrate_lines(payload):
     step = payload.get("step")
     if isinstance(step, dict):
         step["line"] = _brief_step_line()
+    # A STORED BANNER WOULD BE A FROZEN COPY (Story 20.116, #1113, following
+    # Story 20.100's rule for every other owner line): the banner quotes
+    # lifecycle state and an artifact path, both of which a re-open can change,
+    # so it is recomposed at read time from the state the artifact kept and
+    # never served from what a previous invocation wrote.
+    life = payload.get("lifecycle")
+    if isinstance(life, dict):
+        art = payload.get("artifact") or {}
+        life["banner"] = _brief_transition_banner(
+            life.get("state"), artifact_path=art.get("path"),
+            workspace=os.path.dirname(art["path"]) if art.get("path") else None)
     art = payload.get("artifact")
     if isinstance(art, dict) and art.get("path"):
         art["line"] = _brief_artifact_line(art["path"])
@@ -1421,7 +1451,8 @@ def cmd_brief_open(args):
                 f"{' → '.join(BRIEF_LIFECYCLE)}. The lifecycle only moves "
                 f"forward — compose a new brief instead of rewinding this one.")
         history = list(life.get("history") or [])
-        if args.state != state:
+        moved = args.state != state
+        if moved:
             history.append({"state": args.state})
         state = args.state
         payload["lifecycle"] = _brief_lifecycle(state, history)
@@ -1429,6 +1460,17 @@ def cmd_brief_open(args):
             write_brief_artifact(args.at, payload)
         except OSError as exc:
             return _err(f"could not record the transition at {args.at}: {exc}")
+        # AND THE TRANSITION IS ANNOUNCED HERE TOO (Story 20.116, #1113).
+        # Step-3 entry was never the only moment the owner could not confirm —
+        # `composed → inspected → adopted` moves here, and a move nobody
+        # announces is the same defect one state later. Emitted only when the
+        # state ACTUALLY moved: re-asserting the current state is not a
+        # transition, and announcing one would make the banner unreliable as
+        # evidence, which is the whole property it exists to supply.
+        if moved and isinstance(payload.get("lifecycle"), dict):
+            payload["lifecycle"]["banner"] = _brief_transition_banner(
+                state, artifact_path=os.path.abspath(args.at),
+                workspace=os.path.dirname(os.path.abspath(args.at)))
     else:
         payload["lifecycle"] = _brief_lifecycle(state, life.get("history"))
     payload["lifecycle"]["line"] = _brief_lifecycle_line(state)
