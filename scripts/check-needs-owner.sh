@@ -25,7 +25,7 @@ python3 -c "import py_compile; py_compile.compile('$root/$VNO', doraise=True)" 2
 # 1. Skill documents the NEEDS-OWNER contract.
 grep -q 'NEEDS-OWNER' "$SKILL" && ok "skill documents NEEDS-OWNER" || err "NEEDS-OWNER not documented"
 grep -q 'CANDIDATE / REASON / TOPIC' "$SKILL" && ok "skill documents the entry schema" || err "schema not documented"
-grep -q 'surprise, significance, opinion, warning, tradeoff, audience' "$SKILL" && ok "skill documents the TOPIC set (incl. tradeoff/audience, #145)" || err "TOPIC set not documented"
+grep -q 'significance, opinion, warning, tradeoff, audience' "$SKILL" && ok "skill documents the TOPIC set (incl. tradeoff/audience, #145)" || err "TOPIC set not documented"
 grep -q 'exactly one' "$SKILL" && ok "skill states the strict partition rule" || err "partition rule not stated"
 grep -q 'even when' "$SKILL" && ok "skill requires emitting the section even when empty" || err "always-emit rule not stated"
 
@@ -46,7 +46,7 @@ cat > "$work/ok.md" <<'EOF'
 - Chose JAX / a1b2c3d / decision
 
 # NEEDS-OWNER
-- The win surprised us mid-project / no artifact in declared sources / surprise
+- The win is what I would lead with / no artifact in declared sources / significance
 - Reviewers keep asking about leakage / owner's framing / significance
 EOF
 
@@ -83,7 +83,7 @@ printf '# Fact sheet: x\n- A / a1b2c3d / event\n\n# NEEDS-OWNER\n' > "$work/empt
 NO "$work/empty.md" && ok "empty NEEDS-OWNER (heading only) is valid (stable contract)" || err "empty section rejected"
 
 # 7. Consumable by the gap interview: groupable by TOPIC.
-python3 "$root/$VNO" "$work/ok.md" --group | grep -q '\[surprise\]' \
+python3 "$root/$VNO" "$work/ok.md" --group | grep -q '\[significance\]' \
   && ok "--group buckets items by TOPIC for the interview" || err "--group did not group by topic"
 
 # 8. Section-awareness: the fact-sheet validator ignores the NEEDS-OWNER section.
@@ -118,7 +118,7 @@ reason "$work/prem-unpinned.md" | grep -q 'unpinned-premise-pointer' \
   && ok "reject: unpinned premise pointer (path:line with no @sha)" || err "unpinned premise pointer accepted"
 
 # 9e. An item with NO premise clause still parses byte-identically — passes.
-printf '# Fact sheet: x\n\n# NEEDS-OWNER\n- A bare unsourceable question / not in declared sources / surprise\n' > "$work/prem-none.md"
+printf '# Fact sheet: x\n\n# NEEDS-OWNER\n- A bare unsourceable question / not in declared sources / other\n' > "$work/prem-none.md"
 NO "$work/prem-none.md" && ok "accept: no premise clause (bare unsourceable question, AC3)" || err "no-premise item rejected"
 
 # --- Story 18.50 (#567): the rule is shared, and it reaches PROSE clauses -----

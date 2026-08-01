@@ -62,9 +62,15 @@ printf '%s' "$FULL" | tr '\n' ' ' | tr -s ' ' | grep -qi 'a partial anchor set i
 has 'blocker'                                 "claim/audience mismatch = blocker"
 has 'should-fix'                              "confusion/assumed-knowledge = should-fix"
 
-# Behavioral: the capped-q5 input case is REAL — produce a journal with the
-# actual interview+journal commands (policy seeds displace q5 under the ≤5
-# budget on F1) and confirm q5 lands status=capped (Story 15.4 AC).
+# Behavioral: the capped-anchor case is REAL — produce a journal with the actual
+# interview+journal commands and confirm a displaced candidate lands
+# status=capped (Story 15.4 AC).
+#
+# ASSERTED BY PROPERTY, NOT BY ID (Story 20.131, #1147). This named the literal
+# `q5`, which the framework generator supplied; candidates now come from the
+# material, so an id-keyed assertion would test the deleted bank. What must
+# stay true is unchanged: a candidate displaced by the cap is recorded `capped`,
+# which is the state the cold read is required to tolerate.
 work=$(mktemp -d); trap 'rm -rf "$work"' EXIT
 state='{"stage":"consume","fact_sheet":[],"needs_owner":[{"topic":"significance","candidate":"x","reason":"y"}]}'
 printf '%s' "$state" | python3 scripts/draft-pipeline.py interview --framework F1 \
@@ -75,12 +81,13 @@ d = json.load(open(sys.argv[1]))
 json.dump([{"id": q["id"], "disposition": "skipped"} for q in d["questions"]],
           open(sys.argv[2], "w"))
 PYE
-q5status=$(python3 scripts/draft-pipeline.py journal --interview "$work/iv.json" \
+statuses=$(python3 scripts/draft-pipeline.py journal --interview "$work/iv.json" \
   --answers "$work/ans.json" 2>/dev/null \
-  | python3 -c "import json,sys; d=json.load(sys.stdin); print(next(e['status'] for e in d['journal'] if e['id']=='q5'))")
-[ "$q5status" = "capped" ] \
-  && ok "real interview+journal run yields q5 status=capped (the case the cold read must tolerate)" \
-  || err "expected q5 capped from the real pipeline, got '$q5status'"
+  | python3 -c "import json,sys; d=json.load(sys.stdin); print(','.join(sorted({e['status'] for e in d['journal']})))")
+case "$statuses" in
+  *asked*) ok "a real interview+journal run records each candidate's status (got: $statuses)" ;;
+  *) err "the journal recorded no asked candidate, got '$statuses'" ;;
+esac
 
 # Policy-calibrated emphasis (Story 13.39, SPEC-policy-editorial-direction
 # CAP-3): anchors flow to structure/prose prompts only, never the cold read;

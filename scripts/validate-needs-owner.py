@@ -16,7 +16,7 @@ This enforces:
     stages can rely on) — even with zero entries;
   * every NEEDS-OWNER entry is `CANDIDATE / REASON / TOPIC` with all fields
     non-empty (context to seed the interview, not a bare string), and
-    TOPIC ∈ {surprise, significance, opinion, warning, tradeoff, audience, other} — the gap-
+    TOPIC ∈ {significance, opinion, warning, tradeoff, audience, other} — the gap-
     interview categories so items are groupable/prioritizable;
   * the partition is strict — no candidate text appears both here and as a fact-
     sheet CLAIM (mutual exclusion; nothing double-counted);
@@ -56,7 +56,13 @@ import os
 import re
 import sys
 
-TOPICS = {"surprise", "significance", "opinion", "warning", "tradeoff", "audience", "other"}
+# `surprise` LEFT this set at Story 20.131 (#1147). Its retirement was ratified
+# 2026-07-29 — "a mandatory slot for a CONTINGENT property manufactures the
+# property" — and executed at a displaying spec while the generating enums kept
+# it, which is why it kept reappearing. A topic here is one harvest may RAISE,
+# so leaving it would re-create the slot from the other end. Surprise survives
+# as one narrative KIND among the nine, used when the material carries one.
+TOPICS = {"significance", "opinion", "warning", "tradeoff", "audience", "other"}
 
 # The premise rule is the SHARED one (#567): this file is now one CALL SITE of
 # `gate_premise.py`, not its owner. The rule binds every machine-authored gate

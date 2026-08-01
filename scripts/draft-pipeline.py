@@ -147,66 +147,55 @@ def _load(name):
 # set: if a fact-sheet claim already contains that content, the question is
 # redundant (semantic de-dup, not literal-string match) and is suppressed unless
 # a NEEDS-OWNER gap re-raises it.
-QUESTION_BANK = {
-    "q1": {"text": "What surprised you most while building this?", "topic": "surprise",
-           "covers": ["surprise", "surprising", "unexpected", "caught us off guard", "to our shock"]},
-    "q2": {"text": "Which single result or number matters most, and why that one?", "topic": "significance",
-           "covers": ["most important result", "headline number", "key result", "matters most",
-                      "flagship metric", "primary metric", "the result that counts"]},
-    "q3": {"text": "What would you warn a reader about before they adopt this?", "topic": "warning",
-           "covers": ["warning", "caveat", "caution", "pitfall", "limitation", "gotcha", "watch out", "do not use"]},
-    "q4": {"text": "What did this decision cost you — what did you give up?", "topic": "tradeoff",
-           "covers": ["tradeoff", "trade-off", "cost us", "gave up", "sacrificed", "at the expense of"]},
-    "q5": {"text": "Who exactly is this article for, and what should they do after reading?", "topic": "audience",
-           "covers": ["intended audience", "written for", "target reader", "this is for", "aimed at", "readers are"]},
-    "q6": {"text": "What opinion in this piece are you willing to defend in comments?", "topic": "opinion",
-           "covers": ["our opinion", "we argue", "we believe", "hot take", "controversial", "we contend"]},
-    "q7": {"text": "What would you do differently if starting over?", "topic": "retrospective",
-           "covers": ["in hindsight", "would do differently", "if starting over", "lessons for next time"]},
-    # Conditional evidence fallback (SPEC-draft-article-ux CAP-5, Story 13.30):
-    # joins the candidate set ONLY when harvest yielded no `number`/`result`
-    # fact-sheet entry — the evidence GATE's interview fallback, so the gap
-    # surfaces in Stage 2 instead of failing late at Stage 3. Not in any
-    # FRAMEWORK_PRIORITY list; cmd_interview inserts it on its condition.
-    "q8": {"text": "What result or worked example would convince a skeptical reader?",
-           "topic": "significance",
-           "covers": ["convincing result", "worked example", "demonstration", "proof point"]},
+# THE FRAMEWORK GENERATOR IS GONE (Story 20.131, #1147 — owner ruling).
+#
+# `QUESTION_BANK`, `FRAMEWORK_PRIORITY`, `_PRESENTATION_SLOTS` and the
+# mandatory-slot invariant were deleted here. The ruling's reason is the
+# maintenance shape rather than any one question: "If we retain earlier
+# concepts such as Angle or repeated Reader questions, we will have to keep
+# spending effort deciding whether each old concept should remain in or be
+# removed from the generator whenever this issue arises." Pruning question by
+# question pays that cost forever, which is why the previous same-day decision
+# (retire q1, make q2 conditional) was superseded rather than shipped.
+#
+# It discharges #911's registered hypothesis EARLY and by #911's own mechanism:
+# F1-F5 shipped with a falsifier and a removal default ("keeping them requires
+# evidence, not the absence of it"), and the 2026-08-01 dogfood supplied the
+# evidence before the stated window — the designer could not understand the
+# Significance question, Surprise reappeared after its retirement, and the
+# Claim question duplicated the adopted Thesis.
+#
+# WHAT STAGE 2 STILL ASKS is material-driven and nothing else: harvest's
+# NEEDS-OWNER items, and the policy-tension seeds. Neither is a bank question.
+#
+# SIGNIFICANCE IS NOT DELETED, IT MOVED: a structure candidate may emphasise a
+# Strand because that emphasis fits the adopted thesis — that IS significance,
+# expressed at composition rather than extracted by a question.
+#
+# The evidence fallback survives ALONE, and deliberately: its trigger is the
+# MATERIAL (harvest produced no `number`/`result` fact), never a framework
+# slot, so it is not a member of the generator this ruling removes.
+EVIDENCE_FALLBACK = {
+    "id": "q8",
+    "text": "What result or worked example would convince a skeptical reader?",
+    "topic": "significance",
 }
-
-# Owner-facing presentation order (SPEC-draft-article-ux CAP-4, Story 13.30).
-# Selection priority (NEEDS-OWNER first, policy seeds, generic; GATE-slot
-# tie-break; ≤5 cap) is UNCHANGED — this orders only how the survivors are
-# PRESENTED: claim/angle first (the policy-seeded tension question when one
-# exists — it reframes every later answer; else the opinion/claim question),
-# audience second, then headline/significance, then color (surprise, tradeoff,
-# warning, retrospective). The order is contract, not discretion; it is echoed
-# in the journal so a mis-ordered run is attributable. Batching within the
-# order is free; ordering is not.
-_PRESENTATION_SLOTS = {"opinion": 0, "audience": 1, "significance": 2}
 
 
 def presentation_slot(rec):
-    """0 = claim/angle, 1 = audience, 2 = headline/significance, 3 = color."""
+    """0 = a policy-seeded tension (it reframes every later answer), 1 = the rest.
+
+    THE TOPIC RANKING WENT WITH THE BANK (Story 20.131, #1147). The slots were
+    `opinion`/`audience`/`significance` — framework vocabulary ordering
+    questions that no longer exist. What survives is the one ordering rule
+    whose reason sits outside the generator: a tension question reframes the
+    answers that follow it, so it leads.
+    """
     if rec.get("rationale") in ("policy-seed", "policy-reconciliation"):
         return 0
-    return _PRESENTATION_SLOTS.get(rec.get("topic"), 3)
+    return 1
 
-# Per-framework question priority, ORDERED by that framework's GATE slots (not
-# question-bank order) — so the same fact sheet yields a stable, framework-
-# tailored interview and the ordering is the deterministic tie-break under the
-# ≤5 cap.
-#
-# Invariant: every framework's list contains q2 (significance — the claim the
-# article exists to communicate) and q5 (audience). They are the review skill's
-# intent anchors: the cold-read pass compares its reader answers against the
-# journal's q2/q5 entries, so a framework that never asks them would make that
-# comparison unexecutable (issue #120).
-FRAMEWORK_PRIORITY = {
-    "F1": ["q2", "q4", "q3", "q5", "q1"],   # evidence GATE, decision cost, limits, audience, surprise
-    "F2": ["q1", "q4", "q3", "q2", "q5"],   # what-happened, mechanism/cost, applicability, significance, audience
-    "F3": ["q2", "q3", "q4", "q5", "q6"],   # what-it-caught, cannot-tell, tradeoff, audience, opinion
-    "F4": ["q6", "q2", "q3", "q5", "q1"],   # my-take opinion, significance, warning, audience, surprise
-}
+
 QUESTION_BUDGET = 5
 
 # Stage-3 `[VERIFY]` marker contract. The canonical marker is exactly
@@ -2191,8 +2180,9 @@ def cmd_interview(args):
             "working-note ratification: no 5-question interview). `consume "
             "--framework working-note` routes straight to fill.\n")
         return 2
-    if framework not in FRAMEWORK_PRIORITY:
-        sys.stderr.write(f"error: invalid framework {args.framework!r}. Valid: F1, F2, F3, F4.\n")
+    if framework.lower() not in FRAMEWORKS:
+        sys.stderr.write(f"error: invalid framework {args.framework!r}. "
+                         f"Valid: {', '.join(sorted(FRAMEWORKS)).upper()}.\n")
         return 2
 
     # Externally supplied candidate items (e.g. policy-seeded tension questions,
@@ -2222,13 +2212,6 @@ def cmd_interview(args):
     fact_sheet = state.get("fact_sheet", [])
     needs_owner = state.get("needs_owner", [])
     gap_topics = {n.get("topic") for n in needs_owner}
-
-    def covering_entries(qid):
-        """Fact-sheet entries whose claim contains one of the question's synonym
-        keywords — the semantic (not literal) de-dup evidence."""
-        kws = QUESTION_BANK[qid]["covers"]
-        return [e.get("claim", "") for e in fact_sheet
-                if any(kw in e.get("claim", "").lower() for kw in kws)]
 
     def grounding_for(topic):
         """NEEDS-OWNER candidates re-raising this topic — the recommended
@@ -2262,27 +2245,23 @@ def cmd_interview(args):
             # not a policy-seeded one — attribution stays honest.
             rec.update(rationale="topic-absent")
         triage.append(rec)
-    for qid in FRAMEWORK_PRIORITY[framework]:
-        topic = QUESTION_BANK[qid]["topic"]
-        is_gap = topic in gap_topics
-        covers = covering_entries(qid)
-        rec = {"id": qid, "text": QUESTION_BANK[qid]["text"], "topic": topic}
-        if is_gap:
-            rec.update(outcome="recommended", rationale="needs-owner-reraise",
-                       grounding=grounding_for(topic))
-        elif covers:
-            rec.update(outcome="suppressed", covered_by=covers)
-        else:
-            rec.update(outcome="open", rationale="topic-absent")
-        triage.append(rec)
+    # EVERY NEEDS-OWNER ITEM IS A CANDIDATE, and each is `recommended` — a
+    # re-raise is confirm/deny of a claim the run already holds (D1, unchanged).
+    # One per distinct topic, so a topic raised twice asks once. THIS REPLACES
+    # the bank walk: there is nothing to suppress against, because no question
+    # exists that the material did not raise.
+    for topic in sorted(t for t in gap_topics if t):
+        triage.append({"id": f"g-{topic}", "topic": topic,
+                       "text": f"What can only you say about: {topic}?",
+                       "outcome": "recommended", "rationale": "needs-owner-reraise",
+                       "grounding": grounding_for(topic)})
 
     # Evidence fallback (Story 13.30, CAP-5): only when harvest produced no
     # `number`/`result` entry does q8 join the candidates — the evidence GATE
     # has no material and the owner is the only remaining source.
     if not any(e.get("kind") in ("number", "result") for e in fact_sheet):
-        q8 = QUESTION_BANK["q8"]
-        triage.append({"id": "q8", "text": q8["text"], "topic": q8["topic"],
-                       "outcome": "open", "rationale": "evidence-fallback"})
+        triage.append({**EVIDENCE_FALLBACK, "outcome": "open",
+                       "rationale": "evidence-fallback"})
 
     # Survivors = the non-suppressed questions. Confirmed gaps first, then
     # policy-seeded tension questions, then generic open (stable → framework

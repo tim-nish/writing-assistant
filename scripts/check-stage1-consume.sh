@@ -51,7 +51,7 @@ cat > "$work/harvest.md" <<'EOF'
 
 # NEEDS-OWNER
 
-- The win surprised us / no artifact in declared sources / surprise
+- The win is what I would lead with / no artifact in declared sources / audience
 - Reviewers ask about leakage / owner framing / significance
 EOF
 
@@ -77,7 +77,7 @@ assert srcs == ["bench/results.md:42@a1b2c3d", "a1b2c3d", "https://example.com/x
 echo "$state" | python3 -c '
 import json, sys
 tops = sorted(n["topic"] for n in json.load(sys.stdin)["needs_owner"])
-assert tops == ["significance", "surprise"], tops
+assert tops == ["audience", "significance"], tops
 ' && ok "NEEDS-OWNER items carry their interview topic forward" || err "NEEDS-OWNER not threaded with topic"
 
 # 5. Does NOT re-read sources: consume works with NO writing-sources.yaml / no

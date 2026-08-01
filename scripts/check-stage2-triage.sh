@@ -32,36 +32,43 @@ python3 -c "import py_compile; py_compile.compile('$DP', doraise=True)" 2>/dev/n
 out=$(iv '{"fact_sheet":[{"claim":"written for backend engineers"}],"needs_owner":[{"topic":"warning","candidate":"do not use on TPUs"}]}' F3)
 printf '%s' "$out" | jget 'all(t["outcome"] in ("suppressed","recommended","open") for t in d["triage"])' | grep -q True \
   && ok "each triaged question has a valid outcome" || err "an outcome is missing/invalid"
-printf '%s' "$out" | jget 'len(d["triage"]) >= 5' | grep -q True \
+printf '%s' "$out" | jget 'sorted(t["rationale"] for t in d["triage"]) == ["evidence-fallback","needs-owner-reraise"]' | grep -q True \
   && ok "triage classifies the full candidate set (not just survivors)" || err "triage does not cover all candidates"
 
-# 2. A fact-sheet-covered, non-re-raised question is suppressed and NOT presented (AC2).
+# 2. NOTHING THE MATERIAL DID NOT RAISE IS EVER ASKED (Story 20.131, #1147).
+#    This block used to assert that a fact-sheet-covered BANK question lands
+#    `suppressed`. There is no bank: a candidate exists only because harvest
+#    raised it, so a covered-and-unraised topic cannot be asked — which is the
+#    same property, now held by construction rather than by a de-dup pass. The
+#    assertion is kept and re-pointed, because the property is what mattered.
 cov='{"fact_sheet":[{"claim":"this guide is written for backend engineers"}],"needs_owner":[]}'
-iv "$cov" F3 | jget '[t["outcome"] for t in d["triage"] if t["id"]=="q5"][0]' | grep -q suppressed \
-  && ok "covered question (audience) is suppressed" || err "covered question not suppressed"
-iv "$cov" F3 | jget 'any(q["id"]=="q5" for q in d["questions"])' | grep -q False \
-  && ok "suppressed question never reaches the owner (absent from questions)" || err "suppressed question was presented"
-# suppressed record names its covering entries (for the journal).
-iv "$cov" F3 | jget '[bool(t.get("covered_by")) for t in d["triage"] if t["id"]=="q5"][0]' | grep -q True \
-  && ok "suppressed record carries covered_by entries" || err "covered_by missing on suppressed record"
+# The evidence fallback is the ONE candidate the material can raise by absence
+# (harvest produced no `number`/`result` fact), so it is expected here; what
+# must not appear is anything a bank would have supplied.
+iv "$cov" F3 | jget 'all(t["rationale"] == "evidence-fallback" for t in d["triage"])' | grep -q True \
+  && ok "a covered topic the material did not raise is never a candidate" \
+  || err "a question appeared that no NEEDS-OWNER item raised"
+iv "$cov" F3 | jget 'all(q["id"] in ("q8", "depth") for q in d["questions"])' | grep -q True \
+  && ok "...and only the material-raised fallback and the mandated offer reach the owner" \
+  || err "an unraised question was presented"
 
 # 3. A NEEDS-OWNER re-raise is ALWAYS recommended — even when the fact sheet also
 #    covers the topic (re-raise wins over suppression) (AC3).
 rr='{"fact_sheet":[{"claim":"a known caveat: do not use on TPUs"}],"needs_owner":[{"topic":"warning","candidate":"do not use on TPUs"}]}'
-iv "$rr" F3 | jget '[t["outcome"] for t in d["triage"] if t["id"]=="q3"][0]' | grep -q recommended \
+iv "$rr" F3 | jget '[t["outcome"] for t in d["triage"] if t["id"]=="g-warning"][0]' | grep -q recommended \
   && ok "NEEDS-OWNER re-raise is recommended (wins over coverage)" || err "re-raise not recommended"
-iv "$rr" F3 | jget '[t.get("rationale") for t in d["triage"] if t["id"]=="q3"][0]' | grep -q needs-owner-reraise \
+iv "$rr" F3 | jget '[t.get("rationale") for t in d["triage"] if t["id"]=="g-warning"][0]' | grep -q needs-owner-reraise \
   && ok "re-raise records rationale=needs-owner-reraise" || err "re-raise rationale wrong"
-iv "$rr" F3 | jget '[bool(t.get("grounding")) for t in d["triage"] if t["id"]=="q3"][0]' | grep -q True \
+iv "$rr" F3 | jget '[bool(t.get("grounding")) for t in d["triage"] if t["id"]=="g-warning"][0]' | grep -q True \
   && ok "recommended re-raise carries grounding pointers" || err "grounding missing on re-raise"
 
 # 3b. The new tradeoff/audience TOPICs (#145) re-raise their interview questions
 #     (q4 tradeoff, q5 audience) — previously they could never reach recommendation.
 tr='{"fact_sheet":[],"needs_owner":[{"topic":"tradeoff","candidate":"we gave up incremental builds"}]}'
-iv "$tr" F3 | jget '[t["outcome"] for t in d["triage"] if t["id"]=="q4"][0]' | grep -q recommended \
+iv "$tr" F3 | jget '[t["outcome"] for t in d["triage"] if t["id"]=="g-tradeoff"][0]' | grep -q recommended \
   && ok "NEEDS-OWNER topic=tradeoff re-raises q4 (#145)" || err "tradeoff did not re-raise q4"
 au='{"fact_sheet":[],"needs_owner":[{"topic":"audience","candidate":"backend SREs specifically"}]}'
-iv "$au" F3 | jget '[t["outcome"] for t in d["triage"] if t["id"]=="q5"][0]' | grep -q recommended \
+iv "$au" F3 | jget '[t["outcome"] for t in d["triage"] if t["id"]=="g-audience"][0]' | grep -q recommended \
   && ok "NEEDS-OWNER topic=audience re-raises q5 (#145)" || err "audience did not re-raise q5"
 
 # 4. A question with neither coverage nor a re-raise is open.
@@ -73,8 +80,11 @@ iv "$op" F1 | jget 'all(t["outcome"]=="open" for t in d["triage"])' | grep -q Tr
 #    scratch dir with a decoy file whose content would flip a verdict if read.
 work=$(mktemp -d); trap 'rm -rf "$work"' EXIT
 printf 'written for backend engineers\n' > "$work/SOURCE.md"
+# The decoy would create an `audience` candidate if triage read it. Under the
+# material-driven model an empty harvest yields no topic candidate at all, so
+# the property is asserted as the decoy's ABSENCE from the candidate set.
 ( cd "$work" && printf '%s' '{"fact_sheet":[],"needs_owner":[]}' | python3 "$DP" interview --framework F3 ) \
-  | jget '[t["outcome"] for t in d["triage"] if t["id"]=="q5"][0]' | grep -q open \
+  | jget 'not any("audience" in t["id"] for t in d["triage"])' | grep -q True \
   && ok "triage ignores on-disk sources (no read beyond harvest output)" || err "triage appears to read source files"
 
 # 6. SKILL documents the three-outcome triage.

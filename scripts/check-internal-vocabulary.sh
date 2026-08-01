@@ -13,7 +13,9 @@
 # code structures and fails when any derived identifier is not covered by the
 # registered inventory:
 #
-#   framework IDs   <- draft-pipeline.py FRAMEWORK_PRIORITY keys
+#   framework IDs   <- draft-pipeline.py FRAMEWORKS keys (was
+#                      FRAMEWORK_PRIORITY until Story 20.131/#1147 deleted
+#                      the generator; FRAMEWORKS is the surviving F-id set)
 #   pipeline stages <- draft-pipeline.py `next_stage` values (the run's own
 #                      stage vocabulary)
 #   markers         <- [VERIFY] and NEEDS-OWNER, the owner-facing draft markers
@@ -89,8 +91,8 @@ def covered(token):
 
 drift = []
 
-# (a) framework IDs — canonical: FRAMEWORK_PRIORITY keys
-for fid in dp.FRAMEWORK_PRIORITY:
+# (a) framework IDs — canonical: FRAMEWORKS keys
+for fid in dp.FRAMEWORKS:
     if not covered(fid):
         drift.append(f"framework ID {fid!r} is not covered by the registered inventory")
 
@@ -119,7 +121,7 @@ if drift:
     print("\n  Register each in skills/draft-article/internal-vocabulary.json — an\n"
           "  unregistered internal term is silently ungated by dimension 3.", file=sys.stderr)
     raise SystemExit(1)
-print(f"  derived and checked: {len(dp.FRAMEWORK_PRIORITY)} framework IDs, "
+print(f"  derived and checked: {len(dp.FRAMEWORKS)} framework IDs, "
       f"{len(stages)} stage names, 2 markers")
 PY
 
