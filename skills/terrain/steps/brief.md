@@ -128,6 +128,19 @@ adopted it is a `thesis.state: candidates-pending` **coverage statement** over
 the members. Relay `thesis.line` so the owner is not left reading a
 semicolon-joined list as your reading of their set.
 
+**PUT THE CANDIDATES THROUGH THE CARRIER (Story 20.122, #1135).** You compose
+them; presenting them is a GATE and goes through the declared builder:
+
+```
+draft_gates.gate("thesis", where=…, why=…, choices=[…], ws=<run ws>)
+```
+
+This gate is the one the 2026-08-01 run caught: three candidates plus free
+text — inside the control's four-option capacity — rendered as a prose bullet
+list, with **no payload in `presented-payloads.jsonl` at all**. The gate id is
+declared in `draft_gates.GATES` and `payload()` refuses an undeclared one, so
+the call cannot exist without the entry that makes it auditable.
+
 **The requirements bind you and you may not trade them against each other:**
 
 1. **Every candidate is composed over the same complete selected set.** They

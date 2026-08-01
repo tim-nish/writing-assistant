@@ -290,6 +290,32 @@ def payload(where, why, choices, free_text=True, recommended=None,
     return built
 
 
+def gate(gate_id, where, why, choices, ws=None, free_text=True,
+         recommended=None, banner=None, reply_line=None):
+    """Compose ANY declared gate (Story 20.122, #1135).
+
+    ONE BUILDER, NOT FIVE. The gates that reached the owner as prose did so
+    because the skill files had no function to name — `stage0.md:73` instructs
+    the agent by naming `draft_gates.sources_gate(...)`, and the sources gate is
+    the one surface the 2026-08-01 run confirms reached the host control. The
+    five that leaked had nothing to call.
+
+    Five near-identical builders would have been five places for the NEXT gate
+    to be added without one. The registry declares *what* gates exist; this
+    emits *any* of them, so adding a gate is one entry in `GATES` plus a call —
+    and the entry is what `payload()` validates against, so the call cannot
+    exist without the declaration.
+
+    Content-shaped arguments are the caller's because they genuinely differ: a
+    thesis gate carries composed candidates, the harvest completion carries
+    next steps, the gap interview carries questions. What does NOT differ is
+    that composing means emitting, and that is what lives here.
+    """
+    return payload(where=where, why=why, choices=choices, free_text=free_text,
+                   recommended=recommended, banner=banner,
+                   reply_line=reply_line, gate=gate_id, ws=ws)
+
+
 def intent_gate(labels, ws=None):
     """"What are you writing?" — the gate #1081 saw printed as prose.
 
