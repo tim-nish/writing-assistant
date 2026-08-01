@@ -1,7 +1,8 @@
 ---
 id: SPEC-terrain
 companions:
-  - amendments.md            # ratified amendments, 2026-07-30 onward — new ones append here
+  - amendments.md            # ratified amendments, 2026-08-01 onward — new ones append here
+  - amendments-2026-07-30--2026-08-01.md   # closed era (relocated verbatim 2026-08-01, #1148)
   - amendments-archive.md    # ratified amendments, 2026-07-24 → 2026-07-29 (relocated verbatim 2026-07-31; closed)
   - presentation.md   # CAP-3, the presentation surface (relocated verbatim 2026-07-30, #941)
 sources:
@@ -32,8 +33,9 @@ sources:
 > cut at a **date boundary** — relocated verbatim per the amendment-history
 > companion decision (#829, spec sitting 2026-07-27) and, one level down, on
 > 2026-07-31 when that companion reached its own byte ceiling.
-> `amendments-archive.md` holds **2026-07-24 → 2026-07-29** and is **closed**;
-> `amendments.md` holds **2026-07-30 onward**. New amendments are appended to
+> `amendments-archive.md` holds **2026-07-24 → 2026-07-29** and
+> `amendments-2026-07-30--2026-08-01.md` holds its own era; both are
+> **closed**. `amendments.md` holds **2026-08-01 onward**. New amendments are appended to
 > `amendments.md`, newest-last, never here and never to the archive —
 > **including amendments to CAP-3**, whose clause text now lives in
 > `presentation.md`. The cut is by **date and never by CAP**: one spec, one
