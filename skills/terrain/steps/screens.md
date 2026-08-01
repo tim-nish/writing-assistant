@@ -141,8 +141,10 @@ on every one; the declaration is owed once per surface, not once per line
 screen **mixes** composed and quoted lines of the same visual class — and then
 mark the **minority** class, because that is where the reader's default is
 wrong. Say what they share, not what sits behind
-them: this line is the germ of a Thesis, and "background" invited reading it
-as decoration. It is a **group claim** — never a fact-sheet claim, which is a
+them: this line is what a Thesis is later composed FROM, and "background"
+invited reading it as decoration. (It was called "the germ of a Thesis" until
+Story 20.126 (#1140), which retired *angle* as an owner-facing term — an
+informal third sense of a ratified word is the coining defect in miniature.) It is a **group claim** — never a fact-sheet claim, which is a
 different object with a provenance class (`docs/owner-terms.md`).
 The `background.rules` bind you as the composer: the prose asserts only that
 commonality and never substitutes for a Strand's own text; every Strand stays
@@ -201,7 +203,7 @@ corpus. Never assert that a member carries no journey material — the
 denominator says how much it carries, and only the served records can say none.
 
 Selection is by
-Strand index (`L3`, `E2.1`) plus a short note about the angle; free-form
+Strand index (`L3`, `E2.1`), plus any wording of the owner's own; free-form
 and **stop here** stay on the table exactly as on Screen 1. There is no `J`
 index: a Journey is an arc on its lesson's row, so selecting the Lesson carries
 the arc with it (#871, and its minting code was removed in #933).
@@ -278,7 +280,7 @@ Record the answer against the `ask_id` the validator returned, with the **pin
 the listing shows**:
 
 ```
-printf '%s' '{"index":"L3","note":"<the owner'\''s angle, their words>","pin":"<the listing'\''s pin>"}' \
+printf '%s' '{"index":"L3","note":"<the owner'\''s own words, or omit>","pin":"<the listing'\''s pin>"}' \
   | python3 ${CLAUDE_PLUGIN_ROOT}/scripts/validate-proposal-payload.py --ws "$WS" --answer <ask_id>
 ```
 

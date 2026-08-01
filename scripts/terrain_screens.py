@@ -149,7 +149,7 @@ def compose_view(map_data, cands):
                            len(map_data.get("elements", []))),
         "",
         "Answer with an element's index (for example L3) or a subtopic's",
-        "index (for example T1.2) and a short note about the angle you want.",
+        "index (for example T1.2).",
         # Composed from the row types actually present (#978).
         row_type_legend(map_data.get("elements", []),
                         " A row's 'cover the ...' wording names what an "
@@ -408,9 +408,9 @@ def _compose_summary_payload(map_data, view_path, ws=None):
 
     choices = [
         {"label": "choose a direction by its index from the View",
-         "effect": _fit("answer with the index (for example L3 or T1.2) and "
-                         "a short note about the angle you want; your note is "
-                         "carried into the brief word for word")},
+         "effect": _fit("answer with the index (for example L3 or T1.2); "
+                        "any note you add is carried into the brief word for "
+                        "word")},
         # Free-form is offered EVERY time, not only on rejection.
         {"label": "name your own direction or combination axis",
          "effect": _fit("starts the same run with your wording as the brief; "

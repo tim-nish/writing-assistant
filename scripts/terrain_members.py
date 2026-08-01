@@ -1216,9 +1216,8 @@ def _compose_member_rendering(map_data, ms, cands, claims=None,
                 "The complete rendering — every Strand with its claim, its "
                 "`in common:` line and its journey — is in the View file",
                 view_path,
-                note="Open it, then answer with a Strand's index (for example "
-                     "L3) and a short note about the angle you want. Free "
-                     "text always wins.")]
+                note="Open it, then answer with a Strand's index (for "
+                     "example L3). Free text always wins.")]
         else:
             lines += ["NO VIEW PATH WAS GIVEN, so the complete rendering was "
                       "written nowhere. Re-run `member --view PATH`.",
@@ -1241,7 +1240,7 @@ def _compose_member_rendering(map_data, ms, cands, claims=None,
                  "",
                  f"Pin: {_pin_display(map_data)}",
                  "Answer with a Strand's index (for example L3) and a short note",
-                 "about the angle you want. Free text always wins.",
+                 "Free text always wins.",
                  # Composed from the row types actually on this screen (#978):
                  # a legend naming types the screen does not contain primes the
                  # reader to look for rows that never appear.
