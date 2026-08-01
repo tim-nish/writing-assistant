@@ -139,3 +139,51 @@ binds every surface this contract already governs.
 a way the others' is not — but a question reaching the owner with no ask row is
 the defect either way. Enforcement is `check-gate-payload-carrier.sh`, which
 fails when a declared gate has no call site.
+
+## (h) A question is answerable from itself (added 2026-08-01, #1177)
+
+SPEC-writing-assistant §Owner-surface register clause (d) binds **coining**: a
+term meant to reach the owner is defined where the owner reads it, in the act
+that coins it. This clause binds the case that one does not cover — **a term
+that reaches the owner without ever being coined for them**, leaked into the
+question from a **heading name**, an **enum value**, or a **field name**. The
+owner sees the two cases identically, as an undecodable word; only the origin
+differs, and origin is not something the reader can inspect.
+
+**Where a term cannot be removed from the question, the Why section carries
+enough explanation that the owner never needs internal vocabulary to answer.**
+Removing the term is the first move; carrying its meaning inline is the second.
+There is no third.
+
+**A codebook the owner must go and read is NOT a discharge.** The register
+clause's CONSTRAIN ordering puts the obligation at composition, never on the
+reader — and the reader's own report is why: after being asked to decode one
+leaked term, the owner noted that "even if I learn the definition, the same
+problem will likely recur in the next question." A glossary makes learning one
+term the price of the next question too. Each question discharges itself.
+
+**Each option states its effect on the OWNER'S WORLD, not its internal form** —
+item 3 above, applied to the leak. The internal name of a variant is not an
+effect, however faithfully it names the branch taken.
+
+**The benchmark, from the ask that produced this clause.** The owner was asked
+which "form" a per-gap artifact should take, given "the declared default is a
+tracker issue; the file-append is the consented alternative" — and could not
+answer without an outside model to decode it. Every term in it was leaked:
+`NEEDS-RECORDING` from a marker, "default" and "alternative" from the `form`
+enum's own values. The real choices, stated as effects, were:
+
+- open five GitHub issues here (nothing is written to your files)
+- add five lines to docs/journey.md (edits your working tree)
+
+Both shipped labels named the enum instead. The rewrite adds no glossary and
+removes no option; it states what happens to the owner's world in each branch.
+
+**Enforcement is a judgment, so it rides the existing gate.** Whether a
+question carries enough explanation cannot be decided by a token list — the
+defect is an ABSENT explanation, not a present word, and a denial list can only
+delete (§Owner-surface register (a)). What is mechanically checkable is that
+this clause is stated where composers read it, and that is what
+`check-proposal-contract.sh` asserts, as a membership test over this file. The
+reading of a specific ask stays with the human at the gate the loop already
+runs; no new blocking hook is added for it.

@@ -1,5 +1,6 @@
 #!/usr/bin/env sh
 # parallel-safe
+# covers: skills/owner-facing-proposal-contract.md
 # check-proposal-contract.sh — verify the owner-facing proposal contract is
 # captured ONCE as a shared, referenceable convention (Story 7.1,
 # SPEC-writing-assistant). The asset must state its three required elements
@@ -43,6 +44,33 @@ has 'selective presentation'    "(d) selective presentation is the primary inter
 has 'free-form text'            "(d) free-form text only for owner-only knowledge"
 has 'validate-proposal-payload.py' "(e) references the payload validator"
 has 'untruncated'               "(e) requires present, non-empty, untruncated fields"
+
+# 2c. (h) a question is answerable from itself (Story 20.137, #1177). MECHANICAL
+# ONLY: whether a given ask carries enough explanation is a judgment and rides
+# the human gate — see the clause's closing paragraph. What is checkable here is
+# that the clause is STATED where composers read it, since a rule absent from the
+# one shared convention binds nothing. This adds no denial list; the defect this
+# clause names is an ABSENT explanation, which no token list can express.
+has 'without ever being coined' "(h) binds the LEAKED case, not only coining"
+has 'heading name'              "(h) names the leak sources — heading name"
+has 'enum value'                "(h) names the leak sources — enum value"
+has 'field name'                "(h) names the leak sources — field name"
+has 'never needs internal vocabulary to answer' \
+                                "(h) the Why section carries the explanation the term needs"
+has 'codebook the owner must go and read is NOT a discharge' \
+                                "(h) a codebook is not a discharge — the obligation sits at composition"
+has "effect on the OWNER'S WORLD" \
+                                "(h) options state their effect on the owner's world, not their internal form"
+
+# 2d. The clause's own benchmark must survive as concrete option text, not as a
+# claim that concrete option text is required. A worked pair is what a composer
+# copies; the rule alone is what the failing ask already satisfied on paper.
+if grep -q 'nothing is written to your files' "$CONTRACT" \
+   && grep -q 'edits your working tree' "$CONTRACT"; then
+  ok "(h) carries the worked benchmark pair, stated as effects on the owner's world"
+else
+  err "(h) states the rule without the worked benchmark pair — a composer has nothing to copy"
+fi
 
 # 3. Both skills reference the single convention (not their own wording).
 ref() {
