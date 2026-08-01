@@ -279,7 +279,7 @@ of the cross-invocation cache the never-read-back rule forbids.
 
 **Free text still wins here as everywhere.** Owner wording beside an edit
 becomes the brief and the edit is never resolved. And the note — the owner's
-angle — survives an edit they did not restate, disclosed as inherited; an
+own words — survives an edit they did not restate, disclosed as inherited; an
 adopted **claim** does not, because a claim belongs to the set it was composed
 over.
 

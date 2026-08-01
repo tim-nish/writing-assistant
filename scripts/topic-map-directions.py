@@ -79,7 +79,7 @@ an empty chain. See the block above `_parse_edit`.
 
 INDEXED SELECTION (Story 18.67, #602)
 -------------------------------------
-From a View, the owner answers `{index: "T3.2", note: "<their angle>", pin:
+From a View, the owner answers `{index: "T3.2", note: "<their words, if any>", pin:
 "<the View's pin>"}`. The composed brief is the subtopic's coverage wording
 plus THE NOTE VERBATIM, and it goes into the same stage-0 `--brief` path as any
 other brief — no new entry pipeline, and the note reaches the structure
@@ -420,7 +420,7 @@ def _brief_from_index(answer, cands, map_pin, map_data=None,
 
     For ONE index the composed brief is the Strand's coverage wording PLUS THE
     OWNER'S NOTE VERBATIM — the machine resolves which Strand `L3` meant, the
-    owner supplies the angle, and the result is one ordinary brief string for
+    owner supplies any wording of their own, and the result is one ordinary brief string for
     the existing stage-0 `--brief` path. There is no new entry pipeline:
     downstream cannot tell this from a brief the owner typed, and the note
     reaches the structure proposer only as brief text.
@@ -546,11 +546,13 @@ def _brief_from_index(answer, cands, map_pin, map_data=None,
             "index": index, "indexes": indexes, "pin": answer_pin,
             # THE OWNER'S SLOT HOLDS OWNER TEXT OR NOTHING (Story 20.102).
             # It carried machine prose — "selected as a set from the agents
-            # View; no angle stated" — on a run where the owner stated no
-            # angle, which inverts the ratified ruling that kept free text
+            # View; no angle stated" — on a run where the owner wrote
+            # nothing, which inverts the ratified ruling that kept free text
             # first-class: a reader could no longer tell owner speech from
             # composer commentary in the one field reserved for owner speech.
-            # Absence of an angle is now recorded AS absence.
+            # Absence is now recorded AS absence. (The word "angle" survives
+            # only in this quotation of the defect, per Story 20.126's
+            # forward-only rule — the historical record keeps its wording.)
             "note": note or None,
             "adopted_claim": claim or None,
             # THE RECORD ATTESTS TO THE OWNER'S ANSWER (Story 20.120, #1118).
@@ -586,9 +588,9 @@ def _brief_from_index(answer, cands, map_pin, map_data=None,
             # answered this one. The idiom is the shipped one: `edit.note`
             # already declares "inherited …" vs "as recorded in this answer".
             "note_is": (None if not note else
-                        ("the owner's angle, recorded with this answer"
+                        ("the owner's own words, recorded with this answer"
                          if not claim else
-                         "the owner's angle, carried with the selection this "
+                         "the owner's own words, carried with the selection this "
                          "thesis was adopted over — not necessarily typed at "
                          "the adoption gate")),
             # WHERE THE COMPOSER'S OWN SUMMARY GOES (Story 20.102 AC5). The
@@ -1024,7 +1026,7 @@ def cmd_brief(args):
             except SystemExit as exc:
                 return exc.code
             prior = list((base.get("iteration") or {}).get("compositions") or [])
-            # The NOTE is the owner's angle, not a claim over the set, so it
+            # The NOTE is the owner's own free text, not a claim over the set, so it
             # survives an edit they did not restate — with the inheritance
             # disclosed below. The adopted CLAIM does NOT: a claim belongs to
             # the set it was composed over (AC2), and carrying one across an
