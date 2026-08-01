@@ -749,8 +749,12 @@ def _node_ids(strands, by_slug):
     """
     out = []
     for el in strands:
-        c = by_slug.get(el.get("slug"))
-        out.append(c["id"] if c else el.get("slug", "?"))
+        # Tolerant of a member that is not a dict, or carries no slug: the
+        # heading is a display surface, and a missing id must degrade to a
+        # visible placeholder rather than take the screen down with it.
+        slug = el.get("slug") if isinstance(el, dict) else None
+        c = by_slug.get(slug)
+        out.append(c["id"] if c else (slug or "?"))
     return out
 
 

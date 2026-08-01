@@ -1055,9 +1055,18 @@ check("…" not in L.split("in common:")[1].split("\n")[0],
 heads = [l for l in L.splitlines() if l.startswith("## ")]
 check(len(heads) == len(d3["sections"]) >= 2,
       f"AC3: one compact summary line per group, all of them ({len(heads)})")
+# THE COUNT MOVED INSIDE THE PARENTHESIS WITH THE INDEXES (Story 20.128,
+# #1139): a heading now reads `(2: L1, L2)` for a leaf and `(8, 3 subgroups)`
+# for a subdivided group, so an exact `(N)` match tests the old format rather
+# than the property. What AC3 asserts is unchanged — id, title, count — and the
+# count is asserted as the parenthesis opening with it.
 check(all(s["group_id"] in L and s["title"] in L
-          and f"({len(s['strands'])})" in L for s in d3["sections"]),
+          and f"({len(s['strands'])}" in L for s in d3["sections"]),
       "AC3: each summary carries the group id, its derived title and its count")
+check(all(f"({len(s['strands'])}: " in L or f"({len(s['strands'])}, " in L
+          for s in d3["sections"]),
+      "#1139: the count is followed by the Strand indexes (leaf) or the "
+      "subgroup count (subdivided) — one format at both levels")
 check("terrain-view.md" in L,
       "AC3: the View path is on the screen")
 check("no-journey" not in L and "carry journey material" not in L,
@@ -1313,8 +1322,18 @@ head = "## G10 — also knowledge-architecture (15)"
 check(_summary_head(head, sec) == "## G10 — also knowledge-architecture "
                                   "(15, 4 subgroups)",
       "#1075: an adopted subdivision is declared on the summary heading")
-check(_summary_head(head, {"strands": [1] * 15}) == head,
-      "#1075: ...and an UNSUBDIVIDED group's heading is byte-identical")
+# WAS "byte-identical" until Story 20.128 (#1139): an unsubdivided group's
+# heading now carries its Strand indexes inside the same parenthesis, which is
+# where the retired `N Strand(s):` line went. The #1075 property being guarded
+# is that subdivision is DECLARED on the heading; it never required the leaf
+# heading to stay unchanged, and the leaf's own format is asserted below.
+leaf = _summary_head("## G11 — also testing (2)",
+                     {"strands": [{"slug": "s1"}, {"slug": "s2"}]},
+                     {"s1": {"id": "L1"}, "s2": {"id": "L2"}})
+check("subgroup" not in leaf,
+      "#1075: ...and an UNSUBDIVIDED group's heading declares no subdivision")
+check(leaf.endswith("(2: L1, L2)"),
+      "#1139: ...and carries its Strand indexes in the count parenthesis")
 check(_summary_head(head, {"strands": [1] * 15, "subgroups": [1]})
       .endswith("(15, 1 subgroup)"),
       "#1075: ...with the count pluralised honestly")
