@@ -115,6 +115,26 @@ for m in bad:
 PY
 ) || { err "gate-inventory harness did not run"; printf '\nFAILED.\n' >&2; exit 1; }
 
+# --- Story 20.130 (#1146): the map HAS CALLERS -------------------------------
+# The map shipped correct and unreachable: `--pending` rendered its nine lines
+# and `grep -rn "gate-inventory" skills/` returned NOTHING, so no owner surface
+# ever showed it. A derived mechanism with no caller is indistinguishable from
+# an absent one at the surface that needed it, which is exactly what the owner
+# reported ("I do not know what happens next"). Asserted over the two surfaces
+# the story wires — the terrain handoff and the shared completion summary —
+# because a caller is what the previous story could not check for itself.
+for f in skills/terrain/steps/brief.md skills/completion-summary.md; do
+  if grep -q 'gate-inventory.py --pending' "$f"; then
+    ok "$f renders the pending-decision map"
+  else
+    err "$f does not call gate-inventory.py --pending — the map is derived and
+     correct, and an owner surface that never renders it leaves the owner
+     unable to see which decisions remain (#1146)"
+    report="${report}
+caller missing in $f"
+  fi
+done
+
 if [ -z "$report" ]; then
   ok "a run's reached gates are asserted against its emitted ask rows"
   ok "a missing gate is named, and an emitted payload without render: is caught"
