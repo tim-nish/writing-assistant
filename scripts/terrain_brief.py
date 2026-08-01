@@ -111,14 +111,86 @@ def _brief_lifecycle(state, history=None):
             "history": hist}
 
 
+# --- The artifact's key set is an ALLOWLIST, refused at write time -----------
+# (Story 20.125, #1145; SPEC-terrain amendments 2026-08-01.)
+#
+# TWO CLASSES WERE CLOSED BY NAME AND BOTH RETURNED UNDER NEW NAMES. #1048
+# closed a 130 KB `substitution_candidates` blob; #1078 closed an artifact of
+# 21 keys carrying rendered screen sentences and process self-documentation.
+# Measured after both fixes, on run 20260801T131120-663074: `brief.json` 41.9 KB
+# with `iteration` at 8.7 KB and `candidate_theses` at 5.3 KB of option labels,
+# effect prose, command templates and verify/adopt instructions; `brief-out.json`
+# 270 KB of which `consultant` alone was 200 KB. Removing named keys is a denial
+# list, and a denial list's non-member fallback is ADMIT — which is the shape,
+# not the contents, and it is why the class came back twice.
+#
+# SO THE WRITER HOLDS THE SET AND REFUSES. Not a filter: a filter that strips an
+# unlisted key silently is the same shape one layer down, and would let the next
+# payload arrive with nobody deciding it. Refusing makes adding a field an
+# amendment — which is the closure the contract asks for.
+#
+# THE LIST IS WHAT THE RATIFIED CLAUSES ALREADY PUT HERE, not a re-decision of
+# them: `presentation.md`'s "what the brief CARRIES" (member set, served
+# material, pins, harvest scope, thesis state with its offered candidates and
+# recommendation, adopted claim, free text), plus the selection address and the
+# named-artifact surface that clause's own neighbours ratified. What #1078 and
+# #1093 removed stays removed — `_decision_record` still projects — and this
+# adds the floor beneath that projection rather than replacing it.
+BRIEF_KEYS = frozenset({
+    "brief",            # the composed string that crosses into drafting
+    "provenance",       # the closed pair (#1050): owner-authored | terrain-adopted
+    "origin",           # how the brief was arrived at (free-form | adopted-*)
+    "index", "indexes", "pin",   # the selection, and the pin it was made against
+    "note",             # the owner's free text, or null (#1080)
+    "adopted_claim",    # the candidate the owner adopted
+    "thesis",           # its state: candidates-pending | adopted
+    "candidate_theses",  # what it was adopted FROM (#1079)
+    "members", "pins",  # the member set with its served material, and both pins
+    "harvest_scope",    # ratified 2026-07-29 (#896): the union of members' projects
+    "gaps",             # every member's writability verdict, not just the first
+    "lifecycle",        # composed -> inspected -> adopted, with its history
+    "iteration",        # the composition chain — unrecomposable owner history
+    "step", "artifact",  # the named-step identity and the artifact's own address
+    # FOUND BY THE ALLOWLIST ITSELF, on the run that introduced it — which is
+    # the mechanism working rather than a gap in it. Neither key appears in the
+    # ratified CARRIES list, and both are decision content:
+    "partition_proposal",  # the k-group partition OFFERED at the gate (#988) —
+                           # provenance of the owner's approve/modify/decline,
+                           # the same role `candidate_theses` plays for a thesis
+    "edit",                # the signed set change (`+L12 −L3`) that produced a
+                           # recomposition (#997). The owner names what changes,
+                           # so this is unrecomposable owner history, not a
+                           # rendering: the chain cannot be replayed without it
+    "answer_as_given", "note_is", "selection_summary", "thesis_origin",
+    "stage",            # the emitting stage, read by the pipeline seam
+})
+
+
 def write_brief_artifact(path, payload):
     """Write the brief artifact. READ BACK BY DESIGN — see the block above.
+
+    REFUSES AN UNLISTED KEY (Story 20.125, #1145). The whole family goes
+    through here — `brief.json`, its recompositions, and `brief-open`'s
+    write-back — so this is the one place a new payload could enter, and it is
+    where the closure belongs.
 
     Deliberately not `write_view`'s `_ensure_view_dir`: that helper drops a
     self-ignoring `.gitignore` because the View lands inside a working tree.
     This lands in a run workspace under the machine state root, where there is
     no tree to keep clean and an ignore file would be noise.
     """
+    unlisted = sorted(set(payload) - BRIEF_KEYS)
+    if unlisted:
+        raise ValueError(
+            "the brief artifact refuses "
+            + ", ".join(repr(k) for k in unlisted)
+            + ": its key set is an allowlist (`BRIEF_KEYS`), because removing "
+              "keys by name is a denial list whose non-member fallback is "
+              "admit — the shape that let the same class return twice under "
+              "new names (#1048, #1078). If this key is decision content, add "
+              "it to the allowlist and amend SPEC-terrain's content clause; if "
+              "it is a rendering or a gate input, it belongs on stdout, not in "
+              "the record.")
     d = os.path.dirname(path)
     if d:
         os.makedirs(d, exist_ok=True)

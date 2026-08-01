@@ -248,6 +248,7 @@ from terrain_brief import (  # noqa: E402
     _parse_edit,
     read_brief_artifact,
     write_brief_artifact,
+    BRIEF_KEYS,
 )
 
 
@@ -1498,6 +1499,21 @@ def cmd_brief_open(args):
             history.append({"state": args.state})
         state = args.state
         payload["lifecycle"] = _brief_lifecycle(state, history)
+        # AN OLDER ARTIFACT STILL OPENS (Story 20.125, #1145 AC5). The writer
+        # refuses an unlisted key, and a brief written before that allowlist
+        # existed may carry several. Recording a transition on one must neither
+        # crash nor rewrite it silently: the extras are named to the owner and
+        # dropped from what is written back, which is the same forward-only
+        # move the lifecycle itself makes.
+        legacy = sorted(set(payload) - BRIEF_KEYS)
+        if legacy:
+            payload = {k: v for k, v in payload.items() if k in BRIEF_KEYS}
+            sys.stderr.write(
+                "note: this brief predates the artifact allowlist and carried "
+                + ", ".join(repr(k) for k in legacy)
+                + "; those keys are not written back. Nothing you decided is "
+                  "affected — they are renderings and gate inputs, which "
+                  "recompose from `map.json` at the recorded pin.\n")
         try:
             write_brief_artifact(args.at, payload)
         except OSError as exc:

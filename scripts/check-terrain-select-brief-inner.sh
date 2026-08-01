@@ -351,5 +351,42 @@ sys.exit(1 if bad else 0)
 PY_TV
 [ "$fail" -eq 0 ] && ok "the lifecycle renders what happened beside what comes next"
 
+# --- Story 20.125 (#1145): the artifact's key set is an ALLOWLIST ------------
+# The two prior fixes removed named keys and the class returned under new names
+# both times. What is asserted here is the SHAPE of the guard, not a key list:
+# an unlisted key must REFUSE (a silent strip is the same denial shape one
+# layer down), and a brief written before the allowlist must still open.
+python3 - <<'PY_AL' || fail=1
+import sys, json, tempfile, os
+sys.path.insert(0, "scripts")
+import terrain_brief as tb
+
+bad = []
+def need(c, m):
+    if not c: bad.append(m)
+
+need(isinstance(tb.BRIEF_KEYS, frozenset) and tb.BRIEF_KEYS,
+     "BRIEF_KEYS is not a declared, non-empty set")
+tmp = tempfile.mktemp(suffix=".json")
+try:
+    tb.write_brief_artifact(tmp, {"brief": "b", "a_new_payload": {"x": 1}})
+    bad.append("an unlisted key was WRITTEN — the allowlist does not refuse, "
+               "which is the denial-list shape the story exists to remove")
+except ValueError as e:
+    need("a_new_payload" in str(e),
+         "the refusal does not NAME the offending key, so the next author "
+         "cannot tell which field to decide about")
+    need(not os.path.exists(tmp),
+         "a refused write left a file behind")
+# The listed set still writes.
+tb.write_brief_artifact(tmp, {"brief": "b", "members": [], "pins": {}})
+need(json.load(open(tmp))["brief"] == "b",
+     "a conforming artifact no longer writes")
+for m in bad:
+    print("FAIL: %s" % m, file=sys.stderr)
+sys.exit(1 if bad else 0)
+PY_AL
+[ "$fail" -eq 0 ] && ok "the brief artifact REFUSES an unlisted key, naming it"
+
 [ "$fail" -eq 0 ] && printf '\nAll %s checks passed.\n' "$0" \
   || { printf '\n%s FAILED.\n' "$0" >&2; exit 1; }
