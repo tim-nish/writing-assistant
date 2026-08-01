@@ -37,9 +37,31 @@ sources:
   #
   # - type: github-issues                # harvest the HOST repo's issues (read-only).
   #   labels: ["tanuki:*"]               # optional label filter (inline form, like include).
-  #   # Emitted facts carry the issue URL as their SOURCE pointer.
+  #   # Emitted facts carry the issue URL as their SOURCE pointer. The read
+  #   # INCLUDES THE ISSUE THREAD — the decision usually lives in the comments,
+  #   # so a body-only projection is emitted as a MARKED PARTIAL, never as a
+  #   # complete read (#1184).
   # - type: tanuki-den                   # harvest Tanuki's findings ledger (read-only).
   #   # Emitted facts carry a `den:<ledger-id>@<run>` SOURCE pointer.
+  # - type: commits                      # the HOST repo's own history (read-only, #1184).
+  #   since: "2026-07-01"                # optional bound: any git date or revision.
+  #   paths: ["scripts/**", "specs/**"]  # optional path bounds (inline form, like include).
+  #   # A commit message is the closest thing a repository has to a native
+  #   # EPISODE: a change together with the stated reason for it. Emitted
+  #   # material pins to the COMMIT SHA (the bare-sha SOURCE form). Read the
+  #   # declared scope with:
+  #   #   resolve-writing-sources.py commits --root <host-repo>
+
+  # THE TIME AXIS IS DERIVED FROM THE TYPE AND IS NEVER DECLARED BY HAND
+  # (2026-08-01 amendment, #1184). `commits`, `github-issues` and `tanuki-den`
+  # carry a time axis; `path` does not — for prose and code alike, because docs
+  # and specs describe the latest state of usage rather than how it came to be.
+  # A claim about how something CAME TO BE (an `episode` claim) may be grounded
+  # ONLY in a time-axis source, and is refused at the ship gate otherwise; a
+  # claim about how something CURRENTLY IS is admissible against either class.
+  # A hand-written `time_axis:` key is REFUSED at read time, never honoured.
+  # See what your own declaration can ground:
+  #   resolve-writing-sources.py time-axis --root <host-repo>
 
 output:
   # Draft + platform-variant output directory. Recommended: a directory in a

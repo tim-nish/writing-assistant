@@ -14,7 +14,12 @@ It splits cleanly into a MECHANICAL layer and a SEMANTIC layer:
     - every `derived` claim's inherited pointers must RESOLVE to declared
       fact-sheet entries; an unresolvable pointer is a gate failure;
     - a `sourced` claim's pointer must resolve too;
-    - `narration` / `verify` carry no pointer.
+    - `narration` / `verify` carry no pointer;
+    - a claim typed `episode` — one about how something CAME TO BE — must
+      carry at least one pin resolving to a TIME-AXIS source (Story 20.138,
+      #1184 clause (iii)). This is a new PREDICATE on this shipped mechanism,
+      not a new mechanism: the refusal is a finding like any other, so it is
+      deny-never-warn and the Stage 3→4 gate blocks on it.
 
   Semantic (an independent cheap-tier judge decides; this script consumes its
   findings — the drafting agent never self-grades):
@@ -47,10 +52,34 @@ on it. Exit 2 = malformed map; exit 3 = attestation failure.
 
 import argparse
 import hashlib
+import importlib.util
+import os
 import re
 import sys
 
+
+def _load_rws():
+    """The declared-source TYPE authority (`resolve-writing-sources.py`): which
+    source types carry a time axis, and which type a fact-sheet pointer form
+    resolves to. Loading it costs this script no drafting state (NFR13) — it is
+    a pure classification table, and importing it is what keeps ONE copy of the
+    type→time-axis mapping in the repository."""
+    here = os.path.dirname(os.path.realpath(__file__))
+    spec = importlib.util.spec_from_file_location(
+        "rws", os.path.join(here, "resolve-writing-sources.py"))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+rws = _load_rws()
+
 PROV_CLASSES = ("sourced", "derived", "narration", "verify")
+# A claim may declare WHAT KIND OF CLAIM it is, beside its provenance class
+# (#1184 clause (iii)). `episode` — how something came to be — is admissible
+# only against a time-axis source; `state` — how something currently is — is
+# admissible against either class and is the default when nothing is declared.
+CLAIM_TYPES = ("episode", "state")
 ATTEST_LINE = re.compile(r"^attestation:\s*draft-sha256=(?P<hash>[0-9a-fA-F]{64})\s*$")
 GRADED_LINE = re.compile(r"^graded:\s*(?P<positions>\S.*)$")
 CARRIED_LINE = re.compile(r"^carried:\s*(?P<positions>\S.*)$")
@@ -69,14 +98,22 @@ JUDGE_ECHO = re.compile(r'^(?P<pos>[^~:]+)~\s*"(?P<quote>[^"]*)"\s*:\s*(?P<reaso
 # `sourced` claim like any other — its question-id pointer must resolve to the
 # declared pointer set (mechanical layer below), and it carries no narration/
 # derived worklist entry to grade.
+# The optional CLAIM TYPE sits between the class and the pointer arrow —
+# `P1.S1[L7]: sourced episode <- <sha>`. Optional in the grammar (every map
+# authored before #1184 still parses, and every claim it carries is a `state`
+# claim, which the rule does not constrain).
 PROV_LINE = re.compile(
     r"^(?P<pos>[^\s:\[]+)(?:\[L(?P<anchor>\d+)\])?"
     r":\s*(?P<cls>sourced|derived|narration|verify)"
+    r"(?:\s+(?P<ctype>" + "|".join(CLAIM_TYPES) + r"))?"
     r"(?:\s*<-\s*(?P<ptrs>.+?))?\s*$"
 )
 
 
 def parse_map(text):
+    """[(pos, cls, [pointers], anchor, claim_type)] — `claim_type` is `state`
+    when the entry declares none (#1184: the rule constrains episode claims
+    only, so the permissive value is the default)."""
     entries = []
     for lineno, raw in enumerate(text.splitlines(), 1):
         line = raw.strip()
@@ -87,7 +124,8 @@ def parse_map(text):
             raise ValueError(f"line {lineno}: malformed provenance entry: {raw!r}")
         ptrs = [p.strip() for p in (m.group("ptrs") or "").split(",") if p.strip()]
         anchor = int(m.group("anchor")) if m.group("anchor") else None
-        entries.append((m.group("pos"), m.group("cls"), ptrs, anchor))
+        entries.append((m.group("pos"), m.group("cls"), ptrs, anchor,
+                        m.group("ctype") or "state"))
     return entries
 
 
@@ -215,13 +253,13 @@ def check_attestation(draft_hash, graded, entries, draft_text, carried=frozenset
         return ["no judge attestation found (`attestation: draft-sha256=<hex>` header) "
                 "— absence of verdicts is never PASS; a comment-only or free-form file "
                 "does not demonstrate that a judge ran"]
-    worklist = {pos for pos, cls, _, _ in entries if cls in ("narration", "derived")}
+    worklist = {pos for pos, cls, _, _, _ in entries if cls in ("narration", "derived")}
     missing = sorted(worklist - graded - set(carried))
     if missing:
         errors.append("attestation does not cover the expected worklist — ungraded "
                       f"position(s): {', '.join(missing)} (a partially-graded artifact "
                       "is not judged)")
-    unknown = sorted((graded | set(carried)) - {pos for pos, _, _, _ in entries})
+    unknown = sorted((graded | set(carried)) - {pos for pos, _, _, _, _ in entries})
     if unknown:
         errors.append(f"attestation grades position(s) not in the map: {', '.join(unknown)}")
     if draft_text is None:
@@ -270,6 +308,39 @@ def delta_basis(prior_worklist_text, prior_verdicts_text):
     passing = {txt for pos, txt in texts.items()
                if pos in graded and pos not in failing and txt}
     return passing, prior_hash
+
+
+def _episode_findings(pos, cls, ptrs):
+    """The ship-gate refusal for a claim typed `episode` (#1184 clause (iii)).
+
+    DENY, NEVER WARN, and the finding NAMES the claim and the source that
+    failed it — a refusal an author cannot act on is a refusal they route
+    around. Every pointer is resolved to its declared source TYPE by form
+    (`resolve-writing-sources.py` owns that table); an unrecognised form has no
+    established time axis and therefore does not admit the claim, which is the
+    fail-closed direction.
+
+    The rule constrains episode claims ONLY: a claim about how something
+    CURRENTLY IS never reaches here, and is admissible against either class.
+    """
+    if cls in ("narration", "verify"):
+        return [(pos, f"a claim typed `episode` cannot be `{cls}` — {cls} carries "
+                      "no pin, and an episode claim is admissible only against a "
+                      "time-axis source it can name")]
+    if not ptrs:
+        return [(pos, "a claim typed `episode` carries no pin — an episode claim "
+                      "is admissible only against a time-axis source")]
+    if any(rws.pointer_time_axis(p) for p in ptrs):
+        return []
+    named = "; ".join(
+        f"{p} → {rws.pointer_source_type(p) or 'unrecognized pointer form'} "
+        f"(time_axis: false)" for p in ptrs)
+    return [(pos, "EPISODE CLAIM REFUSED — every pin resolves to a source with no "
+                  f"time axis: {named}. A claim about how something CAME TO BE may "
+                  "be grounded only in a `commits`, `github-issues` or `tanuki-den` "
+                  "source (#1184); docs, specs and code record how things "
+                  "currently are. Re-state it as a state claim, or ground it in a "
+                  "time-axis source.")]
 
 
 def _load_set(path):
@@ -347,9 +418,9 @@ def main(argv=None):
         if args.draft:
             print(f"attestation: draft-sha256={draft_sha256(_read(args.draft))}")
             if listed:
-                print(f"graded: {','.join(pos for pos, _, _, _ in listed)}")
+                print(f"graded: {','.join(pos for pos, _, _, _, _ in listed)}")
             if carried:
-                print(f"carried: {','.join(pos for pos, _, _, _ in carried)}")
+                print(f"carried: {','.join(pos for pos, _, _, _, _ in carried)}")
         # Story 19.16 (#755): the printed text is the FULL RECONSTRUCTED
         # SENTENCE from the one segmentation authority (`segment_draft`), not
         # the hard-wrapped physical line — the judge grades exactly what the
@@ -358,7 +429,7 @@ def main(argv=None):
         # does not carry): the anchored physical line, as before.
         seg_by_pos = ({p: s for p, _a, s in segment_draft(_read(args.draft))}
                       if args.draft else {})
-        for pos, cls, ptrs, anchor in listed:
+        for pos, cls, ptrs, anchor, _ctype in listed:
             text = seg_by_pos.get(pos) or anchored_text(anchor, draft_lines)
             if cls_wanted == "narration":
                 print(f"{pos} [L{anchor}]: {text}" if text is not None else pos)
@@ -386,7 +457,7 @@ def main(argv=None):
     findings = []
 
     # --- mechanical layer ---
-    for pos, cls, ptrs, anchor in entries:
+    for pos, cls, ptrs, anchor, ctype in entries:
         if cls in ("narration", "verify") and ptrs:
             findings.append((pos, f"{cls} must carry no pointer"))
         if cls == "sourced" and not ptrs:
@@ -397,6 +468,12 @@ def main(argv=None):
             for ptr in ptrs:
                 if ptr not in valid:
                     findings.append((pos, f"pointer {ptr!r} does not resolve to a fact-sheet entry"))
+        # --- the time-axis admissibility predicate (#1184 clause (iii)) ---
+        # An EPISODE claim — about how something CAME TO BE — may be grounded
+        # only in a source written along a time axis. A STATE claim is
+        # admissible against either class and is never touched here.
+        if ctype == "episode":
+            findings += _episode_findings(pos, cls, ptrs)
 
     # --- semantic layer (independent judge's verdicts) ---
     # Grammar: `POS: reason`, or `POS ~ "<quoted sentence>": reason` when the
@@ -407,7 +484,7 @@ def main(argv=None):
     # the drafting context NFR13 denies the judge. With the echo, the mismatch
     # is arithmetic.
     if verdict_lines is not None:
-        anchors = {pos: anchor for pos, _, _, anchor in entries}
+        anchors = {pos: anchor for pos, _, _, anchor, _ in entries}
         known = set(anchors)
         for ln in verdict_lines:
             m = JUDGE_ECHO.match(ln)

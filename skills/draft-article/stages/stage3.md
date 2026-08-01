@@ -18,7 +18,7 @@ produce.
 | candidate structures (the `structures` sub-command, invoked in the CAP-4 block below) | mechanical | derives 2-3 candidates from the selected elements' evidence kinds; the **owner** chooses |
 | `structure-record` | mechanical | records the owner's choice into the plan; refuses a second gate or a second store |
 | per-section fill | **you (LLM)** | write the draft body against the section intents, with `[VERIFY]` markers |
-| provenance map (sidecar) | **you (LLM)** | author the per-position map alongside the draft |
+| provenance map (sidecar) | **you (LLM)** | author the per-position map alongside the draft; type a came-to-be claim `episode` (`P4.S6[L35]: sourced episode <- a1b2c3d`) — it is admissible only against a **time axis** source and `verify-provenance` refuses it otherwise, deny-never-warn (#1184; `docs/pipeline-vocabulary.md` §Episode vs state claims). A `state` claim (the default) is unconstrained. |
 | `draft-pipeline.py provenance` / `verify-provenance` | mechanical | validate the map against the draft; never write prose |
 | visual-set plan | **you (LLM)**, ratified mechanically | propose the set; the ratification refuses a non-conforming plan |
 | isolated provenance judge | **LLM, separate context** | grades positions independently of the author |

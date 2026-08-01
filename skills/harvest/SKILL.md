@@ -111,18 +111,23 @@ This section is enforced in lockstep with `scripts/validate-fact-sheet.py`
 ## 2b. Declared non-file sources — `github-issues` (Story 13.50)
 
 Source entries carry an optional `type` (Story 13.49). Enumerate the typed
-entries with:
-
-```
-python3 ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-writing-sources.py typed-sources --root <host-repo>
-```
+entries with `resolve-writing-sources.py typed-sources --root <host-repo>`
+(`${CLAUDE_PLUGIN_ROOT}/scripts/`).
 
 A declared `github-issues` entry harvests the **host repo's own issue
 tracker** — dogfood findings and owner-filed lessons become fact-sheet
 evidence. The read is **read-only and one-way**: list issues (e.g. `gh issue
 list --state all --json number,title,url,labels,state,body`, run against the
 host repo); **nothing is ever written** to any issue — no comment, no label,
-no state change. When the entry declares `labels:` patterns (e.g.
+no state change.
+
+**The read INCLUDES THE ISSUE THREAD (#1184)** — after listing, read each
+in-scope issue's comments (`gh issue view <n> --json body,comments`), because
+**the decision usually lives in the comments**, and that is also the ground for
+this source's **time axis**. A body-only read is **a MARKED PARTIAL, never a
+complete read**: disclose it in the coverage manifest with the marker
+`body-only (partial: issue thread not read)` (the string `typed-sources`
+carries on the entry). When the entry declares `labels:` patterns (e.g.
 `"tanuki:*"`), keep **only** issues carrying at least one matching label
 (shell-glob match against the label name); an unfiltered entry reads all
 issues. Issues are the only thing this source reads — it never widens file
@@ -174,6 +179,34 @@ state because it happens to exist on disk.
   unreadable → log **one line** (`tanuki-den source skipped: <reason>`) and
   continue with the declared file sources. Never a failure, and never a
   fallback to reading undeclared producer state.
+
+## 2d. `commits`, and the TIME AXIS of a declared source (Story 20.138, #1184)
+
+A declared `type: commits` entry harvests **the host repository's own
+history** — a commit message being the closest thing a repository has to a
+**native episode**: a change together with its stated reason. Read the declared
+scope (each entry's optional `since:` / `paths:` bounds, deduped, newest first)
+with `resolve-writing-sources.py commits --root <host-repo>`. **SOURCE is the
+commit SHA** — the bare-sha pointer form the fact-sheet grammar already carries
+(`- refactor X because Y / a1b2c3d / event`). The read is **read-only and
+one-way** (`git log` over the host repo; never a write, a fetch, or another
+repository's history), a `--limit` that cuts the history reports
+`truncated: true` rather than shortening it silently, and it **degrades, never
+fails**: no such entry → an empty list, exit 0; a `git log` failure logs one
+line (`commits source skipped: <reason>`) and the file sources continue.
+
+**Every declared source carries a `time_axis`, DERIVED FROM ITS TYPE and never
+declared by hand** — `typed-sources` reports it, and a hand-written
+`time_axis:` key is **refused at read time**. `commits`, `github-issues`
+(thread included) and `tanuki-den` carry one; `path` does not, for prose and
+code alike. A claim about how something **came to be** may be grounded only in
+a time-axis source; one about how something **currently is** is admissible
+against either. Per-type reasons and the claim vocabulary:
+`docs/pipeline-vocabulary.md` §Episode vs state claims. Enforcement is at the
+**ship gate** (`verify-provenance`, Stage 3) — never here: **harvest stays
+capture-only**. `resolve-writing-sources.py time-axis --root <host-repo>` reads
+what a declaration can ground; one grounding no episode claim is a fact about
+that declaration, not an error.
 
 ## 3. Extract facts, each as `CLAIM / SOURCE / KIND`
 

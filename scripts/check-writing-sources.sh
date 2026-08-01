@@ -1,6 +1,7 @@
 #!/usr/bin/env sh
 # parallel-safe
 # tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
+# covers: scripts/resolve-writing-sources.py config/writing-sources.example.yaml
 # check-writing-sources.sh — verify the writing-sources schema/example and the
 # draft-location resolver (Story 1.3). POSIX shell + stdlib Python only.
 #
@@ -258,10 +259,122 @@ set -e
   && ok "writer refuses a misplaced key on a typed entry" \
   || err "writer accepted a misplaced key (rc=$rc)"
 
-# The example documents all three types.
+# The example documents every type.
 has 'type: github-issues' "$EX" 'github-issues type documented in the example'
 has 'type: tanuki-den'    "$EX" 'tanuki-den type documented in the example'
 has 'den:'                "$EX" 'den pointer form documented in the example'
+has 'type: commits'       "$EX" 'commits type documented in the example'
+has 'time_axis'           "$EX" 'the derived time axis documented in the example'
+
+# --- 6d. Sources are TYPED BY TIME AXIS (Story 20.138, #1184) ---------------
+# The axis is DERIVED from the type and never declared by hand; `commits` is a
+# declared source type reading the host repo's own history; and the reading a
+# declaration grounds is reported as a FACT, never as an error.
+mkdir -p "$work/host6"
+cat > "$work/host6/writing-sources.yaml" <<'YAML'
+sources:
+  - path: .
+    include: ["docs/**"]
+  - type: github-issues
+  - type: tanuki-den
+  - type: commits
+    since: "2026-07-01"
+    paths: ["scripts/**"]
+output:
+  drafts: out/
+YAML
+typed6=$($PY --root "$work/host6" typed-sources 2>/dev/null)
+axes=$(printf '%s' "$typed6" | python3 -c 'import json,sys
+print(" ".join(e["type"] + "=" + str(e["time_axis"]) for e in json.load(sys.stdin)))' 2>/dev/null)
+[ "$axes" = "path=False github-issues=True tanuki-den=True commits=True" ] \
+  && ok "time_axis is DERIVED per type (path false; commits/github-issues/tanuki-den true)" \
+  || err "derived time_axis wrong: '$axes'"
+printf '%s' "$typed6" | grep -q '"read": "thread"' \
+  && printf '%s' "$typed6" | grep -q 'body-only (partial' \
+  && ok "a github-issues read declares the THREAD, with the body-only projection marked partial (#1184)" \
+  || err "github-issues entry does not declare the thread read / partial marker: $typed6"
+printf '%s' "$typed6" | grep -q '"since": "2026-07-01"' \
+  && printf '%s' "$typed6" | grep -q '"paths": \["scripts/\*\*"\]' \
+  && ok "a commits entry carries its optional since:/paths: bounds" \
+  || err "commits bounds lost: $typed6"
+
+# A hand-written time_axis: is REFUSED at read time, never silently honoured.
+cat > "$work/host6/writing-sources.yaml" <<'YAML'
+sources:
+  - path: .
+    time_axis: true
+output:
+  drafts: out/
+YAML
+set +e; out=$($PY --root "$work/host6" typed-sources 2>"$work/host6.err"); rc=$?; set -e
+[ "$rc" -eq 5 ] && [ -z "$out" ] && grep -q 'DERIVED FROM `type`' "$work/host6.err" \
+  && ok "a hand-written time_axis: is refused at read time (exit 5, per-key diagnostic)" \
+  || err "hand-written time_axis: rc=$rc out='$out' err=$(tr '\n' ' ' < "$work/host6.err")"
+# ... and at write time too, so it cannot be smuggled in through the writer.
+set +e
+printf '%s' '[{"path":".","time_axis":true}]' | $PY --root "$work/host6" set-sources \
+  >/dev/null 2>"$work/host6w.err"; rc=$?
+set -e
+[ "$rc" -eq 5 ] && grep -q 'DERIVED FROM `type`' "$work/host6w.err" \
+  && ok "the writer refuses a hand-written time_axis too" \
+  || err "writer accepted time_axis (rc=$rc)"
+
+# `commits` reads the HOST repo's own history and pins to the sha.
+mkdir -p "$work/host7"
+git -C "$work/host7" init -q 2>/dev/null
+git -C "$work/host7" config user.email t@e && git -C "$work/host7" config user.name t
+mkdir -p "$work/host7/scripts"; printf 'x\n' > "$work/host7/scripts/a.py"
+git -C "$work/host7" add -A >/dev/null 2>&1
+git -C "$work/host7" commit -q -m "seed: the stated reason for the change" >/dev/null 2>&1
+cat > "$work/host7/writing-sources.yaml" <<'YAML'
+sources:
+  - type: commits
+output:
+  drafts: out/
+YAML
+cm=$($PY --root "$work/host7" commits 2>/dev/null)
+printf '%s' "$cm" | python3 -c '
+import json,sys,re
+d = json.load(sys.stdin)
+c = d["commits"]
+assert d["time_axis"] is True, d
+assert len(c) == 1 and re.match(r"^[0-9a-f]{40}$", c[0]["sha"]), c
+assert "stated reason" in c[0]["subject"], c
+' 2>/dev/null && ok "commits reads the host repo history and pins to the commit sha" \
+  || err "commits read wrong: $cm"
+# No commits entry declared: an empty read, exit 0 — absence is not an error.
+cat > "$work/host7/writing-sources.yaml" <<'YAML'
+sources:
+  - path: .
+output:
+  drafts: out/
+YAML
+set +e; noc=$($PY --root "$work/host7" commits 2>/dev/null); rc=$?; set -e
+[ "$rc" -eq 0 ] && printf '%s' "$noc" | grep -q '"commits": \[\]' \
+  && ok "no declared commits entry is an empty read, exit 0 (absence is not an error)" \
+  || err "undeclared commits scope: rc=$rc out=$noc"
+
+# The time-axis READING is a fact about the declaration, not an error: a
+# declaration of `path` sources alone grounds NO episode claim and exits 0.
+cat > "$work/host6/writing-sources.yaml" <<'YAML'
+sources:
+  - path: .
+    include: ["docs/**"]
+output:
+  drafts: out/
+YAML
+set +e; rep=$($PY --root "$work/host6" time-axis 2>/dev/null); rc=$?; set -e
+[ "$rc" -eq 0 ] && ok "time-axis exits 0 over a declaration that grounds no episode claim" \
+  || err "time-axis exited $rc over an all-path declaration (a reading is never an error)"
+printf '%s' "$rep" | grep -q 'EPISODE CLAIMS: NOT GROUNDABLE' \
+  && printf '%s' "$rep" | grep -q 'FACT ABOUT THE DECLARATION' \
+  && printf '%s' "$rep" | grep -q 'STATE CLAIMS: admissible against either class' \
+  && ok "the reading names the fact (no episode claim, state claims unaffected)" \
+  || err "time-axis report wrong: $(printf '%s' "$rep" | tr '\n' ' ')"
+jrep=$($PY --root "$work/host6" time-axis --json 2>/dev/null)
+printf '%s' "$jrep" | grep -q '"grounds_episode_claims": false' \
+  && ok "the JSON reading carries grounds_episode_claims: false" \
+  || err "time-axis --json wrong: $jrep"
 
 # 7. Negative invariant: the resolver has no hardcoded 'drafts/' default path.
 if grep -F 'drafts/' "$RES" >/dev/null 2>&1; then
