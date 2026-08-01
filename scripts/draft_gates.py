@@ -202,14 +202,15 @@ GATES = {
     # nothing could assert it emitted; that is the #1114 defect, reached by a
     # surface old enough that no story had looked at it.
     #
-    # ONLY THE COLD-RUN BRANCH IS DECLARED HERE, and the absence is deliberate
-    # rather than an oversight. The #1144 amendment ratifies a SECOND branch —
-    # for a brief-carrying run the set is DERIVED and rendered as a disclosure,
-    # which would carry `owner_decision: None` on the `resume-confirmation`
-    # shape. That branch is not implemented: its `Strand → lesson → served
-    # topic` derivation needs a join the hub does not serve (screen 1's axis is
-    # tags precisely because no served Lesson→Topic join exists), so declaring
-    # its id now would put a gate in the inventory that no code path can reach.
+    # THE COLD-RUN BRANCH IS THE ONLY BRANCH — the second one was RETRACTED
+    # (2026-08-01, #1168), not left pending. The #1144 amendment had ratified a
+    # DERIVED disclosure for a brief-carrying run, carrying `owner_decision:
+    # None` on the `resume-confirmation` shape. Its `Strand → lesson → served
+    # topic` derivation needs a join the hub does not serve — screen 1's axis
+    # is tags precisely because no served Lesson→Topic join exists — so the
+    # premise was measured false and the derivation half was withdrawn; see
+    # `specs/spec-policy-topic-at-draft/amendments.md`. Declaring a second id
+    # here would put a gate in the inventory that no code path can reach.
     # The registry states what a run can actually present.
     "policy-topics": {
         "stage": "stage 2",
