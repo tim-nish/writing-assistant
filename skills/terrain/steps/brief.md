@@ -394,7 +394,8 @@ second argument and no second hand-off. Nothing on the owner's surface changes,
 and the extraction one-liner is gone because the pipeline reads the file.
 
 **The sitting does not end on that command. It ends on a GATE (Story 20.136,
-#1176).** Staging the run is not the same as running harvest, and the ask that
+#1176).** Staging the run is not the same as running probe (stage 1 since
+#1182), and the ask that
 decides which happens is an owner decision like every other one here:
 
 ```
@@ -407,7 +408,7 @@ harvest"* — chat prose, answered in free text, with no ask row anywhere, on a
 sitting that had put every earlier decision through the carrier. It read as
 covered because every declared gate had emitted; the gate that had not been
 declared was the one that leaked. The id is `harvest-entry`, declared in
-`draft_gates.GATES`, and the builder carries the two branches (run harvest now
+`draft_gates.GATES`, and the builder carries the two branches (run probe now
 / stop with the brief kept) with the free-text channel intact.
 
 **Point at the brief; do not restate it.** Whichever branch the owner takes,

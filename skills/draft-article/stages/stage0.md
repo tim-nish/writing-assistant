@@ -85,7 +85,7 @@ config or framework:
   in-progress run untouched (its id returned as `fresh_skipped` with a
   `fresh_note` to relay — nothing is deleted), and the ratified automatic
   default is unchanged when `--fresh` is not asked for. Otherwise it mints a fresh workspace with
-  `"resumed": false` and `next_stage: harvest` (the no-false-resume path). A large
+  `"resumed": false` and `next_stage: probe` (the no-false-resume path). A large
   multi-source draft completing across several invocations is the **normal
   model** — a turn-ceiling casualty simply continues next invocation.
 
@@ -98,11 +98,11 @@ for standalone use; `stage0` composes them.)
 `$WS` is a fresh per-run workspace directory **outside the host repo**
 (`docs/storage-architecture.md` D2), resolved by the path resolver — never a
 path you compose yourself, and never the host working tree. Its internal layout
-is resolver-internal; always ask the resolver, never spell it out. The harvest fact
-sheet and NEEDS-OWNER list, interview answers, the provenance map, quality-gate
+is resolver-internal; always ask the resolver, never spell it out. The probe
+record (`probe.json`, #1182), interview answers, the provenance map, quality-gate
 output, and any scratch all live under `$WS/`; there is no state-vs-cache split.
 The **only** files this pipeline writes into the host repo are the declared
-products at `output.drafts` (the `complete` gate). Pass `$WS` to Stage 1 so harvest writes
+products at `output.drafts` (the `complete` gate). Pass `$WS` to Stage 1 so probe writes
 there rather than minting its own workspace.
 
 **Artifact-write precondition (Story 13.78).** The harness Write tool refuses
@@ -550,7 +550,7 @@ converge. So the long stages also record **sub-stage progress** — one call per
 completed unit of work (batchable):
 
 ```
-python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py progress --ws "$WS" --stage harvest --done <source> [<source> …]
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py progress --ws "$WS" --stage <stage> --done <unit> [<unit> …]
 ```
 
 The upsert merges `progress.<stage>.done` into the existing checkpoint
@@ -560,9 +560,9 @@ artifacts are durably written** — the recording IS the boundary, so a
 half-written unit is never marked done. On resume, `autostart`/`resume` return
 the `progress` object with the rest of the state: **skip the units it lists**
 and continue from the first unrecorded one. A stage's normal completion
-checkpoint overwrites the file, clearing its sub-stage progress. Stage 1
-records per pinned-source batch (the harvest skill states the exact contract
-at its write site).
+checkpoint overwrites the file, clearing its sub-stage progress. Stage 1 is
+atomic at `probe.py record` (#1182) and records no sub-stage progress; the
+long later stages do.
 
 **Stage 2 (the gap interview) records per answered question (Story 18.38,
 #533).** The interview presents a deterministic ordered set (`interview`'s
@@ -730,9 +730,9 @@ backstop either way.
 **Stage 0 exit → Stage 1.** Read [`stage1.md`](stage1.md) and run:
 
 ```
-python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py consume <harvest-doc>
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/probe.py record --ws "$WS" --root <host-repo> <result>
 ```
 
-(The harvest skill writes `$WS/fact-sheet.md` first; `consume` threads it into
-run state. The stage sequence and each stage's one command are the dispatcher's
+(Probe writes `$WS/probe.json` — a feasibility verdict plus anchors, never a
+fact sheet (#1182). The stage sequence and each stage's one command are the dispatcher's
 table in [`../SKILL.md`](../SKILL.md) — this line points at it, never restates it.)

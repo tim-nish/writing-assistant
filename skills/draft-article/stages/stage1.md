@@ -1,57 +1,73 @@
 <!-- stages/stage1.md — draft-article stage companion (Story 19.3, #744/#740). Loaded on entry to this stage by the
-     SKILL.md dispatcher; carries the stage's full operating detail,
-     moved verbatim from the pre-split SKILL.md. -->
+     SKILL.md dispatcher; carries the stage's full operating detail. -->
 
-## Stage 1 — harvest and consume its output
+## Stage 1 — probe: can this repository ground the brief?
 
-Hand the run to the `harvest` skill to produce its output document at
-`$WS/fact-sheet.md` (the source-pointed fact sheet **and** the NEEDS-OWNER
-list) — give harvest the `$WS` from Stage 0 so it writes there. The stage-0 sources are
-a **selection**, not a scope widener: harvest enumerates the
-writing-sources-declared files (`resolve-writing-sources.py files`) and
-**intersects** this selection with them, so a path passed on the command line can
-only narrow what is read — never add an undeclared repo. Reconciliation against
-`writing-sources.yaml` happens there.
+Harvest is retired at this stage (amended 2026-08-02, #1182/#1097/#1185/#1209
+— the amendments companion is the authority). Harvest read at stage 1 while
+the article's structure is fixed at stage 3, so it gathered against an
+unstated query; stage 1 now asks the one question it can actually answer:
+whether this repository can ground anything for this brief at all. Probe
+returns a **feasibility verdict** plus a **handful of anchors** — resolvable
+pointers into the declared sources — and writes **no fact sheet**: no
+artifact of harvest's shape exists anywhere in the run workspace. Per-claim
+grounding is `examine` (stage 3+, story 20.147), where a concrete claim
+exists to test.
 
-**Fact-sheet entries are emitted, never guessed (validator convergence, #206).**
-Harvest builds every file-pointer entry through
-`pin-source.py --emit-entry` (its §3) — copied from tool output — and runs
-`validate-fact-sheet.py` as a **single confirmation pass**. Repair after a
-REJECT is **bounded at two validator passes**: entries still rejected after the
-second pass move to the NEEDS-OWNER list with their REJECT reason and the stage
-surfaces its **budget-triage signal** (Story 13.7 — the existing per-stage
-signal, not a new channel) instead of looping again. This stage never instructs
-free-hand entry writing followed by validate-loop repair — that
-reject → guess → re-run cycle is what exhausted the turn budget across all
-three frameworks (#206). Entries rerouted by the bound are listed in the
-completion summary's **informational notes** (they reach the owner as interview
-material, not as a silent loss).
-
-Then consume that output into pipeline state:
+First read the declared surface, then judge, then record:
 
 ```
-python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py consume <harvest-doc>
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/probe.py surface --root <host-repo>
 ```
 
-This carries harvest's output forward **without re-reading any source** — it only
-reads the harvest document, so there is no second read path that could bypass the
-Story 3.1 scope boundary. **Harvest-reuse on a rerun (#736/#737):** a resumed or
-re-entered run reuses the persisted fact sheet and its recorded per-source
-progress verbatim and re-executes only the stages after the last checkpoint —
-consume failing never means harvest re-ran. It:
+`surface` prints the declared read surface **through the typed time-axis
+source model** (`resolve-writing-sources.py files` is the one enumeration; a
+second walk here would be a second boundary that drifts). The stage-0 sources
+are a **selection**, not a scope widener: whatever probe reads must intersect
+the declared boundary — a path can only narrow what is read, never add an
+undeclared repo, and `record` refuses an anchor outside the enumerated
+surface. The surface carries every declared entry with
+its derived `time_axis` and an `id` the coverage ledger must account for,
+plus the enumerated files. Read against the brief only what feasibility
+needs — anchors, never an extraction pass. Then record **your** judgment
+(the model judges; the tool validates and records, never decides):
 
-- holds **both** the fact sheet and the NEEDS-OWNER list, parsed against harvest's
-  exact contract (a schema change surfaces here rather than being absorbed);
-- preserves every entry's **source pointer verbatim** (`path:line@sha` / sha /
-  URL) for later traceability — no re-normalization;
-- **threads the NEEDS-OWNER list into the gap interview** (`next_stage:
-  interview`, Story 4.3), so unsourced gaps are not dropped;
-- advances on a valid-but-empty result (empty fact sheet and/or NEEDS-OWNER) —
-  the stage contract is total.
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/probe.py record --ws "$WS" --root <host-repo> [--framework <F>] <result.json|->
+```
 
-**Working-note runs:** pass the article type — `consume <harvest-doc>
---framework working-note` — so consume routes `next_stage: fill` (the slim
-profile has no interview stage; see "Working-note slim profile" below).
+The result carries:
+
+- **`verdict`** — `grounded` or `ungrounded`, nothing third.
+- **`anchors`** — up to 7 resolvable pointers (`path:line[-line]` into an
+  enumerated source file, or a commit sha); `record` refuses any that do not
+  resolve. An anchor says where the evidence **sits**, never extracts it. A
+  `grounded` verdict carries at least one.
+- **`reasons`** — required on `ungrounded`; the run stops on them.
+- **`coverage`** — what was consulted (`consulted`) and what could not be
+  reached with **why** (`unreached`), accounting for **every** declared
+  source id; `record` refuses a ledger with a gap. An empty result from an
+  unreachable source is a different finding from an empty result from a read
+  source. A brief needing episode claims against a declaration with no
+  time-axis source is the standard ungrounded reason — stated from the typed
+  surface, never guessed.
+
+**A doomed article dies here.** An `ungrounded` verdict stops the run before
+any interview or structure work: the checkpoint routes `next_stage: done`,
+the verdict and its reasons are kept in `$WS/probe.json`, nothing is deleted.
+Relay the verdict and every reason to the owner verbatim.
+
+**Checkpoint/resume contract (the SPEC's per-stage obligation).** Probe is
+atomic at `record`: an interrupted probe leaves the run's checkpoint at
+`next_stage: probe` (the stage-0 mint), so a resumed run re-enters probe from
+the top — there is no partial probe state to reconcile. A recorded probe
+persists `$WS/probe.json` and the routed checkpoint in one invocation, and
+re-running `record` replaces probe.json idempotently.
+
+**Stage exit.** `record` routes `next_stage` itself: `interview` (full
+profile), `fill` (working-note slim profile, via `--framework`), or `done`
+(ungrounded). There is no consume step — no harvest document exists to
+consume.
 
 ## Working-note slim profile (F5 — Story 13.89, #412)
 
@@ -64,7 +80,7 @@ here runs exactly as the full pipeline does:
 - **Sources are constrained (ratified, binding):** the active repos' recent
   activity **plus the owner's policy recall surface via the policy-source
   seam — read-only, pinned, lessons first**; the policy hub's **Q&A history
-  archive is never a harvest source**; **published text carries public
+  archive is never a declared source**; **published text carries public
   repository links only**. State these bounds to the owner at Stage 0.
 - **The one-lesson block is told as a narrative arc (Story 13.93, #425;
   SPEC-article-frameworks "Fill — narrative-arc sourcing").** At fill, select
@@ -78,10 +94,8 @@ here runs exactly as the full pipeline does:
   marker to the owner at selection**. No usable Journey/reversal record →
   a plain one-lesson claim, arc not invented. F5's own template carries the
   full contract.
-- **No Stage 2 interview:** `consume --framework working-note` emits
-  `next_stage: fill` (`interview` rejects F5 with a named error). NEEDS-OWNER
-  entries still ride the state — at fill they become `[VERIFY]` markers or
-  publish blockers, never questions.
+- **No Stage 2 interview:** `probe.py record --framework working-note` routes
+  `next_stage: fill` (`interview` rejects F5 with a named error).
 - **Lighter quality gate:** run `quality-gate --profile slim` — the dim1–2
   rubric judge is waived by contract (do not spawn a judge subagent);
   mechanical dims 3–4 and the audience precondition run in full. The

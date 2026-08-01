@@ -39,17 +39,17 @@ git -C "$fixture" add README.md
 git -C "$fixture" -c user.name=fixture -c user.email=f@x commit -qm init
 git -C "$fixture" tag v0.1.0
 
-# 2. Valid run: records framework + raw sources, proceeds to harvest.
+# 2. Valid run: records framework + raw sources, proceeds to probe.
 out=$(python3 "$DP" start F1 README.md 'src/**/*.py' HEAD~5..HEAD --root "$fixture")
 echo "$out" | python3 -c '
 import json, sys
 d = json.load(sys.stdin)
 assert d["framework"] == "F1", d
 assert d["framework_file"].endswith("F1-project-introduction.md"), d
-assert d["next_stage"] == "harvest", d
+assert d["next_stage"] == "probe", d
 assert d["sources_raw"] == ["README.md", "src/**/*.py", "HEAD~5..HEAD"], d  # raw, unmodified
 print("ok")' >/dev/null 2>&1 \
-  && ok "valid run records framework + raw sources, next_stage=harvest" || err "run-state record wrong"
+  && ok "valid run records framework + raw sources, next_stage=probe" || err "run-state record wrong"
 
 # 3. Source-form disambiguation (all three forms, path vs range not confused).
 forms=$(python3 "$DP" start F2 notes.md 'a/**' HEAD~3..HEAD ../sibling v1..v2 \
