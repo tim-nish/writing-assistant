@@ -342,6 +342,36 @@ clause on this page, and append new amendments there rather than here.
       exhibits no member of it leaves the owner facing the parent's fifteen
       members exactly as before the mechanism shipped. This is a count, not
       composer prose, so the height argument above never applied to it.
+    - **GROUP PRESENTATION IS CLOSED, and each removal names its receiver
+      (amended 2026-08-01, #1115/#1116).** The View's human budget above —
+      under which *"line-granular pointers are machine provenance"* — was
+      written for the evidence summary and never reached the per-Strand
+      rendering inside a group, which is how the 2026-08-01 View for tag
+      `agents` came to carry **110 annotation lines whose 40-character hub
+      pin was identical on every one** (the View is served at one hub commit
+      by construction, so only the `LESSONS.md` line varied). What group
+      presentation carries is therefore closed to **Group ID, Strand ID,
+      gloss, and journey** — the per-Strand annotation line is removed from
+      the screen and from the Full Report alike. Because deleting from one
+      surface while assuming another carries it is the drop this rule exists
+      to prevent, **each removal names its receiver here**: the **shared hub
+      pin is stated once** in the View header, with a **single end-of-report
+      section** mapping Strand index → `LESSONS.md:<line>` (a per-Strand pin
+      returns only if a View can ever be served at mixed pins, which it
+      cannot today); the **`also in:` co-tag list** is dropped where it
+      restates the parent group's axis and moves to that same section where
+      it names tags beyond it; and **Screen 2's instruction block** — *"The
+      complete rendering —"* through *"Selection is always by Strand
+      index."* — is stated **once, in the View**, never on the screen, since
+      reference material standing between the owner and the groups inverts
+      *the summary is a judgment surface, not a table of contents* above.
+      **Two additions keep the Display view self-sufficient rather than
+      merely shorter:** group headings **carry their Strand indexes** (`## G3
+      — also architecture + method — 2 Strands: L1, L2`; exact format is the
+      composer's), and **SubGroups render under their parent** with id and
+      claim line, extending the count-only disclosure of the clause above.
+      Rendering only — the no-second-proposer boundary and the completeness
+      invariant are untouched.
     - **this is the CAP-3 supersession's own shape, not an exception to
       it.** That ruling admits a file as *"a rendering of one invocation
       addressed by path — never a named entity … regenerate per invocation,
