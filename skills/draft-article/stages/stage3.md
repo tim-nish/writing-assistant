@@ -4,7 +4,7 @@
 
 ## Stage 3 — fill the framework (with `[VERIFY]` markers)
 
-Fill the chosen framework's slots from the fact sheet and the interview answers.
+Fill the chosen framework's slots from the interview answers, the brief's material, and **per-claim examinations** — harvest is retired and no fact sheet exists (#1182): a claim needing repository grounding gets one `examine.py` question at the read that produces its pin. Read [`examine.md`](examine.md) before grounding the first claim; every fact-sheet-entry reference below reads as the run's recorded examination pins (`$WS/examination-pins.txt`) plus interview answer ids.
 
 **Who performs each sub-step.** Stage 3 is the one stage that interleaves
 authoring with validation, so read this before running anything: *you* write
@@ -212,7 +212,7 @@ variant packaging strips them, and they never enter the site schema.
 zero-unmarked-claims guarantee, because provenance attaches at the **claim**
 level while connective reasoning is legal at the **paragraph** level:
 
-1. **sourced** — asserts something traceable to **one** fact-sheet entry or
+1. **sourced** — asserts something traceable to **one** examination pin or
    interview answer; carries that **pointer** (`path:line@sha` / sha / URL /
    question `id`), kept verbatim;
 2. **derived** — a synthesis over **≥2 named sourced claims** that **compresses,
@@ -318,7 +318,7 @@ the harness Task tool, never as an inline continuation of this context:
 
 ```
 python3 ${CLAUDE_PLUGIN_ROOT}/scripts/verify-provenance.py --map "$WS/provenance-map.txt" \
-  --draft <draft> --fact-sheet "$WS/fact-sheet-ids.txt" \
+  --draft <draft> --fact-sheet "$WS/examination-pins.txt" \
   --judge-findings "$WS/provenance-verdicts.txt"
 ```
 

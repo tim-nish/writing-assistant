@@ -29,7 +29,7 @@ assert re.fullmatch(r"\d+\.\d+\.\d+", m.get("version", "")), f'version={m.get("v
 assert isinstance(m.get("description"), str) and m["description"].strip(), "description missing"
 assert isinstance(m.get("author"), dict) and m["author"].get("name"), "author.name missing"
 kw = m.get("keywords", [])
-for skill in ("draft-article", "review-article", "harvest"):
+for skill in ("draft-article", "review-article"):
     assert skill in kw, f"manifest does not name skill {skill!r} in keywords"
 # Stay generic: no site-identity proxy leaks into packaging metadata.
 assert "tim-nish.dev" not in json.dumps(m), "site-identity proxy leaked into plugin.json"
@@ -40,15 +40,16 @@ else
   err "plugin.json failed field validation"
 fi
 
-# Skills are auto-discovered from skills/<name>/SKILL.md — the plugin exposes
-# three skill slots. All three directories must exist (declared surface).
-for s in draft-article review-article harvest; do
+# Skills are auto-discovered from skills/<name>/SKILL.md (the harvest skill
+# retired with harvest — #1182/Story 20.147; stage 1 is probe, grounding is
+# per-claim examine inside draft-article). The declared surface:
+for s in draft-article review-article; do
   [ -d "skills/$s" ] && ok "skill directory skills/$s/ present" || err "skills/$s/ missing"
 done
 
 # The skills implemented on the default branch are discoverable now; the
 # review-article SKILL.md ships via the Epic 5 stack.
-for s in draft-article harvest; do
+for s in draft-article; do
   [ -f "skills/$s/SKILL.md" ] && ok "skills/$s/SKILL.md discoverable" || err "skills/$s/SKILL.md missing"
 done
 
@@ -58,7 +59,7 @@ done
 # into a standing gate that blocked every later skill edit (F36). Assert the
 # real invariant instead — the three declared skills still ship a non-empty
 # SKILL.md — so skills can evolve while packaging stays additive.
-for s in draft-article review-article harvest; do
+for s in draft-article review-article; do
   if [ -s "skills/$s/SKILL.md" ]; then
     ok "packaging additive: skills/$s/SKILL.md still present and non-empty"
   else

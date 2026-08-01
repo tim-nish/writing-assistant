@@ -52,8 +52,8 @@ def need(c, m):
 # A run that emitted every gate it reached is clean.
 ws = tempfile.mkdtemp()
 dg.intent_gate({"f%d" % i: "t%d" % i for i in range(1, 6)}, ws=ws)
-dg.sources_gate(ws=ws)
-res = gi.audit(ws, reached=["intent", "sources"])
+dg.harvest_entry_gate(3, ws=ws)
+res = gi.audit(ws, reached=["intent", "harvest-entry"])
 need(res["ok"] is True, "a run whose gates all emitted is reported clean")
 need(res["missing"] == [], "no gate is reported missing on a clean run")
 
@@ -66,11 +66,11 @@ need("NOT" in gi.BOUND and "never declared" in gi.BOUND,
 need(res.get("bound") == gi.BOUND,
      "a CLEAN audit result carries no bound — a caller reading `ok` alone is "
      "exactly the reader the limit is for (#1176)")
-need(gi.audit(ws, reached=["intent", "sources", "terrain-axis"]).get("bound"),
+need(gi.audit(ws, reached=["intent", "harvest-entry", "terrain-axis"]).get("bound"),
      "a FAILING audit result carries no bound either")
 _out = io.StringIO()
 with contextlib.redirect_stdout(_out):
-    gi.main(["--audit", "--ws", ws, "--reached", "intent,sources"])
+    gi.main(["--audit", "--ws", ws, "--reached", "intent,harvest-entry"])
 need(gi.BOUND in _out.getvalue(),
      "the --audit CLI output does not print the bound — the citation shape "
      "the amendment names is `gate-inventory.py --audit`, so that is the "
@@ -96,7 +96,7 @@ need(list(dg.GATES).index("harvest-entry") < list(dg.GATES).index("harvest-compl
 # THE MOTIVATING RUN. 20260801T091400-250105 reached the thesis gate and wrote
 # no payload for it. A check that passes on the run that motivated it is not a
 # check, so the shape is a fixture here.
-res2 = gi.audit(ws, reached=["intent", "sources", "terrain-member"])
+res2 = gi.audit(ws, reached=["intent", "harvest-entry", "terrain-member"])
 need(res2["ok"] is False,
      "a gate the run REACHED with no ask row is not reported — this is the "
      "2026-08-01 thesis-gate shape, which must fail (#1114)")

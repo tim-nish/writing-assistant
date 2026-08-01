@@ -98,17 +98,17 @@ unset XDG_STATE_HOME
 # --- Sub-stage progress (Story 13.83, #388) ---------------------------------
 WS2="$work/ws2"; mkdir -p "$WS2"
 # Recording progress on a fresh workspace keeps the run in that stage.
-python3 "$DP" progress --ws "$WS2" --stage harvest --done srcA srcB >/dev/null \
+python3 "$DP" progress --ws "$WS2" --stage interview --done srcA srcB >/dev/null \
   && ok "progress: records units on a fresh workspace" || err "progress failed on fresh workspace"
 out=$(python3 "$DP" resume --ws "$WS2")
-echo "$out" | jget 'd["next_stage"]' | grep -q harvest && ok "progress: run stays at the in-progress stage" || err "progress moved next_stage"
-echo "$out" | jget 'd["progress"]["harvest"]["done"]' | grep -q "srcA" \
+echo "$out" | jget 'd["next_stage"]' | grep -q interview && ok "progress: run stays at the in-progress stage" || err "progress moved next_stage"
+echo "$out" | jget 'd["progress"]["interview"]["done"]' | grep -q "srcA" \
   && ok "progress: resume returns the recorded units" || err "resume missing progress units"
 # Idempotent per unit; merge preserves existing checkpoint state.
-printf '{"stage":"start","next_stage":"harvest","run_state":{"framework":"F2"}}' | python3 "$DP" checkpoint --ws "$WS2" - >/dev/null
-python3 "$DP" progress --ws "$WS2" --stage harvest --done srcA srcC >/dev/null
+printf '{"stage":"start","next_stage":"interview","run_state":{"framework":"F2"}}' | python3 "$DP" checkpoint --ws "$WS2" - >/dev/null
+python3 "$DP" progress --ws "$WS2" --stage interview --done srcA srcC >/dev/null
 out=$(python3 "$DP" resume --ws "$WS2")
-n=$(echo "$out" | jget 'len(d["progress"]["harvest"]["done"])')
+n=$(echo "$out" | jget 'len(d["progress"]["interview"]["done"])')
 [ "$n" = "2" ] && ok "progress: idempotent per unit (srcA not duplicated)" || err "progress duplicated a unit (count=$n)"
 echo "$out" | jget 'd["run_state"]["framework"]' | grep -q F2 \
   && ok "progress: merge preserves run_state in the checkpoint" || err "progress clobbered run_state"
@@ -117,7 +117,7 @@ echo "$out" | jget 'd["run_state"]["framework"]' | grep -q F2 \
 printf '{"stage":"consume","next_stage":"interview"}' | python3 "$DP" checkpoint --ws "$WS2" - >/dev/null
 python3 "$DP" resume --ws "$WS2" | grep -q '"progress"' \
   && err "stage completion did not clear sub-stage progress" || ok "progress: stage completion clears sub-stage progress"
-python3 "$DP" progress --ws "$WS2" --stage harvest --done srcD 2>&1 | grep -q 'points past it' \
+python3 "$DP" progress --ws "$WS2" --stage probe --done srcD 2>&1 | grep -q 'points past it' \
   && ok "progress: refuses a stage the run has completed" || err "progress accepted a passed stage"
 printf '{"stage":"variants","next_stage":"done"}' | python3 "$DP" checkpoint --ws "$WS2" - >/dev/null
 python3 "$DP" progress --ws "$WS2" --stage fill --done s1 2>&1 | grep -q 'cannot reopen' \
@@ -185,11 +185,8 @@ grep -q 'Sub-stage progress' "$SKILL" && grep -q 'progress --ws' "$SKILL" \
   && ok "SKILL documents sub-stage progress recording (13.83)" || err "SKILL missing sub-stage progress"
 grep -qi 'artifacts are durably written' "$SKILL" \
   && ok "SKILL states the artifacts-before-recording order" || err "SKILL missing write-first rule"
-HSKILL="skills/harvest/SKILL.md"
-grep -q 'progress --ws' "$HSKILL" && grep -q 'progress.harvest.done' "$HSKILL" \
-  && ok "harvest SKILL wires per-source progress + resume skip" || err "harvest SKILL missing progress contract"
-grep -qi 'sheet write comes first' "$HSKILL" \
-  && ok "harvest SKILL orders sheet-append before recording" || err "harvest SKILL missing append-first order"
+# (The harvest SKILL's per-source progress assertions retired with the skill —
+# harvest is retired, #1182/Story 20.147; stage 1 is probe, atomic at record.)
 
 # SKILL documents the durability contract.
 grep -qi 'checkpoint' "$SKILL" && grep -qi 'resume from the last completed' "$SKILL" \
@@ -250,7 +247,7 @@ WS7="$work/ws7"; mkdir -p "$WS7"
 line=$(python3 "$DP" stop-disclosure --ws "$WS7")
 printf '%s' "$line" | grep -q 'workspace ws7' \
   && printf '%s' "$line" | grep -q 'no draft persisted yet' \
-  && printf '%s' "$line" | grep -q 'resumes at harvest' \
+  && printf '%s' "$line" | grep -q 'resumes at probe' \
   && ok "stop-disclosure: a run with no checkpoint still discloses (workspace + no-draft)" \
   || err "stop-disclosure silent/wrong on a checkpoint-less run: '$line'"
 # Stopped mid-run: names the stopped-at stage and the no-draft note.

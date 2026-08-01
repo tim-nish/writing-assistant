@@ -26,7 +26,7 @@ err() { printf 'FAIL: %s\n' "$1" >&2; fail=1; }
 ok()  { printf 'ok:   %s\n' "$1"; }
 
 # 1. Required top-level directories + README.
-for d in .claude-plugin skills/draft-article skills/review-article skills/harvest scripts config specs; do
+for d in .claude-plugin skills/draft-article skills/review-article scripts config specs; do
   if [ -d "$d" ]; then ok "dir $d"; else err "missing directory: $d"; fi
 done
 if [ -f README.md ]; then ok "README.md"; else err "missing README.md"; fi

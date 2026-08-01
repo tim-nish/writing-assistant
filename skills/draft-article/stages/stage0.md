@@ -69,10 +69,8 @@ config or framework:
   writer sees a decision, not a bug. Relay that hint verbatim — never
   fuzzy-select a framework on the writer's behalf; a mapped intent resolves
   exactly as before.
-- **The sources half asks a SCOPE, never paths to retype (Story 20.109, #1103).**
-  `draft_gates.sources_gate(..., repo_root=<host repo>)` — selection over
-  `SCOPE_KINDS`, each narrowing within `writing-sources.yaml`; candidates inform
-  the DEFAULT, never the choices; the label names whose declaration (#1141). **Pass NO file count (Story 20.135, #1178)** — there is no `declared_count` parameter and re-introducing one raises: the gate enumerates `repo_root`'s own declaration through `resolve-writing-sources.py files` and renders the size with its prose/code split, or, where it cannot enumerate, renders no count at all. `repo_root` is therefore what makes a count possible; an agent-supplied number is refused, because the owner who approved *"6 file(s) are declared"* on 2026-08-01 was approving 358.
+- **No sources gate — scope is DERIVED, never composed at a gate (Story 20.147, #1209; amended 2026-08-02 — the amendments companion is the authority).** The owner supplies at most a REGION at the brief; which repositories may be examined comes from the brief's `harvest_scope` — the union of the selected Strands' served `projects:` (`terrain_scope.py`) — and the per-claim examine step does its own enumerating at the read ([`examine.md`](examine.md)).
+  Never ask the owner to compose or approve a file list or a scope selection — the retired gate's 2026-08-01 defect (recommending "all declared sources", 423 files, 78% code, to an episode-claims article) has no gate to be constructed at; a repository outside the derived scope is refused, not searched; and with no brief-carried scope, the recorded `<sources...>` selection stays a filter within `writing-sources.yaml`, never a widener.
 - **Workspace autostart** — resumption is **automatic, not opt-in**; on a `--brief` invocation automatic means **same-brief-only** (amended 2026-08-02, #1207 — the amendments companion is the authority: a different-brief run is skipped fresh via `fresh_skipped`, nothing deleted; cold invocations unchanged below). It resumes
   the **newest in-progress run** (a workspace whose checkpoint records a
   `next_stage` other than `done`) when one exists, returning `"resumed": true`
@@ -275,11 +273,11 @@ The owner can say **"write the article about *this* element"** by passing
 - the name **resolves to an element id** (18.8) and **selection is pinned** to
   it — no other elements are selected, and the disclosure above states the pin
   as the selecting rule;
-- **harvest assembles evidence for that element alone**, and the **interview
-  covers that element's gaps**;
+- **examine grounds claims for that element alone** (stage 3+,
+  [`examine.md`](examine.md)), and the **interview covers that element's gaps**;
 - the pin **scopes** the run — it does **not widen the declared-source
-  boundary**. Harvest still reads only the writing-sources-declared files (the
-  stage-0 sources selection is a filter, never a scope widener); it just gathers
+  boundary**. Examine still reads only the writing-sources-declared files (the
+  recorded sources are a filter, never a scope widener); it just examines claims
   for the one pinned element. A named element outside the declared sources finds
   no evidence there — the pin never reaches past the source boundary to get it.
 
@@ -390,8 +388,9 @@ existing boundaries**:
   thesis the owner already holds), fed into the Stage-3 argument-plan sub-step.
   The disclosure trail is **unchanged**: the thesis is still owner-attributed,
   and every checkable claim stays sourced/derived.
-- **Directed gathering** — harvest **emphasis follows the brief WITHIN the
-  writing-sources-declared files**. The brief **must not widen the source
+- **Directed grounding** — examine **emphasis follows the brief WITHIN the
+  writing-sources-declared files** ([`examine.md`](examine.md)). The brief
+  **must not widen the source
   boundary**: exactly like the #431 `--element` pin, it is a **filter/emphasis,
   never a scope widener** — it never adds a file, never reaches past the
   declared sources, and the **promotion-gated `q_a` staging area stays
@@ -400,11 +399,11 @@ existing boundaries**:
   NEEDS-OWNER gap, not a reason to read further.
 
 At completion record `brief_provenance` **matching the actual producer** (Story 20.94, #1050): `owner-authored` when the owner typed the brief, `terrain-adopted` when it arrived composed from a selection they made over enumerated alternatives — both are the owner's scope, and neither is a tool-invented one. With `terrain-adopted` also record `brief_source` as one-line JSON, `{"pins": {"terrain": ..., "hub": ...}, "artifact": ...}` — **pins first**, because the path is a state-dir location that goes stale by relocation while still looking authoritative, and the pins identify the material without it.
-**Nothing reads that pointer and no stage may** — it is never opened, stat'd or followed — and **no stage branches on `brief_provenance`**: the draft, the harvest emphasis and the argument plan are byte-identical either way. Resolving it would oblige this pipeline to know another producer's rendering, invocation and lifetime; a value nothing reads creates no such obligation.
+**Nothing reads that pointer and no stage may** — it is never opened, stat'd or followed — and **no stage branches on `brief_provenance`**: the draft, the examine emphasis and the argument plan are byte-identical either way. Resolving it would oblige this pipeline to know another producer's rendering, invocation and lifetime; a value nothing reads creates no such obligation.
 With **no** `--brief`, the run behaves exactly as before — the brief is an
 optional owner input, never a required gate.
 
-**The brief record and its journey arcs (Story 20.91, #1044).** A `--brief` FILE that is a JSON object carrying a `brief` string is a **brief record**: the string is used unchanged (so every behaviour above is untouched), and the members it was composed over contribute `journey_arcs` to run state — `{"at": <pins>, "arcs": [{index, slug, arc, arc_cite, served, not_served_reason}, …]}` — **beside `sources`**, as declared source material at the recorded pin, **alongside the host-repo sources and never in place of them**. `sources` is untouched: an arc is not a repository, the boundary is not widened, and repositories remain harvest **scope**, never evidence binding. Recognition is by **shape**, which makes this a **format and never a producer** — nothing here detects, names, imports or resolves who wrote the file, an owner can hand-write one, and anything else stays a plain text file read exactly as before. Each arc travels **quoted at its cite in the register it was served in**; no stage rewrites it into a rule, a summary or a claim before the drafting decision. An absent one carries `served: false` with its `not_served_reason`, so *"no arc exists"*, *"no arc arrived"* and *a record predating the field* stay three findings and never collapse into one.
+**The brief record and its journey arcs (Story 20.91, #1044).** A `--brief` FILE that is a JSON object carrying a `brief` string is a **brief record**: the string is used unchanged (so every behaviour above is untouched), and the members it was composed over contribute `journey_arcs` to run state — `{"at": <pins>, "arcs": [{index, slug, arc, arc_cite, served, not_served_reason}, …]}` — **beside `sources`**, as declared source material at the recorded pin, **alongside the host-repo sources and never in place of them**. `sources` is untouched: an arc is not a repository, the boundary is not widened, and repositories remain examination **scope**, never evidence binding. Recognition is by **shape**, which makes this a **format and never a producer** — nothing here detects, names, imports or resolves who wrote the file, an owner can hand-write one, and anything else stays a plain text file read exactly as before. Each arc travels **quoted at its cite in the register it was served in**; no stage rewrites it into a rule, a summary or a claim before the drafting decision. An absent one carries `served: false` with its `not_served_reason`, so *"no arc exists"*, *"no arc arrived"* and *a record predating the field* stay three findings and never collapse into one.
 **The article floor is unchanged**: every article still carries ≥1 Fact — a sourced or derived claim resolving at the ship gate — and **an arc alone never satisfies it**. An arc arriving is new material, not a new licence, and missing per-Strand facts stay disclosure rather than failure. (The host-repo recording task this paragraph used to hold the arc apart from was retired with the join that minted it — SPEC-writing-assistant, amended 2026-08-01, #1183 — so there is no longer any recording task an arriving arc could be mistaken for discharging. The arc's own status is unchanged: material, never a Fact.) This makes arcs **available** and decides nothing about prose: whether one enters as a worked example, a short story, or a standalone paragraph is **parked** (#1045) behind the first draft composed with arcs available, and a stage that picks one has decided a parked question. Distinct from the completion-time `brief_source.artifact` pointer above, which is never opened, stat'd or followed — this record is an **input handed to the gate** through the `--brief` contract that has accepted a file since Story 18.24.
 
 ### Plan consultation at draft start (SPEC-article-plan CAP-3, Story 13.57)
@@ -566,7 +565,7 @@ long later stages do.
 
 **Stage 2 (the gap interview) records per answered question (Story 18.38,
 #533).** The interview presents a deterministic ordered set (`interview`'s
-`presentation_order`). Harvest itself is capture-only and non-interactive — the
+`presentation_order`). Stage 1 (probe) is non-interactive — the
 only ≤5-question elicitation loop is *this* stage — so it is the interruptible
 question loop the #533 ESC-then-resume burned. After each question is answered
 (recorded via `answer`/`journal`), mark it done:

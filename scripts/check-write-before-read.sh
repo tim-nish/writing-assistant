@@ -20,7 +20,6 @@ cat skills/draft-article/SKILL.md skills/draft-article/stages/stage0.md skills/d
 
 
 DRAFT="$__DA_ALL"
-HARVEST="skills/harvest/SKILL.md"
 fail=0
 err() { printf 'FAIL: %s\n' "$1" >&2; fail=1; }
 ok()  { printf 'ok:   %s\n' "$1"; }
@@ -53,10 +52,8 @@ has "$DRAFT" 're-writes the same workspace' \
   && ok "visual modify anchors the precondition" \
   || err "visual modify choice missing its read-first anchor"
 
-# Harvest fact-sheet write site.
-has "$HARVEST" 'Read it' \
-  && ok "harvest fact-sheet write site carries the read-first comment" \
-  || err "harvest fact-sheet write site missing the read-first comment"
+# (The harvest fact-sheet write-site assertion retired with the skill —
+# #1182/Story 20.147.)
 
 if [ "$fail" -ne 0 ]; then printf '\nFAILED.\n' >&2; exit 1; fi
 printf '\nAll write-before-read checks passed.\n'

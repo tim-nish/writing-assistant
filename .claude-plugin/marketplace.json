@@ -8,7 +8,7 @@
     {
       "name": "writing-assistant",
       "source": "./",
-      "description": "Draft (harvest -> interview -> framework fill -> variants) and review (lint -> structure -> prose -> cold read) technical articles from a repo's own material. Identity lives in config, so the engine is generic."
+      "description": "Draft (probe -> interview -> framework fill with per-claim examination -> variants) and review (lint -> structure -> prose -> cold read) technical articles from a repo's own material. Identity lives in config, so the engine is generic."
     }
   ]
 }

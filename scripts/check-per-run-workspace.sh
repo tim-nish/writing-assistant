@@ -84,9 +84,10 @@ out=$(R new-run --run-id "$rid" 2>&1); rc=$?
 set -e
 if [ "$rc" -ne 0 ]; then ok "explicit existing --run-id is rejected"; else err "new-run reused an existing run id"; fi
 
-# 7. Prompt contract: harvest and draft-article route intermediates through the
-#    resolver workspace (AC2 surface — the prompts must not default into the tree).
-for f in skills/draft-article/SKILL.md skills/harvest/SKILL.md; do
+# 7. Prompt contract: draft-article routes intermediates through the resolver
+#    workspace (AC2 surface — the prompt must not default into the tree).
+#    (harvest retired with its skill, #1182/20.147.)
+for f in skills/draft-article/SKILL.md; do
   # The resolver workspace is reached via `new-run` directly, or via
   # `draft-pipeline.py autostart` / `stage0` (Stories 13.12/13.13), which
   # mint/resume one.

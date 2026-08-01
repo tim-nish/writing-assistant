@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Draft-article pipeline — stage 0 (invocation), Story 4.1.
 
-`draft article <framework> from <sources>` starts the harvest-to-variant flow.
+`draft article <framework> from <sources>` starts the probe-to-variant flow.
 This helper does the mechanical part of stage 0: validate the framework against
 the closed allowlist, classify each source token (path / glob / commit-range),
-and emit a run-state record that stage 1 (harvest) consumes unmodified.
+and emit a run-state record that stage 1 (probe) consumes unmodified.
 
   start <FRAMEWORK> [SOURCE ...]
 
@@ -17,11 +17,12 @@ and emit a run-state record that stage 1 (harvest) consumes unmodified.
       2. commit-range — `A..B` / `A...B` of ref-like parts, not a relative path
       3. path         — anything else (prefix a literal path with ./ to force it)
   * On success, prints the run-state JSON (framework, framework file, the raw
-    sources verbatim, and their classification) and next_stage = harvest.
+    sources verbatim, and their classification) and next_stage = probe.
 
-The recorded sources are a SELECTION for harvest, never a scope widener: stage 1
-enumerates the writing-sources-declared files and INTERSECTS this selection, so
-an undeclared path passed here cannot expand what gets read.
+The recorded sources are a SELECTION, never a scope widener: probe (and the
+per-claim examine step after it, #1182) enumerates the writing-sources-declared
+files and INTERSECTS this selection, so an undeclared path passed here cannot
+expand what gets read.
 """
 
 import argparse
@@ -1037,14 +1038,18 @@ def cmd_reroute(args):
 def cmd_repair_hop(args):
     """Missing-input repair hop (Story 13.63, SPEC-article-draft-pipeline
     missing-input repair route). A review or quality-gate finding classified
-    `missing-input` routes back ONE bounded hop to a scoped re-harvest or a
-    single bounded owner-elicitation question, then re-enters the pipeline.
+    `missing-input` routes back ONE bounded hop to a per-claim examination
+    (harvest is retired, #1182/Story 20.147: re-grounding is `examine.py` run
+    for the named claim inside the fill, never a stage re-entry) or a single
+    bounded owner-elicitation question, then re-enters the pipeline.
 
     Input is the finding's `Upstream:` remediation, exactly one of:
-      re-harvest <scoped target>   -> re-enter harvest, narrowed to <target>
-      ask <one bounded question>   -> re-enter the interview with one question
+      examine <the claim to ground> -> one examination, then the fill resumes
+      ask <one bounded question>    -> re-enter the interview with one question
+    (`re-harvest <target>` is accepted as the legacy spelling of the first and
+    maps to the same examine route, with the mapping disclosed in the output.)
 
-    This is the ONLY backward edge to harvest/interview beyond the rewrite
+    This is the ONLY backward edge to grounding/interview beyond the rewrite
     route. It counts against the SAME two-cycle bound as rewrites and gate
     revisions (Story 13.64): `--cycle` is the number of cycles already spent on
     this draft. When the cap is reached, no third hop is taken — the
@@ -1072,23 +1077,32 @@ def cmd_repair_hop(args):
         }
         print(json.dumps(out, indent=2))
         return 0
-    m = re.match(r"^(?:Upstream:\s*)?re-harvest\s+(?P<target>\S.*)$",
-                 remediation, re.IGNORECASE)
-    m = re.match(r"^(?:Upstream:\s*)?re-harvest\s+(?P<target>\S.*)$",
+    m = re.match(r"^(?:Upstream:\s*)?(?P<verb>examine|re-harvest)\s+(?P<target>\S.*)$",
                  remediation, re.IGNORECASE)
     if m:
         target = m.group("target").strip()
+        legacy = m.group("verb").lower() == "re-harvest"
         out = {
             "stage": "repair-hop",
-            "action": "re-harvest",
-            "scope": target,
-            "next_stage": "harvest",
+            "action": "examine",
+            "claim": target,
+            # Re-grounding is a bounded sub-step of the fill (examine.py run
+            # for this one claim), never a stage re-entry — there is no
+            # harvest stage to go back to (#1182).
+            "next_stage": "fill",
             "cycle": args.cycle + 1,
             "cap": TWO_CYCLE_BOUND,
-            "note": ("re-harvest the scoped target only (declared-scope boundary "
-                     "and pin rules unchanged); new facts are pinned like any "
-                     "Stage-1 fact, and a policy line never becomes a SOURCE"),
+            "note": ("run one examination for the named claim only "
+                     "(examine.py — declared-scope boundary, derived "
+                     "harvest_scope refusal and pin rules unchanged); the pin "
+                     "is recorded at the read, and a policy line never "
+                     "becomes a SOURCE"),
         }
+        if legacy:
+            out["legacy_remediation"] = (
+                "`re-harvest <target>` is the pre-#1182 spelling — mapped to "
+                "the examine route; harvest is retired and no stage re-entry "
+                "exists")
         print(json.dumps(out, indent=2))
         return 0
     m = re.match(r"^(?:Upstream:\s*)?ask\s+(?P<q>\S.*)$",
@@ -1114,8 +1128,9 @@ def cmd_repair_hop(args):
         return 0
     sys.stderr.write(
         "error: a missing-input Upstream: remediation must be exactly one of "
-        "`re-harvest <target>` or `ask <question>` (Story 13.63); got "
-        f"{remediation!r}\n")
+        "`examine <claim>` or `ask <question>` (Story 13.63; examine per "
+        "#1182 — `re-harvest <target>` is accepted as the legacy spelling); "
+        f"got {remediation!r}\n")
     return 2
 
 
@@ -3632,7 +3647,7 @@ def cmd_resume(args):
         print(json.dumps({"resumed": False, "next_stage": "probe"}, indent=2))
         return 0
     with open(path, encoding="utf-8") as f:
-        state = json.load(f)
+        state = _map_legacy_stage(json.load(f))
     out = {"resumed": True}
     out.update(state)
     mm = _skill_contract_mismatch(state)
@@ -3778,7 +3793,7 @@ def cmd_stop_disclosure(args):
         # No checkpoint yet: the run stopped before its first stage persisted —
         # nothing is drafted, and a re-invocation resumes from the start.
         print(f"run-status: workspace {wsid}; stopped before any stage checkpointed; "
-              f"no draft persisted yet — re-invoking `{invocation}` resumes at harvest.")
+              f"no draft persisted yet — re-invoking `{invocation}` resumes at probe.")
         return 0
     try:
         with open(path, encoding="utf-8") as f:
@@ -3812,6 +3827,22 @@ def cmd_stop_disclosure(args):
 DONE_STAGE = "done"
 
 
+def _map_legacy_stage(state):
+    """Map a pre-#1182 checkpoint's `next_stage: harvest` to `probe` (Story
+    20.147): the dispatcher no longer runs a harvest stage, so a checkpoint
+    pointing at it would strand the run. Probe is safe to re-enter from the
+    top (atomic at `record`, no partial state), so the mapping is a route,
+    not a replay. The rewrite is disclosed on the returned state and the
+    checkpoint file is left as written — resuming is a read."""
+    if state and state.get("next_stage") == "harvest":
+        state["next_stage"] = "probe"
+        state["legacy_stage_note"] = (
+            "this run was checkpointed at `harvest`, a stage retired by "
+            "#1182 — resuming at `probe` (its replacement; safe to re-enter); "
+            "relay this once in the completion summary's informational bucket")
+    return state
+
+
 def _autostart(root, fresh=False, sitting=None, brief=None):
     """Core of automatic resume (Story 13.12): return the workspace to use and
     where to start — resuming the newest in-progress run (checkpoint next_stage
@@ -3840,8 +3871,8 @@ def _autostart(root, fresh=False, sitting=None, brief=None):
             # Resume-candidate state, including the checkpoint-less-but-not-
             # empty case (Story 20.111, #1119) — the predicate lives in
             # `draft_resume.py`, which owns resume semantics.
-            state = _load("draft_resume.py").candidate_state(
-                os.path.join(base, run_id), CHECKPOINT_FILE)
+            state = _map_legacy_stage(_load("draft_resume.py").candidate_state(
+                os.path.join(base, run_id), CHECKPOINT_FILE))
             if state is None:
                 continue
             if state.get("next_stage") and state["next_stage"] != DONE_STAGE:
@@ -4800,14 +4831,14 @@ def main(argv=None):
     sp.add_argument("sources", nargs="*")
     sp.add_argument("--depth", help="optional depth/scope directive (deep-dive|standard|note, or an explicit scope statement) — CAP-8, #432")
     sp.add_argument("--element", help="pin the run to one named story element (\"write about <element>\"): "
-                                      "selection is pinned to it, harvest scopes to that element alone "
+                                      "selection is pinned to it, examine grounds that element alone "
                                       "without widening the source boundary — CAP-9, #431")
     sp.add_argument("--brief", help="optional free-form owner coverage brief (\"what this article "
                                     "should cover\", TEXT, a FILE path, or a JSON brief record "
                                     "carrying `brief` plus the selected Strands' journey arcs "
                                     "(#1044)): recorded with "
                                     "owner-authored provenance, maps to story-element clusters, "
-                                    "seeds the argument-plan thesis candidate and harvest emphasis "
+                                    "seeds the argument-plan thesis candidate and examine emphasis "
                                     "WITHIN the declared sources — a filter, never a scope widener "
                                     "(the #431 pin rule) — CAP-9, #505")
     sp.add_argument("--root", help="host-repo root, for the framework entry-gate check "
@@ -4822,7 +4853,7 @@ def main(argv=None):
     sp = sub.add_parser("progress", help="record sub-stage progress (a completed unit inside a long stage) "
                                          "into the workspace checkpoint (Story 13.83)")
     sp.add_argument("--ws", required=True, help="the run workspace ($WS)")
-    sp.add_argument("--stage", required=True, help="the stage in progress (e.g. harvest, fill)")
+    sp.add_argument("--stage", required=True, help="the stage in progress (e.g. interview, fill)")
     sp.add_argument("--done", required=True, nargs="+",
                     help="completed unit id(s) — e.g. source names or section slugs; "
                          "idempotent, batchable in one call")
@@ -4912,14 +4943,14 @@ def main(argv=None):
     sp.add_argument("sources", nargs="*")
     sp.add_argument("--depth", help="optional depth/scope directive (deep-dive|standard|note, or an explicit scope statement) — CAP-8, #432")
     sp.add_argument("--element", help="pin the run to one named story element (\"write about <element>\"): "
-                                      "selection is pinned to it, harvest scopes to that element alone "
+                                      "selection is pinned to it, examine grounds that element alone "
                                       "without widening the source boundary — CAP-9, #431")
     sp.add_argument("--brief", help="optional free-form owner coverage brief (\"what this article "
                                     "should cover\", TEXT, a FILE path, or a JSON brief record "
                                     "carrying `brief` plus the selected Strands' journey arcs "
                                     "(#1044)): recorded with "
                                     "owner-authored provenance, maps to story-element clusters, "
-                                    "seeds the argument-plan thesis candidate and harvest emphasis "
+                                    "seeds the argument-plan thesis candidate and examine emphasis "
                                     "WITHIN the declared sources — a filter, never a scope widener "
                                     "(the #431 pin rule) — CAP-9, #505")
     sp.add_argument("--root", help="host-repo root (default: git top-level of cwd; errors outside a git repo)")
@@ -5176,7 +5207,7 @@ def main(argv=None):
     sp = sub.add_parser("repair-hop")
     sp.add_argument("--upstream", required=True,
                     help="a missing-input finding's Upstream: remediation "
-                         "(`re-harvest <target>` or `ask <question>`)")
+                         "(`examine <claim>` or `ask <question>`)")
     sp.add_argument("--cycle", type=int, default=0,
                     help="cycles already spent on this draft (rewrites + gate "
                          "revisions + prior hops); at the two-cycle cap the hop "

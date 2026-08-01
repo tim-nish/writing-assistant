@@ -93,7 +93,6 @@ check-draft-scaffold.sh
 check-emission-review-evidence.sh
 check-episode-candidates.sh
 check-evidence-types.sh
-check-fact-sheet.sh
 check-footprint-invariant.sh
 check-fork-consult.sh
 check-framework-f1.sh
@@ -106,8 +105,6 @@ check-frameworks.sh
 check-gate-comparison.sh
 check-gateway-only.sh
 check-generic-engine.sh
-check-harvest-scope.sh
-check-harvest.sh
 check-internal-vocabulary.sh
 check-interview-items.sh
 check-interview-journal.sh
