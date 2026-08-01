@@ -52,6 +52,8 @@ form leaves nothing free-form to compose. The excuse is removed, not the
 possibility.
 """
 
+import os
+
 # The host selection control admits 2-4 options. This is the capacity the
 # render form is computed against, declared once here and imported by the
 # check rather than restated in it.
@@ -366,7 +368,8 @@ SCOPE_KINDS = ("all", "subtree", "commit-range")
 
 
 def sources_gate(declared_count, default_kind="all", default_detail=None, ws=None,
-                 candidates=(), reason=None):
+                 candidates=(), reason=None, repo_root=None,
+                 declaring_file="writing-sources.yaml"):
     """"Where does the evidence live?" — the gate #1103 saw as a typing exercise.
 
     THE OWNER'S DECISION IS WHERE THE EVIDENCE LIVES, and identifying which
@@ -383,22 +386,39 @@ def sources_gate(declared_count, default_kind="all", default_detail=None, ws=Non
     owner to retype — that reads the 2026-07-31 licence to "name candidate
     sources" as a licence to demand them.
 
+    WHOSE DECLARATION (#1141). "all declared sources" is unanswerable without
+    knowing which repository declared them: the owner read it as "all of it"
+    and could not tell what it referred to. The scope is a property of ONE
+    host repo's `writing-sources.yaml`, so the gate names that repo and the
+    declaring file rather than presuming the owner holds the declared-boundary
+    concept and its host binding — designer-level knowledge at an owner gate.
+    Multi-repo is not the current case; the label shape is written so it does
+    not become wrong when it is.
+
     `default_kind` is moved to the front by `payload`, so the recommendation
     leads and the directive reads `recommended: 0`.
     """
     if default_kind not in SCOPE_KINDS:
         raise ValueError(f"{default_kind!r} is not a scope; expected one of "
                          f"{', '.join(SCOPE_KINDS)}")
+    # The repo is named by its DIRECTORY NAME, never by its absolute path:
+    # #1117 ruled that an owner-facing path renders whole on its own line and
+    # never inline in a sentence, so putting the root into a label would fix
+    # one owner-surface defect by committing another. The full path reaches the
+    # owner through `owner_surface.artifact_block`, on the surface that owns it.
+    repo_name = os.path.basename(str(repo_root).rstrip("/")) if repo_root else None
+    whose = f" of {repo_name}" if repo_name else ""
     labels = {
-        "all": "all declared sources",
+        "all": f"all declared sources{whose}",
         "subtree": (f"just {default_detail}" if default_detail
                     else "a directory subtree"),
         "commit-range": (f"the commit range {default_detail}"
                          if default_detail else "a commit range"),
     }
     effects = {
-        "all": f"harvests the whole declared set ({declared_count} file(s)) — "
-               f"the widest scope the source boundary allows",
+        "all": f"harvests the whole set {declaring_file} declares "
+               f"({declared_count} file(s)) — the widest scope that "
+               f"boundary allows",
         "subtree": "narrows the declared set to one subtree; files outside it "
                    "are counted as unexamined, never read",
         "commit-range": "narrows the declared set to what that range touched; "
@@ -413,9 +433,11 @@ def sources_gate(declared_count, default_kind="all", default_detail=None, ws=Non
         # correction.
         shown = ", ".join(list(candidates)[:3])
         why = f"{why} Seen so far: {shown}."
+    where_repo = repo_name or "this repo"
     return payload(
         where=f"Stage 0: the article type is chosen and harvest needs its "
-              f"scope; {declared_count} file(s) are declared for this repo.",
+              f"scope; {declared_count} file(s) are declared for "
+              f"{where_repo} in {declaring_file}.",
         why=why,
         choices=choices,
         gate="sources", ws=ws,
