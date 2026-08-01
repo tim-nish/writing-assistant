@@ -139,6 +139,7 @@ def confirmation(run_id, ws, state, why):
     started = run_id_started(run_id)
     stage = state.get("next_stage")
     out = dg.payload(
+        gate="resume-confirmation",
         where=f"Stage 0: run {run_id} is in progress and stops at {stage}.",
         why=f"It {why}, so adopting it silently would resume another "
             f"sitting's work.",

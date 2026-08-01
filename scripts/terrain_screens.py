@@ -35,7 +35,7 @@ sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
 # the builder rather than recomputed here: `control` follows from the choice
 # count against ONE capacity, and a second copy of that arithmetic is how the
 # screens and the gates would drift apart.
-from draft_gates import render_form  # noqa: E402
+from draft_gates import emit, render_form  # noqa: E402
 
 
 def _render(choices, banner, reply_line):
@@ -245,7 +245,7 @@ def write_view(path, text):
         fh.write(text)
 
 
-def compose_axis_payload(map_data):
+def compose_axis_payload(map_data, ws=None):
     """Screen 1 as ONE owner-facing proposal payload (Story 20.8, #810).
 
     The same contract every other screen honours: machine-proposed selectable
@@ -317,7 +317,7 @@ def compose_axis_payload(map_data):
                       f"{axis['unreachable_strands']} Strand(s) sit outside "
                       f"both — reach one at free-form."])
     where = _fit_parts(parts, BUDGETS["where"])
-    return {"items": [{
+    return emit({"items": [{
         "where": _fit(where, BUDGETS["where"]),
         "why": _fit("Pick where to look first, by tag or by topic. The count "
                      "is a signal for your judgment, never a gate: every "
@@ -330,10 +330,10 @@ def compose_axis_payload(map_data):
             "Choose where to look first — one member, by tag or by topic.",
             "Reply with one member's name, or describe a direction in your "
             "own words."),
-    }]}
+    }]}, ws, "terrain-axis")
 
 
-def compose_payload(map_data, cands, view_path=None):
+def compose_payload(map_data, cands, view_path=None, ws=None):
     """The ONE screen.
 
     At or under the screen budget: the terrain, the candidate directions, a
@@ -348,7 +348,7 @@ def compose_payload(map_data, cands, view_path=None):
     the owner sees.
     """
     if view_path and is_large(map_data):
-        return _compose_summary_payload(map_data, view_path)
+        return _compose_summary_payload(map_data, view_path, ws)
     topics = map_data.get("topics", [])
     # The terrain line was a histogram of depth ESTIMATES per subtopic. Both
     # are gone (Story 20.7, #809), so it states what the terrain now holds:
@@ -394,10 +394,10 @@ def compose_payload(map_data, cands, view_path=None):
             "Choose a direction to draft, or name your own.",
             "Reply with one direction from the list, or your own wording."),
     }
-    return {"items": [item]}
+    return emit({"items": [item]}, ws, "terrain-member")
 
 
-def _compose_summary_payload(map_data, view_path):
+def _compose_summary_payload(map_data, view_path, ws=None):
     """The >budget screen: a summary and the View's path. Still ONE item, still
     free-form every time, still `stop here` last — the size switch changes what
     the screen SHOWS, never the shape of the contract it is presented under."""
@@ -441,4 +441,4 @@ def _compose_summary_payload(map_data, view_path):
             "Reply with an index from the View (for example L3 or T1.2), or "
             "your own wording."),
     }
-    return {"items": [item]}
+    return emit({"items": [item]}, ws, "terrain-member")

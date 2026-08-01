@@ -128,8 +128,128 @@ def render_form(choices, recommended=None, banner=None, reply_line=None):
     return form
 
 
+# --------------------------------------------------------------------------
+# THE GATE REGISTRY (Story 20.118, #1114) — every owner-facing gate this
+# repository composes, declared in one place.
+#
+# WHY A REGISTRY AND NOT ONLY AN EMIT CALL. #1114's CONSTRAIN half asks that a
+# gate surface be composed only by the emitter that writes its payload — but an
+# emit call still lets a NEW surface be written that never calls it, which is
+# exactly how the thesis gate came to reach the owner with no payload at all
+# and nothing failing. A declared id closes that: `payload()` refuses an
+# undeclared gate, so composing a surface the registry does not know is an
+# error at the moment of composition rather than an absence discovered later.
+#
+# IT IS ALSO THE INVENTORY TWO OTHER STORIES NEED. Story 20.119 asserts a run's
+# gates against its payload log and needs the left-hand side; story 20.117
+# renders the owner decisions still pending and its AC3 forbids a hand-listed
+# map — *"a hardcoded list is a conformance copy with no precedence rule and
+# drifts the first time a gate moves"*. Both derive from here, so the three
+# stories share one authority instead of three copies of one list.
+#
+# `owner_decision` is what 20.117 renders: the decision the owner still owes at
+# that gate, or None where the gate asks nothing the owner must carry forward.
+GATES = {
+    # IN PIPELINE ORDER, and the order is load-bearing: story 20.117 renders
+    # this as "where each decision is asked", so a registry sorted any other
+    # way would tell the owner that sources comes before the terrain screens.
+    "terrain-axis": {
+        "stage": "terrain screen 1",
+        "owner_decision": "where to look first — one axis member",
+    },
+    "terrain-member": {
+        "stage": "terrain screen 2",
+        "owner_decision": "which Strands the brief is composed from",
+    },
+    "thesis": {
+        "stage": "terrain step 3",
+        "owner_decision": "the thesis — which candidate the brief adopts",
+    },
+    "resume-confirmation": {
+        "stage": "stage 0",
+        "owner_decision": None,   # asked only when a run predates the sitting
+    },
+    "intent": {
+        "stage": "stage 0",
+        "owner_decision": "intent — which article type the draft is filled from",
+    },
+    "sources": {
+        "stage": "stage 0",
+        "owner_decision": "sources — the scope harvest reads",
+    },
+    "harvest-completion": {
+        "stage": "after harvest",
+        "owner_decision": None,   # next-step options; nothing is carried forward
+    },
+    "gap-interview": {
+        "stage": "stage 2",
+        "owner_decision": "the gap interview — what only you can answer",
+    },
+    "narrative-structure": {
+        "stage": "stage 3",
+        "owner_decision": "narrative structure — which arc the article takes",
+    },
+    "visual-set": {
+        "stage": "stage 3",
+        "owner_decision": "the visual set — which figures the article carries",
+    },
+}
+
+# DECLARED BUT NOT YET CODE-COMPOSED (Story 20.118 step 3, #1114): `thesis`,
+# `harvest-completion`, `gap-interview`, `narrative-structure`, `visual-set`
+# reach the owner from the SKILL prompt, not from a script — which is the whole
+# of what #1114 reports: a surface with no code site leaves no event, so nothing
+# can assert it emitted. They are declared here anyway, deliberately: story
+# 20.117's map must name the stage-3 gates or it hands the owner a map missing
+# exactly the decisions they went looking for, and story 20.119's audit now
+# reports each as reached-but-never-emitted — a FINDING, which is the honest
+# state, rather than the silence that shipped.
+
+
+def declared_gates():
+    """The registry, for consumers that render or assert over it.
+
+    Returned as a copy so a reader cannot mutate the authority it is reading —
+    the failure mode a shared dict invites, and the reason this is a function
+    rather than the bare name.
+    """
+    return {k: dict(v) for k, v in GATES.items()}
+
+
+def emit(built, ws, gate):
+    """Record that a gate was PRESENTED, in the run's own payload log.
+
+    Best-effort on the write and strict on the id: an unwritable workspace
+    degrades the receipt, which is a worse run rather than a wrong one, while
+    an undeclared gate is a programming error that must not reach an owner.
+
+    RECORDING IS NOT ANSWERING. This row says a question was put; the answer
+    row is a separate act by whoever collects it. A reader of the log can tell
+    the two apart by `kind`.
+    """
+    if gate not in GATES:
+        raise ValueError(
+            f"gate {gate!r} is not declared in GATES — declare it beside the "
+            f"others so the inventory (Story 20.119) and the pending-decision "
+            f"map (Story 20.117) can see it")
+    if not ws:
+        return built
+    import json
+    import os
+    try:
+        with open(os.path.join(ws, "presented-payloads.jsonl"), "a",
+                  encoding="utf-8") as f:
+            f.write(json.dumps({"kind": "ask", "gate": gate,
+                                "stage": GATES[gate]["stage"],
+                                "items": built.get("items", [])},
+                               ensure_ascii=False) + "\n")
+    except OSError:
+        pass
+    return built
+
+
 def payload(where, why, choices, free_text=True, recommended=None,
-            banner=None, reply_line=None):
+            banner=None, reply_line=None, gate=None, ws=None):
     """One gate item in the shipped payload shape.
 
     `free_text` is TRUE by default and is the contract's other half: options
@@ -160,10 +280,17 @@ def payload(where, why, choices, free_text=True, recommended=None,
         # Recorded on the item so the renderer cannot drop the override
         # channel while faithfully quoting everything else.
         item["free_text"] = True
-    return {"items": [item]}
+    built = {"items": [item]}
+    # ASKING IS EMITTING (Story 20.118, #1114). A declared gate id is checked
+    # even when no workspace is available to write to: the check that matters
+    # is that the surface is KNOWN, and it must not be skippable just because
+    # a caller happens to have nowhere to record.
+    if gate is not None:
+        built = emit(built, ws, gate)
+    return built
 
 
-def intent_gate(labels):
+def intent_gate(labels, ws=None):
     """"What are you writing?" — the gate #1081 saw printed as prose.
 
     Its options were never missing: the closed intent set is data
@@ -196,6 +323,7 @@ def intent_gate(labels):
         why="The category set is ratified and closed, so this is a choice "
             "among five, not free text to be matched.",
         choices=choices,
+        gate="intent", ws=ws,
         banner="Choose the article type before drafting starts.",
         reply_line="Reply with one article type from the list, or describe "
                    "the piece you have in mind.",
@@ -211,7 +339,7 @@ def intent_gate(labels):
 SCOPE_KINDS = ("all", "subtree", "commit-range")
 
 
-def sources_gate(declared_count, default_kind="all", default_detail=None,
+def sources_gate(declared_count, default_kind="all", default_detail=None, ws=None,
                  candidates=(), reason=None):
     """"Where does the evidence live?" — the gate #1103 saw as a typing exercise.
 
@@ -264,5 +392,6 @@ def sources_gate(declared_count, default_kind="all", default_detail=None,
               f"scope; {declared_count} file(s) are declared for this repo.",
         why=why,
         choices=choices,
+        gate="sources", ws=ws,
         recommended=SCOPE_KINDS.index(default_kind),
     )

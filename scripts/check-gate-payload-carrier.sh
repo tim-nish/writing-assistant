@@ -158,5 +158,72 @@ check("skills/terrain/" in src["why"],
 sys.exit(1 if fail else 0)
 PY
 
+# --- asking is emitting (Story 20.118, #1114) -------------------------------
+# THE REGISTRY IS THE CONSTRAINT. An emit call alone still lets a NEW surface be
+# written that never calls it — which is exactly how the thesis gate reached the
+# owner with no payload and nothing failing. A declared id makes composing an
+# unknown surface an error at composition time.
+python3 - <<'PY_AIE' || fail=1
+import importlib.util, json, os, sys, tempfile
+sys.path.insert(0, "scripts")
+def load(n, p):
+    sp = importlib.util.spec_from_file_location(n, p)
+    m = importlib.util.module_from_spec(sp); sp.loader.exec_module(m); return m
+dg = load("draft_gates", "scripts/draft_gates.py")
+
+bad = []
+def need(c, m):
+    if not c: bad.append(m)
+
+try:
+    dg.payload(where="w", why="y", choices=[{"label": "a", "effect": "b"}],
+               gate="not-a-real-gate")
+    need(False, "payload() accepted an UNDECLARED gate id — the registry is "
+                "advisory, so a new surface can still be written that no "
+                "inventory knows about (#1114)")
+except ValueError:
+    pass
+
+snap = dg.declared_gates()
+snap["intent"]["stage"] = "MUTATED"
+need(dg.GATES["intent"]["stage"] != "MUTATED",
+     "declared_gates() hands out the live dict — a reader can rewrite the "
+     "authority it is reading")
+
+for gid, spec in dg.GATES.items():
+    need("stage" in spec, "gate %r declares no stage — 20.119 asserts over it" % gid)
+    need("owner_decision" in spec,
+         "gate %r has no owner_decision KEY — 20.117 derives its map from it, "
+         "and a missing key is not the same as an explicit None" % gid)
+
+ws = tempfile.mkdtemp()
+dg.intent_gate({"f%d" % i: "type %d" % i for i in range(1, 6)}, ws=ws)
+dg.sources_gate(11, ws=ws)
+rows = [json.loads(l) for l in
+        open(os.path.join(ws, "presented-payloads.jsonl"), encoding="utf-8")]
+need([r["gate"] for r in rows] == ["intent", "sources"],
+     "the stage-0 gates did not both emit: %s" % [r.get("gate") for r in rows])
+need(all(r.get("stage") for r in rows),
+     "an emitted row carries no stage — the inventory cannot place it")
+need(all(r["items"][0].get("render") for r in rows),
+     "an emitted payload lost its render: declaration — the #1114 defect was "
+     "an emitted payload with none")
+need(all(r.get("kind") == "ask" for r in rows),
+     "an emitted row is not marked as an ASK — recording a question and "
+     "recording its answer must be tellable apart")
+
+src = open("scripts/terrain_screens.py", encoding="utf-8").read()
+need("from draft_gates import emit" in src,
+     "terrain_screens imports render_form without emit — composing a render "
+     "directive there still implies no event (#1114)")
+need(src.count("emit(") >= 3,
+     "not every terrain screen payload routes through emit()")
+
+for m in bad:
+    print("FAIL: %s" % m, file=sys.stderr)
+sys.exit(1 if bad else 0)
+PY_AIE
+[ "$fail" -eq 0 ] && ok "asking is emitting: the registry refuses an undeclared gate, and every code-path gate leaves an ask row"
+
 [ "$fail" -eq 0 ] || { printf '\nFAILED.\n' >&2; exit 1; }
 printf '\nAll gate-payload-carrier checks passed.\n'
