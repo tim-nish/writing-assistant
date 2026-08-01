@@ -64,6 +64,22 @@ stop** (Story 13.85, #388): it finishes only the unit in progress, persists at
 that sub-stage boundary with a `--stop-note`, and exits clean — a normal end
 of an invocation, never a silent death at `error_max_turns`.
 
+**Compose the summary; do not assemble it in chat (Story 20.123, #1137).**
+
+```
+python3 -c "import sys; sys.path.insert(0,'${CLAUDE_PLUGIN_ROOT}/scripts'); \
+  import owner_surface as o; print(o.completion_summary(<stage>, notes=[…], \
+  blockers=[…], cleanup=[…], next_step=<the choice>))"
+```
+
+Print what it returns, unchanged. The three bucket headings are `BUCKETS` in
+that module — one string, never N paraphrases — and every bucket renders even
+when empty, because "publish blockers: none" is a fact the owner needs and a
+vanishing bucket is indistinguishable from one nobody filled. The 2026-08-01
+run headed a summary *"Three things you should know"*, a phrase that exists
+nowhere in this repository; a composed block leaves no free-form string for
+that to happen in.
+
 ## Explicit next step — an in-conversation choice, never a file to open
 
 After the three buckets, present **one concrete next step as an in-conversation
