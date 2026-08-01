@@ -348,6 +348,22 @@ unqualified placeholder. The owner may still name any paths, globs or ranges
 freely, and **sources remain the owner's input**: the brief directs harvest
 emphasis *within* the sources they declare and never widens scope.
 
+**Show what is still theirs to decide, and where (Story 20.130, #1146/#1112).**
+The owner's report on the 2026-08-01 sitting was *"I understand that the Brief
+was created, but I do not know what happens next"*. Render the map:
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/gate-inventory.py --pending \
+  --answered <the gate ids this sitting already answered>
+```
+
+Relay its lines **as given** — it is derived from the gate registry, so a
+decision that moves stages moves here with it, and a hand-written list would be
+a conformance copy with no precedence rule. It names the never-asked decision
+too, with its reason: an absence that reads as *later* and one that reads as
+*never* are different facts, and the owner who expected a gate and saw none can
+otherwise only conclude the pipeline decided it silently.
+
 **What the owner never sees at this boundary:** the word "framework", a
 bare angle-bracket sources placeholder, the raw pipeline command, or the
 absolute state-directory path the brief artifact sits at. Those are stage vocabulary and

@@ -78,6 +78,21 @@ options otherwise). The owner decides by selecting, never by opening a file:
   draft is publishable".
 - **partially-completed run** → the resume command above is the next step.
 
+**And say which decisions remain, and where (Story 20.130, #1146/#1112).**
+Beside the next step, render the pending-decision map:
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/gate-inventory.py --pending \
+  --answered <the gate ids this sitting already answered>
+```
+
+Relay it as given — it derives from the gate registry, so it cannot drift when
+a gate moves stage, and a hand-listed version would be a conformance copy with
+no precedence rule. It states the never-asked decision with its reason too:
+the absence of a gate must read as *later* where that is true and as *never,
+and here is why* where it is not, or an owner who expected one concludes the
+pipeline decided it silently.
+
 **Interaction contract (CAP-6, #226):** every human decision point — the next
 step included — lives **in the conversation**. Local artifact paths (fact sheet,
 run workspace, logs, checkpoints) MAY be displayed informationally — a
