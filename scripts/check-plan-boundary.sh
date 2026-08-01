@@ -95,9 +95,8 @@ for f in scripts/write-article-plan.py specs/spec-article-plan/SPEC.md; do
     || err "'skeleton' names the plan in $f: $hits"
 done
 # The harvest fence names the marker, not 'skeleton'.
-grep -q 'kind: article-plan' skills/harvest/SKILL.md \
-  && ok "AC4: harvest fence names the kind: article-plan marker" \
-  || err "harvest fence missing the article-plan marker"
+# (AC4's harvest-skill fence-wording assertion retired with the skill —
+# #1182/Story 20.147; the validator-side fence above is the enforcement.)
 
 if [ "$fail" -eq 0 ]; then
   printf '\nAll plan-boundary checks passed.\n'; exit 0

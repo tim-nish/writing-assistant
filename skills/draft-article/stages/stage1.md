@@ -11,8 +11,8 @@ whether this repository can ground anything for this brief at all. Probe
 returns a **feasibility verdict** plus a **handful of anchors** — resolvable
 pointers into the declared sources — and writes **no fact sheet**: no
 artifact of harvest's shape exists anywhere in the run workspace. Per-claim
-grounding is `examine` (stage 3+, story 20.147), where a concrete claim
-exists to test.
+grounding is `examine` (stage 3+, story 20.147 — [`examine.md`](examine.md)),
+where a concrete claim exists to test.
 
 First read the declared surface, then judge, then record:
 

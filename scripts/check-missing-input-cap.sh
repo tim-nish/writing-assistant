@@ -23,8 +23,13 @@ ok()  { printf 'ok:   %s\n' "$1"; }
 jget() { python3 -c "import json,sys; d=json.load(sys.stdin); print(eval(sys.argv[1]))" "$1"; }
 
 # Within budget (cycle 0): a real hop, incremented cycle reported.
-out=$(python3 "$DP" repair-hop --upstream "re-harvest bench/results.md" --cycle 0 2>/dev/null)
-[ "$(printf '%s' "$out" | jget 'd["action"]')" = "re-harvest" ] && ok "cycle 0: within budget, a real hop is emitted" || err "cycle 0 not a hop"
+out=$(python3 "$DP" repair-hop --upstream "examine the bench results ground the claimed speedup" --cycle 0 2>/dev/null)
+[ "$(printf '%s' "$out" | jget 'd["action"]')" = "examine" ] && ok "cycle 0: within budget, a real hop is emitted" || err "cycle 0 not a hop"
+[ "$(printf '%s' "$out" | jget 'd["next_stage"]')" = "fill" ] && ok "cycle 0: re-grounding resumes the fill, never a stage re-entry (#1182)" || err "examine hop routed to a stage"
+# The legacy spelling maps to the same route, with the mapping disclosed.
+lout=$(python3 "$DP" repair-hop --upstream "re-harvest bench/results.md" --cycle 0 2>/dev/null)
+[ "$(printf '%s' "$lout" | jget 'd["action"]')" = "examine" ] && ok "legacy re-harvest spelling maps to the examine route" || err "legacy re-harvest not mapped"
+printf '%s' "$lout" | jget '"legacy_remediation" in d' | grep -q True && ok "legacy mapping is disclosed on the output" || err "legacy mapping silent"
 [ "$(printf '%s' "$out" | jget 'd["cycle"]')" = "1" ] && ok "cycle 0 -> hop reports incremented cycle 1" || err "cycle not incremented"
 
 # Within budget (cycle 1): still a hop (this is the second and last allowed).
@@ -33,7 +38,7 @@ out=$(python3 "$DP" repair-hop --upstream "ask what result would convince a skep
 [ "$(printf '%s' "$out" | jget 'd["cycle"]')" = "2" ] && ok "cycle 1 -> hop reports incremented cycle 2 (at the bound)" || err "cycle 1 increment wrong"
 
 # At the cap (cycle 2): NO third hop — a publish blocker instead.
-out=$(python3 "$DP" repair-hop --upstream "re-harvest bench/results.md" --cycle 2 2>/dev/null)
+out=$(python3 "$DP" repair-hop --upstream "examine bench/results.md" --cycle 2 2>/dev/null)
 [ "$(printf '%s' "$out" | jget 'd["action"]')" = "publish-blocker" ] && ok "cycle 2 (cap): action is publish-blocker, no third hop" || err "cap did not block"
 [ "$(printf '%s' "$out" | jget 'str(d["publishable"])')" = "False" ] && ok "cap: publishable is false" || err "cap publishable not false"
 printf '%s' "$out" | jget '"missing-input" in d["blocker"]' | grep -q True && ok "cap: blocker names the unrepaired missing-input gap" || err "cap blocker unnamed"
@@ -49,7 +54,7 @@ python3 "$DP" repair-hop --upstream "find more stuff" --cycle 0 >/dev/null 2>&1 
   && err "malformed remediation accepted within budget" || ok "malformed remediation still refused within budget"
 
 # Negative cycle is refused.
-python3 "$DP" repair-hop --upstream "re-harvest x" --cycle -1 >/dev/null 2>&1 \
+python3 "$DP" repair-hop --upstream "examine x" --cycle -1 >/dev/null 2>&1 \
   && err "negative cycle accepted" || ok "negative --cycle is refused"
 
 # SKILL documents the cap + publish blocker.

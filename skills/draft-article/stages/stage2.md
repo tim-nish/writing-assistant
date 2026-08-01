@@ -1,8 +1,9 @@
 <!-- stages/stage2.md — draft-article stage companion (Story 19.3, #744/#740). Loaded on entry to this stage by the
-     SKILL.md dispatcher; carries the stage's full operating detail,
-     moved verbatim from the pre-split SKILL.md. -->
+     SKILL.md dispatcher; carries the stage's full operating detail, moved verbatim from the pre-split SKILL.md. -->
 
 ## Stage 2 — bounded gap interview
+
+**Harvest is retired and no fact sheet exists (#1182; Story 20.147) — the interview is TOTAL ON EMPTY ITEMS.** Probe (stage 1) produces no fact sheet and no NEEDS-OWNER list, so `interview` normally runs over an empty item set: every clause below that reads "fact sheet", "NEEDS-OWNER entry", or "harvest output" applies only when such items exist (a brief gap, a repair-hop item) and is vacuous otherwise — the thesis/arc/stakes items, the policy-seeded tension questions, and the free-form channel are what the interview asks. A deep rewrite of this file's harvest-era framing is left open (recorded in the 20.147 delivery notes), not silently reinterpreted.
 
 ### Owner thesis, arc, and stakes as first-class items (Story 17.1, #439)
 
@@ -18,9 +19,8 @@ knowledge, [`SPEC-policy-source-seam CAP-2`](../../../specs/spec-policy-source-s
 never a source-pointed recommendation. Their answers come back as **owner
 opinion** and reach the draft as **attributed prose spans** (Stage 3 below),
 not as atomic sourced claims — this is the prose-shaped channel the owner's
-story needs. When the fact sheet already carries the thesis as a sourced claim,
-the item is suppressed like any covered question; when it does not, the owner's
-answer is the article's spine.
+story needs. When no recorded material covers the thesis, the owner's answer
+is the article's spine.
 
 ### The gap interview is *the* owner-input channel (Story 13.98, #435)
 

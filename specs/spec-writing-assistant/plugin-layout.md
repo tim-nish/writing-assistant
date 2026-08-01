@@ -8,14 +8,13 @@ writing-assistant/
     plugin.json              # plugin manifest: name, version, skills/commands exposed
     marketplace.json         # makes this repo its own marketplace (/plugin marketplace add <owner>/writing-assistant)
   skills/
-    draft-article/           # CAP-3: harvest → interview → framework fill → quality gate → variants
+    draft-article/           # CAP-3: probe → interview → framework fill (per-claim examine) → quality gate → variants
       SKILL.md
       frameworks/            # CAP-5: F1–F4 templates from SPEC-article-frameworks
       quality-rubric.md      # stage 3→4 gate rubric (SPEC-article-draft-pipeline CAP-7) — versioned asset; exemplar-derived threshold tuning edits this file, not the specs
     review-article/          # CAP-4: lint → structure → prose → cold read
       SKILL.md
       review-prompts.md      # ported from spec-article-review companion
-    harvest/                 # CAP-2: fact sheet with source pointers (used by draft-article, invocable alone)
       SKILL.md
   scripts/
     lint-article.(sh|py)     # pass 0 of review: zero-token mechanical checks — POSIX shell or stdlib-only Python, no JS/TS
@@ -88,7 +87,7 @@ This layout is not contractual: specs reference the footprint invariant and the 
 | Existing contract | Lands as |
 |---|---|
 | SPEC-article-frameworks + `article-frameworks.md` | `skills/draft-article/frameworks/` |
-| SPEC-article-draft-pipeline + `pipeline-stages.md` | `skills/draft-article/SKILL.md`, `skills/harvest/SKILL.md` |
+| SPEC-article-draft-pipeline + `pipeline-stages.md` | `skills/draft-article/SKILL.md` |
 | SPEC-article-review + `review-prompts.md` | `skills/review-article/SKILL.md`, `scripts/lint-article` |
 
 The site-specific frontmatter/pointer-block details inside those specs move into `user-config.example.yaml` during the port (CAP-6); their pipeline logic is preserved verbatim.

@@ -38,7 +38,7 @@ import importlib.util, json, os, sys
 sys.path.insert(0, "scripts")
 spec = importlib.util.spec_from_file_location("dp", "scripts/draft-pipeline.py")
 dp = importlib.util.module_from_spec(spec); spec.loader.exec_module(dp)
-from draft_gates import intent_gate, sources_gate, harvest_entry_gate
+from draft_gates import intent_gate, harvest_entry_gate
 from draft_resume import confirmation
 w = sys.argv[1]
 json.dump(intent_gate(dp.INTENT_LABELS), open(os.path.join(w, "intent.json"), "w"))
@@ -47,9 +47,8 @@ json.dump(intent_gate(dp.INTENT_LABELS), open(os.path.join(w, "intent.json"), "w
 # four enumerated in skills/completion-summary.md matched, which is why it fell
 # through to prose, so it is the one this check exercises by fixture.
 json.dump(harvest_entry_gate(11), open(os.path.join(w, "harvest-entry.json"), "w"))
-json.dump(sources_gate(default_kind="subtree", default_detail="skills/terrain",
-                       candidates=["skills/terrain/", "scripts/harvest-scope.py"]),
-          open(os.path.join(w, "sources.json"), "w"))
+# (The sources gate retired with harvest — Story 20.147, #1209: scope is
+# derived from the brief's harvest_scope, never composed at a gate.)
 json.dump(confirmation("20260718T000000-111111", "/ws", {"next_stage": "harvest"},
                        "started 14 days ago, on a different calendar day"),
           open(os.path.join(w, "resume.json"), "w"))
@@ -59,7 +58,7 @@ PY
 # --require-render (Story 20.107, #1102) is what turns this from an EXISTENCE
 # assertion into a CONFORMANCE one: a gate must declare how it renders, or the
 # rendering step is free to compose prose from it, which is #1102 exactly.
-for g in intent resume sources harvest-entry; do
+for g in intent resume harvest-entry; do
   if python3 scripts/validate-proposal-payload.py --require-render "$work/$g.json" >/dev/null 2>"$work/$g.err"; then
     ok "the $g gate emits a PRESENTABLE payload (shipped validator, #1081)"
   else
@@ -81,7 +80,7 @@ def check(cond, msg):
         fail = 1
 
 
-for name in ("intent", "resume", "sources", "harvest-entry"):
+for name in ("intent", "resume", "harvest-entry"):
     item = json.load(open(os.path.join(w, name + ".json")))["items"][0]
     # OPTIONS PLUS FREE FORM, never options alone: options-only is a different
     # violation of the same clause that prose-only violates.
@@ -124,7 +123,7 @@ check(_v.OVERFLOW_MARGIN == BUILDER_MARGIN,
       f"#1206: builder and validator agree on the overflow margin "
       f"({BUILDER_MARGIN})")
 
-for name in ("intent", "resume", "sources", "harvest-entry"):
+for name in ("intent", "resume", "harvest-entry"):
     item = json.load(open(os.path.join(w, name + ".json")))["items"][0]
     r = item.get("render")
     check(isinstance(r, dict),
@@ -199,33 +198,15 @@ check(_refused({"where": "w", "why": "y",
                 "free_text": True}),
       "#1206: an overflow member unnamed in the question text is refused")
 
-# THE SOURCES GATE ASKS A SCOPE (Story 20.109, #1103). The observed gate listed
-# candidate FILES and expected them typed back. The owner's decision is where
-# the evidence lives; which files carry it is harvest's own step. So what is
-# asserted is the ANSWER FORMAT: the choices are the closed scope vocabulary,
-# and a path never appears as a choice label.
-from draft_gates import SCOPE_KINDS
-src = json.load(open(os.path.join(w, "sources.json")))["items"][0]
-check(len(src["choices"]) == len(SCOPE_KINDS),
-      f"#1103: the sources gate offers exactly the {len(SCOPE_KINDS)} scopes")
-check(src["render"]["control"] == "selection",
-      "#1103: ...as a selection, not a typing exercise")
-check(src["render"]["recommended"] == 0,
-      "#1103: ...with the recommended scope leading")
-# CANDIDATES INFORM THE DEFAULT AND ARE NEVER THE ANSWER FORMAT: the evidence
-# state a terrain-originated run carries is preserved, in the prose the owner
-# reads, rather than promoted into the choice set.
-# A SUBTREE SCOPE MAY NAME ITS SUBTREE — that is a scope, not a file list.
-# What may never happen is a CANDIDATE becoming an option, which is the exact
-# shape #1103 reports: the run's evidence state promoted from reason to answer.
-_cands = ["skills/terrain/", "scripts/harvest-scope.py"]
-check(not any(c["label"] in _cands for c in src["choices"]),
-      "#1103: ...and no candidate file was promoted into the choice set")
-check(not any(c["label"].endswith(".py") or c["label"].endswith(".md")
-              for c in src["choices"]),
-      "#1103: ...and no choice label is an individual file")
-check("skills/terrain/" in src["why"],
-      "#1103: ...while the candidates justifying the default survive in the reason")
+# THE SOURCES GATE IS UNCONSTRUCTIBLE (Story 20.147, #1209). Its #1103/#1178
+# assertions retired with it: `draft_gates` no longer exports `sources_gate`
+# or `SCOPE_KINDS`, so a scope-selection ask cannot be composed through the
+# registry at all — asserted here so a re-introduction fails loudly.
+import draft_gates as _dg_mod
+check(not hasattr(_dg_mod, "sources_gate") and not hasattr(_dg_mod, "SCOPE_KINDS"),
+      "#1209: no sources gate is constructible — scope is derived, never asked")
+check("sources" not in _dg_mod.GATES,
+      "#1209: the retired sources gate is not declared in the registry")
 
 # THE TRANSITION INTO STAGE 1 IS A SELECTION (Story 20.136, #1176). The run
 # kind is a terrain sitting ending at a STAGED stage-0 run — the case none of
@@ -292,11 +273,11 @@ for gid, spec in dg.GATES.items():
 
 ws = tempfile.mkdtemp()
 dg.intent_gate({"f%d" % i: "type %d" % i for i in range(1, 6)}, ws=ws)
-dg.sources_gate(ws=ws)
+dg.harvest_entry_gate(3, ws=ws)
 rows = [json.loads(l) for l in
         open(os.path.join(ws, "presented-payloads.jsonl"), encoding="utf-8")]
-need([r["gate"] for r in rows] == ["intent", "sources"],
-     "the stage-0 gates did not both emit: %s" % [r.get("gate") for r in rows])
+need([r["gate"] for r in rows] == ["intent", "harvest-entry"],
+     "the declared gates did not both emit: %s" % [r.get("gate") for r in rows])
 need(all(r.get("stage") for r in rows),
      "an emitted row carries no stage — the inventory cannot place it")
 need(all(r["items"][0].get("render") for r in rows),

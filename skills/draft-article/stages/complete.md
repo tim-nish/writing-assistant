@@ -252,7 +252,6 @@ their reference lives in [`variants.md`](../variants.md).
 | `checkpoint` | durability | Persist a completed stage's state to `<ws>/checkpoint.json` (Story 13.5) | `--ws` (req) `<state\|->` |
 | `resume` | durability | Report where to resume a run from its workspace checkpoint | `--ws` (req) |
 | `progress` | durability | Record sub-stage progress (completed units inside a long stage) into the checkpoint (Story 13.83); with `--stop-note`, records an orderly budget stop (Story 13.85) | `--ws` (req) `--stage` (req) `--done` (req, 1+) `--stop-note` |
-| `consume` | 1 | Ingest the harvest fact-sheet document into pipeline state | `<harvest-doc\|->` |
 | `interview` | 2 | Build the bounded gap-interview question set for the framework | `--framework` (req) `<state\|->` |
 | `answer` | 2 | Record one owner answer (single form), or validate a batch | `--id` `--disposition` `--text` `--pointer` (repeatable) `--batch` `--candidates` `--selection` |
 | `journal` | 2 | Write the interview journal (triage record, Story 10.4) | `--interview` (req) `--answers` `--seed-extra` `--policy-note` `--events` |

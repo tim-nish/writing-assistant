@@ -134,7 +134,7 @@ re-enters the pipeline:
 
 ```
 python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py repair-hop \
-  --upstream "re-harvest bench/results.md"   # or: "ask <one bounded question>"
+  --upstream "examine <the claim to ground>"   # or: "ask <one bounded question>"
 ```
 
 **Evidence-type absences build episodes on the hop (Story 13.91, #417).**
@@ -177,14 +177,17 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py episode-candidates \
   publish-blocker semantics — surface it in the completion summary naming
   the section and missing type; never loop, never open-ended re-harvest.
 
-- `re-harvest <target>` → re-enter **harvest** narrowed to that scoped target;
-  the new facts are pinned exactly like any Stage-1 fact (declared-scope
-  boundary and pin rules unchanged), and a policy line never becomes a SOURCE.
+- `examine <claim>` → run **one examination** for the named claim
+  ([`examine.md`](examine.md) — harvest is retired, #1182: `next_stage: fill`,
+  the re-grounding happens inside the fill, never a stage re-entry); the pin
+  is recorded at the read (declared-scope boundary, derived `harvest_scope`
+  refusal and pin rules unchanged), and a policy line never becomes a SOURCE.
+  The legacy `re-harvest <target>` spelling maps to this route, disclosed.
 - `ask <question>` → re-enter the **interview** with exactly one owner-facing
   question under the proposal contract; the answer records as owner judgment
   (interview provenance), never a SOURCE.
 
-This is the **only** backward edge to harvest/interview beyond the rewrite
+This is the **only** backward edge to grounding/interview beyond the rewrite
 route above, and it counts against the **same two-cycle bound** as
 rewrites/gate revisions. Pass the cycles already spent on this draft as
 `--cycle N`; when the cap is reached the command emits a **publish blocker**
@@ -195,7 +198,7 @@ forces "not publishable":
 
 ```
 python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py repair-hop \
-  --upstream "re-harvest bench/results.md" --cycle 2   # -> publish-blocker, no third hop
+  --upstream "examine <claim>" --cycle 2   # -> publish-blocker, no third hop
 ```
 
 A within-budget hop returns the incremented `cycle` so the next stage carries

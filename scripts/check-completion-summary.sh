@@ -4,8 +4,8 @@
 # (Story 7.5, CAP-6): every run ends with exactly three labelled buckets
 # (informational notes / publish blockers / optional cleanup) + an explicit next
 # step; a blocker lives only in the publish-blockers bucket; article-producing /
-# review runs show a reading-time estimate (~200 wpm EN / ~500 cpm JA) while a
-# standalone harvest omits it. POSIX shell + stdlib Python.
+# review runs show a reading-time estimate (~200 wpm EN / ~500 cpm JA).
+# POSIX shell + stdlib Python.
 
 set -eu
 
@@ -23,7 +23,6 @@ cat skills/review-article/SKILL.md skills/review-article/phases/entry.md \
     skills/review-article/phases/reentry.md > "$REVIEW"
 # ^ story 20.13 (#818): the skill is now a dispatcher + phase companions; checks
 #   assert over the concatenation, whose order matches the pre-split file.
-HARVEST="skills/harvest/SKILL.md"
 fail=0
 err() { printf 'FAIL: %s\n' "$1" >&2; fail=1; }
 ok()  { printf 'ok:   %s\n' "$1"; }
@@ -54,12 +53,7 @@ hasc 'never a prerequisite'   "opening a local artifact is never a prerequisite"
 grep -qi 'review the fact sheet, or' "$CONV" \
   && err "convention still phrases harvest next step as artifact navigation" \
   || ok "convention: no navigation-as-gate harvest wording"
-grep -qi 'continue into draft-article' "$HARVEST" \
-  && ok "harvest offers in-conversation continuation" \
-  || err "harvest missing the in-conversation continuation choice"
-grep -qi 'review the fact sheet, or run draft-article' "$HARVEST" \
-  && err "harvest still instructs the owner to review the fact sheet to continue" \
-  || ok "harvest: no navigation-as-gate wording"
+# (Harvest-skill wording assertions retired with the skill — #1182/20.147.)
 grep -qi 'in-conversation choice' "$DRAFT" && grep -qi 'in-conversation choice' "$REVIEW" \
   && ok "draft + review present the next step as an in-conversation choice" \
   || err "draft/review next step not phrased as an in-conversation choice"
@@ -124,20 +118,16 @@ printf 'just a few words here\n' > "$work/tiny.md"
 [ "$(python3 "$RT" --language en "$work/tiny.md")" = "~1 min read" ] \
   && ok "short body -> ~1 min (never 0)" || err "short-body estimate wrong"
 
-# 3. All three skills reference the shared convention.
-for f in "$DRAFT" "$REVIEW" "$HARVEST"; do
+# 3. Both run-producing skills reference the shared convention (harvest is
+# retired, #1182/20.147).
+for f in "$DRAFT" "$REVIEW"; do
   grep -q 'completion-summary.md' "$f" && ok "$f references the completion summary" \
     || err "$f does not reference the completion summary"
 done
 
-# 4. Article-producing/review runs show reading time; standalone harvest omits it.
+# 4. Article-producing/review runs show reading time.
 grep -q 'reading-time.py' "$DRAFT"  && ok "draft run shows reading time"  || err "draft missing reading time"
 grep -q 'reading-time.py' "$REVIEW" && ok "review run shows reading time" || err "review missing reading time"
-grep -qi 'omits.*reading-time\|omits the reading-time' "$HARVEST" \
-  && ok "standalone harvest omits reading time" || err "harvest does not omit reading time"
-grep -q 'reading-time.py' "$HARVEST" \
-  && err "harvest should NOT invoke reading-time (no article body)" \
-  || ok "harvest does not invoke reading-time"
 
 # 5. Draft SKILL wires the budget-triage/partial-progress reporting (Story
 # 13.7; hardened to an orderly stop by Story 13.85).

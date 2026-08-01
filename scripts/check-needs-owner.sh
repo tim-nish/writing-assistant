@@ -13,7 +13,6 @@ cd "$root"
 
 VNO="scripts/validate-needs-owner.py"
 VFS="scripts/validate-fact-sheet.py"
-SKILL="skills/harvest/SKILL.md"
 fail=0
 err() { printf 'FAIL: %s\n' "$1" >&2; fail=1; }
 ok()  { printf 'ok:   %s\n' "$1"; }
@@ -22,18 +21,8 @@ ok()  { printf 'ok:   %s\n' "$1"; }
 python3 -c "import py_compile; py_compile.compile('$root/$VNO', doraise=True)" 2>/dev/null \
   && ok "validator compiles" || { err "validator syntax error"; printf '\nFAILED.\n' >&2; exit 1; }
 
-# 1. Skill documents the NEEDS-OWNER contract.
-grep -q 'NEEDS-OWNER' "$SKILL" && ok "skill documents NEEDS-OWNER" || err "NEEDS-OWNER not documented"
-grep -q 'CANDIDATE / REASON / TOPIC' "$SKILL" && ok "skill documents the entry schema" || err "schema not documented"
-grep -q 'significance, opinion, warning, tradeoff, audience' "$SKILL" && ok "skill documents the TOPIC set (incl. tradeoff/audience, #145)" || err "TOPIC set not documented"
-grep -q 'exactly one' "$SKILL" && ok "skill states the strict partition rule" || err "partition rule not stated"
-grep -q 'even when' "$SKILL" && ok "skill requires emitting the section even when empty" || err "always-emit rule not stated"
-
-# 1a. LOCKSTEP (#526): §4 documents the premise-clause rule AND the sanctioned form.
-grep -q 'premise:' "$SKILL" && ok "skill documents the premise: clause (#526)" || err "premise: clause rule not documented"
-grep -q 'premise: unverified' "$SKILL" && ok "skill documents the sanctioned unverified marker" || err "unverified marker not documented"
-grep -q 'confabulated' "$SKILL" && ok "skill names the confabulated-premise rejection" || err "confabulated-premise rule not documented"
-grep -q 'lockstep' "$SKILL" && ok "skill states the validator↔skill lockstep for premises" || err "premise lockstep not stated"
+# 1./1a. The harvest-skill documentation assertions retired with the skill
+# (#1182/Story 20.147) — the validator's own behavior below is the contract.
 
 # --- fixtures --------------------------------------------------------------
 work=$(mktemp -d); trap 'rm -rf "$work"' EXIT
@@ -168,10 +157,8 @@ reason "$work/inline-footnote.md" | grep -q 'confabulated-premise' \
   && ok "reject: marker in a different clause (a footnote is not point-of-use)" \
   || err "a distant marker grounded the assertion"
 
-# 10f. LOCKSTEP (#567): §4 documents the prose rule and the em-dash marker.
-grep -q 'unverified —' "$SKILL" && grep -qi 'point of use' "$SKILL" \
-  && ok "skill documents the inline \`unverified —\` marker at the point of use (#567)" \
-  || err "skill missing the inline marker rule (lockstep breach)"
+# 10f. (The #567 skill-side lockstep assertion retired with the harvest skill
+# — #1182/Story 20.147; the validator behavior above is the enforcement.)
 
 if [ "$fail" -eq 0 ]; then
   printf '\nAll NEEDS-OWNER checks passed.\n'; exit 0
