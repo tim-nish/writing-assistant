@@ -4,7 +4,9 @@
 # covers: scripts/draft-pipeline.py scripts/draft_resume.py
 # removal-signal: gate emission is routed through the single emitter Story
 #   20.118 (#1114) builds, and the per-run gate-inventory assertion of 20.119
-#   covers every gate rather than this one — at that point the ask_emitted and
+#   covers every DECLARED gate rather than this one (its bound, stated at
+#   `gate_inventory.BOUND`: it never covers an ask composed outside the
+#   registry) — at that point the ask_emitted and
 #   render_control assertions here are the inventory's subject, and what is
 #   left (the cmd_stage0 guard) folds into check-checkpoint-resume.sh.
 # check-stage0-resume-confirmation.sh — the sitting-boundary gate FIRES rather

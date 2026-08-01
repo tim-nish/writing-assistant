@@ -15,6 +15,25 @@ which the log cannot supply — a log missing a row is precisely the case being
 audited, so deriving "reached" from the log would make the check vacuous by
 construction. The caller (the sitting, or a fixture) names what it reached; the
 registry validates that those ids exist at all.
+
+WHAT THIS AUDIT DOES NOT COVER — STATED, BECAUSE A CLEAN AUDIT OTHERWISE READS
+AS A CLEAN CLASS (Story 20.136, #1176). This is coverage of DECLARED-ID
+EMISSION. It compares the ids a caller says it reached against the ask rows the
+run wrote, and both sides are keyed on `draft_gates.GATES` — so an owner-facing
+ask that was never declared there is invisible to it, and a run that composed
+one still audits clean. That is not a gap to be closed by a better predicate:
+the sentence above is the reason. `reached` is supplied by the caller because
+deriving it from the log would make the check vacuous, which means the actor
+that failed to declare a gate is the actor that reports which gates it reached
+— the self-assertion shape already declined upstream as "self-asserted by the
+same actor class that made the original error". No mechanical carrier is
+possible at the agent's composition step, so THE STATED LIMIT IS THE REMEDY
+(`specs/spec-writing-assistant/amendments-2026-07-24--2026-08-01.md`,
+2026-08-01 #1176/#1177, clause (a)). Reopen trigger: a harness-level signal
+that fires when a turn ends awaiting a reply.
+
+No spec, skill or check may cite this audit as evidence of gate coverage
+without that bound.
 """
 
 import argparse
@@ -54,6 +73,18 @@ def read_asks(ws):
     return rows
 
 
+# THE BOUND, DECLARED ONCE (Story 20.136, #1176) and carried by every audit —
+# in the result, in the CLI output, and in --help. One string, so a consumer
+# quotes it rather than paraphrasing the limit into something weaker.
+BOUND = (
+    "BOUND: this is coverage of DECLARED-ID EMISSION — reached ids against the "
+    "ask rows written for them, both keyed on draft_gates.GATES. It is NOT "
+    "coverage of an ask that was never declared: a surface composed outside the "
+    "registry is invisible here and this audit still reports ok. A clean audit "
+    "is not a clean class."
+)
+
+
 def audit(ws, reached):
     """Assert `reached` ⊆ emitted, and that every emitted payload declares its
     render form.
@@ -76,6 +107,10 @@ def audit(ws, reached):
         r["gate"] for r in rows
         if not all((it or {}).get("render") for it in (r.get("items") or [{}]))})
     return {"ok": not missing and not render_missing,
+            # The bound travels WITH the verdict, not beside it in a doc
+            # somewhere: a caller that reads `ok` and nothing else is the
+            # reader this clause exists for.
+            "bound": BOUND,
             "reached": list(reached),
             "emitted": sorted(x for x in emitted if x),
             "missing": missing,
@@ -133,10 +168,19 @@ def pending_decision_lines(answered=()):
 
 
 def main(argv=None):
-    p = argparse.ArgumentParser(description=__doc__)
+    # RawDescriptionHelpFormatter, deliberately: the default formatter reflows
+    # the epilog into one block and the bound is the half a reader skims for.
+    p = argparse.ArgumentParser(
+        description="Audit a run's gates against the ask rows it wrote. " + BOUND,
+        epilog=BOUND,
+        formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--ws", help="the run workspace to audit")
     p.add_argument("--reached",
                    help="comma-separated gate ids the run reached")
+    p.add_argument("--audit", action="store_true",
+                   help="audit --reached against the ask rows in --ws (the "
+                        "default mode; named so citations can say --audit). "
+                        + BOUND)
     p.add_argument("--list", action="store_true",
                    help="print the declared registry and exit")
     p.add_argument("--pending", action="store_true",
@@ -156,6 +200,10 @@ def main(argv=None):
         p.error("--ws and --reached are required unless --list/--pending")
     res = audit(args.ws, [g.strip() for g in args.reached.split(",") if g.strip()])
     print(json.dumps(res, indent=2))
+    # PRINTED ON EVERY AUDIT, INCLUDING A CLEAN ONE — especially a clean one.
+    # A limit disclosed only on failure is disclosed exactly where nobody is
+    # about to over-read the result.
+    print(BOUND)
     if res["missing"]:
         print(f"error: reached but never emitted: {res['missing']} — a gate "
               f"surface that asked the owner something left no record of it",

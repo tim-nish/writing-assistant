@@ -15,6 +15,16 @@
 # passes the same validator every other proposal surface passes. This check
 # deliberately reads NO reply prose — nothing in this repository can, which is
 # exactly why the carrier sits at the composed artifact instead.
+#
+# THE BLIND SPOT, STATED (Story 20.136, #1176). Every assertion below iterates
+# `dg.GATES` or names a member of it, so this check shares the gate-inventory
+# audit's bound exactly: it is coverage of DECLARED gates, and an owner-facing
+# ask that was never declared in the registry is invisible to it — a run that
+# composed one passes here. That is not a predicate to sharpen: no carrier is
+# possible at the agent's own composition step, so the stated limit IS the
+# remedy (spec-writing-assistant, amended 2026-08-01, #1176 clause (a)). The
+# limit is REPORTED on every run, not only on failure, because a clean report
+# is where it would otherwise be over-read as a clean class.
 set -u
 cd "$(dirname "$0")/.."
 fail=0
@@ -28,10 +38,15 @@ import importlib.util, json, os, sys
 sys.path.insert(0, "scripts")
 spec = importlib.util.spec_from_file_location("dp", "scripts/draft-pipeline.py")
 dp = importlib.util.module_from_spec(spec); spec.loader.exec_module(dp)
-from draft_gates import intent_gate, sources_gate
+from draft_gates import intent_gate, sources_gate, harvest_entry_gate
 from draft_resume import confirmation
 w = sys.argv[1]
 json.dump(intent_gate(dp.INTENT_LABELS), open(os.path.join(w, "intent.json"), "w"))
+# THE STAGED STAGE-0 CASE (Story 20.136, #1176) — a terrain sitting that ends
+# with the run staged and harvest not yet run. It is the run kind none of the
+# four enumerated in skills/completion-summary.md matched, which is why it fell
+# through to prose, so it is the one this check exercises by fixture.
+json.dump(harvest_entry_gate(11), open(os.path.join(w, "harvest-entry.json"), "w"))
 json.dump(sources_gate(11, default_kind="subtree", default_detail="skills/terrain",
                        candidates=["skills/terrain/", "scripts/harvest-scope.py"]),
           open(os.path.join(w, "sources.json"), "w"))
@@ -44,7 +59,7 @@ PY
 # --require-render (Story 20.107, #1102) is what turns this from an EXISTENCE
 # assertion into a CONFORMANCE one: a gate must declare how it renders, or the
 # rendering step is free to compose prose from it, which is #1102 exactly.
-for g in intent resume sources; do
+for g in intent resume sources harvest-entry; do
   if python3 scripts/validate-proposal-payload.py --require-render "$work/$g.json" >/dev/null 2>"$work/$g.err"; then
     ok "the $g gate emits a PRESENTABLE payload (shipped validator, #1081)"
   else
@@ -66,7 +81,7 @@ def check(cond, msg):
         fail = 1
 
 
-for name in ("intent", "resume", "sources"):
+for name in ("intent", "resume", "sources", "harvest-entry"):
     item = json.load(open(os.path.join(w, name + ".json")))["items"][0]
     # OPTIONS PLUS FREE FORM, never options alone: options-only is a different
     # violation of the same clause that prose-only violates.
@@ -105,7 +120,7 @@ check(_v.CONTROL_CAPACITY == BUILDER_CAP,
       f"#1102: builder and validator agree on the control capacity "
       f"({BUILDER_CAP})")
 
-for name in ("intent", "resume", "sources"):
+for name in ("intent", "resume", "sources", "harvest-entry"):
     item = json.load(open(os.path.join(w, name + ".json")))["items"][0]
     r = item.get("render")
     check(isinstance(r, dict),
@@ -154,6 +169,27 @@ check(not any(c["label"].endswith(".py") or c["label"].endswith(".md")
       "#1103: ...and no choice label is an individual file")
 check("skills/terrain/" in src["why"],
       "#1103: ...while the candidates justifying the default survive in the reason")
+
+# THE TRANSITION INTO HARVEST IS A SELECTION (Story 20.136, #1176). The run
+# kind is a terrain sitting ending at a STAGED stage-0 run — the case none of
+# the four enumerated run kinds matched, which is exactly why the ask reached
+# the owner as "Say the word and I'll run harvest" and was answered in free
+# text. What is asserted is the shape the total rule requires: a selection with
+# both branches offered, and a stop branch that says nothing is lost.
+he = json.load(open(os.path.join(w, "harvest-entry.json")))["items"][0]
+check(he["render"]["control"] == "selection",
+      "#1176: the transition into harvest renders as a selection, not prose")
+check(len(he["choices"]) == 2,
+      "#1176: ...offering both branches — run harvest now, and stop")
+check(any("harvest" in c["label"] for c in he["choices"])
+      and any("stop" in c["label"] for c in he["choices"]),
+      "#1176: ...named as running harvest and as stopping")
+check("brief" in he["choices"][1]["label"],
+      "#1176: ...and the stop branch says what is KEPT — an owner who cannot "
+      "see that stopping keeps the brief is choosing between continue and an "
+      "unknown loss")
+check(he.get("free_text") is True,
+      "#1176: ...with the free-text channel intact")
 
 sys.exit(1 if fail else 0)
 PY
@@ -247,3 +283,10 @@ PY_AIE
 
 [ "$fail" -eq 0 ] || { printf '\nFAILED.\n' >&2; exit 1; }
 printf '\nAll gate-payload-carrier checks passed.\n'
+# THE BOUND IS PART OF THE PASS (Story 20.136, #1176). "All checks passed" over
+# an iteration of dg.GATES says nothing about a surface that never entered it,
+# and a pass line that does not say so is read as a clean class.
+printf 'BOUND: these assertions iterate the DECLARED registry (draft_gates.GATES).\n'
+printf '       An owner-facing ask that was never declared there is invisible here,\n'
+printf '       and a run that composed one still passes. No carrier is possible at\n'
+printf '       the agent composition step; the stated limit is the remedy (#1176).\n'

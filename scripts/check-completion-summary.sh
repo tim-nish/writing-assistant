@@ -64,6 +64,41 @@ grep -qi 'in-conversation choice' "$DRAFT" && grep -qi 'in-conversation choice' 
   && ok "draft + review present the next step as an in-conversation choice" \
   || err "draft/review next step not phrased as an in-conversation choice"
 
+# 1a-i. The next-step mandate is a TOTAL RULE, not an enumeration (Story
+# 20.136, #1176). The four run kinds are worked examples; a run kind the list
+# does not name presents a selection anyway. The defect this asserts against is
+# the shape, not the list's contents: the enumeration's non-member fallback was
+# *admit*, so a terrain sitting ending at a staged stage-0 run fell through to
+# prose ("Say the word and I'll run harvest") with nothing to bind it.
+hasc 'including run kinds this list does not name\|run kinds this list does not name' \
+  "next step: the rule binds run kinds the list does not name (#1176)"
+hasc 'worked examples' "next step: the four run kinds are worked EXAMPLES, not the scope"
+grep -qi 'fall through to prose' "$CONV" \
+  && ok "next step: the non-member fallback is named and refused" \
+  || err "convention does not state the non-member fallback — an enumeration's load-bearing half"
+# THE UNNAMED RUN KIND IS THE ONE EXERCISED: a terrain sitting ending at a
+# staged stage-0 run, with its declared builder named rather than described.
+grep -qi 'staged stage-0 run' "$CONV" \
+  && ok "next step: the staged stage-0 case is present as a worked example" \
+  || err "convention omits the staged stage-0 run — the case that fell through in #1176"
+grep -q 'harvest_entry_gate' "$CONV" \
+  && ok "next step: the staged stage-0 case NAMES its builder rather than describing a shape" \
+  || err "convention describes the harvest-entry choice without naming harvest_entry_gate"
+# THE ROUTING HALF (AC6): a composed artifact is POINTED AT, never restated —
+# that is what shrinks the free-form surface the detect layer cannot police.
+grep -qi 'pointer' "$CONV" && grep -qi 'restate\|restatement' "$CONV" \
+  && ok "next step: a composed artifact is carried as a pointer, not a restatement" \
+  || err "convention missing the pointer-not-restatement routing rule (#1176)"
+# THE LIMIT IS STATED (clause (a)): a mandate at the composition step is
+# advisory, and the declared-id audit does not cover an undeclared ask. A
+# surface that reads as covered and is not is the failure being closed.
+grep -qi 'not a carrier' "$CONV" \
+  && ok "next step: the rule states that it is advisory, not a carrier" \
+  || err "convention does not state its own limit — the surface then reads as covered"
+grep -qi 'declared-id emission' "$CONV" \
+  && ok "next step: the gate audit is cited with its bound, never as gate coverage" \
+  || err "convention cites no bound for gate-inventory.py --audit (#1176)"
+
 # 1b. Partial-progress reporting + budget-triage signal (Story 13.7, CAP-6).
 hasc 'last completed stage' "partial run reports the last completed stage"
 hasc 'resume --ws'          "partial run gives the resume path (pairs with Story 13.5)"
