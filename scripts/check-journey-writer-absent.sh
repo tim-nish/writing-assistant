@@ -16,6 +16,31 @@
 # SPEC-writing-assistant, the Host-repo footprint invariant, amended
 # 2026-08-01).
 #
+# STATED LIMIT, AND WHAT A GREEN RUN MEANS (#1194, decided 2026-08-01).
+# Section 2 greps prose for an instruction-shaped string, and it CANNOT
+# DISTINGUISH AN INSTRUCTION FROM A QUOTATION OF THE RETIRED ONE. It has
+# already fired on the honest case: `skills/owner-facing-proposal-contract.md`
+# quoted the real historical option label inside documentation explaining why
+# that label was wrong, and this check read it as an instruction and turned
+# `main` red (fixed in PR #1195 by rewording the quote, not by narrowing here).
+# So a green run does NOT mean "no writer exists"; it means "no writer exists
+# AND no instruction-shaped string exists anywhere under skills/, quotations
+# included".
+#
+# THAT IMPRECISION IS DELIBERATE AND IS NOT A BUG TO FIX. A bounded exemption
+# for quoted history — skip blockquotes, skip fenced blocks — would carve a
+# non-member fallback into an absence assertion, and that fallback ADMITS: the
+# next real leak wears a `>` and passes. The load-bearing half of a boundedness
+# contract is its non-member fallback, and this check's strength is that it has
+# none. A convention forbidding literal mentions was also considered and
+# declined: it is a rule someone must remember, which is the exact shape #1183
+# exists to reject.
+#
+# THE REMEDY WHEN IT FIRES ON A QUOTATION is to reword the quotation. Cost
+# measured once: one line, ~10 minutes, loud and immediate. REOPEN TRIGGER: a
+# third occurrence, or one that is NOT one line to fix — e.g. documentation
+# that must reproduce the path verbatim for a retrospective to make sense.
+#
 # WHY AN ABSENCE-OF-WRITER ASSERTION, AND NOT A FILE-ABSENCE TEST. A test that
 # `docs/journey.md` does not exist passes on every clean checkout and fails only
 # after the harm has already landed in someone's tree — and it cannot even run
