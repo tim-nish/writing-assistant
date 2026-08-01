@@ -172,6 +172,11 @@ def candidates(map_data):
                 else None),
             "gloss": el.get("gloss"),
             "gloss_unavailable": el.get("gloss_unavailable"),
+            # The served `projects:` attribution travels with the Strand
+            # (Story 20.144, #1097): the brief's harvest scope is the union of
+            # the selected members' values, so dropping them at this
+            # projection would leave the union nothing to read.
+            "projects": el.get("projects"),
             # THE ARC TRAVELS (Story 20.90, #1044). These three were on the
             # element and were dropped by this projection, which is why a
             # brief's recorded members carried no journey even though the hub

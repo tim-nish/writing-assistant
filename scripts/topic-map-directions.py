@@ -239,6 +239,11 @@ from terrain_select import (  # noqa: E402
 # the edit-set iteration loop that recomposes over a changed member set. They
 # are one closure: the loop reads a written artifact, checks the pin it was
 # composed at, and writes the next one beside it.
+# The brief's harvest scope, derived from the selected members' served
+# `projects:` — the one computation of the union (Story 20.144, #1097).
+from terrain_scope import (  # noqa: E402
+    harvest_scope_block,
+)
 from terrain_brief import (  # noqa: E402
     BRIEF_FILENAME,
     _base_composition_pin,
@@ -601,29 +606,19 @@ def _brief_from_index(answer, cands, map_pin, map_data=None,
             "selection_summary": (
                 f"selected as a set of {len(matches)} from the terrain"
                 if len(matches) > 1 else "selected as a single Strand"),
-            # HARVEST SCOPE IS OWED AND NOT EMITTABLE HERE (Story 20.102,
-            # #1080). The ratified field is the union of the members'
-            # `projects:` — and `projects:` is populated hub-side (100% of 115
-            # lessons, measured 2026-07-28) but is NOT among the fields the
-            # element manifest serves (slug, kind, tags, journey shard, topic,
-            # renderings, pins). So the union cannot be computed from what
-            # arrives, and re-deriving it by parsing lesson bodies is the
-            # consumer re-derivation class the hub ruled against in the same
-            # breath as the manifest — "serve structure so there is nothing to
-            # parse".
-            #
-            # Stated in the artifact rather than silently omitted, in the same
-            # three-valued shape a served arc uses: a consumer must be able to
-            # tell "no scope" from "scope not served", and Step 4 must not
-            # quietly re-derive what was ratified to stop being re-derived.
-            "harvest_scope": {
-                "projects": None,
-                "served": False,
-                "not_served_reason": (
-                    "`projects:` is not served by the element manifest; the "
-                    "union is owed by a hub-side manifest extension and is "
-                    "never re-derived here"),
-            },
+            # HARVEST SCOPE IS THE UNION OF THE MEMBERS' `projects:` AS
+            # SERVED (Story 20.144, #1097). The element manifest now serves
+            # the field on every record, so the union is read from the served
+            # records — never re-derived from lesson bodies — and the interim
+            # `served: false` branch died with the stale reason it carried:
+            # the 2026-08-01 brief stated a reason the pinned manifest
+            # falsifies, #1208's second defect. Per-member provenance
+            # survives the union in `by_member`, so a later refusal can name
+            # its Strand. At an older pin whose records do not carry the
+            # field, the three-valued absence shape renders with a reason
+            # true of THAT pin — stated staleness, never a claim the pin
+            # falsifies.
+            "harvest_scope": harvest_scope_block(members),
             # THE MEMBER SET IS NOT BOOKKEEPING (Story 20.54 AC4): the
             # completeness invariant follows it into drafting — every selected
             # Strand placed or its omission disclosed — so with no members

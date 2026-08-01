@@ -17,15 +17,16 @@ verdicts, the `host_join` block and that to-do are gone with it.
 ## 1. State the scope of the selection
 
 Relay, in one or two lines, **which selected Strands carry a bound repository
-and which do not** — the host repo the run was invoked against is the binding,
-and `harvest_scope` on the brief states what is and is not served for it. This
-is a fact **about the selection**, derived from what the owner just picked. It
-is never a claim that something is or is not recorded in the owner's tree: that
-claim needs a source this flow does not read, and asserting it from an empty
-lookup is what #1183 removed.
+and which do not** — `harvest_scope` on the brief is the union of the selected
+Strands' served `projects:`, with `by_member` naming which member contributed
+which values (#1097). This is a fact **about the selection**, derived from
+what the owner just picked. It is never a claim that something is or is not
+recorded in the owner's tree: that claim needs a source this flow does not
+read, and asserting it from an empty lookup is what #1183 removed.
 
 Relay `harvest_scope.not_served_reason` **as given** when the union is not
-served. A scope that is owed and not served is said as such, never as "no
+served — an older pin whose records carry no `projects:` states that
+staleness. A scope that is owed and not served is said as such, never as "no
 scope".
 
 ## 2. Relay each member's episode disclosure
