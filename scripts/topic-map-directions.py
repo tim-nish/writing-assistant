@@ -255,7 +255,7 @@ from terrain_brief import (  # noqa: E402
 def cmd_axis(args):
     m = load_map(args.map)
     out = {"kind": "terrain-axis", "axis": axis_members(m),
-           "payload": compose_axis_payload(m)}
+           "payload": compose_axis_payload(m, getattr(args, "ws", None))}
     json.dump(out, sys.stdout, indent=2)
     sys.stdout.write("\n")
     return 0
@@ -727,7 +727,8 @@ def cmd_payload(args):
     cands = candidates(data)
     if view_path and large:
         write_view(view_path, compose_view(data, cands))
-    print(json.dumps(compose_payload(data, cands, view_path),
+    print(json.dumps(compose_payload(data, cands, view_path,
+                                     getattr(args, "ws", None)),
                      indent=2, ensure_ascii=False))
     if large and not view_path:
         sys.stderr.write(
@@ -1578,6 +1579,7 @@ def main(argv=None):
                         "(by tag, by topic) with per-member Strand counts, "
                         "as JSON + payload")
     ax.add_argument("--map", required=True)
+    ax.add_argument("--ws", metavar="PATH", help="the run workspace. When given, the gate records that it was PRESENTED in <ws>/presented-payloads.jsonl (Story 20.118, #1114) — the ask row a post-sitting check asserts against.")
     mb = sub.add_parser("member", help="Screen 2: one axis member's Strands, "
                         "whole, in presentation-only sections")
     mb.add_argument("--map", required=True)
@@ -1678,6 +1680,7 @@ def main(argv=None):
                          f"the budget writes nothing and the screen is "
                          f"unchanged. The View is WRITE-ONLY: nothing reads it "
                          f"back.")
+    pa.add_argument("--ws", metavar="PATH", help="the run workspace. When given, the gate records that it was PRESENTED in <ws>/presented-payloads.jsonl (Story 20.118, #1114) — the ask row a post-sitting check asserts against.")
     v = sub.add_parser("view", help="render the View file alone")
     v.add_argument("--tag", metavar="MEMBER",
                    help="render ONE member's whole view instead of the terrain "
