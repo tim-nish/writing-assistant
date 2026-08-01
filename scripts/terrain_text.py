@@ -72,6 +72,46 @@ def _brief_step_line():
     return f"{BRIEF_STEP_NAME} ({BRIEF_STEP_ID})"
 
 
+def _brief_transition_banner(state, artifact_path=None, workspace=None):
+    """The transition, ANNOUNCED at the moment it happens (Story 20.116, #1113).
+
+    The owner's report is *"Because there is no explicit brief-creation command,
+    I am never fully confident that the workflow has actually transitioned from
+    Terrain into Brief correctly."* Two things already shipped and neither is
+    the gap: the step has a named identity (`_brief_step_line`, the act the
+    owner can refer to) and the lifecycle line shows the whole machine with the
+    current state legible. What was missing is that **no transition was
+    announced when it occurred** — the owner saw *"Selection recorded. Entering
+    Step 3."*, which is narration, and narration is exactly the register they
+    report being unable to distinguish from a machine fact.
+
+    So this QUOTES rather than narrates. Every value is read from state that
+    already exists — the step constants, the lifecycle argument, the artifact
+    path the caller wrote — and nothing here is composed from what the code
+    believes it just did. A banner that asserted a state the artifact does not
+    record would be worse than no banner, because it would look like evidence.
+
+    THE PATH RENDERS WHOLE, ON ITS OWN LINE, through the owner-surface seam
+    (Story 20.115, #1117). This banner exists because the owner could not
+    verify a transition; handing them an elided path would reproduce the defect
+    inside its own fix.
+
+    A NAMED `brief` SUB-COMMAND WAS DECLINED, with its reason recorded so it is
+    not reopened as an oversight: #1113 leaves it open and states the
+    requirement as the owner being able to CONFIRM the transition, not trigger
+    it. Reopen trigger: a sitting where this banner is present and the owner
+    still cannot confirm the transition.
+    """
+    lines = [f"— {BRIEF_STEP_NAME} —", _brief_step_line()]
+    if workspace:
+        lines.append(_owner_surface().artifact_block("Run workspace", workspace))
+    if artifact_path:
+        lines.append(_owner_surface().artifact_block("Brief artifact",
+                                                     artifact_path))
+    lines.append(_brief_lifecycle_line(state))
+    return "\n".join(lines)
+
+
 def _brief_lifecycle_line(state):
     """The lifecycle, stated on the surface with the current state legible —
     never the current state alone, because one word out of three tells the

@@ -179,5 +179,71 @@ sys.exit(1 if fail else 0)
 PYEOF
 [ $? -eq 0 ] || fail=1
 
+# --- the transition is ANNOUNCED (Story 20.116, #1113) ----------------------
+python3 - <<'PY_TR' || fail=1
+import importlib.util, os, sys
+sys.path.insert(0, "scripts")
+def load(n, p):
+    sp = importlib.util.spec_from_file_location(n, p)
+    m = importlib.util.module_from_spec(sp); sp.loader.exec_module(m); return m
+tt = load("terrain_text", "scripts/terrain_text.py")
+tmd = load("tmd", "scripts/topic-map-directions.py")
+
+bad = []
+def need(c, m):
+    if not c: bad.append(m)
+
+WS = "/state/wa/host-qualified/terrain-runs/20260801T091400-250105"
+AP = WS + "/brief.json"
+b = tt._brief_transition_banner("composed", artifact_path=AP, workspace=WS)
+lines = b.split("\n")
+
+need(tt.BRIEF_STEP_ID in b,
+     "the banner names the step ID — the act the owner refers to, not 'the "
+     "message above'")
+need(AP in lines and WS in lines,
+     "the artifact path and the run workspace each render WHOLE on their own "
+     "line (#1117): a banner that exists because the owner could not verify a "
+     "transition must not hand them an elided path")
+need(any(l.startswith("Lifecycle:") and "[composed]" in l for l in lines),
+     "the banner carries the lifecycle line with the current state legible — "
+     "the #1075-era form is REUSED, never replaced")
+
+# It quotes state; it does not narrate one.
+b2 = tt._brief_transition_banner("adopted", artifact_path=AP)
+need("[adopted]" in b2 and "now: adopted" in b2,
+     "the banner renders the state it was given, so display and record cannot "
+     "disagree about which state the brief is in")
+
+# The banner is NOT stored: it renders lifecycle + path, both already kept.
+need("banner" in tmd.RENDERED_KEYS.get("lifecycle", ()),
+     "the banner is stripped from the stored artifact — a stored rendering is "
+     "the frozen copy Story 20.100 removed everywhere else")
+need("transition" not in tmd.RENDERED_KEYS,
+     "no new top-level key: the brief payload's key set is a CLOSED contract")
+need("banner" not in tmd.RENDERED_KEYS.get("step", ()),
+     "the banner is NOT on `step`, which is asserted invariant across a "
+     "re-open — it quotes the current state, so it varies with `lifecycle`")
+rec = tmd._decision_record({
+    "step": {"id": "x", "name": "y", "line": "L"},
+    "lifecycle": {"state": "adopted", "states": list(tt.BRIEF_LIFECYCLE),
+                  "line": "L", "banner": "STALE",
+                  "history": [{"state": "adopted"}]},
+    "artifact": {"path": AP, "line": "A", "read_back": "r"},
+    })
+need("banner" not in rec.get("lifecycle", {}), "no banner reaches storage")
+tmd._rehydrate_lines(rec)
+need("[adopted]" in rec["lifecycle"]["banner"],
+     "a re-opened brief recomposes the banner from the lifecycle it KEPT, so a "
+     "stale stored state cannot be served back")
+need(AP in rec["lifecycle"]["banner"].split("\n"),
+     "...and the recomposed banner still renders the path whole")
+
+for m in bad:
+    print("FAIL: %s" % m, file=sys.stderr)
+sys.exit(1 if bad else 0)
+PY_TR
+[ $? -eq 0 ] && ok "the Terrain->Brief transition is announced, quoted from machine state, and never stored"
+
 [ "$fail" -eq 0 ] && printf '\nAll %s checks passed.\n' "$0" \
   || { printf '\n%s FAILED.\n' "$0" >&2; exit 1; }
