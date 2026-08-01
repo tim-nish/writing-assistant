@@ -509,8 +509,65 @@ def harvest_completion_gate(fact_count, needs_owner_count, ws=None,
 # enter unnoticed.
 SCOPE_KINDS = ("all", "subtree", "commit-range")
 
+# THE ENUMERATOR IS NOT HERE, DELIBERATELY (Story 20.135, #1178).
+# `resolve-writing-sources.py files` is the single authority for the declared
+# read boundary and its order — harvest-scope.py and harvest-budget.py already
+# read through it for exactly that reason. A second glob walk in this module
+# would be a second boundary that drifts from the one harvest actually reads,
+# so the gate SHELLS OUT to the same subcommand and counts what it returns.
+ENUMERATOR = os.path.join(os.path.dirname(os.path.realpath(__file__)),
+                          "resolve-writing-sources.py")
 
-def sources_gate(declared_count, default_kind="all", default_detail=None, ws=None,
+# THE COMPOSITION AXIS IS PROSE vs EVERYTHING ELSE, by extension.
+# It is not the `time_axis` typing #1184 added: both halves of this split are
+# `type: path` sources with `time_axis: false`, so that typing cannot tell a
+# 49-file docs tree from the 309 shell scripts sitting beside it. The owner
+# question this answers — *is the scope I am approving mostly writing, or
+# mostly build machinery?* — turns on the file's own kind, and extension is
+# the only signal available without reading 400 files at gate time.
+PROSE_SUFFIXES = (".md", ".markdown", ".txt", ".rst", ".adoc", ".asciidoc",
+                  ".org")
+
+
+def declared_scope(repo_root, enumerator=None):
+    """What the host's declaration ACTUALLY expands to, or None.
+
+    THE COUNT THE OWNER APPROVES MUST BE THE COUNT THE MACHINE COMPUTED. On
+    2026-08-01 the sources gate read *"6 file(s) are declared"* and the owner
+    approved believing they had approved six files; the declaration was six
+    include GLOBS over 358 tracked files. Nothing computed the six — it was
+    handed to the gate by the agent composing it, and a number a gate accepts
+    is a number the gate cannot vouch for.
+
+    NONE IS A FIRST-CLASS ANSWER. Where the enumeration is unavailable — no
+    `repo_root`, no declaration for it, a resolver that failed — this returns
+    None and the gate renders NO COUNT. A count with no denominator behind it
+    is the defect, so the honest degradation is silence about size, never a
+    plausible number from a weaker source.
+    """
+    if not repo_root:
+        return None
+    import subprocess
+    import sys
+    cmd = [sys.executable, enumerator or ENUMERATOR,
+           "--root", str(repo_root), "files"]
+    try:
+        r = subprocess.run(cmd, capture_output=True, text=True)
+    except OSError:
+        return None
+    if r.returncode != 0:
+        return None
+    files = [ln.strip() for ln in r.stdout.splitlines() if ln.strip()]
+    if not files:
+        # Indistinguishable, from here, from "this root declares nothing":
+        # the enumerator exits 0 with an empty list in both cases. An
+        # unenumerable scope is reported as unenumerable rather than as zero.
+        return None
+    prose = sum(1 for f in files if f.lower().endswith(PROSE_SUFFIXES))
+    return {"files": len(files), "prose": prose, "code": len(files) - prose}
+
+
+def sources_gate(default_kind="all", default_detail=None, ws=None,
                  candidates=(), reason=None, repo_root=None,
                  declaring_file="writing-sources.yaml"):
     """"Where does the evidence live?" — the gate #1103 saw as a typing exercise.
@@ -538,9 +595,29 @@ def sources_gate(declared_count, default_kind="all", default_detail=None, ws=Non
     Multi-repo is not the current case; the label shape is written so it does
     not become wrong when it is.
 
+    THE SIZE AND THE COMPOSITION ARE COMPUTED HERE (Story 20.135, #1178).
+    `declared_count` is gone from the signature rather than made optional: it
+    was an agent-supplied number rendered as a machine fact, and the option it
+    described — *"all declared sources"* — is unjudgeable without it being
+    true. The gate now enumerates `repo_root`'s declaration itself, states the
+    DENOMINATOR it counted over in the same breath as the count, and states
+    WHAT THE SET IS MADE OF: a scope that is 49 prose files reads nothing like
+    the same scope at 309 shell scripts, and only one of those is an article's
+    material. Where enumeration is impossible the gate renders no count at
+    all — see `declared_scope`.
+
     `default_kind` is moved to the front by `payload`, so the recommendation
     leads and the directive reads `recommended: 0`.
     """
+    if not isinstance(default_kind, str):
+        # The old first parameter was `declared_count`. A caller still passing
+        # one lands here, and is told WHY the parameter is gone rather than
+        # getting a bare type error from the membership test below.
+        raise ValueError(
+            "sources_gate takes no file COUNT (Story 20.135, #1178): the "
+            "count is enumerated from repo_root inside the gate, because a "
+            "number the gate accepts is a number it cannot vouch for. Pass "
+            "repo_root=<host repo> and drop the count.")
     if default_kind not in SCOPE_KINDS:
         raise ValueError(f"{default_kind!r} is not a scope; expected one of "
                          f"{', '.join(SCOPE_KINDS)}")
@@ -551,6 +628,25 @@ def sources_gate(declared_count, default_kind="all", default_detail=None, ws=Non
     # owner through `owner_surface.artifact_block`, on the surface that owns it.
     repo_name = os.path.basename(str(repo_root).rstrip("/")) if repo_root else None
     whose = f" of {repo_name}" if repo_name else ""
+    where_repo = repo_name or "this repo"
+    # ONE COMPUTED VALUE FEEDS BOTH RENDER SITES. The `effect` line and the
+    # `where` line described the same set from the same argument before, and
+    # the way an unsourced number reaches two places is by being available to
+    # be interpolated into them. There is nothing to interpolate now but this.
+    scope = declared_scope(repo_root)
+    if scope:
+        all_effect = (f"harvests all {scope['files']} enumerated file(s) — "
+                      f"{scope['prose']} prose, {scope['code']} code/config — "
+                      f"the widest scope that boundary allows")
+        where_scope = (f"Enumerating what {declaring_file} declares for "
+                       f"{where_repo} gives {scope['files']} file(s): "
+                       f"{scope['prose']} prose, {scope['code']} code/config.")
+    else:
+        all_effect = (f"harvests the whole set {declaring_file} declares, "
+                      f"whose size is not stated here — the widest scope that "
+                      f"boundary allows")
+        where_scope = (f"What {declaring_file} declares for {where_repo} could "
+                       f"not be enumerated here, so no file count is stated.")
     labels = {
         "all": f"all declared sources{whose}",
         "subtree": (f"just {default_detail}" if default_detail
@@ -559,10 +655,8 @@ def sources_gate(declared_count, default_kind="all", default_detail=None, ws=Non
                          if default_detail else "a commit range"),
     }
     effects = {
-        "all": f"harvests the whole set {declaring_file} declares "
-               f"({declared_count} file(s)) — the widest scope that "
-               f"boundary allows",
-        "subtree": "narrows the declared set to one subtree; files outside it "
+        "all": all_effect,
+        "subtree":"narrows the declared set to one subtree; files outside it "
                    "are counted as unexamined, never read",
         "commit-range": "narrows the declared set to what that range touched; "
                         "the rest is counted as unexamined",
@@ -576,11 +670,9 @@ def sources_gate(declared_count, default_kind="all", default_detail=None, ws=Non
         # correction.
         shown = ", ".join(list(candidates)[:3])
         why = f"{why} Seen so far: {shown}."
-    where_repo = repo_name or "this repo"
     return payload(
         where=f"Stage 0: the article type is chosen and harvest needs its "
-              f"scope; {declared_count} file(s) are declared for "
-              f"{where_repo} in {declaring_file}.",
+              f"scope. {where_scope}",
         why=why,
         choices=choices,
         gate="sources", ws=ws,
