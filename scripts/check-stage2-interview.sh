@@ -34,26 +34,29 @@ grep -qi 'bullet' "$SKILL" && ok "skill accepts bullet answers" || err "bullet a
 grep -q 'verbatim' "$SKILL" && ok "skill captures answers verbatim" || err "verbatim capture not documented"
 
 # 2. At most 5 questions, prioritized/framework-tailored, gaps first.
-out=$(iv '{"fact_sheet":[{"claim":"Throughput rose 2x"}],"needs_owner":[{"topic":"surprise"},{"topic":"significance"}]}' F1)
+out=$(iv '{"fact_sheet":[{"claim":"Throughput rose 2x"}],"needs_owner":[{"topic":"warning"},{"topic":"significance"}]}' F1)
 [ "$(printf '%s' "$out" | jget 'd["asked"]')" -le 5 ] && ok "asks <= 5 questions" || err "exceeded 5 questions"
 # Selection priority: every confirmed NEEDS-OWNER gap survives into the asked
 # set (display order is the separate pinned presentation contract, Story 13.30).
-printf '%s' "$out" | jget 'all(any(q["id"]==g and q["from_gap"] for q in d["questions"]) for g in ["q1","q2"])' | grep -q True \
+printf '%s' "$out" | jget 'all(any(q["id"]==g and q["from_gap"] for q in d["questions"]) for g in ["g-warning","g-significance"])' | grep -q True \
   && ok "confirmed NEEDS-OWNER gaps are selected into the asked set" || err "gaps not prioritized in selection"
 
 # 3. Hard cap even when NEEDS-OWNER exceeds five gaps.
-big='{"fact_sheet":[],"needs_owner":[{"topic":"surprise"},{"topic":"significance"},{"topic":"warning"},{"topic":"opinion"},{"topic":"other"},{"topic":"surprise"}]}'
+big='{"fact_sheet":[],"needs_owner":[{"topic":"warning"},{"topic":"significance"},{"topic":"tradeoff"},{"topic":"opinion"},{"topic":"other"},{"topic":"audience"}]}'
 [ "$(iv "$big" F1 | jget 'd["asked"]')" -le 5 ] && ok "<=5 cap holds when NEEDS-OWNER > 5 gaps" || err "cap broken with many gaps"
 
-# 4. De-dup is semantic (synonym), not literal: a differently-phrased fact
-#    suppresses the matching question when it is not a NEEDS-OWNER gap.
+# 4. NOTHING UNRAISED IS ASKED (Story 20.131, #1147). This block asserted that
+#    semantic de-dup SUPPRESSED a bank question the fact sheet already covered.
+#    There is no bank to suppress from: a candidate exists only where harvest
+#    raised a gap, so the property holds by construction. Both halves are kept,
+#    re-pointed — the covered-and-unraised topic is absent, and a raised one is
+#    present even when the fact sheet also covers it.
 dd='{"fact_sheet":[{"claim":"This guide is written for backend engineers"}],"needs_owner":[]}'
-iv "$dd" F3 | jget 'any(q["id"]=="q5" for q in d["questions"])' | grep -q False \
-  && ok "semantic de-dup suppresses a redundant question (audience already stated)" || err "de-dup did not suppress"
-# ...but a NEEDS-OWNER gap re-raises the same topic (warning is a real gap topic).
+iv "$dd" F3 | jget 'any("audience" in q["id"] for q in d["questions"])' | grep -q False \
+  && ok "a covered topic the material did not raise is never asked" || err "de-dup did not suppress"
 rr='{"fact_sheet":[{"claim":"a known caveat: do not use on TPUs"}],"needs_owner":[{"topic":"warning"}]}'
-iv "$rr" F3 | jget 'any(q["id"]=="q3" for q in d["questions"])' | grep -q True \
-  && ok "a NEEDS-OWNER gap re-raises an otherwise-suppressed question" || err "gap did not re-raise"
+iv "$rr" F3 | jget 'any(q["id"]=="g-warning" for q in d["questions"])' | grep -q True \
+  && ok "a NEEDS-OWNER gap is asked even when the fact sheet also covers it" || err "gap did not re-raise"
 
 # 5. Empty-gap: fact sheet covers everything (and carries a result, so the
 #    evidence fallback q8 has no condition) + no gaps -> zero questions.
@@ -65,11 +68,17 @@ a=$(iv '{"fact_sheet":[],"needs_owner":[{"topic":"warning"}]}' F2)
 b=$(iv '{"fact_sheet":[],"needs_owner":[{"topic":"warning"}]}' F2)
 [ "$a" = "$b" ] && ok "selection is deterministic (stable across runs)" || err "non-deterministic selection"
 
-# 7. Prioritization is framework-tailored (tied to GATE slots, not bank order).
-s='{"fact_sheet":[],"needs_owner":[]}'
-f1=$(iv "$s" F1 | jget 'd["questions"][0]["id"]')
-f4=$(iv "$s" F4 | jget 'd["questions"][0]["id"]')
-[ "$f1" != "$f4" ] && ok "different frameworks yield different priority (F1:$f1 vs F4:$f4)" || err "framework did not tailor order"
+# 7. FRAMEWORK-TAILORED PRIORITY IS GONE (Story 20.131, #1147). This asserted
+#    that F1 and F4 lead with different questions — a property of the deleted
+#    per-framework priority lists. The ruling removes the generator, so the
+#    replacement property is the one that survives it: the SAME material yields
+#    the same interview whatever the article type, because the candidates come
+#    from the material and not from the type.
+s='{"fact_sheet":[],"needs_owner":[{"topic":"warning"}]}'
+f1=$(iv "$s" F1 | jget '[q["id"] for q in d["questions"]]')
+f4=$(iv "$s" F4 | jget '[q["id"] for q in d["questions"]]')
+[ "$f1" = "$f4" ] && ok "the same material yields the same interview across article types (F1 == F4)" \
+  || err "the article type still tailors the candidate set (F1:$f1 vs F4:$f4)"
 
 # 8. Every asked question carries a stable id (so bullet answers key to it).
 iv "$s" F1 | jget 'all(q.get("id") and q.get("text") for q in d["questions"])' | grep -q True \
@@ -78,10 +87,15 @@ iv "$s" F1 | jget 'all(q.get("id") and q.get("text") for q in d["questions"])' |
 # 9. Pinned presentation order (Story 13.30, SPEC-draft-article-ux CAP-4):
 #    claim/angle -> audience -> significance -> color; echoed as
 #    presentation_order and matching the questions array.
-[ "$(iv "$s" F1 | jget '",".join([q for q in d["presentation_order"] if q not in d["mandated"]])')" = "q5,q2,q4,q3,q1" ] \
-  && ok "F1 presentation: audience, significance, then color (pinned)" || err "F1 presentation order wrong"
-[ "$(iv "$s" F4 | jget 'd["presentation_order"][0]')" = "q6" ] \
-  && ok "F4: the claim/angle (opinion) question presents first" || err "claim slot not first for F4"
+# THE TOPIC ORDERING WENT WITH THE BANK (Story 20.131, #1147): `claim/angle ->
+# audience -> significance -> color` ordered questions that no longer exist.
+# What survives is the one rule whose reason sits outside the generator — a
+# policy-seeded tension leads, because it reframes every answer after it.
+seeded=$(printf '%s' '{"fact_sheet":[],"needs_owner":[{"topic":"warning"}]}' \
+  | python3 "$DP" interview --framework F1 --items scripts/fixtures/interview-items/valid.json -)
+[ "$(printf '%s' "$seeded" | jget '[q for q in d["presentation_order"] if q not in d["mandated"]][0]')" = "t1" ] \
+  && ok "a policy-seeded tension presents first (it reframes the answers after it)" \
+  || err "the policy seed does not lead the presentation"
 iv "$s" F1 | jget 'd["presentation_order"] == [q["id"] for q in d["questions"]]' | grep -q True \
   && ok "presentation_order matches the questions array" || err "order field out of sync"
 
@@ -107,8 +121,12 @@ grep -qiE 'recorded as the depth directive|as the depth directive' "$SKILL" \
 ivout=$(iv "$s" F4)
 ans=$(printf '%s' "$ivout" | jget 'json.dumps([{"id": q["id"], "disposition": "skipped"} for q in d["questions"]])')
 printf '%s' "$ivout" > /tmp/iv-$$.json; printf '%s' "$ans" > /tmp/ans-$$.json
+# Asserted as EQUALITY with the interview's own order rather than against a
+# bank id (Story 20.131, #1147): what makes a mis-ordered run attributable is
+# that the journal echoes what was presented, whatever that was.
+order=$(printf '%s' "$ivout" | jget 'json.dumps(d["presentation_order"])')
 python3 "$DP" journal --interview /tmp/iv-$$.json --answers /tmp/ans-$$.json \
-  | jget 'd.get("presentation_order",[])[0]' | grep -q q6 \
+  | jget 'json.dumps(d.get("presentation_order",[]))' | grep -qF "$order" \
   && ok "journal echoes presentation_order" || err "journal does not echo the order"
 rm -f /tmp/iv-$$.json /tmp/ans-$$.json
 

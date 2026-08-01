@@ -69,13 +69,18 @@ jget 'all("grounding" in e for e in d["journal"] if e.get("outcome")=="recommend
 jget 'any(e["status"]=="asked" and e["rationale"]=="needs-owner-reraise" for e in d["journal"])' < "$work/journal.json" \
   | grep -q True && ok "a re-raise records rationale=needs-owner-reraise" || err "re-raise rationale not journaled"
 
-# AC3 — suppressed questions record their covering entries.
-jget 'any(e["status"]=="suppressed" and e.get("covered_by") for e in d["journal"])' < "$work/journal.json" \
-  | grep -q True && ok "suppressed entries record covering fact-sheet entries" || err "suppressed entry missing covered_by"
-
-# AC4 — attributability: the suppressed audience question names WHAT covered it.
-jget '[e["covered_by"] for e in d["journal"] if e["id"]=="q5"][0][0]' < "$work/journal.json" \
-  | grep -qi 'backend engineers' && ok "a suppression is attributable to its covering entry" || err "suppression not attributable"
+# AC3/AC4 — SUPPRESSION NO LONGER EXISTS (Story 20.131, #1147). These asserted
+# that a bank question the fact sheet covered was journaled `suppressed` with
+# its covering entries. With the generator gone a candidate exists only where
+# the material raised it, so nothing is suppressed and no `covered_by` is owed.
+# What AC3/AC4 were really protecting is ATTRIBUTABILITY — that a reader can
+# tell from the journal why each question was asked — and that is asserted here
+# on the candidates that do exist.
+jget 'all(e.get("rationale") for e in d["journal"] if e["status"]=="asked")' < "$work/journal.json" \
+  | grep -q True && ok "every asked entry names why it survived" || err "an asked entry has no rationale"
+jget 'not any(e["status"]=="suppressed" for e in d["journal"])' < "$work/journal.json" \
+  | grep -q True && ok "nothing is journaled suppressed — no candidate exists that the material did not raise" \
+  || err "a suppressed entry appeared after the generator was removed"
 
 # Fail-closed: an asked question with no recorded disposition is rejected.
 python3 "$DP" journal --interview "$work/iv.json" --answers /dev/null >/dev/null 2>&1 \

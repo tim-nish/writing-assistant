@@ -283,7 +283,7 @@ and fabricated pointers reach the sheet (the `pin-source.py` step below fixes th
   block) — but **unlike `quote`, its CLAIM is your summary, not verbatim**, so it
   is not whitespace-matched; the span only has to resolve. Narrative kinds admit
   **only pointer-backed** material — unsourceable owner judgment (opinion,
-  significance, surprise) still routes to **NEEDS-OWNER** (§4), never onto the
+  significance) still routes to **NEEDS-OWNER** (§4), never onto the
   sheet through a narrative kind.
 - A `quote` entry's CLAIM is the source text **verbatim and ONLY the source text**
   — no label, attribution, or prefix (not "Decision from batch 16: …"), and never
@@ -395,11 +395,13 @@ A useful candidate you cannot attach a resolvable source to goes to the
 - **REASON** — why it could not be sourced (e.g. "no artifact in declared
   sources", "owner's opinion", "unverified number") — enough context to seed the
   gap interview.
-- **TOPIC** ∈ {surprise, significance, opinion, warning, tradeoff, audience,
+- **TOPIC** ∈ {significance, opinion, warning, tradeoff, audience,
   other} — the gap-interview categories, so items are groupable into ≤5
   questions (the cap is on questions asked, not on the topic set). Pick the one
-  that best fits, using these one-line senses (amended 2026-07-13, #142):
-  - **surprise** — something unexpected the owner learned while building it;
+  that best fits, using these one-line senses (amended 2026-07-13, #142;
+  `surprise` retired 2026-08-01, #1147 — a mandatory slot for a contingent
+  property manufactures it, and a topic harvest may raise re-creates the slot
+  from the other end; it survives as one narrative KIND among the nine):
   - **significance** — why a result/number matters, which one counts most;
   - **opinion** — a stance the owner holds and would defend, not a fact;
   - **warning** — a caveat/limitation/pitfall a reader must know before adopting;
@@ -530,7 +532,7 @@ skipped: docs/appendix.md (over the read ceiling — surfaced to owner)
 
 # NEEDS-OWNER
 
-- The token-bill win surprised us mid-project / no artifact in declared sources / surprise
+- The token-bill win is what I would lead with / no artifact in declared sources / significance
 - This matters because reviewers keep asking about leakage / owner's framing / significance
 ```
 
