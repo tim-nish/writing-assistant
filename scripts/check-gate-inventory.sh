@@ -52,7 +52,7 @@ def need(c, m):
 # A run that emitted every gate it reached is clean.
 ws = tempfile.mkdtemp()
 dg.intent_gate({"f%d" % i: "t%d" % i for i in range(1, 6)}, ws=ws)
-dg.sources_gate(11, ws=ws)
+dg.sources_gate(ws=ws)
 res = gi.audit(ws, reached=["intent", "sources"])
 need(res["ok"] is True, "a run whose gates all emitted is reported clean")
 need(res["missing"] == [], "no gate is reported missing on a clean run")

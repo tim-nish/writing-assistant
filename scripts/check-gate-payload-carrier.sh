@@ -47,7 +47,7 @@ json.dump(intent_gate(dp.INTENT_LABELS), open(os.path.join(w, "intent.json"), "w
 # four enumerated in skills/completion-summary.md matched, which is why it fell
 # through to prose, so it is the one this check exercises by fixture.
 json.dump(harvest_entry_gate(11), open(os.path.join(w, "harvest-entry.json"), "w"))
-json.dump(sources_gate(11, default_kind="subtree", default_detail="skills/terrain",
+json.dump(sources_gate(default_kind="subtree", default_detail="skills/terrain",
                        candidates=["skills/terrain/", "scripts/harvest-scope.py"]),
           open(os.path.join(w, "sources.json"), "w"))
 json.dump(confirmation("20260718T000000-111111", "/ws", {"next_stage": "harvest"},
@@ -234,7 +234,7 @@ for gid, spec in dg.GATES.items():
 
 ws = tempfile.mkdtemp()
 dg.intent_gate({"f%d" % i: "type %d" % i for i in range(1, 6)}, ws=ws)
-dg.sources_gate(11, ws=ws)
+dg.sources_gate(ws=ws)
 rows = [json.loads(l) for l in
         open(os.path.join(ws, "presented-payloads.jsonl"), encoding="utf-8")]
 need([r["gate"] for r in rows] == ["intent", "sources"],
