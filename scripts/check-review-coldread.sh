@@ -44,8 +44,17 @@ has 'do after'                                "rubric Q6: next action"
 
 # Comparison to interview answers and severity mapping.
 has 'intent anchor'                           "compares to the author's intent anchors"
-has 'q2'                                       "claim anchor comes from journal q2"
-has 'q5'                                       "audience anchor comes from journal q5"
+# The anchors are CARRIERS, not question ids (SPEC-article-review amended
+# 2026-08-01, #1167). The framework generator was discarded at 20.131, so `q2`
+# and `q5` are asked by nothing — the old assertions here named those ids and
+# survived only by matching the severity line's "Q2 (audience)", which is why
+# the drift reached a publication-gating criterion unnoticed.
+has 'editorial_anchor'                        "claim anchor comes from the journal's editorial_anchor"
+has 'audience:. frontmatter\|audience: frontmatter' \
+                                              "audience anchor comes from the draft's audience frontmatter"
+printf '%s\n' "$sec" | grep -qi 'journal \*\*q2\*\*\|journal \*\*q5\*\*\|answer to \*\*q2\|answer to \*\*q5' \
+  && err "cold read still anchors on a retired question id (q2/q5) — 20.131 deleted the bank" \
+  || ok "no anchor resolves to a retired question id"
 
 # Capped-anchor tolerance (Story 15.4): a q5 displaced by policy seeds is an
 # absent anchor — informational note, partial comparison, never a failure.
@@ -104,7 +113,7 @@ grep -q 'NEVER to the cold read' "$SKILL" \
   && ok "anchors never flow to the cold read (control arm)" || err "cold-read exclusion missing"
 grep -qi 'changes only .*what those reviewers weight' "$SKILL" \
   && ok "criteria fixed — only weighting changes" || err "fixed-criteria clause missing"
-grep -qi "editorial_anchor.*is the claim.*anchor when present\|editorial_anchor. (Story 13.38) is the claim" "$SKILL" \
+grep -qi "claim — the interview journal.s .editorial_anchor.*\|editorial_anchor.*is the claim.*anchor when present\|editorial_anchor. (Story 13.38) is the claim" "$SKILL" \
   && ok "claim anchor consumes the journal's editorial_anchor (13.38 handoff)" \
   || err "editorial_anchor consumption missing"
 grep -qi 'influence in the review' "$SKILL" \

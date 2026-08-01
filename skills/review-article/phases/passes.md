@@ -107,21 +107,32 @@ Two facts about the author's intent anchor this review: the article's **claim**
 (the one point it exists to communicate) and its **intended audience**. Resolve
 each, in this order:
 
-1. **Interview journal** — when the draft came out of the draft-article
-   pipeline, its run workspace holds an interview journal keyed by question id
-   (Story 10.4). **The journal's `editorial_anchor` (Story 13.38) is the claim
-   anchor when present** — the run's claim/angle answer, possibly
-   policy-seeded (`policy_seeded: true`); fall back to the answer to **q2
-   (significance — the result that matters most and why)** when the journal
-   predates it or records no anchor. The audience anchor is the answer to
-   **q5 (audience)**. Every framework's interview asks both. A question the
-   journal records as *suppressed* was covered by the fact sheet — use the
-   covering entries it names as the anchor. A question recorded as **capped**
-   (Story 15.4: displaced by policy-seeded questions under the interview's ≤5
-   budget) was **never asked** and has no covering entries — that anchor is
-   **absent**: report it as an informational note naming which anchor is
-   missing and why (`q5 capped by policy seeds`), run the comparison on the
-   anchors that do exist, and never fail or block on the absence.
+1. **The draft's own carriers** — neither anchor is a question id. Both are
+   fields that a framework-complete draft carries by construction, which is
+   what makes them resolvable at all (SPEC-article-review, amended
+   2026-08-01, #1167):
+   - **Claim — the interview journal's `editorial_anchor`** (Story 13.38).
+     When the draft came out of the draft-article pipeline, its run workspace
+     holds an interview journal (Story 10.4); `editorial_anchor` is the run's
+     claim/angle answer, possibly policy-seeded (`policy_seeded: true`), and
+     an empty-text or reconciliation-item candidate is already rejected at
+     write time rather than swallowed (`editorial_anchor_rejected`). When the
+     journal predates the field or records no anchor, the claim anchor is
+     **absent** — handled below, not substituted.
+   - **Audience — the draft's own `audience:` frontmatter.** It is born at
+     stage 3 and is a stage 3→4 quality-gate precondition (Stories 13.41 and
+     13.71), so every framework-complete draft carries it; packaging strips
+     it, but review reads the canonical, which still has it. When it is
+     missing the draft did not clear its own gate — report that as the
+     finding rather than guessing an audience.
+
+   A journal question recorded as *suppressed* was covered by the fact sheet
+   — use the covering entries it names as the anchor. One recorded as
+   **capped** (Story 15.4: displaced by policy-seeded questions under the
+   interview's ≤5 budget) was **never asked** and has no covering entries —
+   that anchor is **absent**: report it as an informational note naming which
+   anchor is missing and why, run the comparison on the anchors that do
+   exist, and never fail or block on the absence.
 2. **Owner, once** — for a hand-written draft (no journal), ask the owner the
    two anchor questions at review start — "what is this article's one claim?"
    and "who exactly is it for?" — and use those answers.
@@ -383,8 +394,9 @@ the reader rubric:
 6. What would you **do after** reading it?
 
 **Then compare the cold-read answers to the author's intent** — the two
-**intent anchors** resolved above (journal **q2** for the claim, journal **q5**
-for the audience; owner-stated for a journal-less draft):
+**intent anchors** resolved above (the journal's **`editorial_anchor`** for the
+claim, the draft's **`audience:` frontmatter** for the audience; owner-stated
+for a journal-less draft):
 
 - A **mismatch on Q1 (claim) or Q2 (audience)** against the anchors is a
   **blocker** — the draft does not communicate its own claim or reader, which
