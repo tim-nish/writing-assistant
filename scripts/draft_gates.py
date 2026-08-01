@@ -181,7 +181,13 @@ GATES = {
     },
     "harvest-completion": {
         "stage": "after harvest",
-        "owner_decision": None,   # next-step options; nothing is carried forward
+        # NOT None (Story 20.129, #1143). It read "next-step options; nothing
+        # is carried forward" — but a two-option owner choice recorded as no
+        # owner decision is invisible to the pending-decision map, which is
+        # why nothing forced it through the selection UI and it reached the
+        # owner as prose answered by free text on 2026-08-01.
+        "owner_decision": "continue into drafting, or stop with the fact "
+                          "sheet kept",
     },
     "gap-interview": {
         "stage": "stage 2",
@@ -198,7 +204,9 @@ GATES = {
 }
 
 # DECLARED BUT NOT YET CODE-COMPOSED (Story 20.118 step 3, #1114): `thesis`,
-# `harvest-completion`, `gap-interview`, `narrative-structure`, `visual-set`
+# `gap-interview`, `narrative-structure`, `visual-set`
+# (`harvest-completion` LEFT this list at Story 20.129, #1143 — it has a
+# builder below, so its surface can no longer be composed without an ask row)
 # reach the owner from the SKILL prompt, not from a script — which is the whole
 # of what #1114 reports: a surface with no code site leaves no event, so nothing
 # can assert it emitted. They are declared here anyway, deliberately: story
@@ -355,6 +363,50 @@ def intent_gate(labels, ws=None):
         banner="Choose the article type before drafting starts.",
         reply_line="Reply with one article type from the list, or describe "
                    "the piece you have in mind.",
+    )
+
+
+def harvest_completion_gate(fact_count, needs_owner_count, ws=None,
+                            blockers=0):
+    """"Continue, or stop with the fact sheet?" — the gate #1143 saw as prose.
+
+    THE CONTRACT EXISTED TWICE AND THE EMITTER DID NOT. `GATES` declared this
+    gate, `skills/harvest/SKILL.md` mandated the carrier and even recorded the
+    2026-08-01 failure shape, and `skills/completion-summary.md` named the
+    selection UI — and the choice still reached the owner as two prose bullets
+    answered by typing, on a run at code that already carried all three. A
+    surface with no builder to call is composed freely every time, however many
+    documents say it should not be.
+
+    THE COUNTS ARE THE WHY, NOT DECORATION. What makes this answerable without
+    opening the fact sheet is knowing what the harvest produced — so the counts
+    ride in the `why`, which is the field the owner reads before choosing. That
+    is the interaction contract's own requirement: the choice is "drafted from
+    what this run produced… so the owner decides by selecting, not by opening
+    the fact sheet".
+
+    A run with publish blockers says so HERE. Continuing past one is a
+    different decision from continuing past none, and a gate that renders both
+    identically has hidden the difference at the moment it mattered.
+    """
+    why = (f"Harvest produced {fact_count} sourced fact(s) and "
+           f"{needs_owner_count} item(s) only you can answer.")
+    if blockers:
+        why += f" {blockers} publish blocker(s) are open."
+    return payload(
+        where="After harvest: the fact sheet is written and validated; "
+              "drafting has not started.",
+        why=why,
+        choices=[
+            {"label": "continue into draft-article",
+             "effect": f"runs the gap interview over the {needs_owner_count} "
+                       f"open item(s), then framework fill and verification"},
+            {"label": "stop here",
+             "effect": "keeps the fact sheet as it is; the run stays "
+                       "resumable from harvest and nothing is discarded"},
+        ],
+        gate="harvest-completion", ws=ws,
+        recommended=0,
     )
 
 

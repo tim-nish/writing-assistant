@@ -554,12 +554,16 @@ cleanup** — then the explicit **next step as an in-conversation choice**
 NEEDS-OWNER count) so the owner decides by selecting, not by opening the fact
 sheet.
 
-**Put that choice through the carrier (Story 20.122, #1135):**
-`draft_gates.gate("harvest-completion", …, ws=<run ws>)`. "An in-conversation
-choice" is what the interaction contract asks for and is not the same as a
-prose list — the 2026-08-01 run relayed these options as prose and left no
-payload, so nothing afterwards could tell an offered choice from one the run
-skipped. The path stays printed for reference — display is fine; requiring the
+**Put that choice through its builder (Story 20.129, #1143):**
+`draft_gates.harvest_completion_gate(<fact count>, <NEEDS-OWNER count>,
+ws=<run ws>[, blockers=<n>])` — it composes the payload, carries the counts as
+the **Why** so the choice is answerable without opening the fact sheet, and
+emits the ask row. Print what it returns through the selection UI; do not
+author the options. "An in-conversation choice" is what the interaction
+contract asks for and is not the same as a prose list — the 2026-08-01 run
+relayed these options as prose and left no payload, so nothing afterwards could
+tell an offered choice from one the run skipped, and the contract existing in
+three documents did not prevent it. The path stays printed for reference — display is fine; requiring the
 owner to navigate to it before continuing is the defect. A **standalone harvest
 omits the reading-time estimate**: it produces a fact sheet, not an article body,
 so there is nothing to measure.
