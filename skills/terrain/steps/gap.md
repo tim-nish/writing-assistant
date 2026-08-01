@@ -29,6 +29,12 @@ served — an older pin whose records carry no `projects:` states that
 staleness. A scope that is owed and not served is said as such, never as "no
 scope".
 
+Relay the scope's named sections **as given** (#1185): `portfolio_wide` is a
+scope claim, never a repository set; `hub_only` members are hub-only material
+— their served arc is what they have, and no work item is minted from the
+absence; `cannot_determine` stays parked behind the upstream carrier. A
+`scope_question` with one answer is not asked.
+
 ## 2. Relay each member's episode disclosure
 
 Every member of the selection carries a `gaps` entry with its `disclosure` —

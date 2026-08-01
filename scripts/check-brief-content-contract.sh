@@ -2,6 +2,7 @@
 # parallel-safe
 # tier: inner
 # covers: scripts/topic-map-directions.py scripts/terrain_brief.py
+#   scripts/terrain_scope.py
 # removal-signal: the brief acquires a declared JSON schema enforced by a
 #   validator at the write — this check asserts by hand exactly what such a
 #   schema would assert, and retires the moment one exists.
@@ -118,6 +119,14 @@ printf '{"index":"L1, L2, L3","pin":"%s"}' "$pin" \
   | python3 "$D" brief --map "$work/map-old.json" --answer - \
       --out "$work/old.json" > /dev/null 2>"$work/err" \
   || err "#1097: composing at an older pin failed: $(cat "$work/err")"
+
+# The NON-REPOSITORY carriers (#1185): a portfolio-wide alone-carrier beside
+# an empty-carrier, so the two absent-of-repository classes must stay
+# distinguishable in the derived scope.
+printf '{"index":"L3, L4","pin":"%s"}' "$pin" \
+  | python3 "$D" brief --map "$work/map.json" --answer - \
+      --out "$work/claims.json" > /dev/null 2>"$work/err" \
+  || err "#1185: composing over the claim carriers failed: $(cat "$work/err")"
 
 # THE JUDGE PIN (Story 20.106, #1090) — declared, never introspected, and
 # absent-as-absent. Three cases, because the failure being guarded is a pin
@@ -284,6 +293,69 @@ check(ho.get("served") is False and ho.get("projects") is None
       and "predates" in (ho.get("not_served_reason") or ""),
       "#1097: at an older pin with no served `projects:` the three-valued "
       "absence shape renders, with a reason true of that pin")
+
+# THE DERIVED EXAMINATION SCOPE (#1185). The scope question has one answer
+# where the union resolves to a single repository candidate, and an answered
+# question is not asked; more than one candidate leaves it the owner's.
+sq = hs1.get("scope_question") or {}
+check(sq.get("needed") is False and sq.get("answer") == "repo-a",
+      "#1185: a scope union resolving to a single repository candidate asks "
+      "no which-repository question — it has one answer")
+sq = hs.get("scope_question") or {}
+check(sq.get("needed") is True
+      and sq.get("candidates") == ["repo-a", "repo-b"],
+      "#1185: two repository candidates leave the scope question the owner's")
+cd = hs.get("cannot_determine") or {}
+check(cd.get("values") == ["repo-a", "repo-b"]
+      and "cannot-determine" in (cd.get("classification") or ""),
+      "#1185: the repository-vs-scope-claim class is CANNOT-DETERMINE — "
+      "parked behind the upstream carrier, never re-derived here")
+claims = json.load(open(w + "/claims.json"))
+hc = claims.get("harvest_scope") or {}
+check((hc.get("portfolio_wide") or {}).get("members") == ["L3"]
+      and "scope claim" in (hc.get("portfolio_wide") or {}).get(
+          "classification", ""),
+      "#1185: `portfolio-wide` renders as an explicit named section — a "
+      "scope claim, not an attribution, never a silent drop")
+check((hc.get("hub_only") or {}).get("members") == ["L4"]
+      and "no work item" in (hc.get("hub_only") or {}).get("line", ""),
+      "#1185: an empty `projects:` is stated as hub-only material, minting "
+      "nothing — and stays distinguishable from the alone-carrier")
+check((hc.get("scope_question") or {}).get("needed") is False
+      and (hc.get("scope_question") or {}).get("answer") is None,
+      "#1185: no repository-valued scope asks nothing and answers nothing")
+check("portfolio_wide" not in hs1 and "hub_only" not in hs1,
+      "#1185: a section with no carriers is ABSENT, never present-and-empty")
+
+# THE ORACLE BINDING (#1185 AC1): a Strand is examined only against the
+# repositories its served `projects:` names — anything else is refused, not
+# searched, with the Strand and its served attribution named. The rule lives
+# in the scope layer so the examine stage consumes it.
+sys.path.insert(0, "scripts")
+import terrain_scope as ts
+mem = next(m for m in s["members"] if m["index"] == "L2")
+check(ts.examination_refusal(mem, "repo-b") is None,
+      "#1185: a repository inside the served attribution is admitted")
+r = ts.examination_refusal(mem, "repo-x") or {}
+check(r.get("refused") is True and r.get("member") == "L2"
+      and r.get("attribution") == ["repo-a", "repo-b"]
+      and "refused, not searched" in r.get("line", ""),
+      "#1185: a repository outside the served attribution is REFUSED, "
+      "naming the Strand and its served attribution")
+pwm = next(m for m in claims["members"] if m["index"] == "L3")
+r = ts.examination_refusal(pwm, "repo-a") or {}
+check(r.get("refused") is True,
+      "#1185: `portfolio-wide` is never expanded into a repository set — it "
+      "admits no repository through the binding")
+em = next(m for m in claims["members"] if m["index"] == "L4")
+r = ts.examination_refusal(em, "repo-a") or {}
+check(r.get("refused") is True and "hub-only" in r.get("line", ""),
+      "#1185: an empty attribution refuses as hub-only material")
+om = next(m for m in old["members"] if m["index"] == "L1")
+r = ts.examination_refusal(om, "repo-a") or {}
+check(r.get("refused") is True and "cannot-determine" in r.get("line", ""),
+      "#1185: an unserved attribution refuses as cannot-determine — never "
+      "searched on a guess")
 
 # NO RENDERED SENTENCE OR PROCESS DOC IS STORED (#1078). Each is a second copy
 # that drifts — one already had, the stored line reading "2-3 candidates" while
