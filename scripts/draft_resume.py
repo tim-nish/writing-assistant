@@ -123,9 +123,54 @@ def confirmation(run_id, ws, state, why):
         "candidate_ws": ws,
         "candidate_next_stage": stage,
         "started": started.isoformat() if started else None,
+        "age_days": _age_days(started),
         "why": why,
     })
+    # THE ASK IS RECORDED WHERE IT CAN BE AUDITED (Story 20.111, #1119). The
+    # contract states the candidate's id and AGE and confirms the resume
+    # (SPEC-article-draft-pipeline amendments, #1082) — but a gate that only
+    # prints has left no evidence it fired, which is the absence-shape #1081
+    # names and #1114 makes checkable. `candidate_ws` is the only workspace in
+    # existence at this point, so the record goes there.
+    #
+    # RECORDING IS NOT ADOPTING, and the distinction is the whole gate: an ask
+    # row says a question was posed ABOUT that run. Nothing reads it back as
+    # progress, and no checkpoint is written — stage 0 returns immediately on
+    # this shape precisely so the run is not attached to.
+    _emit_ask(ws, out)
     return out
+
+
+def _age_days(started):
+    """How old the candidate run is, in whole days — the quantity the
+    sitting-boundary contract says to STATE, kept beside the timestamp rather
+    than left for each caller to recompute (and disagree about)."""
+    if started is None:
+        return None
+    import datetime
+    return (datetime.datetime.now() - started).days
+
+
+def _emit_ask(ws, out):
+    """Append the gate's payload to the workspace's presented-payloads log.
+
+    Best-effort by construction: a workspace that cannot be written is a
+    degraded record, never a reason to swallow the owner's question. The gate
+    firing matters more than its receipt, so a failure here is silent and the
+    confirmation still returns.
+    """
+    import json
+    import os
+    try:
+        with open(os.path.join(ws, "presented-payloads.jsonl"), "a",
+                  encoding="utf-8") as f:
+            f.write(json.dumps({"kind": "ask", "gate": "resume-confirmation",
+                                "candidate_run_id": out["candidate_run_id"],
+                                "age_days": out["age_days"],
+                                "items": out["items"]},
+                               ensure_ascii=False) + "\n")
+    except OSError:
+        pass
 
 
 def disclosure_line(run_id, ws, state):
