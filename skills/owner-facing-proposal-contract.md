@@ -174,7 +174,7 @@ answer without an outside model to decode it. Every term in it was leaked:
 enum's own values. The real choices, stated as effects, were:
 
 - open five GitHub issues here (nothing is written to your files)
-- add five lines to docs/journey.md (edits your working tree)
+- add five lines to a notes file you own (edits your working tree)
 
 Both shipped labels named the enum instead. The rewrite adds no glossary and
 removes no option; it states what happens to the owner's world in each branch.
