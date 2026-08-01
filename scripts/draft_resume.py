@@ -81,6 +81,41 @@ def predates_sitting(run_id, state, sitting, now=None):
                   "declared; day-boundary rule)")
 
 
+def candidate_state(run_dir, checkpoint_file):
+    """The resume-scan's per-run-dir predicate: the state to consider, or None.
+
+    It lives here rather than inline in the scan because it is a resume
+    SEMANTIC — what counts as a run worth resuming — and because
+    `draft-pipeline.py` is at its size ratchet, where the sanctioned remedy is
+    moving code to the module that owns it, never raising the ceiling.
+
+    CHECKPOINT-LESS BUT NOT EMPTY (Story 20.111, #1119). A run that captured an
+    owner answer before it could checkpoint is the one workspace a later
+    sitting must NOT walk past: it holds a record of what the owner said, and
+    skipping it mints a second workspace while the answers sit in the first.
+    That is the observed knock-on — one run captured the intent ask, was
+    invisible to this scan, and the retry minted a second workspace with the
+    ask log copied across by hand.
+
+    The ask log is the evidence, so it is the predicate. Such a run resumes at
+    the START: no checkpoint means no stage has declared itself complete, and
+    claiming otherwise would be inventing progress from a file that records
+    questions.
+    """
+    import json
+    import os
+    cp = os.path.join(run_dir, checkpoint_file)
+    if not os.path.isfile(cp):
+        if not os.path.isfile(os.path.join(run_dir, "presented-payloads.jsonl")):
+            return None
+        return {"next_stage": "stage0", "checkpoint_absent": True}
+    try:
+        with open(cp, encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return None
+
+
 def confirmation(run_id, ws, state, why):
     """The run is NOT adopted; the caller is handed the question instead.
 

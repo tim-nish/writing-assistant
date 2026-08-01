@@ -3933,31 +3933,13 @@ def _autostart(root, fresh=False, sitting=None):
         for run_id in sorted(os.listdir(base), reverse=True):
             if os.path.islink(os.path.join(base, run_id)):
                 continue  # the `latest` shorthand (F40) is not a resumable run
-            cp = os.path.join(base, run_id, CHECKPOINT_FILE)
-            if not os.path.isfile(cp):
-                # CHECKPOINT-LESS BUT NOT EMPTY (Story 20.111, #1119). A run
-                # that captured an owner answer before it could checkpoint is
-                # the one workspace a later sitting must NOT walk past: it
-                # holds a record of what the owner said, and skipping it mints
-                # a second workspace while the answers sit in the first. That
-                # is the observed knock-on — 20260801T094203-040860 captured
-                # the intent ask, was invisible here, and the retry minted
-                # 20260801T095044-528227 with the log copied across by hand.
-                #
-                # The ask log is the evidence, so it is the predicate. Such a
-                # run resumes at the START: no checkpoint means no stage has
-                # declared itself complete, and claiming otherwise would be
-                # inventing progress from a file that records questions.
-                if not os.path.isfile(
-                        os.path.join(base, run_id, "presented-payloads.jsonl")):
-                    continue
-                state = {"next_stage": "stage0", "checkpoint_absent": True}
-            else:
-                try:
-                    with open(cp, encoding="utf-8") as f:
-                        state = json.load(f)
-                except (OSError, json.JSONDecodeError):
-                    continue
+            # Resume-candidate state, including the checkpoint-less-but-not-
+            # empty case (Story 20.111, #1119) — the predicate lives in
+            # `draft_resume.py`, which owns resume semantics.
+            state = _load("draft_resume.py").candidate_state(
+                os.path.join(base, run_id), CHECKPOINT_FILE)
+            if state is None:
+                continue
             if state.get("next_stage") and state["next_stage"] != DONE_STAGE:
                 if fresh:
                     skipped = run_id      # left untouched, reported, never deleted
@@ -4838,25 +4820,12 @@ def cmd_stage0(args):
                           sitting=getattr(args, "sitting", None)))
     # Durability by construction (#830): a freshly minted workspace persists the
     # state stage0 just composed IN THE SAME INVOCATION — the enforced-mechanism
-    # invariant (SPEC-writing-assistant), not a per-skill checkpoint reminder.
-    # Without this, `_autostart`'s resume scan skips the checkpoint-less run dir
-    # and a later sitting mints a fresh run with no brief (the terrain pause).
-    # A RESUMED run is left alone: its checkpoint records real progress
-    # (next_stage may be past harvest), which stage0's start-state must never
-    # clobber.
+    # invariant (SPEC-writing-assistant). A RESUMED run is left alone: its
+    # checkpoint records real progress, which the start-state must never clobber.
     #
-    # THE CONFIRMATION SHAPE IS NEITHER (Story 20.111, #1119). When a resumable
-    # run predates the sitting, `_autostart` hands back the question instead of
-    # a workspace — `resume_requires_confirmation` with `candidate_ws`, and NO
-    # top-level `ws` (draft_resume.py:119-127). It is not `resumed`, so the
-    # branch below used to run on it and index `out["ws"]`, raising
-    # `KeyError: 'ws'` and killing the run where the contract says to ASK. The
-    # sitting-boundary gate (Story 20.104, #1082) was therefore unreachable on
-    # its own common case: any in-progress run predating the sitting.
-    #
-    # Nothing is written here, deliberately. Until the owner answers, no
-    # workspace has been adopted and none has been minted — writing a
-    # checkpoint would attach to a run the gate exists to NOT attach to.
+    # THE CONFIRMATION SHAPE IS NEITHER (Story 20.111, #1119): it carries
+    # `candidate_ws` and no `ws`, so the branch below used to index it and die
+    # where the contract says to ASK. Nothing is written on this path.
     if out.get("resume_requires_confirmation"):
         print(json.dumps(out, indent=2))
         return 0

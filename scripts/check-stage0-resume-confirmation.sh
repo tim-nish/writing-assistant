@@ -84,8 +84,18 @@ report["no_checkpoint_written"] = not os.path.isfile(
 
 # 6. A checkpoint-less workspace holding an ask log is VISIBLE to the resume
 #    scan — the knock-on that orphaned a workspace on the observed run.
-report["scan_sees_asklog"] = "presented-payloads.jsonl" in src.split(
-    "def _autostart")[1][:4000]
+#    Asserted BEHAVIOURALLY, not by grepping a function body: the predicate
+#    moved from `_autostart` into `draft_resume.candidate_state` when
+#    draft-pipeline.py hit its size ratchet, and a source-grep assertion broke
+#    on a relocation that changed nothing about the behaviour it guards.
+import tempfile
+probe = tempfile.mkdtemp()
+open(os.path.join(probe, "presented-payloads.jsonl"), "w").write("{}\n")
+report["scan_sees_asklog"] = (
+    (dr.candidate_state(probe, "checkpoint.json") or {}).get("checkpoint_absent")
+    is True)
+empty = tempfile.mkdtemp()
+report["scan_skips_empty"] = dr.candidate_state(empty, "checkpoint.json") is None
 
 json.dump(report, open(os.path.join(work, "report.json"), "w"))
 PY
@@ -93,7 +103,8 @@ PY
 r="$work/report.json"
 for k in no_ws_key flagged candidate_ws states_id states_age render_control \
          within_capacity ask_emitted stage0_guards_before_index \
-         stage0_guard_returns no_checkpoint_written scan_sees_asklog; do
+         stage0_guard_returns no_checkpoint_written scan_sees_asklog \
+         scan_skips_empty; do
   v=$(python3 -c "import json,sys;print(json.load(open(sys.argv[1])).get(sys.argv[2]))" "$r" "$k")
   if [ "$v" = "True" ]; then
     ok "$k"
@@ -108,7 +119,9 @@ for k in no_ws_key flagged candidate_ws states_id states_age render_control \
       no_checkpoint_written)
         err "a checkpoint was written for a run the owner has not adopted — recording the ask must never attach to the candidate run" ;;
       scan_sees_asklog)
-        err "_autostart's resume scan still skips a checkpoint-less workspace holding an ask log, so a retry mints a second run and strands the owner's answers (#1119)" ;;
+        err "the resume scan still skips a checkpoint-less workspace holding an ask log, so a retry mints a second run and strands the owner's answers (#1119)" ;;
+      scan_skips_empty)
+        err "the resume scan adopts an EMPTY checkpoint-less run dir — the ask log is the predicate, not the directory's existence" ;;
       states_age)
         err "the confirmation does not state the candidate's AGE, which the #1082 contract requires alongside its id" ;;
       *)
