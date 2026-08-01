@@ -250,11 +250,20 @@ def check(cond, msg):
 
 by = {"a": {"id": "L1"}, "b": {"id": "L2"}}
 flat = {"title": "t", "strands": [{"slug": "a"}, {"slug": "b"}]}
-out = tm._summary_index_lines(flat, by)
-check(any("L1" in l and "L2" in l for l in out),
+# THE CARRIER MOVED, THE PROPERTY DID NOT (Story 20.128, #1139). The indexes
+# used to ride a standalone `N Strand(s): …` line, which the owner ruled out as
+# unreadable; they are now inside the heading's count parenthesis. #1115's
+# property is unchanged and is asserted on its new carrier — an unsubdivided
+# group still states its indexes on the summary, and `_summary_index_lines`
+# emits nothing for one.
+head = tm._summary_head("## G3 — t (2)", flat, by)
+check("L1" in head and "L2" in head,
       "#1115: an unsubdivided group states its Strand indexes on the summary — "
       "the id is shorthand that expands to them, so no surface should make the "
       "owner open a file to learn the expansion")
+check(tm._summary_index_lines(flat, by) == [],
+      "#1139: and the standalone `N Strand(s):` line is retired — one format, "
+      "one line per node")
 
 sub = {"title": "t", "strands": [{"slug": "a"}, {"slug": "b"}],
        "subgroups": [{"subgroup_id": "G3-1", "claim": "shared thing",
@@ -273,6 +282,9 @@ check("no single commonality found" in joined,
       "one never asked (the three claim states, #979/#980)")
 check("L1" in joined and "L2" in joined,
       "per-subgroup index lists, so the mapping survives subdivision")
+check(all("Strand(s):" not in l for l in o2),
+      "#1139: a subgroup carries its indexes in its own heading parenthesis, "
+      "in the same format the group heading uses — never a second line")
 check(not any(l.strip().startswith("G3-") and "Strand(s)" in l for l in o2),
       "the subgroup head and its index list are separate lines — the head is "
       "the claim surface, the list is the mapping")

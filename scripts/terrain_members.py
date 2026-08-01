@@ -740,21 +740,54 @@ GROUP_ID_KIND = " ".join(GROUP_ID_KIND_LINES)
 SUBGROUP_ID_KIND = " ".join(SUBGROUP_ID_KIND_LINES)
 
 
-def _summary_head(head, sec):
-    """The summary heading, declaring an adopted subdivision (Story 20.97).
+def _node_ids(strands, by_slug):
+    """The display ids of a node's Strands, in placement order.
 
-    A screen that defines the `G<n>-<m>` id family and exhibits no member of it
-    leaves the owner facing the parent's members exactly as before subdivision
-    shipped. This is a COUNT, not composer prose, so the screen-height argument
-    that governed the claim never reached it.
+    One resolver for both levels — the group heading and the subgroup line —
+    because Story 20.128 (#1139) makes them one format, and two resolvers is
+    how two formats come back.
     """
+    out = []
+    for el in strands:
+        c = by_slug.get(el.get("slug"))
+        out.append(c["id"] if c else el.get("slug", "?"))
+    return out
+
+
+def _summary_head(head, sec, by_slug=None):
+    """The summary heading — count, indexes, and any adopted subdivision.
+
+    ONE FORMAT FOR BOTH LEVELS (Story 20.128, #1139). The indexes used to ride
+    a standalone `N Strand(s): L5, L71` line beneath the heading, and the owner
+    ruled that line out: *"They make the Display difficult to read. I requested
+    Lesson Index visibility, but this was not a good implementation."* The
+    requirement was index visibility; a second line per node was the bad
+    implementation of it. So the indexes move INTO the heading's count
+    parenthesis — `(3: L59, L60, L61)` — and the subgroup line takes the same
+    shape, which is what makes them one format rather than two that resemble
+    each other.
+
+    A SUBDIVIDED group lists its members per subgroup, so its own parenthesis
+    carries the counts alone: repeating fifteen ids in the parent and again
+    across its subgroups is the density the ruling objected to.
+
+    The subdivision count itself is unchanged and still required (Story 20.97,
+    #1075): a screen that defines the `G<n>-<m>` family and exhibits no member
+    of it leaves the owner facing the parent's members exactly as before
+    subdivision shipped. This is a COUNT, not composer prose, so the
+    screen-height argument that governed the claim never reached it.
+    """
+    n_strands = len(sec["strands"])
     subs = sec.get("subgroups") or []
-    if not subs:
+    if subs:
+        n = len(subs)
+        return head.replace(f"({n_strands})",
+                            f"({n_strands}, {n} subgroup"
+                            f"{'' if n == 1 else 's'})", 1)
+    ids = _node_ids(sec["strands"], by_slug or {})
+    if not ids:
         return head
-    n = len(subs)
-    return head.replace(f"({len(sec['strands'])})",
-                        f"({len(sec['strands'])}, {n} subgroup"
-                        f"{'' if n == 1 else 's'})", 1)
+    return head.replace(f"({n_strands})", f"({n_strands}: {', '.join(ids)})", 1)
 
 
 def _summary_index_lines(sec, by_slug, claims=None):
@@ -769,22 +802,21 @@ def _summary_index_lines(sec, by_slug, claims=None):
     it asks for a member of the family to be exhibited. A subgroup rendered
     with its id, its claim and its indexes is that member.
 
-    An unsubdivided group gets one line of its own indexes.
+    ONE FORMAT WITH THE HEADING (Story 20.128, #1139): a subgroup renders as
+    `G2-1 — <claim> (3: L59, L60, L61)`, the same shape `_summary_head` gives
+    a group, and the standalone `N Strand(s): …` line is retired at both
+    levels. An unsubdivided group emits nothing here — its indexes are in its
+    own heading.
     """
-    def idents(strands):
-        out = []
-        for el in strands:
-            c = by_slug.get(el.get("slug"))
-            out.append(c["id"] if c else el.get("slug", "?"))
-        return out
-
     subs = sec.get("subgroups") or []
     if not subs:
-        ids = idents(sec["strands"])
-        return [_clip_line(f"  {len(ids)} Strand(s): {', '.join(ids)}")] if ids else []
+        # NOTHING (Story 20.128, #1139): an unsubdivided group's indexes are in
+        # its heading's parenthesis now. This used to emit the standalone
+        # `N Strand(s): …` line the owner ruled out.
+        return []
     out = []
     for sub in subs:
-        ids = idents(sub["strands"])
+        ids = _node_ids(sub["strands"], by_slug)
         # The subgroup's own claim, in the same three states the parent's uses:
         # declared, tried-and-found-nothing, or never asked. Read from the
         # record, never composed here.
@@ -796,9 +828,9 @@ def _summary_index_lines(sec, by_slug, claims=None):
                     f"grouped as placed")
         else:
             head = f"  {sub['subgroup_id']}"
-        out.append(_clip_line(head))
         if ids:
-            out.append(_clip_line(f"    {len(ids)} Strand(s): {', '.join(ids)}"))
+            head += f" ({len(ids)}: {', '.join(ids)})"
+        out.append(_clip_line(head))
     return out
 
 
@@ -1304,7 +1336,7 @@ def _compose_member_rendering(map_data, ms, cands, claims=None,
             # Without the claim, this screen's whole information content over
             # the tag name is a member count, so every judgment required opening
             # the View: a judgment surface that is a table of contents.
-            lines.append(_clip_line(_summary_head(head, sec)))
+            lines.append(_clip_line(_summary_head(head, sec, by_slug)))
             cl = _summary_claim_line(claims, gid) if claims is not None else None
             if cl:
                 lines.append(cl)
