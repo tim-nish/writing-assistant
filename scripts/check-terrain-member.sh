@@ -683,25 +683,41 @@ check(("machine-composed at render time" in listing)
              for l in listing.splitlines()),
       "the summarised console announces the authoring class exactly when it "
       "renders composed claims — the two never separate")
-check("DISPLAY id" in listing and "NEVER recorded" in listing,
-      "the `G` group-id kind is DECLARED on the screen that renders it")
-# Story 20.96 (#1074): the screen states the WHOLE contract, not only its
-# refusing half. It used to say "conferring no selection authority" and stop,
-# while the skill files carried the expansion half — so Screen 2 presented an
-# owner with two instructions and no way to tell which was live. Both halves are
-# asserted together, because either alone is what the defect looked like.
-check("expands to its members" in listing,
-      "#1074: the screen states that a typed group id EXPANDS — the half the "
-      "owner was missing at the gate")
-check("Selection is always by Strand index" in listing,
-      "#1074: ...and that selection is still by Strand index, so expansion "
-      "reads as shorthand rather than as group-select")
-check("expand" in listing.lower() and "selects nothing" in listing,
-      "#1074: the two uses of a group id are named as DIFFERENT acts — asking "
-      "for a report selects nothing; typing one expands")
-check("recomposed and re-offered" in listing,
-      "#1074/AC5: a claim is pinned to the set it was composed over, so a "
-      "changed set re-offers it rather than carrying it silently")
+# THE ID CONTRACT MOVED TO THE VIEW (Story 20.124, #1138), and each assertion
+# moves WITH it — as a PAIR. Asserting only the receiver would let a future
+# change put the line back on the screen with nothing noticing, and asserting
+# only the absence would let it be deleted outright. #1115 already ruled these
+# lines "stated once, in the View, never on the screen"; the allowlist is what
+# finally made that true of the code, so the check states both halves.
+def relocated(needle, what):
+    check(needle not in listing and needle in whole_dc,
+          f"{what} — relocated to the View, absent from the screen (#1138)")
+
+relocated("DISPLAY id", "the `G` group-id kind is DECLARED where it renders")
+# Story 20.96 (#1074): the WHOLE contract, not only its refusing half. It used
+# to say "conferring no selection authority" and stop, while the skill files
+# carried the expansion half — so the owner met two instructions with no way to
+# tell which was live. Both halves are asserted together, because either alone
+# is what the defect looked like.
+relocated("expands to its members",
+          "#1074: a typed group id EXPANDS — the half the owner was missing")
+relocated("Selection is always by Strand index",
+          "#1074: ...and selection is still by Strand index")
+check("selects nothing" not in listing and "selects nothing" in whole_dc,
+      "#1074: the two uses of a group id are named as DIFFERENT acts — "
+      "relocated to the View (#1138)")
+relocated("recomposed and re-offered",
+          "#1074/AC5: a claim is pinned to the set it was composed over")
+# WHAT THE SCREEN KEEPS is the material and its exits — the allowlist's own
+# content, asserted positively so the relocation cannot become a deletion of
+# the screen's purpose.
+check("Every exit stays open" in listing,
+      "#1138: the screen keeps the standing exits — the summary is the whole "
+      "of what is relayed, so they have nowhere else to be")
+check("in common:" in listing and "## " in listing,
+      "#1138: ...and keeps the material: group headings and their claims")
+check("What the words mean" not in listing and "placement(s) across" not in listing,
+      "#1138: the codebook pointer and the placement count are View classes")
 check("Grouped by: journey-similarity" in listing
       and "none narrowed away" in listing,
       "the judged screen names its substrate and states that nothing was narrowed")
@@ -1028,6 +1044,14 @@ VP = "/nonexistent-destination/terrain/terrain-view.md"
 d3 = json.loads(member(big_member, "--view", VP,
                        "--claims", '{"G1":"a claim that must not ride along"}').stdout)
 L = d3["listing"]
+# The RECEIVER for everything the allowlist moved off this screen (#1138): the
+# View file, written by the `view` subcommand for the same member. `member`
+# alone cannot supply it — over budget, that call returns the summary too.
+_vt = tempfile.mktemp(suffix=".md")
+subprocess.run(["python3", D, "view", "--map", big_member, "--tag", "workflow",
+                "--out", _vt, "--claims", '{"G1":"c"}'],
+               capture_output=True, text=True)
+whole_view = open(_vt).read()
 # #1073: the pointer is rendered WHOLE. It went through `_short_path`, which
 # keeps the last two segments, so the one line whose purpose is *open this*
 # named an unopenable path. `_short_path(VP)` is a SUFFIX of `VP`, so asserting
@@ -1079,8 +1103,12 @@ for exit_name in ("switch substrate", "back to the member list",
                   "name your own direction", "stop here"):
     check(exit_name in L,
           f"AC5: the standing exit '{exit_name}' is on the over-budget screen")
-check("Selection is by Strand index" in L,
-      "AC5: selection stays BY INDEX on the over-budget screen")
+# The selection CONTRACT moved to the View with the rest of the id contract
+# (Story 20.124, #1138); what AC5 guarantees about this screen — that it
+# proposes no less — is the narrowing disclosure asserted immediately below,
+# which is a claim about the screen the reader is looking at.
+check("Selection is by Strand index" in whole_view,
+      "AC5: selection stays BY INDEX, stated on the View (#1138)")
 check("capped, truncated or ordered by any measure of strength" in L,
       "AC5: the screen states that nothing was narrowed away")
 

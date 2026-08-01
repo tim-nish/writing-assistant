@@ -86,6 +86,14 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/topic-map-directions.py member \
   > "$WS/terrain-screen.json"
 ```
 
+**The screen carries the MATERIAL, and only the classes the composer allows
+(Story 20.124, #1138).** `SCREEN_LINE_CLASSES` in `scripts/terrain_members.py`
+is the declared allowlist — header, pin, the View pointer, the authoring-class
+preamble, group headings, `in common:` claims, subgroups, disclosures, exits.
+The instruction block, the placement count and the `G`/`G-n` id contract are
+**View classes**: they are stated once, in the View, per #1115. Relocated with
+their receivers named, never dropped.
+
 **Relay the returned `listing` as one block, unchanged.** It already carries
 the group ids, your claims, every Strand's served rendering, its deterministic
 context line, any absence marks, and the count. **Do not retype, re-fit,
