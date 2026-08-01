@@ -73,7 +73,7 @@ config or framework:
   `draft_gates.sources_gate(..., repo_root=<host repo>)` — selection over
   `SCOPE_KINDS`, each narrowing within `writing-sources.yaml`; candidates inform
   the DEFAULT, never the choices; the label names whose declaration (#1141). **Pass NO file count (Story 20.135, #1178)** — there is no `declared_count` parameter and re-introducing one raises: the gate enumerates `repo_root`'s own declaration through `resolve-writing-sources.py files` and renders the size with its prose/code split, or, where it cannot enumerate, renders no count at all. `repo_root` is therefore what makes a count possible; an agent-supplied number is refused, because the owner who approved *"6 file(s) are declared"* on 2026-08-01 was approving 358.
-- **Workspace autostart** — resumption is **automatic, not opt-in**. It resumes
+- **Workspace autostart** — resumption is **automatic, not opt-in**; on a `--brief` invocation automatic means **same-brief-only** (amended 2026-08-02, #1207 — the amendments companion is the authority: a different-brief run is skipped fresh via `fresh_skipped`, nothing deleted; cold invocations unchanged below). It resumes
   the **newest in-progress run** (a workspace whose checkpoint records a
   `next_stage` other than `done`) when one exists, returning `"resumed": true`
   and the `next_stage` to continue from — **skip straight to that stage**, reusing
