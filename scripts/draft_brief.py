@@ -18,6 +18,7 @@ new record path — `_read_brief`'s text/file behaviour is byte-identical for th
 same inputs.
 """
 
+import hashlib
 import json
 import os
 
@@ -135,6 +136,18 @@ def _journey_arcs(record, source=None):
     }
 
 
+def brief_pin(state):
+    """The recorded brief's IDENTITY (amended 2026-08-02, #1207): a content
+    pin over the exact recorded text. Same-brief on a brief-carrying stage-0
+    entry is decided by this pin — the recorded artifact — never by text
+    similarity. None for an absent or empty brief, and None never matches a
+    pin, so a run with no recorded brief is never a same-brief resume."""
+    text = state.get("text") if isinstance(state, dict) else None
+    if not text:
+        return None
+    return "sha256:" + hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
 def _read_brief(raw):
     """Resolve a free-form coverage brief (Story 18.24, #505) into its recorded
     form. A value that is an existing file path is read (origin `file`, source
@@ -149,11 +162,12 @@ def _read_brief(raw):
     val = raw.strip()
     if not val:
         return None
+    state = None
     if os.path.isfile(val):
         try:
             text = open(val, encoding="utf-8").read().strip()
         except OSError:
-            text = val
+            pass
         else:
             rec = _brief_record(text)
             if rec is not None:
@@ -164,8 +178,14 @@ def _read_brief(raw):
                 arcs = _journey_arcs(rec, os.path.abspath(val))
                 if arcs:
                     state["journey_arcs"] = arcs
-                return state
-            return {"text": text, "provenance": "owner-authored",
-                    "origin": "file", "source": os.path.abspath(val)}
-    return {"text": val, "provenance": "owner-authored", "origin": "inline"}
+            else:
+                state = {"text": text, "provenance": "owner-authored",
+                         "origin": "file", "source": os.path.abspath(val)}
+    if state is None:
+        state = {"text": val, "provenance": "owner-authored",
+                 "origin": "inline"}
+    # The identity rides ON the record, so the same-brief predicate reads what
+    # a minted run's checkpoint already carries (#1207).
+    state["pin"] = brief_pin(state)
+    return state
 

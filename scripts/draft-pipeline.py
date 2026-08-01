@@ -3899,7 +3899,7 @@ def cmd_stop_disclosure(args):
 DONE_STAGE = "done"
 
 
-def _autostart(root, fresh=False, sitting=None):
+def _autostart(root, fresh=False, sitting=None, brief=None):
     """Core of automatic resume (Story 13.12): return the workspace to use and
     where to start — resuming the newest in-progress run (checkpoint next_stage
     != done), or minting a fresh run when none is in progress. Shared by the
@@ -3909,10 +3909,16 @@ def _autostart(root, fresh=False, sitting=None):
     resumable state — the explicit opt-out of automatic resumption. The prior
     in-progress run is left untouched and its id reported (`fresh_skipped`),
     never deleted; the ratified default (#142) is unchanged when fresh is not
-    asked for."""
+    asked for.
+
+    `brief` (amended 2026-08-02, #1207): a brief-carrying entry resumes only
+    a run minted from the SAME recorded brief (`draft_resume.brief_mismatch`
+    carries the grounds); any other is skipped exactly as `--fresh` skips it,
+    by data rather than by owner keystroke."""
     rp = _load("resolve-paths.py")
     base = rp.runs_dir(root)
     skipped = None
+    other_brief = False
     if os.path.isdir(base):
         # Run ids are timestamp-based, so reverse-lexicographic == newest-first.
         for run_id in sorted(os.listdir(base), reverse=True):
@@ -3926,8 +3932,11 @@ def _autostart(root, fresh=False, sitting=None):
             if state is None:
                 continue
             if state.get("next_stage") and state["next_stage"] != DONE_STAGE:
-                if fresh:
-                    skipped = run_id      # left untouched, reported, never deleted
+                _dr = _load("draft_resume.py")
+                if fresh or _dr.brief_mismatch(state, brief):
+                    # Left untouched, reported, never deleted — by owner
+                    # keystroke, or by brief data (#1207).
+                    skipped, other_brief = run_id, not fresh
                     break
                 # AUTOMATIC RESUME IS BOUNDED BY THE SITTING (Story 20.104,
                 # #1082). #142's ruling is retained with its purpose intact;
@@ -3935,7 +3944,6 @@ def _autostart(root, fresh=False, sitting=None):
                 # predicate and the confirmation payload live in
                 # `draft_resume.py` — see there for why the sitting is
                 # declared rather than inferred.
-                _dr = _load("draft_resume.py")
                 predates, why = _dr.predates_sitting(run_id, state, sitting)
                 ws = os.path.join(base, run_id)
                 if predates:
@@ -3950,8 +3958,8 @@ def _autostart(root, fresh=False, sitting=None):
     out = {"resumed": False, "ws": ws, "run_id": os.path.basename(ws), "next_stage": "harvest"}
     if skipped:
         out["fresh_skipped"] = skipped
-        out["fresh_note"] = (f"--fresh: minted a new run; in-progress run {skipped} "
-                             "left untouched (resumable later; nothing deleted)")
+        out["fresh_note"] = _load("draft_resume.py").fresh_note(skipped,
+                                                                other_brief)
     return out
 
 
@@ -3967,7 +3975,9 @@ def cmd_autostart(args):
     rp = _load("resolve-paths.py")
     print(json.dumps(_autostart(rp.host_root(args.root),
                                 fresh=getattr(args, "fresh", False),
-                                sitting=getattr(args, "sitting", None)), indent=2))
+                                sitting=getattr(args, "sitting", None),
+                                brief=_read_brief(getattr(args, "brief", None))),
+                     indent=2))
     return 0
 
 
@@ -4804,7 +4814,8 @@ def cmd_stage0(args):
     # before scope is read, a workspace is minted, or a token is spent (#309).
     out = {"config_ok": True, "target": root, "run_state": run_state}
     out.update(_autostart(root, fresh=getattr(args, "fresh", False),
-                          sitting=getattr(args, "sitting", None)))
+                          sitting=getattr(args, "sitting", None),
+                          brief=run_state.get("brief")))
     # Durability by construction (#830): a freshly minted workspace persists the
     # state stage0 just composed IN THE SAME INVOCATION — the enforced-mechanism
     # invariant (SPEC-writing-assistant). A RESUMED run is left alone: its
@@ -4983,6 +4994,8 @@ def main(argv=None):
     sp.add_argument("--fresh", action="store_true",
                     help="mint a new workspace even when a resumable run exists (#746): "
                          "the in-progress run is left untouched and its id reported")
+    sp.add_argument("--brief", help="the entry's coverage brief: resume only a run minted from "
+                                    "the SAME recorded brief; others skip fresh, nothing deleted (#1207)")
     sp = sub.add_parser("stage0", help="fold Stage 0 into one call: config validation + framework + autostart (Story 13.13)")
     sp.add_argument("framework")
     sp.add_argument("--fresh", action="store_true",
