@@ -26,7 +26,8 @@ and the command returns all three — **relay them, never paraphrase**:
   the artifact is the owner's route back to what this step decided;
 - **the lifecycle** (`lifecycle.line`) — `composed → inspected → adopted`,
   with the current state legible. It is `composed` the moment the artifact is
-  written.
+  written; a composition that records the owner's adopted candidate (`claim`
+  in the answer) is `adopted` in the same act (#1208).
 
 **Re-opening is a first-class move, and this artifact is the one thing the
 terrain surface reads back:**

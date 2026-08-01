@@ -204,6 +204,20 @@ check((s.get("candidate_theses") or {}).get("recommendation") is None,
       "#1079/#1078: before composition the key holds the gate's own guarantee "
       "object, which is process self-documentation and is NOT stored")
 
+# THE ADOPTION ACT MOVES THE LIFECYCLE (#1208). Recording the adopted answer
+# and moving the brief's visible truth are one act: an artifact whose thesis
+# is adopted while its lifecycle never entered `adopted` is the two-carrier
+# disagreement the observed run produced.
+_lf = adopted.get("lifecycle") or {}
+check(_lf.get("state") == "adopted"
+      and [h.get("state") for h in _lf.get("history") or []]
+      == ["composed", "adopted"],
+      "#1208: recording the adopted answer moves the lifecycle to `adopted` "
+      "in the same act, through the recorded history")
+check((s.get("lifecycle") or {}).get("state") == "composed",
+      "#1208: ...and a brief whose thesis was never adopted stays `composed`, "
+      "exactly as before")
+
 for name, b in (("a 3-member set", s), ("a 1-member set", one)):
     keys = set(b)
     unknown = keys - CARRIED - set(INTERIM)
