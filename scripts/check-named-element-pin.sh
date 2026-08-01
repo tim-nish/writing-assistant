@@ -70,9 +70,9 @@ printf '%s' "$S" | grep -qi 'resolves to an element id' \
 printf '%s' "$S" | grep -qi 'selection is pinned' \
   && ok "SKILL: selection is pinned to the named element" \
   || err "SKILL missing the pinned-selection rule"
-printf '%s' "$S" | grep -qi 'harvest assembles evidence for that element alone' \
-  && ok "SKILL: harvest scopes to that element alone" \
-  || err "SKILL missing the harvest-scoping rule"
+printf '%s' "$S" | grep -qi 'examine grounds claims for that element alone' \
+  && ok "SKILL: examine grounds that element alone (#1182)" \
+  || err "SKILL missing the element-scoped grounding rule"
 printf '%s' "$S" | grep -qi 'does not widen the declared-source boundary' \
   && ok "SKILL: the pin does NOT widen the declared-source boundary" \
   || err "SKILL missing the no-widen invariant (the load-bearing constraint)"
