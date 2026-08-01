@@ -47,6 +47,13 @@ live in [`review-prompts.md`](review-prompts.md).
   capped at 10, severity-tagged (`blocker`/`should`/`nit`), each naming the
   criterion behind its severity — **no rewrites, no praise, no summaries**.
   Nothing is applied without the owner's arbitration.
+- **Style is MEASURED, never carried.** The Reviewer has exactly **one** style
+  dimension — conformance to the owner's one versioned style contract, **citing
+  the clause** — and it is its **own finding class, outside blocker/should/nit,
+  that never blocks**. A style finding that cannot cite a clause is **not
+  emitted, because it is taste**; with no contract configured the dimension
+  states that it did not run and why. Contract:
+  [`style-conformance.md`](style-conformance.md).
 - **Fixed pass order, never reordered:** lint → structure → prose → policy
   consistency → cold read; each LLM pass runs **exactly once per draft
   version**. No pass is skipped at the agent's discretion.

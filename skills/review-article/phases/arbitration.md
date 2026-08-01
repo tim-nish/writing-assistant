@@ -108,6 +108,17 @@ may be correct); escalation is a per-finding owner call inside the round, and
 nothing in the policy hub is ever created or modified (the consumer holds no
 hub path at all — Story 13.73; the gateway serves read-only).
 
+**Style-contract conformance findings are an ordinary reject-only item and are
+never blocker-eligible (Story 20.140, #1202).** They carry the class
+`conformance` instead of a severity, rank **after** the three severities in the
+consolidated list (blockers → should → nit → conformance), default to accepted
+like any ordinary finding, and emit their disposition with
+`"severity": "conformance"` and `"criterion": "style-contract-<section-id>"`.
+An open conformance finding **never** triggers the second cycle and never
+withholds "publishable" — a conformance miss and a factual error are different
+kinds, not different severities. Full contract:
+[`../style-conformance.md`](../style-conformance.md).
+
 **Rubric-mapped findings are blocker-eligible (Story 12.2).** A structure or
 prose finding that **maps to a quality-rubric dimension** (Epic 11: narrative
 arc, paragraph flow, explanation calibration, readability mechanics — the same
