@@ -354,3 +354,56 @@ PYEOF
 
 [ "$fail" -eq 0 ] && printf '\nAll %s checks passed.\n' "$0" \
   || { printf '\n%s FAILED.\n' "$0" >&2; exit 1; }
+
+# --- footnote pin repetition (Story 20.113, #1116) --------------------------
+# WHAT IS UNIFORM IS STATED ONCE. Measured on the 2026-08-01 run: 110 footnote
+# lines, each carrying the identical 40-char pin, because a View is served at
+# one hub commit by construction. The View's own budget clause already rules
+# that line-granular pointers are machine provenance and that evidence
+# aggregates with the shared part stated once; this asserts it for the report's
+# footnote block, which the clause was not written for.
+python3 - <<'PY' || exit 1
+import importlib.util, sys
+sys.path.insert(0, "scripts")
+spec = importlib.util.spec_from_file_location("tm", "scripts/terrain_members.py")
+tm = importlib.util.module_from_spec(spec); spec.loader.exec_module(tm)
+
+fail = 0
+def check(cond, msg):
+    global fail
+    if cond:
+        print("ok:   %s" % msg)
+    else:
+        print("FAIL: %s" % msg, file=sys.stderr); fail = 1
+
+P = "9cd6025a72632bc64e2418b441ba66fef2147120"
+single = ["- **L%d** — G3 — (from LESSONS.md:%d@%s · claim only)" % (i, i, P)
+          for i in range(1, 6)]
+out, shared = tm._footnotes_state_shared_pin_once(single)
+check(shared == P, "a single-pinned report states its shared pin once")
+check(not any("@" in ln for ln in out),
+      "no footnote line repeats the shared pin (#1116: 110 identical pins)")
+check(all("LESSONS.md:" in ln for ln in out),
+      "what VARIES per Strand — the file and line — survives the strip")
+
+mixed = single + ["- **L9** — G4 — (from LESSONS.md:9@deadbeef123 · claim only)"]
+out2, shared2 = tm._footnotes_state_shared_pin_once(mixed)
+check(shared2 is None,
+      "a MIXED-pin report states no shared pin and strips nothing")
+check(all("@" in ln for ln in out2),
+      "every line keeps its own pin when the report is not single-pinned — the "
+      "single-pin property is measured, never assumed")
+
+# AC4 (dropping `also in:` where it restates the group's axis) is NOT
+# implemented, and its absence is asserted rather than left silent: the
+# footnote's placement field is required unconditionally by #987 above, and
+# removing it for the subset case would delete a disclosure this same check
+# asserts. The amendment's reasoning (the heading already carries the axis) is
+# about the HEADING and does not reach the footnote's own contract. Routed back
+# to #1116 rather than resolved here.
+check("_drop_redundant_cotags" not in open(
+          "scripts/terrain_members.py", encoding="utf-8").read(),
+      "AC4 stays unimplemented until #1116 reconciles it with #987's "
+      "unconditional placement field — not silently half-done")
+sys.exit(fail)
+PY

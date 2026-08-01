@@ -895,6 +895,33 @@ def _strand_context_line(el, member_tag, substituted=()):
     return f"  ({topics} · {where} · {reasoning}{mark})"
 
 
+PIN_IN_POINTER = re.compile(r"@([0-9a-f]{7,40})\b")
+
+
+def _footnotes_state_shared_pin_once(footnotes):
+    """Strip the pin from footnote lines when the whole report shares ONE.
+
+    Returns `(lines, shared_pin_or_None)`.
+
+    THE ASSUMPTION IS ASSERTED, NEVER ASSUMED (Story 20.113, #1116). A View is
+    served at one hub commit by construction today, which is exactly why the
+    pin repeated 110 times on the 2026-08-01 run. But "by construction today"
+    is not a licence to render one pin as though it covered every Strand: if
+    the set of pins is ever larger than one, every line keeps its own and the
+    header states nothing. The single-pin claim is therefore MEASURED from the
+    lines themselves, per report — the cheapest possible check, and the only
+    one that cannot go stale.
+
+    A line with no pin at all (an unrecorded origin) is untouched: it makes no
+    claim to strip.
+    """
+    pins = {m.group(1) for ln in footnotes for m in PIN_IN_POINTER.finditer(ln)}
+    if len(pins) != 1:
+        return footnotes, None
+    shared = pins.pop()
+    return [PIN_IN_POINTER.sub("", ln) for ln in footnotes], shared
+
+
 def _journey_arc_line(el):
     """A Lesson's Journey arc, rendered on the Lesson's own row.
 
@@ -1508,6 +1535,7 @@ def compose_full_report(map_data, tag, cands, group_ids, axis="tag",
     # verification material is reachable without standing between the reader
     # and the material it verifies.
     if footnotes:
+        footnotes, shared_pin = _footnotes_state_shared_pin_once(footnotes)
         lines.append("## Footnotes — placement, origin pins and attestation")
         lines.append("")
         lines.append("One entry per Strand rendered above, in the order it "
@@ -1515,6 +1543,19 @@ def compose_full_report(map_data, tag, cands, group_ids, axis="tag",
                      "came from, and whether its reasoning travels with it. "
                      "Nothing here is new — this is the row context line, "
                      "moved out of the reading flow.")
+        if shared_pin:
+            # WHAT IS UNIFORM IS STATED ONCE (Story 20.113, #1116). Measured on
+            # the 2026-08-01 run: 110 footnotes, every one carrying the same
+            # 40-character pin, because a View is served at ONE hub commit by
+            # construction — only the line number ever varied. Repetition at
+            # that ratio is the log-file failure the View's own budget clause
+            # names, and the remedy it already states is aggregation with the
+            # shared part stated once. Nothing is dropped: the pin is here, and
+            # it is here EXPLICITLY rather than implied, so a reader can still
+            # resolve any line below to a commit.
+            lines.append("")
+            lines.append(f"Every origin below is served at one pin: "
+                         f"`{shared_pin}`. Lines carry the file and line only.")
         lines.append("")
         lines += footnotes
         lines.append("")
