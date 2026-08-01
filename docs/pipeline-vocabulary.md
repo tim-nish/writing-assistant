@@ -90,6 +90,42 @@ The four narrative kinds admit **pointer-backed** narrative material and may use
 a multi-line span pointer like `quote`. Anything that does not fit one of these
 nine KINDs cannot enter the fact sheet — it routes elsewhere (below).
 
+## Episode vs state claims, and the time axis of a source
+
+Added 2026-08-01 (#1182/#1184/#1185, `specs/spec-writing-assistant/` amendments).
+Two vocabularies meet here: what a **source** is, and what a **claim** asserts.
+
+**A declared source carries a `time_axis`, DERIVED FROM ITS TYPE** — the
+declaration never states it, and `resolve-writing-sources.py` refuses a
+hand-written `time_axis:` key at read time.
+
+| `type` | `time_axis` | Why |
+|---|---|---|
+| `commits` | **true** | A commit is a change together with its stated reason, in order — the closest thing a repository has to a native episode. |
+| `github-issues` | **true** | An issue **thread** records a decision being reached, dated. The read includes the comments; a body-only projection is a marked partial. |
+| `tanuki-den` | **true** | A finding record carries `first_seen`, a recurrence count, an ordered per-run evidence list and a `status` that moves; its pointer pins to the dated run that judged it. |
+| `path` | **false** | Prose and code alike. Docs and specs may describe the latest state of usage, but they are not written with the directional purpose of generating episodes, and material beyond a document's original purpose is not something to depend on. |
+
+**A claim declares its type in the provenance map**, beside its provenance
+class — `P4.S6[L35]: sourced episode <- a1b2c3d`:
+
+- **`episode`** — asserts how something **came to be**. Admissible **only**
+  against a source with a time axis.
+- **`state`** — asserts how something **currently is**. Admissible against
+  either class, and the **default** when a map entry declares no type. The rule
+  constrains episode claims only.
+
+**Enforcement is at the ship gate, deny-never-warn.** `verify-provenance`
+refuses a claim typed `episode` whose every pin resolves to a `time_axis:
+false` source, naming the claim and the source that failed it; the Stage 3→4
+gate blocks on it like any other finding. This is a **predicate on the shipped
+mechanism**, not a second one — harvest is unchanged and stays capture-only.
+
+**What a given repository can ground is readable before drafting:**
+`resolve-writing-sources.py time-axis --root <host-repo>`. A declaration that
+grounds no episode claim is reported as a **fact about the declaration**, exit
+0 — an owner who declares only prose and code has not misconfigured anything.
+
 ## Where information is narrowed, discarded, or routed
 
 The pipeline deliberately loses material at each boundary; knowing where keeps

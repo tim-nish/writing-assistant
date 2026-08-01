@@ -95,6 +95,20 @@ grep -qF "13.51" "skills/draft-article/stages/stage2.md" \
   && ok "stage-2 triage states the Den-fact rule (recurrence never amplified)" \
   || err "draft-article triage missing the Den-fact rule"
 
+# 4d. commits typed source + the derived time axis (Story 20.138, #1184).
+has "type: commits" "documents the commits source"
+has "commit SHA" "commit facts pin to the commit sha"
+has "commits source skipped" "a failed git log degrades with one logged line"
+has "time_axis" "documents the derived time axis"
+has "DERIVED FROM ITS TYPE" "the time axis is derived from the type"
+has "INCLUDES THE ISSUE THREAD" "the github-issues read includes the thread"
+has "MARKED PARTIAL" "a body-only issue read is a marked partial"
+# Harvest stays CAPTURE-ONLY: the admissibility rule is enforced at the ship
+# gate, never inside harvest.
+grep -q 'ship gate' "$SKILL" && grep -q 'capture-only' "$SKILL" \
+  && ok "the time-axis rule is enforced at the ship gate, not inside harvest" \
+  || err "harvest SKILL does not state that enforcement stays at the ship gate"
+
 # --- behavioral: the source-scope enumerator (the enforced boundary) --------
 work=$(mktemp -d); trap 'rm -rf "$work"' EXIT
 mkdir -p "$work/host/src" "$work/host/.git" \

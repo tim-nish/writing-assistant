@@ -1,6 +1,7 @@
 #!/usr/bin/env sh
 # parallel-safe
 # tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
+# covers: scripts/verify-provenance.py
 # check-verify-provenance.sh — verify the independent verify-provenance check
 # (Story 11.2). POSIX shell + stdlib Python.
 #
@@ -248,6 +249,66 @@ grep -q 'attestation: draft-sha256=' "$SKILL" \
   && ok "SKILL states the judge attestation grammar verbatim (13.67)" || err "SKILL missing attestation grammar"
 grep -qi 're-spawn.*judge\|judge.*re-spawn\|every revision cycle re-spawns' "$SKILL" \
   && ok "SKILL states every revision cycle re-spawns the judge (13.67)" || err "SKILL missing re-spawn-per-cycle rule"
+
+# --- Time-axis admissibility (Story 20.138, #1184 clause (iii)) -------------
+# A claim typed `episode` — how something CAME TO BE — is refused at the ship
+# gate when its every pin resolves to a `time_axis: false` source. A `state`
+# claim is admissible against either class; an untyped claim is a state claim.
+printf '%s\n' 'aaaaaaa' 'den:f-1@r-2' 'https://github.com/o/r/issues/7' \
+  'docs/x.md:3@bbbbbbb' 'fs-1' > "$work/ta-ids.txt"
+cat > "$work/ta-ok.txt" <<'MAP'
+P1.S1: sourced episode <- aaaaaaa
+P1.S2: sourced episode <- https://github.com/o/r/issues/7
+P1.S3: sourced episode <- den:f-1@r-2
+P1.S4: derived episode <- docs/x.md:3@bbbbbbb, aaaaaaa
+MAP
+python3 "$VP" --map "$work/ta-ok.txt" --fact-sheet "$work/ta-ids.txt" >/dev/null 2>&1 \
+  && ok "an episode claim pinned to a time-axis source (commit / issue / den) passes" \
+  || err "a time-axis-grounded episode claim was refused"
+cat > "$work/ta-state.txt" <<'MAP'
+P1.S1: sourced <- docs/x.md:3@bbbbbbb
+P1.S2: sourced state <- docs/x.md:3@bbbbbbb
+P1.S3: derived state <- docs/x.md:3@bbbbbbb, fs-1
+MAP
+python3 "$VP" --map "$work/ta-state.txt" --fact-sheet "$work/ta-ids.txt" >/dev/null 2>&1 \
+  && ok "a state claim (declared or default) is admissible against a time_axis:false source" \
+  || err "the rule leaked onto state claims — it constrains episode claims only"
+cat > "$work/ta-bad.txt" <<'MAP'
+P1.S1: sourced episode <- docs/x.md:3@bbbbbbb
+MAP
+set +e
+ta_err=$(python3 "$VP" --map "$work/ta-bad.txt" --fact-sheet "$work/ta-ids.txt" 2>&1 >/dev/null)
+ta_rc=$?
+set -e
+[ "$ta_rc" -ne 0 ] && ok "an episode claim grounded only in a time_axis:false source is REFUSED (deny, never warn)" \
+  || err "an episode claim over a path source was admitted"
+printf '%s' "$ta_err" | grep -q 'P1.S1' \
+  && printf '%s' "$ta_err" | grep -q 'docs/x.md:3@bbbbbbb' \
+  && ok "the refusal names the claim and the source that failed it" \
+  || err "refusal does not name claim + source: $(printf '%s' "$ta_err" | tr '\n' ' ')"
+# An unrecognised pointer form has no established time axis: fail closed.
+cat > "$work/ta-unk.txt" <<'MAP'
+P1.S1: sourced episode <- fs-1
+MAP
+python3 "$VP" --map "$work/ta-unk.txt" --fact-sheet "$work/ta-ids.txt" >/dev/null 2>&1 \
+  && err "an episode claim over an unresolvable pointer form was admitted" \
+  || ok "an unresolvable pointer form does not admit an episode claim (fail closed)"
+# The type table has ONE home — this check never restates it.
+grep -q 'SOURCE_TYPE_TIME_AXIS' "$root/scripts/resolve-writing-sources.py" \
+  && grep -q 'rws.pointer_time_axis' "$VP" \
+  && ok "the type->time-axis table lives in resolve-writing-sources.py and is imported, not copied" \
+  || err "verify-provenance carries its own copy of the time-axis table"
+# The pipeline's mirrored map grammar accepts the marker, so a typed map still
+# passes the structural stage before it reaches this gate.
+printf 'P1.S1[L1]: sourced episode <- aaaaaaa\n' > "$work/ta-dp-map.txt"
+printf 'A sentence about how it came to be.\n' > "$work/ta-dp-draft.md"
+python3 "$DP" provenance --map "$work/ta-dp-map.txt" --draft "$work/ta-dp-draft.md" >/dev/null 2>&1 \
+  && ok "draft-pipeline's structural validation accepts a claim-typed map line" \
+  || err "a claim-typed map line fails the structural provenance stage"
+# The stage-3 SKILL documents the marker and the refusal.
+grep -q 'sourced episode' "$SKILL" && grep -qi 'time axis' "$SKILL" \
+  && ok "SKILL documents the episode claim type and the time-axis rule" \
+  || err "SKILL does not document the episode claim type"
 
 if [ "$fail" -eq 0 ]; then
   printf '\nAll verify-provenance checks passed.\n'; exit 0

@@ -241,9 +241,15 @@ PROV_CLASSES = ("sourced", "derived", "narration", "verify")
 # fixed at grading time, so the ambiguity is gratuitous: the anchor lets a judge
 # MATCH instead of derive. The suffix is optional in the grammar (older maps
 # still parse) and required where it matters — see `provenance --draft`.
+# A claim may also declare its TYPE — `sourced episode <- <sha>` (#1184 clause
+# (iii)). This parser ACCEPTS the marker and carries no opinion about it: the
+# structural layer here checks pointer counts and anchors, and time-axis
+# ADMISSIBILITY is `verify-provenance`'s ship-gate predicate, which is where the
+# refusal belongs (a map is not the place a claim is judged).
 PROV_LINE = re.compile(
     r"^(?P<pos>[^\s:\[]+)(?:\[L(?P<anchor>\d+)\])?"
     r":\s*(?P<cls>sourced|derived|narration|verify)"
+    r"(?:\s+(?:episode|state))?"
     r"(?:\s*<-\s*(?P<ptrs>.+?))?\s*$"
 )
 

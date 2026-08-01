@@ -28,11 +28,34 @@ git repo the script errors rather than silently resolving against cwd):
   typed-sources             All declared entries with their `type` as JSON
                             (Story 13.49). Entries carry an optional `type`
                             key — `path` (default), `github-issues`
-                            (optional inline `labels:` filter), `tanuki-den`.
-                            Unknown types and keys that only apply to another
-                            type (e.g. `include` on `github-issues`) are
-                            refused fail-closed with per-key diagnostics
-                            (exit 5, same posture as #221).
+                            (optional inline `labels:` filter), `tanuki-den`,
+                            `commits` (the host repo's own history, optional
+                            `since:` / inline `paths:` bounds — Story 20.138,
+                            #1184). Unknown types and keys that only apply to
+                            another type (e.g. `include` on `github-issues`)
+                            are refused fail-closed with per-key diagnostics
+                            (exit 5, same posture as #221). Every entry
+                            carries a DERIVED `time_axis` (see below); a
+                            hand-written `time_axis:` key is REFUSED.
+
+  commits [--limit N]       Read the declared `type: commits` scope — the host
+                            repository's own history under each entry's
+                            optional `since:` / `paths:` bounds — as JSON:
+                            {"time_axis": true, "scopes": [...],
+                             "commits": [{"sha","date","subject","body"}],
+                             "truncated": bool}. Emitted material pins to the
+                            commit SHA (the bare-sha SOURCE form the fact-sheet
+                            grammar already carries). Exit 0 with an empty
+                            commit list when no `type: commits` entry is
+                            declared — absence is not an error.
+
+  time-axis [--json]        Report which declared sources carry a TIME AXIS and
+                            therefore which claims the declaration can ground
+                            (2026-08-01 amendment, #1182/#1184/#1185). A
+                            declaration with no time-axis source grounds NO
+                            EPISODE claim — reported as a FACT ABOUT THE
+                            DECLARATION, exit 0, never an error. State claims
+                            are admissible against either class.
 
   is-declared PATH          Exit 0 iff PATH lies inside a declared source root;
                             non-zero otherwise. This is the harvest read
@@ -381,6 +404,11 @@ def render_sources_block(specs):
             if s.get("labels"):
                 quoted = ", ".join(f'"{g}"' for g in s["labels"])
                 out.append(f"    labels: [{quoted}]")
+            if s.get("since"):
+                out.append(f"    since: {s['since']}")
+            if s.get("paths"):
+                quoted = ", ".join(f'"{g}"' for g in s["paths"])
+                out.append(f"    paths: [{quoted}]")
     return out
 
 
@@ -390,8 +418,9 @@ def validate_source_specs(specs):
     errors = []
     if not isinstance(specs, list) or not specs:
         return ["sources must be a non-empty JSON array of "
-                '{"type"?: "path"|"github-issues"|"tanuki-den", '
-                '"path": str, "include": [str, ...]?, "labels": [str, ...]?} '
+                '{"type"?: "path"|"github-issues"|"tanuki-den"|"commits", '
+                '"path": str, "include": [str, ...]?, "labels": [str, ...]?, '
+                '"since": str?, "paths": [str, ...]?} '
                 "objects"]
     for i, s in enumerate(specs):
         if not isinstance(s, dict):
@@ -402,23 +431,33 @@ def validate_source_specs(specs):
             errors.append(f"sources[{i}].type: unknown type {t!r} — valid "
                           "types: " + ", ".join(VALID_SOURCE_TYPES))
             continue
+        # `time_axis` is derived from the type; the writer refuses it exactly as
+        # the reader does, so a caller cannot smuggle in by write what it may
+        # not declare by hand (#1184 clause (ii)).
+        for key in DERIVED_KEYS:
+            if key in s:
+                errors.append(f"sources[{i}].{key}: {TIME_AXIS_HAND_WRITTEN}")
+        # Every key belongs to exactly one type (KEY_OWNER); a key naming
+        # another type's contract is refused per-key.
+        for key in sorted(k for k in s if k in KEY_OWNER and KEY_OWNER[k] != t):
+            errors.append(f"sources[{i}].{key}: only applies to "
+                          f"`type: {KEY_OWNER[key]}` entries")
         if t != "path":
-            for key in ("path", "include"):
-                if key in s:
-                    errors.append(f"sources[{i}].{key}: only applies to "
-                                  f"`type: path` entries")
-            if t == "tanuki-den" and "labels" in s:
-                errors.append(f"sources[{i}].labels: only applies to "
-                              "`type: github-issues` entries")
             labels = s.get("labels", [])
             if not isinstance(labels, list) or any(
                     not isinstance(g, str) or not g.strip() for g in labels):
                 errors.append(f"sources[{i}].labels: must be a list of "
                               "non-empty strings")
+            if "since" in s and (not isinstance(s["since"], str)
+                                 or not s["since"].strip()):
+                errors.append(f"sources[{i}].since: must be a non-empty string "
+                              "(a git date or revision bound)")
+            paths = s.get("paths", [])
+            if not isinstance(paths, list) or any(
+                    not isinstance(g, str) or not g.strip() for g in paths):
+                errors.append(f"sources[{i}].paths: must be a list of "
+                              "non-empty strings")
             continue
-        if "labels" in s:
-            errors.append(f"sources[{i}].labels: only applies to "
-                          "`type: github-issues` entries")
         if not isinstance(s.get("path"), str) or not s["path"].strip():
             errors.append(f"sources[{i}]: a non-empty string `path` is required")
             continue
@@ -466,7 +505,109 @@ def set_sources(lines, specs):
 # Typed source entries (Story 13.49, SPEC-writing-assistant CAP-2 amendment):
 # `type: path` is the default — an untyped {path, include} entry behaves
 # byte-identically to before. Non-file evidence is an explicit opt-in.
-VALID_SOURCE_TYPES = ("path", "github-issues", "tanuki-den")
+# `commits` joined 2026-08-01 (#1184, clause (i)): the host repository's own
+# history, which is the closest thing a repo has to a native episode — a change
+# together with the stated reason for it.
+VALID_SOURCE_TYPES = ("path", "github-issues", "tanuki-den", "commits")
+
+# The TIME AXIS is DERIVED FROM THE TYPE and never declared by hand (#1184,
+# clause (ii)). A source has a time axis when it was written with the
+# directional purpose of recording *how something came to be*:
+#
+#   commits       true  — a commit is a change plus its stated reason, ordered.
+#   github-issues true  — an issue thread is a dated record of a decision being
+#                         reached; the READ INCLUDES THE THREAD (a body-only
+#                         projection is a MARKED PARTIAL, never a complete read
+#                         — the decision usually lives in the comments).
+#   tanuki-den    true  — OPEN QUESTION at story time, RESOLVED BY READING A
+#                         RECEIPT (Story 20.138). A Den finding record carries
+#                         `first_seen`, a `recurrence` count, an ordered
+#                         `evidence` list of `<run>/<scenario>#<seq>` ids, a
+#                         `status` that moves (open → accepted/dismissed) and an
+#                         appended `notes` list; the event records carry
+#                         `first_seen`/`last_seen` and an ordered `runs` list.
+#                         The pointer form itself — `den:<ledger-id>@<run>` —
+#                         pins to the dated run that judged the finding. That is
+#                         a directional record of how a finding came to be, so
+#                         the read is CONCLUSIVE and the type is true rather
+#                         than refused-by-default.
+#   path          false — for prose and code ALIKE. Docs and specs may describe
+#                         the latest state of usage; they are not written to
+#                         generate episodes, and material beyond a document's
+#                         original purpose is not something to depend on.
+SOURCE_TYPE_TIME_AXIS = {
+    "path": False,
+    "github-issues": True,
+    "tanuki-den": True,
+    "commits": True,
+}
+
+# Which keys each type admits. A key naming another type's contract is refused
+# per-key (#221 posture), never silently ignored.
+TYPE_KEYS = {
+    "path": ("path", "include"),
+    "github-issues": ("labels",),
+    "tanuki-den": (),
+    "commits": ("since", "paths"),
+}
+KEY_OWNER = {k: t for t, keys in TYPE_KEYS.items() for k in keys}
+# Keys parsed as an INLINE list (#221: the block form is a hard error).
+LIST_KEYS = ("include", "labels", "paths")
+# Keys parsed as a bare scalar.
+SCALAR_KEYS = ("path", "type", "since")
+# The one key a declaration may never carry: it is derived, and a hand-written
+# value would be an assertion about a source that the source itself decides.
+DERIVED_KEYS = ("time_axis",)
+TIME_AXIS_HAND_WRITTEN = (
+    "`time_axis` is DERIVED FROM `type` and is never declared by hand "
+    "(2026-08-01 amendment, #1184 clause (ii)) — delete the line. "
+    "`commits`, `github-issues` and `tanuki-den` carry a time axis; "
+    "`type: path` does not, for prose and code alike.")
+
+
+def time_axis_for_type(source_type):
+    """The derived time axis of a declared source type. An unknown type has no
+    time axis — the fail-closed direction, since admitting an episode claim
+    against an unrecognised source is the failure this rule exists to stop."""
+    return SOURCE_TYPE_TIME_AXIS.get(source_type, False)
+
+
+# --- pointer -> declared-source-type resolution ------------------------------
+# The FORM of a fact-sheet SOURCE pointer is what says which declared source it
+# came from; the grammar is `validate-fact-sheet.py`'s and is mirrored here in
+# the narrow shape this resolution needs (that validator imports THIS module, so
+# the dependency may not run the other way). Consumers: the ship-gate episode
+# predicate in `verify-provenance.py`, which must stay standalone (NFR13) and so
+# resolves a pin by form rather than by carrying drafting state.
+_PTR_SHA = re.compile(r"^[0-9a-f]{7,40}$")
+_PTR_DEN = re.compile(r"^den:[A-Za-z0-9._-]+@[A-Za-z0-9._-]+$")
+_PTR_ISSUE = re.compile(r"^https?://[^/\s]+/[^/\s]+/[^/\s]+/(issues|pull)/\d+", re.I)
+_PTR_FILE = re.compile(r"^.+:\d+(-\d+)?@[0-9a-f]{7,40}$")
+
+
+def pointer_source_type(pointer):
+    """The declared source TYPE a fact-sheet pointer resolves to, or None when
+    the form names no declared type (a bare fact id, an interview question id,
+    an arbitrary URL). None is NOT `path`: it is "cannot determine", and the
+    episode predicate treats it as it treats every non-time-axis source."""
+    p = (pointer or "").strip()
+    if not p:
+        return None
+    if _PTR_DEN.match(p):
+        return "tanuki-den"
+    if _PTR_SHA.match(p):
+        return "commits"
+    if _PTR_ISSUE.match(p):
+        return "github-issues"
+    if _PTR_FILE.match(p):
+        return "path"
+    return None
+
+
+def pointer_time_axis(pointer):
+    """True iff a fact-sheet pointer resolves to a source WITH a time axis.
+    Unresolvable forms are false — deny, never warn."""
+    return time_axis_for_type(pointer_source_type(pointer))
 
 
 def _entry_key(cur, key, raw, lineno, errors):
@@ -475,9 +616,13 @@ def _entry_key(cur, key, raw, lineno, errors):
     never a silent fall-through."""
     cur["keys"].add(key)
     val = re.sub(r"\s+#.*$", "", raw).strip()
-    if key in ("path", "type"):
+    if key in DERIVED_KEYS:
+        # Refused AT READ TIME for every type, path entries included — a
+        # derived property that a declaration can assert is not derived.
+        errors.append(f"line {lineno}: {TIME_AXIS_HAND_WRITTEN}")
+    elif key in SCALAR_KEYS:
         cur[key] = val.strip('"').strip("'")
-    elif key in ("include", "labels"):
+    elif key in LIST_KEYS:
         m = re.match(r"^\[(.*)\]$", val)
         if not m:
             errors.append(
@@ -501,11 +646,15 @@ def get_typed_sources(lines, root):
       {'type': 'path', 'path': abs, 'include': [...]}
       {'type': 'github-issues', 'labels': [...]}
       {'type': 'tanuki-den'}
+      {'type': 'commits', 'since': str|None, 'paths': [...]}
+
+    Every entry additionally carries `time_axis` — DERIVED FROM ITS TYPE
+    (#1184 clause (ii)), never read from the file.
 
     Fail-closed: an unknown `type`, a key that only applies to another type
-    (e.g. `include` on a `github-issues` entry), or a non-inline list form
-    (#221) raises MalformedSources with per-key diagnostics — same posture as
-    the block-style `include` hard error.
+    (e.g. `include` on a `github-issues` entry), a hand-written `time_axis:`,
+    or a non-inline list form (#221) raises MalformedSources with per-key
+    diagnostics — same posture as the block-style `include` hard error.
     """
     entries = []
     errors = []
@@ -522,7 +671,7 @@ def get_typed_sources(lines, root):
         m = re.match(r"^\s*-\s+([A-Za-z][\w-]*):\s*(.*?)\s*$", ln)
         if m:
             current = {"type": None, "path": None, "include": [], "labels": [],
-                       "keys": set(), "line": lineno}
+                       "paths": [], "since": None, "keys": set(), "line": lineno}
             entries.append(current)
             _entry_key(current, m.group(1), m.group(2), lineno, errors)
             continue
@@ -540,23 +689,26 @@ def get_typed_sources(lines, root):
                 + ", ".join(VALID_SOURCE_TYPES))
             continue
         e["type"] = t
+        # The time axis is DERIVED here and nowhere else (#1184 clause (ii)); a
+        # hand-written key never reaches this point — `_entry_key` refused it.
+        e["time_axis"] = time_axis_for_type(t)
+        # Every key belongs to exactly one type. A key naming another type's
+        # contract is refused per-key; an unknown key on a path entry keeps the
+        # legacy ignore (byte-identical), and `_entry_key` already refuses one
+        # on a typed entry.
+        for key in sorted(e["keys"]):
+            owner = KEY_OWNER.get(key)
+            if owner is None or owner == t:
+                continue
+            detail = (" — a `type: %s` source reads no files" % t
+                      if key in ("path", "include") and t != "path" else "")
+            errors.append(f"{tag}: `{key}` only applies to `type: {owner}` "
+                          f"entries{detail}")
         if t == "path":
             if not e["path"]:
                 errors.append(f"{tag}: a `type: path` entry requires a `path:` key")
                 continue
-            if "labels" in e["keys"]:
-                errors.append(f"{tag}: `labels` only applies to "
-                              f"`type: github-issues` entries")
             e["path"] = os.path.realpath(os.path.join(root, e["path"]))
-        else:
-            for key in ("path", "include"):
-                if key in e["keys"]:
-                    errors.append(
-                        f"{tag}: `{key}` only applies to `type: path` entries "
-                        f"— a `type: {t}` source reads no files")
-            if t == "tanuki-den" and "labels" in e["keys"]:
-                errors.append(f"{tag}: `labels` only applies to "
-                              f"`type: github-issues` entries")
 
     if errors:
         raise MalformedSources("\n".join(errors))
@@ -1021,14 +1173,172 @@ def cmd_typed_sources(args):
     out = []
     for e in get_typed_sources(read_lines(root), root):
         if e["type"] == "path":
-            out.append({"type": "path", "path": e["path"],
-                        "include": e["include"]})
+            rec = {"type": "path", "path": e["path"], "include": e["include"]}
         elif e["type"] == "github-issues":
-            out.append({"type": "github-issues", "labels": e["labels"]})
+            # `read: thread` is contract, not decoration (#1184 clause (ii)):
+            # the decision usually lives in the comments, so a body-only
+            # projection is a MARKED PARTIAL and never a complete read.
+            rec = {"type": "github-issues", "labels": e["labels"],
+                   "read": "thread",
+                   "partial_marker": "body-only (partial: issue thread not read)"}
+        elif e["type"] == "commits":
+            rec = {"type": "commits", "since": e["since"], "paths": e["paths"]}
         else:
-            out.append({"type": e["type"]})
+            rec = {"type": e["type"]}
+        rec["time_axis"] = e["time_axis"]   # derived, never declared
+        out.append(rec)
     print(json.dumps(out))
     return 0
+
+
+def cmd_commits(args):
+    """Read the declared `type: commits` scope — the host repo's own history
+    (#1184 clause (i)). A commit message is the closest thing a repository has
+    to a native episode: a change together with the stated reason for it.
+
+    Emitted material pins to the commit SHA, which is already a valid
+    fact-sheet SOURCE form (`validate-fact-sheet.py`: a bare 7-40 hex sha), so
+    this adds a READ, never a new pointer grammar. No declared `commits` entry
+    is not an error: an empty list, exit 0."""
+    import json
+    root = host_root(args.root)
+    scopes = [e for e in get_typed_sources(read_lines(root), root)
+              if e["type"] == "commits"]
+    seen, commits, truncated = set(), [], False
+    # ASCII record/unit separators: a NUL cannot travel in argv, and both
+    # characters are absent from git metadata and commit messages in practice.
+    REC, FLD = "\x1e", "\x1f"
+    for e in scopes:
+        cmd = ["git", "-C", root, "log",
+               f"--format=%H{FLD}%aI{FLD}%s{FLD}%b{REC}"]
+        if e["since"]:
+            cmd.append(f"--since={e['since']}")
+        if args.limit:
+            cmd.append(f"-n{args.limit}")
+        if e["paths"]:
+            cmd += ["--"] + list(e["paths"])
+        res = subprocess.run(cmd, capture_output=True, text=True)
+        if res.returncode != 0:
+            why = (res.stderr.strip().splitlines() or ["git log failed"])[0]
+            sys.stderr.write(f"commits source skipped: {why} (in {root})\n")
+            continue
+        recs = [r for r in res.stdout.split(REC) if r.strip()]
+        if args.limit and len(recs) >= args.limit:
+            truncated = True
+        for r in recs:
+            parts = r.lstrip("\n").split(FLD)
+            if len(parts) < 4:
+                continue
+            sha, date, subject, body = parts[0], parts[1], parts[2], parts[3]
+            if sha in seen:
+                continue
+            seen.add(sha)
+            commits.append({"sha": sha, "date": date,
+                            "subject": subject, "body": body.strip()})
+    commits.sort(key=lambda c: c["date"], reverse=True)
+    print(json.dumps({
+        "time_axis": time_axis_for_type("commits"),
+        "scopes": [{"since": e["since"], "paths": e["paths"]} for e in scopes],
+        "commits": commits,
+        "truncated": truncated,
+    }))
+    return 0
+
+
+def time_axis_report(root, lines):
+    """The declaration's TIME-AXIS reading, as data (#1184 clause (iii)).
+
+    A declaration with no time-axis source grounds no EPISODE claim. That is a
+    FACT ABOUT THE DECLARATION — the reading is exit 0 either way, because an
+    owner whose repository declares only prose and code has not misconfigured
+    anything; they have declared a scope that answers `how it currently is`."""
+    entries = get_typed_sources(lines, root)
+    with_axis = [e for e in entries if e["time_axis"]]
+    without = [e for e in entries if not e["time_axis"]]
+    files = enumerate_files([{"path": e["path"], "include": e["include"]}
+                             for e in entries if e["type"] == "path"])
+    globs = sum(len(e["include"]) for e in entries if e["type"] == "path")
+    return {
+        "declared": len(entries),
+        "include_globs": globs,
+        "files_in_scope": len(files),
+        "time_axis_sources": [_axis_row(e) for e in with_axis],
+        "non_time_axis_sources": [_axis_row(e) for e in without],
+        "grounds_episode_claims": bool(with_axis),
+        "grounds_state_claims": bool(entries),
+    }
+
+
+def _axis_row(e):
+    row = {"type": e["type"], "time_axis": e["time_axis"]}
+    if e["type"] == "path":
+        row["path"] = e["path"]
+        row["include"] = e["include"]
+    elif e["type"] == "github-issues":
+        row["labels"] = e["labels"]
+    elif e["type"] == "commits":
+        row["since"], row["paths"] = e["since"], e["paths"]
+    return row
+
+
+def cmd_time_axis(args):
+    import json
+    root = host_root(args.root)
+    rep = time_axis_report(root, read_lines(root))
+    if args.json:
+        print(json.dumps(rep))
+        return 0
+    path, _kind = sources_path(root)
+    print(f"declaration: {path}")
+    print(f"declared sources: {rep['declared']} "
+          f"({rep['include_globs']} include glob(s), "
+          f"{rep['files_in_scope']} file(s) in scope)")
+    print("")
+    print(f"time-axis sources (may ground an EPISODE claim): "
+          f"{len(rep['time_axis_sources'])}")
+    for r in rep["time_axis_sources"] or [None]:
+        print(f"  - {_axis_line(r)}")
+    print("")
+    print(f"non-time-axis sources (STATE claims only): "
+          f"{len(rep['non_time_axis_sources'])}")
+    for r in rep["non_time_axis_sources"] or [None]:
+        print(f"  - {_axis_line(r)}")
+    print("")
+    if rep["grounds_episode_claims"]:
+        print("EPISODE CLAIMS: groundable against the time-axis sources above.")
+    else:
+        print("EPISODE CLAIMS: NOT GROUNDABLE — no declared source carries a "
+              "time axis.")
+        print("This is a FACT ABOUT THE DECLARATION, not an error: docs, specs "
+              "and code")
+        print("describe how things currently are, and a claim about how "
+              "something CAME TO BE")
+        print("may be grounded only in a source written along a time axis "
+              "(#1184).")
+        print("To ground one, declare a `type: commits` or `type: "
+              "github-issues` source.")
+    print("STATE CLAIMS: admissible against either class — the rule constrains "
+          "episode claims only.")
+    return 0
+
+
+def _axis_line(row):
+    if row is None:
+        return "(none)"
+    if row["type"] == "path":
+        inc = (" include: " + ", ".join(row["include"])) if row["include"] else ""
+        return f"path: {row['path']}{inc}"
+    if row["type"] == "github-issues":
+        lab = (" labels: " + ", ".join(row["labels"])) if row["labels"] else ""
+        return f"github-issues{lab}"
+    if row["type"] == "commits":
+        b = []
+        if row.get("since"):
+            b.append(f"since: {row['since']}")
+        if row.get("paths"):
+            b.append("paths: " + ", ".join(row["paths"]))
+        return "commits" + (" (" + "; ".join(b) + ")" if b else "")
+    return row["type"]
 
 
 def cmd_is_declared(args):
@@ -1102,6 +1412,14 @@ def main(argv=None):
     sp.add_argument("path")
     sub.add_parser("sources", parents=[root_parent])
     sub.add_parser("typed-sources", parents=[root_parent])
+    sp = sub.add_parser("commits", parents=[root_parent])
+    sp.add_argument("--limit", type=int, default=0,
+                    help="at most N commits per declared scope (0 = no bound); "
+                         "a truncated read reports `truncated: true` rather "
+                         "than silently shortening the history")
+    sp = sub.add_parser("time-axis", parents=[root_parent])
+    sp.add_argument("--json", action="store_true",
+                    help="emit the reading as JSON instead of the report")
     sp = sub.add_parser("is-declared", parents=[root_parent])
     sp.add_argument("path")
     sub.add_parser("files", parents=[root_parent])
@@ -1133,6 +1451,8 @@ def main(argv=None):
             "set-draft-location": cmd_set_draft_location,
             "sources": cmd_sources,
             "typed-sources": cmd_typed_sources,
+            "commits": cmd_commits,
+            "time-axis": cmd_time_axis,
             "is-declared": cmd_is_declared,
             "files": cmd_files,
             "policy-source": cmd_policy_source,
