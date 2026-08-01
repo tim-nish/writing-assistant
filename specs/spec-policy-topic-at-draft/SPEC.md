@@ -1,5 +1,7 @@
 # SPEC — policy topic selection at draft time (`policy_source` split)
 
+**Companion: `amendments.md`** — the dated, ratified amendment record for this spec (opened 2026-08-01, #1144). New amendments append there, never here.
+
 **Status: RATIFIED (2026-07-15, owner, via /triage-gh on #230) — decomposed into stories 13.34–13.36; amendment notes placed in SPEC-policy-source-seam and SPEC-repo-onboarding.**
 Origin: owner feedback after the 2026-07-15 QSB F1 run. Setup froze
 `track: benchmark-engineering` into the machine-global config at onboarding,
