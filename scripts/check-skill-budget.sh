@@ -41,6 +41,26 @@ COMP_HARD_LINES=600
 # Format: "<path>:<lines-at-adoption>", space-separated.
 COMP_RATCHETED="skills/draft-article/stages/stage0.md:731 skills/draft-article/stages/stage2.md:705 skills/draft-article/stages/stage3.md:603"
 
+# THE LINE COUNT IS A PROXY, AND THIS CHECK NAMES WHAT IT STANDS FOR (#1199).
+# The property that matters is whether a file has absorbed more content than
+# its structure carries — whether a reader or an agent can still navigate it.
+# That is not mechanically decidable, so a line count stands in for it, and a
+# proxy must name the property it proxies or it silently becomes the target.
+#
+# CONSEQUENCE, STATED BECAUSE IT HAS ALREADY HAPPENED: this count is
+# satisfiable by REFORMATTING. Story 20.135 (#1178) needed a clause in
+# stage0.md, which sat at exactly its ratchet with zero headroom, and paid for
+# it by appending to an existing line — net-zero lines, real content growth,
+# fully disclosed and matching the file'"'"'s own convention (it already carries
+# lines of 1269 and 1128 characters). Nothing was gamed; the instrument simply
+# did not measure what it stands for.
+#
+# So the messages below say "may have absorbed content" and never "is too
+# long", exactly so that shortening a line to duck the threshold is VISIBLY
+# not a fix. A BYTE axis was considered and is not the answer either: a
+# contributor at a byte ceiling compresses wording instead, and the report
+# would still be true about size and silent about the property.
+
 # --- Spec-document family (Story 20.15, #819) ---------------------------------
 # Third axis of the per-file-class criterion (SPEC-writing-assistant,
 # 2026-07-27 amendment): spec documents are measured in BYTES (~tokens =
@@ -157,16 +177,16 @@ for f in $(find skills -name '*.md' ! -name 'SKILL.md' | sort); do
   if [ -n "$ratchet" ]; then
     limit=$(( ratchet + ratchet * RATCHET_SLACK_PCT / 100 ))
     if [ "$n" -gt "$limit" ]; then
-      err "$f is $n lines — GREW past its ratchet ($ratchet at adoption, +${RATCHET_SLACK_PCT}% slack = $limit) — move detail down or split the companion; never raise the ratchet to absorb growth (Story 20.14, #820)"
+      err "$f may have ABSORBED CONTENT past what its structure carries — $n lines against its $ratchet ratchet (+${RATCHET_SLACK_PCT}% slack = $limit). Move detail down or split the companion; never raise the ratchet to absorb growth. NOTE: this count is satisfiable by reformatting (longer lines, tighter wording), which does not address what it stands for (Story 20.14, #820; #1199)"
     elif [ "$n" -lt "$ratchet" ]; then
       warn "$f is $n lines (below its $ratchet ratchet) — ratchet DOWN: update the COMP_RATCHETED entry to $n so the gain is locked in"
     else
       ok "$f is $n lines (ratcheted companion outlier: <= $limit)"
     fi
   elif [ "$n" -gt "$COMP_HARD_LINES" ]; then
-    err "$f is $n lines (> hard ceiling $COMP_HARD_LINES for skill companions) — split it or move detail to a spec (Story 20.14, #820)"
+    err "$f may have ABSORBED CONTENT past what its structure carries — $n lines, over the $COMP_HARD_LINES ceiling for skill companions. Split it or move detail to a spec; reformatting to fit the count is not a fix (Story 20.14, #820; #1199)"
   elif [ "$n" -gt "$COMP_WARN_LINES" ]; then
-    warn "$f is $n lines (> warning line $COMP_WARN_LINES, ceiling $COMP_HARD_LINES) — consider splitting before the ceiling forces it"
+    warn "$f may be absorbing content past what its structure carries — $n lines, over the $COMP_WARN_LINES warning line (ceiling $COMP_HARD_LINES). Consider splitting before the ceiling forces it (#1199)"
   else
     ok "$f is $n lines (within budget)"
   fi
