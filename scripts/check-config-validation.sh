@@ -270,67 +270,21 @@ grep -q 'track_topics' "$DRAFT" \
   && ok "draft SKILL documents the mapped default recommendation (never silently applied)" \
   || err "draft SKILL missing the track_topics default-recommendation contract"
 
-# 9. Journey element (#671): the config-surface half of the writing-sources
-#    `journey:` element (semantics in SPEC-writing-assistant CAP-2).
+# 9. The `journey:` config key is RETIRED (Story 20.134, #1183). Its only
+#    consumer was the host-repo episode join, which is removed, so the key, its
+#    resolver subcommand, its exit code and this lint went with it. The tests
+#    that asserted the lint are deleted rather than weakened; what is asserted
+#    here is that the subcommand is gone, so nothing keeps calling it.
 RWS="scripts/resolve-writing-sources.py"
-mkdir -p "$work/journeyok/docs"
-printf 'episode: the retry storm doubled token spend / #665\n' > "$work/journeyok/docs/journey.md"
-cat > "$work/journeyok/writing-sources.yaml" <<'YAML'
-sources:
-  - path: .
-    include: ["docs/**"]
-journey:
-  - docs/journey.md
-output:
-  drafts: articles/drafts/
-YAML
-python3 "$VAL" --repo-config /dev/null --root "$work/journeyok" \
-  --global-config "$work/clean.yaml" >/dev/null 2>&1 \
-  && ok "journey: a well-formed block naming a readable file validates clean (#671)" \
-  || err "journey: a valid journey block was flagged as a defect"
-python3 "$RWS" --root "$work/journeyok" journey | grep -q 'docs/journey.md' \
-  && ok "journey: the resolver reports the declared episode-record file" \
-  || err "journey subcommand did not report the declared file"
-python3 "$RWS" --root "$work/journeyok" files | grep -q 'docs/journey.md' \
-  && ok "journey: the declared file joins the harvest read set (no new read path)" \
-  || err "journey file absent from the files enumeration"
-
-# A declared journey file that does not exist is a stage-0 configuration defect.
-mkdir -p "$work/journeybad"
-cat > "$work/journeybad/writing-sources.yaml" <<'YAML'
-sources:
-  - path: .
-journey:
-  - docs/does-not-exist.md
-output:
-  drafts: articles/drafts/
-YAML
 set +e
-out=$(python3 "$VAL" --repo-config /dev/null --root "$work/journeybad" \
-      --global-config "$work/clean.yaml" 2>&1); rc=$?
+python3 "$RWS" --root "$work" journey >/dev/null 2>&1; rc=$?
 set -e
-if [ "$rc" -ne 0 ] && printf '%s' "$out" | grep -q 'journey' \
-   && printf '%s' "$out" | grep -qi 'does not exist'; then
-  ok "journey: a missing episode-record file is a stage-0 defect naming the key (#671)"
-else err "journey missing-file defect not raised (rc=$rc, out='$out')"; fi
-
-# A `..`-escaping journey path is refused.
-mkdir -p "$work/journeyesc"
-cat > "$work/journeyesc/writing-sources.yaml" <<'YAML'
-sources:
-  - path: .
-journey:
-  - ../outside.md
-output:
-  drafts: articles/drafts/
-YAML
-set +e
-out=$(python3 "$VAL" --repo-config /dev/null --root "$work/journeyesc" \
-      --global-config "$work/clean.yaml" 2>&1); rc=$?
-set -e
-if [ "$rc" -ne 0 ] && printf '%s' "$out" | grep -qi 'escapes the repository'; then
-  ok "journey: a path escaping the repo with .. is refused"
-else err "journey .. escape not refused (rc=$rc, out='$out')"; fi
+[ "$rc" -ne 0 ] \
+  && ok "#1183: the retired \`journey\` subcommand is gone (argparse refuses it)" \
+  || err "the retired \`journey\` subcommand still resolves"
+grep -qE '^def get_journey|validate_journey\(args' "$RWS" "$VAL" \
+  && err "a retired journey: reader or lint is still defined (#1183)" \
+  || ok "#1183: no journey: reader or lint is defined anywhere"
 
 if [ "$fail" -eq 0 ]; then
   printf '\nAll config-validation checks passed.\n'; exit 0

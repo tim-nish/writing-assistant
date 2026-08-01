@@ -20,8 +20,8 @@ say what a screen does and does not cover:
     of which names a bound or an abnormal condition ON THE SURFACE, because a
     bounded projection read as the whole record is the harm the bound exists to
     guard against;
-  * `_verdict_phrase` and `_pin_display`, the two owner-facing renderings whose
-    wording is fixed by ratified decisions rather than by this module.
+  * `_pin_display`, the owner-facing rendering whose wording is fixed by a
+    ratified decision rather than by this module.
 
 This is a MOVE, not a rewrite: every definition below is the one that stood in
 `topic-map-directions.py`, unchanged, and the composed output is byte-identical
@@ -44,8 +44,8 @@ BUDGETS = {"where": 240, "why": 200, "effect": 140}
 # The brief's NAMED STEP IDENTITY and its LIFECYCLE (Story 20.75, #994;
 # SPEC-terrain CAP-3, the named-artifact clause added 2026-07-31)
 #
-# Owner-facing strings, so they live HERE with `_verdict_phrase` and
-# `_pin_display` rather than inline at the composer — the same register seam
+# Owner-facing strings, so they live HERE with `_pin_display` rather than
+# inline at the composer — the same register seam
 # every other owner-facing rendering goes through. The brief previously
 # arrived as a chat continuation with no name, so the owner could refer to it
 # only as "the message above"; naming the act that produced it is the whole
@@ -396,32 +396,11 @@ def row_type_legend(elements, suffix=""):
     return f"What each row IS: {body}.{suffix}"
 
 
-def _verdict_phrase(cand):
-    """A candidate's writability verdict as one short owner-readable phrase
-    (#799). The three-valued verdict SURFACES on every element — matched /
-    episodic-unrecorded / no-episode are the ratified verdict names, spoken as
-    themselves — and it is surfacing only: an unmatched element stays
-    selectable, and the phrase says what selecting one does instead of hiding
-    it. `cannot-determine` is the lookup's honest fourth outcome (2026-07-26
-    correction), never rendered as "none"."""
-    u = cand.get("usability") or {}
-    verdict = u.get("verdict")
-    if not verdict or cand.get("kind") != "element":
-        return ""
-    if verdict == "matched":
-        checked = [_short_path(p) for p in (u.get("checked") or [])]
-        where = f" — evidence at {', '.join(checked[:2])}" if checked else ""
-        return f"matched{where}"
-    if verdict == "episodic-unrecorded":
-        return ("episodic-unrecorded — selectable; picking it records the "
-                "gap, never blocks the draft")
-    if verdict == "no-episode":
-        return "no-episode — offerable as your own framing, stated as such"
-    # The lookup's honest fourth outcome, said in the owner's register (#842;
-    # the fix belongs in the derivation, #637): the lookup did not look, so
-    # neither presence nor absence is asserted.
-    return ("whether this can be evidenced was not checked — "
-            "still selectable")
+# `_verdict_phrase()` was REMOVED (Story 20.134, #1183). It rendered the
+# host-repo join's four verdicts as an owner-facing phrase; the join, its
+# verdicts and the `usability` block they lived in are gone, so the rendering
+# has no input left to render. Nothing replaces it on the row: an element's
+# served arc is shown by the journey marker the screens already carry.
 
 
 def _short_path(path):

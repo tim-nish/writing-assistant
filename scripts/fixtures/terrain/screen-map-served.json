@@ -9,11 +9,6 @@
   "stale_mapping_tracks": [],
   "subtopic_defects": [],
   "topics": [],
-  "needs_recording": [],
-  "recording_target": {
-    "repo": "host",
-    "file": "/tmp/tmp.NbyWNyYzFm/host/docs/journey.md"
-  },
   "gloss": {
     "served": true,
     "reason": null,

@@ -1367,95 +1367,21 @@ def lesson_elements(topics, gloss_info, consumption):
 # nothing ever requested a journey shard.
 
 
-def journey_join(root, topics, elements=None):
-    """Resolve each candidate's usability against the target repo's declared
-    sources — the mechanical topic↔evidence join (Story 18.96, #669). Returns
-    `(needs_recording, recording_target)` and annotates every item AND every
-    element in place with `usability` — the pivot (#799) makes the verdict a
-    visible property of every element: it SURFACES at selection, it never
-    filters what appears, and an unmatched element stays selectable (picking
-    one yields the gap disclosure and its NEEDS-RECORDING tracking artifact,
-    never a refusal to draft).
-
-    A hub-lesson candidate is `matched` when a declared **journey** entry carries
-    its slug (the #671 join key resolves into declared sources); otherwise it is
-    `episodic-unrecorded` and emits a NEEDS-RECORDING task naming the slug, the
-    episode label, and the target journey file. **Never a silent drop** — the
-    unusable candidate IS the map's product, a named backfill worklist
-    (constrained-excludes-visibly, the flywheel that grows the usable set). A
-    source-derived or articles item is `matched` by construction: its evidence is
-    the declared source it came from. Every verdict carries the pointers checked
-    (audited), and the join only LOCATES evidence — it never supplies it, and no
-    hub line becomes a SOURCE pointer.
-
-    Boundary — `no-episode` is cannot-determine here: distinguishing a lesson the
-    hub records with no episode at all from one whose episode is merely unrecorded
-    needs the Lesson BODY, which the seam does not serve (only index lines, OQ3).
-    So an unmatched hub lesson defaults to `episodic-unrecorded` — the expected
-    day-one majority — and `no-episode` is the owner's attribution at offer
-    (Story 17.1 tier), stated as such."""
-    jpaths = []
-    r = subprocess.run([sys.executable, SRC_RES, "--root", root, "journey"],
-                       capture_output=True, text=True)
-    if r.returncode == 0:
-        try:
-            jpaths = json.loads(r.stdout).get("journey", [])
-        except json.JSONDecodeError:
-            jpaths = []
-    haystack = ""
-    for p in jpaths:
-        try:
-            with open(p, encoding="utf-8") as fh:
-                haystack += fh.read() + "\n"
-        except OSError:
-            continue
-    checked = list(jpaths)
-    target_file = jpaths[0] if jpaths else os.path.join(root, "docs", "journey.md")
-    target_repo = os.path.basename(root)
-    needs_recording = []
-    for topic in topics:
-        for item in topic["items"]:
-            if item.get("family") != FAMILY_HUB_LESSONS:
-                item["usability"] = {"verdict": "matched", "checked": []}
-                continue
-            slug = item.get("slug") or ""
-            if slug and slug in haystack:
-                item["usability"] = {"verdict": "matched", "checked": checked}
-            else:
-                item["usability"] = {"verdict": "episodic-unrecorded",
-                                     "checked": checked}
-                needs_recording.append({
-                    "slug": slug,
-                    "episode": item.get("title") or slug,
-                    "target_repo": target_repo,
-                    "target_file": target_file,
-                })
-    for el in elements or []:
-        if el.get("kind") in ("lesson", "journey"):
-            slug = el.get("slug") or ""
-            if slug and slug in haystack:
-                el["usability"] = {"verdict": "matched", "checked": checked}
-            else:
-                # The expected day-one majority. `no-episode` stays the
-                # owner's attribution at offer (Story 17.1 tier) — the seam
-                # serves index lines and renderings, not lesson bodies, so
-                # the map cannot mechanically tell the two apart (OQ3), and
-                # collapsing them would queue work that can never complete.
-                el["usability"] = {"verdict": "episodic-unrecorded",
-                                   "checked": checked}
-        else:
-            # A decision/reversal element carries no lesson slug a `journey:`
-            # entry could name — the LOOKUP has no key, and the honest outcome
-            # is `cannot-determine` (the contracted fourth outcome of the
-            # lookup, 2026-07-26 correction), never a merge into the three
-            # verdicts and never rendered as "none".
-            el["usability"] = {"verdict": "cannot-determine",
-                               "checked": checked,
-                               "reason": ("no join key — a decision/reversal "
-                                          "element names no lesson slug a "
-                                          "journey entry could carry")}
-    return (sorted(needs_recording, key=lambda t: t["slug"]),
-            {"repo": target_repo, "file": target_file})
+# THE HOST-REPO EPISODE JOIN WAS REMOVED (Story 20.134, #1183;
+# SPEC-writing-assistant and
+# SPEC-terrain both amended 2026-08-01). It matched a hub lesson's filename stem
+# against the concatenated text of the target repo's declared `journey:` files
+# and stamped every unmatched element as an unrecorded episode — including where no
+# such block was declared at all, i.e. an asserted absence over ZERO BYTES,
+# which is `cannot-determine` under this repo's three-valued absence rule. Its
+# key was another repository's internal filename stem, so no document written
+# for its own purpose could ever satisfy it: the only text that could was the
+# recording IOU the gap step itself wrote, a to-do that discharges itself.
+# Removed with it: all four verdicts (matched, unrecorded-episode, no-episode,
+# and the join's own cannot-determine), the `usability` block on every item and
+# element, the recording worklist and its target.
+# RETAINED, and untouched: `episode.served` / `episode.arc` — the hub serving a
+# Strand's journey arc was never the defective half.
 
 
 def build_map(args):
@@ -1484,8 +1410,7 @@ def build_map(args):
     subtopic_defects = []
     # The PRIMARY selection units (stance-3 pivot, 2026-07-27, #799): every hub
     # Lesson and every served Journey rendering is its own element beside the
-    # decision/reversal projection. Built before the join so every element
-    # carries its usability verdict.
+    # decision/reversal projection.
     # The decisions-shard join (Story 20.22, #851 — the join #850 D1 found
     # missing): fetch the served renderings for exactly the topics that
     # produced decision/reversal Strands, then attach them. A missing
@@ -1498,10 +1423,6 @@ def build_map(args):
     join_decision_gloss(elements, decision_gloss, decision_gloss_misses)
     elements = (elements
                 + lesson_elements(topics, gloss_info, consumption))
-    # Topic↔evidence usability join (Story 18.96, #669) — annotate every item
-    # AND every element with its usability verdict and collect the
-    # NEEDS-RECORDING worklist.
-    needs_recording, recording_target = journey_join(root, topics, elements)
     # NO CLUSTERING (Story 20.7, #809). The subtopic cluster is abandoned, not
     # tuned: one dogfood run spent its whole budget to produce a single usable
     # line. Strands — Lessons and Journeys — are the selection unit, and they
@@ -1525,15 +1446,6 @@ def build_map(args):
         # clustering went (Story 20.7, #809).
         "subtopic_defects": subtopic_defects,
         "topics": topics,
-        # The topic↔evidence join's product (Story 18.96, #669): the
-        # NEEDS-RECORDING worklist for hub-lesson candidates whose episode no
-        # declared source carries. Never a silent drop — the unusable candidate
-        # is surfaced as named backfill work (constrained-excludes-visibly).
-        "needs_recording": needs_recording,
-        # Where a NEEDS-RECORDING gap is discharged: the target repo's declared
-        # journey file. Selecting an unmatched element yields the gap
-        # disclosure plus a tracking artifact HERE — never a refusal to draft.
-        "recording_target": recording_target,
         # The gloss surface's own disclosure: whether the ratified renderings
         # were served, and the reason when they were not. A slot without a
         # served rendering states this — it never quotes the recall one-liner
@@ -1567,7 +1479,7 @@ def build_map(args):
         # The PRIMARY selection units (stance-3 pivot, 2026-07-27, #799):
         # typed strands — hub Lessons and Journeys first-class, plus the
         # decision/reversal projection — each individually
-        # selectable, each carrying its visible usability verdict. Since the
+        # selectable. Since the
         # cluster removal (Story 20.7, #809) they are the ONLY units. Derived
         # per invocation and stored nowhere.
         "elements": elements,

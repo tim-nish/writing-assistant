@@ -46,7 +46,6 @@ sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
 from terrain_text import (  # noqa: E402
     VIEW_LINE_CHARS,
     _elide,
-    _verdict_phrase,
 )
 
 
@@ -184,9 +183,6 @@ def candidates(map_data):
             "journey": el.get("journey"),
             "journey_cite": el.get("journey_cite"),
             "journey_unavailable": el.get("journey_unavailable"),
-            # The three-valued writability verdict, VISIBLE on every strand
-            # (#799): it surfaces at selection and never filters what appears.
-            "usability": el.get("usability"),
             "consumed": bool(el.get("consumed")),
             "evidence_pointers": len(el.get("evidence") or []),
         })
@@ -247,16 +243,10 @@ def _direction_lines(cands):
         # the exact shape the clause forbids, and the counts stay one section
         # down in the subtopic's own block.
         facts = []
-        verdict = _verdict_phrase(c)
-        if verdict:
-            # The writability verdict is VISIBLE on every element row (#799):
-            # it surfaces, it never filters, and it may not be clipped away —
-            # the claim gives way to it below, never the other way round.
-            facts.append(verdict)
         if _is_substance_led(c):
             # Declared, not checked (#842): this counts the source references
-            # the material declares; whether they resolve is the verdict's to
-            # say, so the two never share one phrase.
+            # the material declares — a count of what the material names, and
+            # never a claim that any of them resolves.
             n = c.get("evidence_pointers", 0)
             facts.append(f"{n} source reference{'' if n == 1 else 's'} "
                          "declared")

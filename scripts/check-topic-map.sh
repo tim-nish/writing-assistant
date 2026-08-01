@@ -440,63 +440,43 @@ grep -q 'SENTINEL-HOOK' "$work/lessons.json" \
   && err "a lesson hook reached the map — more than the index line's title was projected" \
   || ok "hub-lessons: only the index line's title is projected (no hook prose, no lesson body)"
 
-# --- 7c. topic↔evidence usability join (Story 18.96, #669) --------------------
-# With no journey record declared, every hub-lesson candidate is
-# episodic-unrecorded and surfaced in needs_recording — never silently dropped.
-python3 - "$work/lessons.json" <<'PYEOF' && ok "#669: unmatched hub lessons are episodic-unrecorded, surfaced as NEEDS-RECORDING (never dropped)" || err "usability join / needs_recording wrong with no journey"
+# --- 7c. the host-repo episode join is GONE (Story 20.134, #1183) ------------
+# The join that stamped every hub-lesson candidate with a writability verdict
+# and collected a host-side recording worklist was removed: it searched zero
+# bytes wherever the target repo declared no episode-record block and asserted
+# an absence anyway. The tests that asserted its three verdicts, its worklist
+# and its target went with it. What is asserted here is that none of it grows
+# back — a verdict key on an item or an element, or a worklist beside them, is
+# the mechanism returning.
+python3 - "$work/lessons.json" <<'PYEOF' && ok "#1183: the map carries no host-repo writability verdict and no recording worklist" || err "a removed host-repo join key is present on the map"
 import json, sys
 d = json.load(open(sys.argv[1]))
+assert "needs_recording" not in d and "recording_target" not in d, sorted(d)
 seeds = [i for t in d["topics"] for i in t["items"] if i.get("family") == "hub-lessons"]
 assert seeds, "no hub-lesson seeds"
-assert all(i["usability"]["verdict"] == "episodic-unrecorded" for i in seeds), \
-    [i.get("usability") for i in seeds]
-nr = {t["slug"]: t for t in d["needs_recording"]}
-assert {"retry-storm", "cache-warmth", "team-shape"} <= set(nr), nr
-one = nr["cache-warmth"]
-assert one["target_file"].endswith("journey.md") and one["episode"], one
+assert all("usability" not in i for i in seeds), seeds[0]
+assert all("usability" not in e for e in d["elements"]), d["elements"][0]
 PYEOF
 
-# Declare a journey record carrying ONE lesson's slug -> that candidate MATCHES;
-# the others stay episodic-unrecorded (three-valued, never collapsed).
-mkdir -p "$h/docs"
-printf '2026-07-01 · the retry storm doubled token spend (event) · #665 · retry-storm\n' \
-  > "$h/docs/journey.md"
-cfg=$(find "$work/xdg" -name writing-sources.yaml | head -1)
-printf '\njourney:\n  - docs/journey.md\n' >> "$cfg"
-MAP > "$work/lessons2.json" 2>"$work/l2.err" \
-  && ok "#671/#669: the map assembles with a declared journey record" \
-  || err "assemble failed with a journey declared: $(cat "$work/l2.err")"
-python3 - "$work/lessons2.json" <<'PYEOF' && ok "#669: a lesson whose slug a journey entry carries is MATCHED; others stay episodic-unrecorded" || err "journey match verdict wrong"
-import json, sys
-d = json.load(open(sys.argv[1]))
-seeds = {i["slug"]: i for t in d["topics"] for i in t["items"]
-         if i.get("family") == "hub-lessons"}
-assert seeds["retry-storm"]["usability"]["verdict"] == "matched", \
-    seeds["retry-storm"]["usability"]
-assert seeds["retry-storm"]["usability"]["checked"], \
-    "a matched verdict must carry the pointers checked (audited)"
-assert seeds["cache-warmth"]["usability"]["verdict"] == "episodic-unrecorded", \
-    seeds["cache-warmth"]["usability"]
-nr = {t["slug"] for t in d["needs_recording"]}
-assert "retry-storm" not in nr and "cache-warmth" in nr, nr
-PYEOF
-
-# The SKILL presents the verdicts and never silently filters to matched.
-# Story 20.64 (#962): dispatcher + step companions — assert over the family.
+# The SKILL family never re-declares the removed mechanism, and still carries
+# the half that survives: the hub's own served arc.
 __tsk=$(cat skills/terrain/SKILL.md skills/terrain/steps/*.md)
-printf '%s' "$__tsk" | grep -qi 'never silently' \
-  && printf '%s' "$__tsk" | grep -q 'needs_recording' \
-  && printf '%s' "$__tsk" | grep -qi 'no-episode' \
-  && ok "#669: topic-map SKILL presents verdicts + NEEDS-RECORDING, never silently filters" \
-  || err "topic-map SKILL missing the usability-verdict presentation"
+if printf '%s' "$__tsk" | grep -q 'needs_recording'; then
+  err "the terrain SKILL family still names the removed recording worklist"
+else
+  ok "#1183: the terrain SKILL family names no recording worklist"
+fi
+if printf '%s' "$__tsk" | grep -q 'episode-served'; then
+  ok "...and still states the served-arc disclosure it retains"
+else
+  err "the terrain SKILL family dropped the episode-served disclosure"
+fi
 
 # --- 7d. the stance-3 pivot (#799): elements primary, the Gloss quoted -------
 # With the two-tier gloss surface served (`gloss_index`, tsurezure-gateway#64),
 # every hub Lesson is a PRIMARY element quoting the ratified `gloss:` rendering
 # — never the recall one-liner — and a journey-named index path yields journey
-# elements quoting `journey_gloss:`. Every element carries its VISIBLE
-# three-valued usability verdict, verdicts never filter, and the map names the
-# recording target a gap artifact lands in.
+# elements quoting `journey_gloss:`.
 python3 - "$FX" <<'PYEOF'
 import json, sys
 fx = json.load(open(sys.argv[1]))
@@ -557,26 +537,20 @@ assert cw.get("journey") is None and "not requested" in (cw.get("journey_unavail
 # is substituted for a ratified rendering.
 ts = els[("lesson", "team-shape")]
 assert ts["gloss"] is None and ts["gloss_unavailable"], ts
-# Every element carries its VISIBLE verdict; the journey record declared above
-# still matches retry-storm, and the others stay episodic-unrecorded.
-assert all(e.get("usability", {}).get("verdict") for e in d["elements"]), \
-    [e.get("usability") for e in d["elements"]]
-assert els[("lesson", "retry-storm")]["usability"]["verdict"] == "matched"
-assert els[("lesson", "cache-warmth")]["usability"]["verdict"] == "episodic-unrecorded"
-# The gap artifact's destination is named on the map.
-assert d["recording_target"]["file"].endswith("journey.md"), d["recording_target"]
+# No writability verdict survives on any element (#1183).
+assert all("usability" not in e for e in d["elements"]), d["elements"][0]
 assert d["gloss"]["served"] is True and d["gloss"]["journey_renderings"] == 1, d["gloss"]
 assert d["gloss"]["journeys_requested"] == ["journeys/agents"], d["gloss"]
 fams = {f["family"]: f for f in d["coverage"]["families"]}
 assert fams["hub-gloss"]["enumerated"] is True, fams["hub-gloss"]
 PYEOF
 
-# The directions surface: elements are individually selectable ideas with their
-# verdicts visible; selecting an unmatched one yields the brief PLUS the gap
-# disclosure and its NEEDS-RECORDING artifact content — never a refusal.
+# The directions surface: elements are individually selectable ideas, and
+# selecting one yields the brief PLUS its episode disclosure — never a refusal,
+# and never a claim about the owner's repository (#1183).
 DIR="$root/scripts/topic-map-directions.py"
 python3 "$DIR" candidates --map "$work/pivot.json" > "$work/pivot-cands.json"
-python3 - "$work/pivot-cands.json" <<'PYEOF' && ok "#799/#871: N elements are N selectable candidates (L namespace; J retired), each quoting the gloss with its verdict attached" || err "element candidates wrong"
+python3 - "$work/pivot-cands.json" <<'PYEOF' && ok "#799/#871: N elements are N selectable candidates (L namespace; J retired), each quoting the gloss" || err "element candidates wrong"
 import json, sys
 c = json.load(open(sys.argv[1]))["candidates"]
 els = {x["id"]: x for x in c if x.get("kind") == "element"}
@@ -588,109 +562,102 @@ assert els["L1"]["slug"] == "cache-warmth" and els["L2"]["slug"] == "retry-storm
 assert "GLOSS-ALPHA" in els["L2"]["direction"], els["L2"]["direction"]
 # The one-liner is identification, never the quote.
 assert "The retry storm" not in els["L2"]["direction"], els["L2"]
-assert els["L2"]["usability"]["verdict"] == "matched", els["L2"]
-assert els["L1"]["usability"]["verdict"] == "episodic-unrecorded", els["L1"]
+assert "usability" not in els["L2"], els["L2"]
+assert "usability" not in els["L1"], els["L1"]
 PYEOF
 
 pivotpin=$(python3 -c "import json;print(json.load(open('$work/pivot.json'))['coverage']['pin'])")
 printf '{"index":"L1","note":"the cold-start angle","pin":"%s"}' "$pivotpin" > "$work/pivot-answer.json"
 python3 "$DIR" brief --answer "$work/pivot-answer.json" --map "$work/pivot.json" \
   > "$work/pivot-brief.json" 2>"$work/pivot-brief.err" \
-  && ok "#799: selecting an episodic-unrecorded element STILL yields a brief (exit 0, never a refusal)" \
-  || err "an unmatched element selection was refused: $(cat "$work/pivot-brief.err")"
-python3 - "$work/pivot-brief.json" <<'PYEOF' && ok "#799: the unmatched selection carries the gap disclosure + NEEDS-RECORDING artifact content beside the brief" || err "gap disclosure wrong on the brief"
+  && ok "#799: selecting an element with no served arc STILL yields a brief (exit 0, never a refusal)" \
+  || err "an element selection was refused: $(cat "$work/pivot-brief.err")"
+python3 - "$work/pivot-brief.json" <<'PYEOF' && ok "#1183: the selection carries its episode disclosure beside the brief, and no recording payload" || err "gap disclosure wrong on the brief"
 import json, sys
 b = json.load(open(sys.argv[1]))
 assert b["brief"].startswith("cover the lesson — GLOSS-BETA"), b["brief"]
 assert b["brief"].endswith("the cold-start angle"), b["brief"]
 # `gaps`, NOT `gap` (Story 20.99, #1077). The singular carried member[0]'s
 # record beside the plural and read as "the selection"; a one-member selection
-# is the degenerate case of a set and now takes the same path and the same key.
-# Every assertion below is unchanged — only where the record is read from.
+# is the degenerate case of a set and takes the same path and the same key.
 assert "gap" not in b, sorted(b)
 assert len(b["gaps"]) == 1, b["gaps"]
 gap = b["gaps"][0]
 assert gap["index"] == "L1", gap
-assert gap["verdict"] == "episodic-unrecorded", gap
 assert "never" in gap["drafting"] and "gate" in gap["drafting"], gap
-nr = gap["needs_recording"]
-assert nr["slug"] == "cache-warmth" and nr["target_file"].endswith("journey.md"), nr
-assert nr["heading"] == "NEEDS-RECORDING" and nr["entry"], nr
-# Story 20.91 (#1044) AC2: with NO arc served, the absence is still reported —
-# and it says WHICH absence it is, in the kind Story 20.90 carries. "No arc
-# exists" and "no arc arrived" must not collapse into one finding.
+# The host-repo join and everything it minted are GONE (Story 20.134, #1183):
+# no writability verdict, no host_join, no recording payload, and nothing
+# asserted about the owner's repository.
+for k in ("needs_recording", "host_join", "tier"):
+    assert k not in gap, (k, gap)
+assert gap.get("verdict") is None, gap
+# Story 20.91 (#1044) AC2 is RETAINED: with NO arc served, the absence is
+# still reported — and it says WHICH absence it is, in the kind Story 20.90
+# carries. "No arc exists" and "no arc arrived" must not collapse into one.
 ep = gap["episode"]
 assert ep["served"] is False and ep["arc"] is None, ep
 assert "not requested" in (ep["not_served_reason"] or ""), ep
-assert "host_join" not in gap, gap
 PYEOF
-
-# --- 7f. an episode the system is CARRYING is not an absent one (#1044, 20.91)
-# Same fixture, unit-exact: a selected Strand whose host-repo join found nothing
-# but whose served arc IS present is not reported `episodic-unrecorded`. The
-# host verdict is kept under `host_join`, the arc travels quoted at its cite,
-# and the NEEDS-RECORDING task is STILL minted — recording host-side feeds
-# evidence, the arc is material that already existed; adjacent, never
-# substitutes (AC3/AC4).
-python3 - <<PYEOF && ok "#1044/20.91: a served arc is reported as episode-served, keeps host_join, and still mints NEEDS-RECORDING" || err "the served-arc gap disclosure is wrong"
+# --- 7f. an episode the system is CARRYING is disclosed as served (#1044) ---
+# Unit-exact over the same fixture, as amended 2026-08-01 (#1183): a selected
+# Strand whose served arc is present is reported `episode-served` and the arc
+# travels quoted at its cite. The host-repo half of this disclosure — the
+# verdict, the `host_join` block and the recording task — was removed; what is
+# asserted here is the retained half plus the absence of the removed one.
+python3 - <<PYEOF && ok "#1044/#1183: a served arc is reported as episode-served, and mints nothing" || err "the served-arc gap disclosure is wrong"
 import sys
 sys.path.insert(0, "$root/scripts")
 from terrain_select import _selection_gap
-target = {"repo": "host", "file": "docs/journey.md"}
 served = {"kind": "element", "slug": "retry-storm",
           "journey": "JOURNEY-ALPHA the belief inverted after the retro.",
-          "journey_cite": "gloss/journeys/agents.md:6@" + "1" * 40,
-          "usability": {"verdict": "episodic-unrecorded", "checked": ["docs/journey.md"]}}
-g = _selection_gap(served, target)
+          "journey_cite": "gloss/journeys/agents.md:6@" + "1" * 40}
+g = _selection_gap(served)
 assert g["verdict"] == "episode-served", g
-assert g["host_join"]["verdict"] == "episodic-unrecorded", g
-assert g["host_join"]["checked"] == ["docs/journey.md"], g
-assert "NOT an unrecorded episode" in g["disclosure"], g
-# The arc is QUOTED, never re-expressed, and carries its cite (AC5).
+# The arc is QUOTED, never re-expressed, and carries its cite (20.91 AC5).
 assert g["episode"]["arc"] == served["journey"], g
 assert g["episode"]["arc_cite"] == served["journey_cite"], g
 assert g["episode"]["served"] is True, g
-# AC4: the flow is unchanged and the relationship is STATED, not silently
-# subsumed. AC3: the arc is material, never a Fact.
-assert g["needs_recording"]["slug"] == "retry-storm", g
-assert g["needs_recording"]["heading"] == "NEEDS-RECORDING", g
-assert "adjacent, not substitutes" in g["disclosure"], g
+# The article floor is untouched: an arc is material, never a Fact (AC3).
 assert "never a Fact" in g["disclosure"], g
 assert "never" in g["drafting"] and "gate" in g["drafting"], g
-# An arc-less Strand at the same verdict is UNCHANGED — the two findings stay
+# Nothing about the owner's repository, and no work item, is composed here.
+for k in ("needs_recording", "host_join"):
+    assert k not in g, (k, g)
+# An arc-less Strand keeps its absence in its own kind — the two findings stay
 # distinct, and nothing here relabels an absence.
 bare = dict(served, journey=None, journey_cite=None,
             journey_unavailable="requested journeys/agents and it did not arrive")
-b = _selection_gap(bare, target)
-assert b["verdict"] == "episodic-unrecorded", b
-assert "host_join" not in b, b
+b = _selection_gap(bare)
+assert b.get("verdict") is None, b
 assert b["episode"]["served"] is False, b
 assert b["episode"]["not_served_reason"] == bare["journey_unavailable"], b
-# A `no-episode` or `cannot-determine` verdict is never relabelled by an arc.
-noep = dict(served, usability={"verdict": "no-episode", "checked": []})
-assert _selection_gap(noep, target)["verdict"] == "no-episode", noep
+assert "needs_recording" not in b, b
 PYEOF
 
-# The step companion states the relationship rather than leaving it inferred.
+# The step companion states what it retains and what it no longer does.
 __gapf=$(cat skills/terrain/steps/gap.md)
-printf '%s' "$__gapf" | grep -q 'episode-served' \
-  && printf '%s' "$__gapf" | grep -qi 'adjacent, not' \
-  && printf '%s' "$__gapf" | grep -qi 'harvest' \
-  && ok "#1044/20.91: gap.md states episode-served and the NEEDS-RECORDING relationship" \
-  || err "gap.md missing the episode-served relationship note"
+if printf '%s' "$__gapf" | grep -q 'episode-served' \
+   && printf '%s' "$__gapf" | grep -qi 'mints no tracking artifact' \
+   && printf '%s' "$__gapf" | grep -qi 'scope'; then
+  ok "#1183: gap.md is a scope statement that still relays the served arc"
+else
+  err "gap.md is not the scope statement #1183 requires"
+fi
 
-# A MATCHED selection carries no gap block — the verdict already located its
-# evidence, and the brief is indistinguishable from any other.
+# A selection whose arc IS served takes the same path and discloses it, with
+# no recording payload either (#1183).
 printf '{"index":"L2","note":"","pin":"%s"}' "$pivotpin" > "$work/pivot-answer2.json"
 python3 "$DIR" brief --answer "$work/pivot-answer2.json" --map "$work/pivot.json" \
   > "$work/pivot-brief2.json" 2>/dev/null
-python3 - "$work/pivot-brief2.json" <<'PYEOF' && ok "#799: a matched element selection carries no gap block" || err "a matched selection grew a gap block"
+python3 - "$work/pivot-brief2.json" <<'PYEOF' && ok "#1183: a served-arc selection discloses episode-served and mints nothing" || err "the served-arc selection is wrong"
 import json, sys
 b = json.load(open(sys.argv[1]))
-assert "gap" not in b, b.get("gap")
 assert "GLOSS-ALPHA" in b["brief"], b["brief"]
+g = b["gaps"][0]
+assert g["verdict"] == "episode-served", g
+assert g["episode"]["arc"].startswith("JOURNEY-ALPHA"), g
+assert "needs_recording" not in g and "host_join" not in g, g
 PYEOF
-
 # Without gloss_index (an older gateway), the elements STILL exist — the pivot
 # does not depend on the rendering being served — and the absent rendering is
 # a named disclosure, never a silent fallback to the one-liner.

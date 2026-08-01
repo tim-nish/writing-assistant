@@ -41,33 +41,16 @@ the axis word with the member when you present or resolve a choice. A
 Strand belonging to neither axis appears in the **outside-both disclosure
 line**; relay that line as given.
 
-**Usability verdict per candidate (the topic↔evidence join, #669; enforced on
-every element, #799).** Each item AND each element carries a `usability`
-verdict resolving whether the target repo can *evidence* it, and the map's
-`needs_recording` list is the join's product. The verdict is **surfacing,
-never a filter and never a refusal**: every element appears whatever its
-verdict says, every element stays selectable, and selecting an unmatched one
-yields the gap disclosure plus its tracking artifact (Step 4) while the draft
-proceeds. A flow that refuses to draft on a missing-Evidence verdict is the
-defect this pivot removed (owner ruling, #799):
+**No writability verdict, and no host-repo join (removed 2026-08-01, #1183).**
+The map once carried a writability verdict per item and per element, plus a
+host-side recording worklist and its target file. All of them are gone: the
+join behind them matched a hub lesson's filename stem against the target repo's
+declared `journey:` files, searched **zero bytes** where no such block was
+declared and stamped an absence anyway, and its key was the hub's own internal
+filename stem, so the only text that could ever satisfy it was the to-do the
+gap step wrote for it. **Evidence still never blocks drafting** — there is now
+nothing that could, because no verdict is computed at all.
 
-- **matched** — a declared source (for a hub lesson, a `journey:` entry carrying
-  its slug — #671) resolves into the read boundary → offer as **draft-ready**,
-  evidence pre-located. The verdict carries the pointers `checked` (audited).
-- **episodic-unrecorded** — a hub lesson no declared source carries → it appears
-  in `needs_recording` as a **NEEDS-RECORDING task** naming the lesson slug, the
-  episode, and the target `journey:` file. **Present this list — never silently
-  filter to matched**: the unusable topic IS the map's product, a named backfill
-  worklist (recording an episode there makes the next harvest match it — the
-  flywheel).
-- **no-episode** — a hub lesson with no locatable episode: **still selectable
-  and still drafted** — offered on the **owner-attributed framing tier** (the
-  Story 17.1 attribution tier: a framing contribution, not sourced claims),
-  stated as such. The seam serves index lines and renderings, not lesson
-  bodies, so the map cannot mechanically tell `no-episode` from
-  `episodic-unrecorded` (cannot-determine); it defaults an unmatched hub
-  lesson to `episodic-unrecorded` and leaves the `no-episode` call to the
-  owner at offer.
-
-The join **locates** evidence, it never **supplies** it: no hub line becomes a
-SOURCE pointer, and every offer stays a proposal the owner ratifies.
+**What the map still carries about episodes** is the hub's own service: an
+element's served journey arc (`journey`, `journey_cite`) with its absence typed
+(`journey_unavailable`). That half was never defective and is untouched.

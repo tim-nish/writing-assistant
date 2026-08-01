@@ -67,7 +67,6 @@ from terrain_text import (  # noqa: E402
     _pin_display,
     _substitution_disclosure_line,
     _terrain_size_line,
-    _verdict_phrase,
 )
 from terrain_directions import (  # noqa: E402
     _direction_lines,
@@ -360,11 +359,8 @@ def compose_payload(map_data, cands, view_path=None, ws=None):
 
     choices = []
     for c in cands:
-        verdict = _verdict_phrase(c)
         n = c["evidence_pointers"]
         effect = (f"starts a normal drafting run with this as your coverage "
-                  f"brief; {verdict}" if verdict else
-                  f"starts a normal drafting run with this as your coverage "
                   f"brief; {n} source reference{'' if n == 1 else 's'} "
                   f"behind it")
         choices.append({"label": c["direction"], "effect": _fit(effect)})

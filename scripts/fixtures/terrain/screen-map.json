@@ -37,11 +37,7 @@
      "live": true,
      "lessons": [
       "lesson:retry-storm"
-     ],
-     "usability": {
-      "verdict": "matched",
-      "checked": []
-     }
+     ]
     }
    ],
    "subtopics": []
@@ -67,11 +63,7 @@
       "host/retro.md:44@abc1234",
       "host/rota.md:7@abc1234"
      ],
-     "live": true,
-     "usability": {
-      "verdict": "matched",
-      "checked": []
-     }
+     "live": true
     },
     {
      "slug": "team-shape",
@@ -85,21 +77,12 @@
      "evidence": [
       "host/notes.md:9@abc1234"
      ],
-     "live": true,
-     "usability": {
-      "verdict": "matched",
-      "checked": []
-     }
+     "live": true
     }
    ],
    "subtopics": []
   }
  ],
- "needs_recording": [],
- "recording_target": {
-  "repo": "host",
-  "file": "/nonexistent/host/docs/journey.md"
- },
  "gloss": {
   "served": false,
   "reason": "policy_source unavailable: policy_source not declared in writing-sources.yaml (read-policy-source.py exit 10)",

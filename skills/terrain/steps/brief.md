@@ -317,7 +317,7 @@ originator rather than a consultant.
 The recorded brief carries its **member set**, and that is not bookkeeping:
 the completeness invariant follows the set into drafting — every selected
 Strand placed or its omission disclosed — so a brief with no members recorded
-would make omission silent. Every member's writability gap is disclosed in
+would make omission silent. Every member's episode disclosure travels in
 `gaps`, not just the first one's.
 
 ## The end of the sitting: ask what they are writing
@@ -343,8 +343,8 @@ requires.
 **Ask for sources with this run's evidence state attached.** A terrain-originated
 run knows something a cold run does not: the members' evidence state, from the
 brief's own `gaps`. So name the candidate sources you actually know about —
-a member whose gap names a recording target names that artifact — instead of an
-unqualified placeholder. The owner may still name any paths, globs or ranges
+a member whose gap carries a served arc names the material that arc came from —
+instead of an unqualified placeholder. The owner may still name any paths, globs or ranges
 freely, and **sources remain the owner's input**: the brief directs harvest
 emphasis *within* the sources they declare and never widens scope.
 
