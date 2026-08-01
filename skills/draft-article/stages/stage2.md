@@ -41,6 +41,13 @@ dogfooding surprise this closes).
 
 ### Policy-seeded tension questions (Story 14.4)
 
+**THE INTERVIEW IS A GATE AND EMITS LIKE ONE (Story 20.122, #1135):**
+`draft_gates.gate("gap-interview", …, ws=<run ws>)`. Whether that is one call
+per question or one for the batch is deliberately left to you — the interview's
+content is variable in a way the other gates' is not — but a question reaching
+the owner with no ask row is the defect #1114 names, whichever shape you pick.
+
+
 Before selecting questions, probe the host repo's optional `policy_source`
 (SPEC-policy-source-seam) — the owner's policy repo, read-only and bounded
 **in code** to GLOSSARY.md, LESSONS.md, and ≤2 `topics/*.md`. Which two topic

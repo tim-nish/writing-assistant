@@ -552,7 +552,14 @@ cleanup** — then the explicit **next step as an in-conversation choice**
 (interaction contract, CAP-6/#226): offer "**continue into draft-article** /
 **stop here**", drafted from what this run produced (fact-sheet entry count,
 NEEDS-OWNER count) so the owner decides by selecting, not by opening the fact
-sheet. The path stays printed for reference — display is fine; requiring the
+sheet.
+
+**Put that choice through the carrier (Story 20.122, #1135):**
+`draft_gates.gate("harvest-completion", …, ws=<run ws>)`. "An in-conversation
+choice" is what the interaction contract asks for and is not the same as a
+prose list — the 2026-08-01 run relayed these options as prose and left no
+payload, so nothing afterwards could tell an offered choice from one the run
+skipped. The path stays printed for reference — display is fine; requiring the
 owner to navigate to it before continuing is the defect. A **standalone harvest
 omits the reading-time estimate**: it produces a fact sheet, not an article body,
 so there is nothing to measure.

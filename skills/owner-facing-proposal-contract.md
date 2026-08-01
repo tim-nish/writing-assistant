@@ -113,3 +113,29 @@ conventions, keeping their `file:line@commit` pointer.
 
 Enforcement lives at gate (e) — the validator rejects forbidden markers like a
 missing Effect line — never in prompt wording alone.
+
+## Every gate is composed through the declared builder (Story 20.122, #1135)
+
+A gate's options are **never composed as prose**. Each declared gate is put
+through `draft_gates.gate(<id>, where=…, why=…, choices=[…], ws=<run ws>)`,
+which validates the id against `draft_gates.GATES` and writes the ask row to
+`<ws>/presented-payloads.jsonl`. Composing an undeclared gate raises.
+
+| gate id | where it is asked |
+|---|---|
+| `thesis` | terrain step 3 — candidates you composed |
+| `harvest-completion` | after harvest — continue into draft / stop |
+| `gap-interview` | stage 2 — the questions only the owner can answer |
+| `narrative-structure` | stage 3 — the candidates `structures` derived |
+| `visual-set` | stage 3 — the set-level plan |
+
+**Why this is one rule and not five instructions.** The 2026-08-01 run relayed
+four of these as numbered prose and left **no payload for any of them**, while
+the one gate whose skill named a function reached the host control. A rule
+repeated per stage is one a new stage can be written without; stated here, it
+binds every surface this contract already governs.
+
+`gap-interview` may emit per question or per batch — its content is variable in
+a way the others' is not — but a question reaching the owner with no ask row is
+the defect either way. Enforcement is `check-gate-payload-carrier.sh`, which
+fails when a declared gate has no call site.

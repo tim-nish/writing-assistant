@@ -212,6 +212,26 @@ need(all(r.get("kind") == "ask" for r in rows),
      "an emitted row is not marked as an ASK — recording a question and "
      "recording its answer must be tellable apart")
 
+# EVERY DECLARED GATE HAS A CODE SITE (Story 20.122, #1135). A registry entry
+# with nothing calling it is the state 20.118 shipped deliberately and this
+# story closes: the gate was declared so the audit could REPORT it, not so it
+# could stay prose forever.
+import glob
+sites = ""
+for f in glob.glob("skills/**/*.md", recursive=True):
+    sites += open(f, encoding="utf-8").read()
+sites += open("scripts/draft_gates.py", encoding="utf-8").read()
+sites += open("scripts/terrain_screens.py", encoding="utf-8").read()
+sites += open("scripts/draft_resume.py", encoding="utf-8").read()
+for gid in dg.GATES:
+    need(('"%s"' % gid) in sites or ("'%s'" % gid) in sites,
+         "gate %r is declared but nothing composes it — a registry entry with "
+         "no call site leaves the surface as prose, which is what #1114 "
+         "reports (#1135)" % gid)
+need(callable(getattr(dg, "gate", None)),
+     "there is no generic gate() builder — five near-identical builders would "
+     "be five places for the NEXT gate to be added without one")
+
 src = open("scripts/terrain_screens.py", encoding="utf-8").read()
 need("from draft_gates import emit" in src,
      "terrain_screens imports render_form without emit — composing a render "
