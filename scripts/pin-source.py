@@ -54,9 +54,36 @@ import sys
 
 POINTER_RE = re.compile(r"^(?P<path>.+):(?P<l1>\d+)(?:-(?P<l2>\d+))?$")
 
-# validate-fact-sheet.py's closed KIND set — kept in lockstep by the round-trip
-# check in check-harvest.sh (emitted entries must validate with zero rejects).
-KINDS = ("result", "decision", "number", "quote", "event")
+# THE KIND SET IS SOURCED, NOT COPIED (Story 20.112, #1120).
+#
+# This was a literal five-tuple — the five ATOMIC kinds — while the closed set
+# has been NINE since the narrative kinds landed (amended 2026-07-20, #438:
+# `chronology | motivation | cost | reversal`). The amendment names its
+# enforcement copies as `validate-fact-sheet.py` and `skills/harvest/SKILL.md
+# §3`; this file was a THIRD copy nobody had named, so it was not updated with
+# them and `--emit-entry` silently could not emit narrative material at all.
+# Measured on the 2026-08-01 harvest: 88 of 157 entries — every reversal (48),
+# motivation (33) and cost (7) — had to be hand-composed against a bare pin,
+# outside the path the harvest skill calls the only sanctioned one.
+#
+# Sourcing from the validator removes the copy rather than refreshing it: a kind
+# admissible to the validator is admissible here BY CONSTRUCTION, so the two can
+# no longer drift. SPAN_ELIGIBLE travels the same way, because the kind/pointer-
+# form rules and the emitter's kind list diverging is the same defect one level
+# down (it rejected 54 span-pointer entries on the same run).
+def _load_validator():
+    here = os.path.dirname(os.path.realpath(__file__))
+    spec = importlib.util.spec_from_file_location(
+        "vfs", os.path.join(here, "validate-fact-sheet.py"))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+_VFS = _load_validator()
+# Sorted for a stable, reviewable `--help`; the validator's set is unordered.
+KINDS = tuple(sorted(_VFS.KINDS))
+SPAN_ELIGIBLE = frozenset(_VFS.SPAN_ELIGIBLE)
 
 
 def _load_rws():
@@ -179,11 +206,16 @@ def main(argv=None):
             failed += 1
             continue
         path, l1, l2 = parsed
-        if args.emit_entry and l2 is not None and args.kind != "quote":
-            # validate-fact-sheet.py accepts a line range only for a quote —
-            # refuse here rather than emit a would-be-rejected entry.
-            print(f"skip: {path}:{l1}-{l2}: a line range is only valid for KIND 'quote' "
-                  f"(got '{args.kind}') — split into per-line pointers", file=sys.stderr)
+        if args.emit_entry and l2 is not None and args.kind not in SPAN_ELIGIBLE:
+            # The SAME lockstep gap as the KIND set above, one level down: this
+            # hardcoded `quote` while #438 widened the span pointer to the four
+            # narrative kinds too. Sourced from the validator's own
+            # SPAN_ELIGIBLE, so the emitter cannot refuse a pointer form the
+            # validator would have accepted.
+            eligible = ", ".join(sorted(SPAN_ELIGIBLE))
+            print(f"skip: {path}:{l1}-{l2}: a line range is only valid for KINDs "
+                  f"{eligible} (got '{args.kind}') — split into per-line pointers",
+                  file=sys.stderr)
             failed += 1
             continue
         resolved, reason = pin_one(path, l1, l2, host, cache)
