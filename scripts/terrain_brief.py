@@ -38,6 +38,7 @@ from terrain_text import (  # noqa: E402
     _brief_edit_option_effect,
     _brief_iteration_line,
     _brief_lifecycle_line,
+    _brief_traversal_line,
     _fit,
 )
 # The refusal helper the whole terrain surface refuses through.
@@ -97,9 +98,17 @@ def _brief_lifecycle(state, history=None):
     "composed → inspected → adopted" is legible only if the owner can see what
     follows what.
     """
+    hist = list(history or [{"state": state}])
     return {"state": state, "states": list(BRIEF_LIFECYCLE),
             "line": _brief_lifecycle_line(state),
-            "history": list(history or [{"state": state}])}
+            # WHAT ACTUALLY HAPPENED, beside what comes next (Story 20.121,
+            # #1118). The line above shows the whole machine with the current
+            # state bracketed; bracketing marks where the owner IS, never where
+            # they HAVE BEEN, so a state the run skipped rendered as though it
+            # had occurred. Both render: they answer different questions, and
+            # collapsing them loses whichever is dropped.
+            "traversal": _brief_traversal_line(hist),
+            "history": hist}
 
 
 def write_brief_artifact(path, payload):

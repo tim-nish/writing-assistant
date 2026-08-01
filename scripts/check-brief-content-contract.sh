@@ -137,6 +137,16 @@ CARRIED = {
     # BESIDE the owner's slot rather than inside it; and the harvest scope,
     # which is owed but not emittable here (see the assertions below).
     "selection_summary", "harvest_scope",
+    # #1118: the record ATTESTS to the owner's answer. Without these the record
+    # is byte-identical to what a silent, machine-initiated adoption would have
+    # produced — which is why an incomplete transcript was enough to make a
+    # correct, owner-named adoption look like a defect. `thesis_origin` is a
+    # different axis from `origin` (that one records how the MEMBERS were
+    # selected, never how the THESIS was chosen); `answer_as_given` is the
+    # owner's utterance distinct from the text it resolved to; `note_is`
+    # declares which question the note answered, since the adoption gate
+    # inherits the selection gate's free text.
+    "thesis_origin", "answer_as_given", "note_is",
 }
 INTERIM = {  # present today, scheduled for removal, named with its issue
     "step": 1079, "lifecycle": 1079, "artifact": 1079, "iteration": 1079,

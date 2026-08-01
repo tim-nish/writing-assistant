@@ -72,7 +72,38 @@ def _brief_step_line():
     return f"{BRIEF_STEP_NAME} ({BRIEF_STEP_ID})"
 
 
-def _brief_transition_banner(state, artifact_path=None, workspace=None):
+def _brief_traversal_line(history):
+    """Which states this brief ACTUALLY entered (Story 20.121, #1118).
+
+    THE MAP AND THE TRAVERSAL ANSWER DIFFERENT QUESTIONS, and that is why both
+    render. `_brief_lifecycle_line` shows the whole machine with the current
+    state bracketed — deliberately, because *"one word out of three tells the
+    owner nothing about what comes next"* — but bracketing marks where the
+    owner IS, never where they HAVE BEEN. On the observed run the line read
+    `composed → inspected → [adopted]` while `lifecycle.history` recorded only
+    `composed → adopted`: `inspected` was never entered and nothing said so.
+
+    Rendering `lifecycle.history` INSTEAD was considered and refused: it
+    reverses that decision without engaging it, since history is the current
+    state plus its past and is still silent on what comes next. So the forward
+    map is untouched and this is added beside it.
+
+    The artifact is the authority. A state absent from `history` is stated as
+    not entered rather than inferred from position in the sequence — an
+    inference is exactly what made the display and the record disagree.
+    """
+    entered = [h.get("state") for h in (history or []) if h.get("state")]
+    if not entered:
+        return "Entered: not recorded — this brief carries no traversal history."
+    skipped = [s for s in BRIEF_LIFECYCLE if s not in entered]
+    line = "Entered: " + " → ".join(entered) + "."
+    if skipped:
+        line += f" Never entered: {', '.join(skipped)}."
+    return line
+
+
+def _brief_transition_banner(state, artifact_path=None, workspace=None,
+                             history=None):
     """The transition, ANNOUNCED at the moment it happens (Story 20.116, #1113).
 
     The owner's report is *"Because there is no explicit brief-creation command,
@@ -109,6 +140,8 @@ def _brief_transition_banner(state, artifact_path=None, workspace=None):
         lines.append(_owner_surface().artifact_block("Brief artifact",
                                                      artifact_path))
     lines.append(_brief_lifecycle_line(state))
+    if history is not None:
+        lines.append(_brief_traversal_line(history))
     return "\n".join(lines)
 
 

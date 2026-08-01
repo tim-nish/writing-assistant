@@ -245,5 +245,111 @@ sys.exit(1 if bad else 0)
 PY_TR
 [ $? -eq 0 ] && ok "the Terrain->Brief transition is announced, quoted from machine state, and never stored"
 
+# --- the adopt record ATTESTS (Story 20.120, #1118) -------------------------
+python3 - <<'PY_AT' || fail=1
+import importlib.util, sys
+sys.path.insert(0, "scripts")
+sp = importlib.util.spec_from_file_location("tmd", "scripts/topic-map-directions.py")
+tmd = importlib.util.module_from_spec(sp); sp.loader.exec_module(tmd)
+
+bad = []
+def need(c, m):
+    if not c: bad.append(m)
+
+els = [{"kind": "lesson", "slug": "s%d" % i, "title": "t%d" % i,
+        "tags": ["workflow"], "gloss": "g%d" % i} for i in range(3)]
+MAP = {"kind": "topic-map", "topics": [], "coverage": {"pin": "h@abc1234"},
+       "elements": els}
+cands = tmd.candidates(MAP)
+ids = [c["id"] for c in cands][:2]
+
+# An owner who NAMED a candidate.
+named = tmd.brief_from_answer(
+    {"index": ", ".join(ids), "note": "my angle", "claim": "the adopted thesis",
+     "adopted": "B", "pin": "h@abc1234"}, cands, "h@abc1234", MAP)
+# A machine default over the same set: same members, no adopted claim.
+silent = tmd.brief_from_answer(
+    {"index": ", ".join(ids), "note": "my angle", "pin": "h@abc1234"},
+    cands, "h@abc1234", MAP)
+
+need(named.get("answer_as_given") == "B",
+     "the owner's utterance is not recorded — the record cannot say THAT the "
+     "owner named B, only what B resolved to")
+need(named.get("thesis_origin") == "adopted-candidate",
+     "an owner-adopted thesis is not recorded as such")
+need(silent.get("thesis_origin") == "coverage-statement",
+     "a machine coverage statement claims an adopted origin")
+need(named.get("thesis_origin") != silent.get("thesis_origin")
+     or named.get("answer_as_given") != silent.get("answer_as_given"),
+     "an owner-named adoption is INDISTINGUISHABLE from a silent one on the "
+     "artifact alone — this is the whole of #1118")
+need(silent.get("answer_as_given") is None,
+     "an absent utterance is recorded as absence, never filled in")
+
+# `origin` is a different axis and must not be repurposed.
+need(named.get("origin", "").startswith("adopted-index"),
+     "`origin` stopped recording how the MEMBERS were selected — it is a "
+     "different axis from thesis_origin and collapsing them loses a fact")
+
+# The note declares which question it answered.
+need(named.get("note_is") and "adopted over" in named["note_is"],
+     "a note carried from the selection gate is presented as though typed at "
+     "the adoption gate (#1118's second record oddity)")
+need(silent.get("note_is") and "with this answer" in silent["note_is"],
+     "a note recorded with its own answer is not declared as such")
+
+for m in bad:
+    print("FAIL: %s" % m, file=sys.stderr)
+sys.exit(1 if bad else 0)
+PY_AT
+[ "$fail" -eq 0 ] && ok "the adopt record distinguishes an owner-named adoption from a silent one"
+
+# --- the lifecycle renders its TRAVERSAL too (Story 20.121, #1118) ----------
+python3 - <<'PY_TV' || fail=1
+import importlib.util, sys
+sys.path.insert(0, "scripts")
+def load(n, p):
+    sp = importlib.util.spec_from_file_location(n, p)
+    m = importlib.util.module_from_spec(sp); sp.loader.exec_module(m); return m
+tt = load("terrain_text", "scripts/terrain_text.py")
+tb = load("terrain_brief", "scripts/terrain_brief.py")
+
+bad = []
+def need(c, m):
+    if not c: bad.append(m)
+
+# THE OBSERVED RUN: composed -> adopted, `inspected` never entered.
+skipped = tt._brief_traversal_line([{"state": "composed"}, {"state": "adopted"}])
+need("composed → adopted" in skipped,
+     "the traversal does not render the states actually entered")
+need("Never entered: inspected" in skipped,
+     "a state the run SKIPPED is not stated as skipped — bracketing marks "
+     "where the owner IS, never where they HAVE BEEN, which is how "
+     "`inspected` rendered as though it had occurred (#1118)")
+
+full = tt._brief_traversal_line([{"state": s} for s in tt.BRIEF_LIFECYCLE])
+need("Never entered" not in full,
+     "a brief that entered every state still reports skips")
+
+# THE FORWARD MAP IS UNCHANGED — rendering history INSTEAD was refused.
+line = tt._brief_lifecycle_line("adopted")
+need(line == "Lifecycle: composed → inspected → [adopted] — now: adopted.",
+     "the forward map changed — Story 20.121 ADDS the traversal beside it and "
+     "must not replace it; the docstring's reason (one word out of three tells "
+     "the owner nothing about what comes next) is untouched by this story")
+
+# Both render, from the same block, and the traversal is not stored.
+blk = tb._brief_lifecycle("adopted", [{"state": "composed"}, {"state": "adopted"}])
+need(blk.get("line") and blk.get("traversal"),
+     "the lifecycle block does not carry BOTH the map and the traversal")
+need("Never entered: inspected" in blk["traversal"],
+     "the block's traversal disagrees with its own history")
+
+for m in bad:
+    print("FAIL: %s" % m, file=sys.stderr)
+sys.exit(1 if bad else 0)
+PY_TV
+[ "$fail" -eq 0 ] && ok "the lifecycle renders what happened beside what comes next"
+
 [ "$fail" -eq 0 ] && printf '\nAll %s checks passed.\n' "$0" \
   || { printf '\n%s FAILED.\n' "$0" >&2; exit 1; }

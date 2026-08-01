@@ -143,6 +143,7 @@ from terrain_text import (  # noqa: E402
     _brief_lifecycle_line,
     _brief_step_line,
     _brief_transition_banner,
+    _brief_traversal_line,
     _elide,
     _fit,
     _partition_proposal_line,
@@ -551,6 +552,44 @@ def _brief_from_index(answer, cands, map_pin, map_data=None,
             # Absence of an angle is now recorded AS absence.
             "note": note or None,
             "adopted_claim": claim or None,
+            # THE RECORD ATTESTS TO THE OWNER'S ANSWER (Story 20.120, #1118).
+            #
+            # With the owner's answer "B", the contract puts candidate B's
+            # thesis into `claim` — by design — and the resulting record is
+            # BYTE-IDENTICAL to what a silent, machine-initiated adoption would
+            # have produced. Nothing recorded THAT the owner named B, only the
+            # adopted text. That is exactly why an incomplete transcript was
+            # enough to make a correct, owner-named adoption look like a
+            # defect: the artifact could not arbitrate, so a post-hoc audit had
+            # to reach for a transcript instead.
+            #
+            # `origin` above is a DIFFERENT AXIS and is not this: it records
+            # how the MEMBERS were selected (`adopted-index` /
+            # `adopted-index-set`), never how the THESIS was chosen. Reusing it
+            # would collapse two independent facts into one field.
+            "thesis_origin": ("adopted-candidate" if claim else
+                              "coverage-statement"),
+            # The owner's utterance as given, distinct from the text it
+            # resolved to. An audit of `brief.json` alone can then tell an
+            # owner-named adoption from a machine default, which is the whole
+            # ask — and `None` is recorded as absence rather than filled in,
+            # per the same rule that keeps `note` owner-text-or-nothing.
+            "answer_as_given": (str(answer.get("adopted") or "").strip()
+                                or None),
+            # WHOSE NOTE THIS IS (Story 20.120, #1118). On the observed run
+            # `note` carried "create brief using G4 members" — the owner's free
+            # text from the EARLIER selection gate — re-attributed to the
+            # adoption answer, so a reader could not tell which question it
+            # answered. The fix is not to guess which gate produced it, which
+            # this layer cannot know, but to stop the record ASSERTING it
+            # answered this one. The idiom is the shipped one: `edit.note`
+            # already declares "inherited …" vs "as recorded in this answer".
+            "note_is": (None if not note else
+                        ("the owner's angle, recorded with this answer"
+                         if not claim else
+                         "the owner's angle, carried with the selection this "
+                         "thesis was adopted over — not necessarily typed at "
+                         "the adoption gate")),
             # WHERE THE COMPOSER'S OWN SUMMARY GOES (Story 20.102 AC5). The
             # machine does have something useful to say about how the
             # selection was made; the information was never the problem, its
@@ -1170,7 +1209,7 @@ GATE_ONLY_BLOCKS = ("consultant", "recomposition",
 RENDERED_KEYS = {
     "step": ("line",),
     "artifact": ("line", "read_back"),
-    "lifecycle": ("line", "banner"),
+    "lifecycle": ("line", "banner", "traversal"),
     "iteration": ("line",),
     "thesis": ("line", "brief_string_is"),
     "candidate_theses": ("line", "label", "requirements", "recommendation",
@@ -1235,7 +1274,9 @@ def _rehydrate_lines(payload):
         art = payload.get("artifact") or {}
         life["banner"] = _brief_transition_banner(
             life.get("state"), artifact_path=art.get("path"),
-            workspace=os.path.dirname(art["path"]) if art.get("path") else None)
+            workspace=os.path.dirname(art["path"]) if art.get("path") else None,
+            history=life.get("history"))
+        life["traversal"] = _brief_traversal_line(life.get("history"))
     art = payload.get("artifact")
     if isinstance(art, dict) and art.get("path"):
         art["line"] = _brief_artifact_line(art["path"])
