@@ -149,7 +149,7 @@ nothing. Every owner-facing ask follows the shared
 | **0 — start** (config gate, framework check, workspace autostart; optional `--depth`/`--element`/`--brief`; plan consultation, continuation, differential context; durability contract) | [`stages/stage0.md`](stages/stage0.md) | `draft-pipeline.py stage0 <framework> <sources…> --root <host-repo>` |
 | **1 — harvest + consume** (the harvest skill writes `$WS/fact-sheet.md`; consume threads it into state; working-note slim profile) | [`stages/stage1.md`](stages/stage1.md) | `draft-pipeline.py consume <harvest-doc>` |
 | **2 — gap interview** (policy seeds → classification → ≤5 questions + mandated tier → answers → journal → staging candidates → policy-block gate) | [`stages/stage2.md`](stages/stage2.md) | `draft-pipeline.py interview --framework <F> [--items …] <state>` |
-| **3 — fill** (argument plan, structure proposal, per-section fill + sidecar provenance map, visual set, isolated provenance judge) | [`stages/stage3.md`](stages/stage3.md) | `draft-pipeline.py provenance --map <map> --draft <draft>` |
+| **3 — fill** (argument plan, structure proposal, per-section fill + sidecar provenance map, visual set, isolated provenance judge) | [`stages/stage3.md`](stages/stage3.md) **and** [`style-contract.md`](style-contract.md) | `draft-pipeline.py provenance --map <map> --draft <draft>` |
 | **3→4 — quality gate** (mechanical dims + isolated rubric judge; two-cycle bound; missing-input repair hop) | [`stages/gate.md`](stages/gate.md) | `draft-pipeline.py quality-gate --draft … --map … --judge …` |
 | **4 — owner verification** (resolve every `[VERIFY]` to zero; bounded rewrites) | [`stages/stage4.md`](stages/stage4.md) | `draft-pipeline.py verify <draft>` → `verify-markers --count` = 0 |
 | **complete** (article plan emission + conformance, the dual-product `complete` gate, completion summary; variants are post-review — `variants.md`) | [`stages/complete.md`](stages/complete.md) | `draft-pipeline.py complete --draft … --slug … --root … --ws …` |
@@ -162,6 +162,11 @@ nothing. Every owner-facing ask follows the shared
 - Stage 1 hands off to the **harvest skill** with `$WS`; a working-note run
   passes `consume … --framework working-note` and skips Stage 2 (the slim
   profile, stages/stage1.md).
+- Stage 3 reads the owner's **one versioned style contract** once, before the
+  fill ([`style-contract.md`](style-contract.md), Story 20.139 #1201): the
+  contract is consumed **at generation**, never per article and never at
+  review, and it is **read-only** — an absent contract is stated and the run
+  proceeds, and nothing here ever writes or offers to create one.
 - Stage 2 ends at the **policy-block gate** (`policy-block-check`): blocked →
   surface the payload, checkpoint at the block, STOP; clear → Stage 3.
 - The Stage 3→4 gate and `verify-provenance` both pass before Stage 4; both
