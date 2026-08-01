@@ -195,10 +195,13 @@ printf '%s' "$S" | grep -qiE 'alongside the host-repo sources|beside .sources.' 
 printf '%s' "$S" | grep -qiE 'article floor is unchanged|never satisfies it|never a new licence' \
   && ok "stage0: the article floor is unchanged — an arc is not a Fact" \
   || err "stage0 missing the article-floor clause"
+# The host-side recording task stage0 used to hold the arc apart from was
+# RETIRED with the join that minted it (Story 20.134, #1183). The assertion that
+# stage0 stated their adjacency is deleted rather than weakened; what stage0
+# still owes — the arc is material and never a Fact — is asserted just above.
 printf '%s' "$S" | grep -qi 'NEEDS-RECORDING' \
-  && printf '%s' "$S" | grep -qi 'adjacent, not' \
-  && ok "stage0: NEEDS-RECORDING is adjacent, not subsumed" \
-  || err "stage0 missing the NEEDS-RECORDING relationship"
+  && err "stage0 still names the retired host-side recording task (#1183)" \
+  || ok "stage0 names no retired recording task (#1183)"
 printf '%s' "$S" | grep -qi '#1045' \
   && printf '%s' "$S" | grep -qi 'parked' \
   && ok "stage0: the incorporation register stays parked (#1045), nothing decided" \

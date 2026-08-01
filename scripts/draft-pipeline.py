@@ -4174,7 +4174,9 @@ def _run_state(framework, sources, root=None, depth=None, element=None,
         # THE ARCS CROSS BESIDE THE SOURCES (Story 20.91, #1044 AC1): declared
         # source material at the recorded pin, stated at the top level ALONGSIDE
         # the host-repo sources and never in place of them. `sources` is
-        # untouched (AC3); NEEDS-RECORDING is untouched (AC4).
+        # untouched (AC3). The host-repo recording task this clause used to
+        # name was retired with the join that minted it (Story 20.134, #1183);
+        # the arcs themselves are the half that was never defective.
         arcs = brief_state.pop("journey_arcs", None)
         if arcs:
             state["journey_arcs"] = arcs

@@ -6,7 +6,7 @@ description: >
   and "open the brief [<path>]" to re-enter an existing brief at Step 3)
   to assemble the derived, bounded ELEMENT SURVEY of the hub — every Lesson
   and Journey an individually selectable Strand, quoting its served
-  Gloss rendering and carrying its visible writability verdict — navigate it
+  Gloss rendering — navigate it
   in TWO SCREENS (the served-tag axis, then one member's complete material)
   plus free-form, and hand the owner's chosen direction to the existing
   stage-0 --brief path as an ordinary brief-carrying run. The contract it
@@ -98,18 +98,18 @@ step files cite them and restate nothing.
   validator error is relayed **as given**; a non-zero exit is relayed with the
   named fix and the run stops. A blocked payload is never shown.
 - **Nothing is decided for the owner.** Every screen offers **name your own
-  direction** and **stop here**, every Strand stays selectable whatever its
-  verdict says, and stopping is an outcome that costs nothing.
+  direction** and **stop here**, every Strand is selectable, and stopping is an
+  outcome that costs nothing.
 - **One invocation, one corpus load.** The map is assembled once, in Step 1;
   navigation re-presents held state and never re-assembles or re-invokes.
 
 | Step | Enter by reading | The one command |
 |---|---|---|
 | **Step 0 — mint the run workspace** (above; the storage contract) | — (in this file) | `resolve-paths.py new-run --terrain --root <host-repo>` |
-| **Step 1 — assemble the map** (what the map carries; the tag and decision-topic axes; the usability verdict and `needs_recording`) | [`steps/map.md`](steps/map.md) | `terrain_map.py assemble --root <host-repo> > "$WS/map.json"` |
+| **Step 1 — assemble the map** (what the map carries; the tag and decision-topic axes; the served journey arc and its typed absence) | [`steps/map.md`](steps/map.md) | `terrain_map.py assemble --root <host-repo> > "$WS/map.json"` |
 | **Step 2 — two screens** (Screen 1's axis payload; Screen 2's whole-member listing, group claim, journey markers and set selection; the Full Report over named group ids; navigation over held state; the size switch) | [`steps/screens.md`](steps/screens.md) | `topic-map-directions.py axis --map "$WS/map.json"` then `topic-map-directions.py member --map "$WS/map.json" --tag <member> --axis <tag\|topic>` |
 | **Step 3 — the brief, then a normal run** (brief composition; set recomposition; the coherence consultant's four rules; the named artifact and its lifecycle; the edit-set iteration loop and its retained compositions; the stage-0 handoff) | [`steps/brief.md`](steps/brief.md) | `topic-map-directions.py brief --payloads "$WS/presented-payloads.jsonl" --map "$WS/map.json" --out "$WS/brief.json"` |
-| **Step 4 — the gap artifact** (only when the brief carries `gap`) | [`steps/gap.md`](steps/gap.md) | — (a relay plus one write into the target repo) |
+| **Step 4 — the scope statement** (only when the brief carries `gaps`) | [`steps/gap.md`](steps/gap.md) | — (a relay; this step writes nothing anywhere) |
 
 **Step routing notes (the dispatcher's whole job):**
 
@@ -148,8 +148,9 @@ step files cite them and restate nothing.
   brief-carrying run: uniform in BEHAVIOUR, while the provenance record does
   distinguish the producers (#1050).
 - **Step 4:** runs **beside** the draft, never instead of it, and only when
-  the brief carries `gap`. A `cannot-determine` gap is relayed as its
-  disclosure alone.
+  the brief carries `gaps`. It is a relay — a scope statement over the
+  selection plus each member's episode disclosure — and it writes nothing,
+  asks nothing, and mints no tracking artifact (#1183).
 
 ## Boundaries
 
@@ -161,11 +162,10 @@ step files cite them and restate nothing.
   forbid.
 - **The map is a view, not a gate.** It never refuses a member on depth, never
   hides consumed material, and never narrows the sources a run may read.
-- **Evidence never blocks drafting.** The writability verdict surfaces at
-  selection and decides what the selection *yields* (evidence pre-located, or
-  a gap disclosure plus its tracking artifact) — never whether the element
-  appears and never whether the draft runs. There is no refusal path on
-  evidence anywhere in this flow.
+- **Evidence never blocks drafting.** There is no writability verdict left to
+  block with: the host-repo episode join and its four verdicts were removed
+  (#1183). A selection yields a brief plus each member's episode disclosure,
+  and there is no refusal path on evidence anywhere in this flow.
 - **Sections never gate.** Screen 2's sectioning is presentation only — a
   permutation of the member's complete material; nothing is selectable only
   through a section, and no section's shape limits which Strands the owner

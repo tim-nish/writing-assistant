@@ -660,7 +660,7 @@ def _brief_from_index(answer, cands, map_pin, map_data=None,
     # absent field: every future reader had to learn which to distrust.
     #
     # It also dragged the map-element schema across the boundary whole —
-    # `element_kind`, `topics`, `subtopics`, `date`, `depth`, `usability`,
+    # `element_kind`, `topics`, `subtopics`, `date`, `depth`,
     # `consumed`, `evidence_pointers` — map-internal working state, with
     # internal topic vocabulary reaching an artifact that crosses into
     # drafting. Removing the key removes that leak entirely; `_member_record`
@@ -1041,10 +1041,11 @@ def cmd_brief(args):
             answer = dict(answer, index=indexes, note=note)
     out = brief_from_answer(answer, cands, map_pin, map_data,
                             composed_block, getattr(args, 'judge', None))
-    # Evidence-independence at the hand-off (#799): a selected element's
-    # writability gap is DISCLOSED beside the brief — with the tracking
-    # artifact's content for the target repo — and the run proceeds. There is
-    # no refusal path here on evidence.
+    # What each selected element's episode DISCLOSES travels beside the brief
+    # and the run proceeds — there is no refusal path here on evidence. The
+    # host-repo join that used to compute a writability verdict and mint a
+    # host-side recording artifact was removed (Story 20.134, #1183); what remains
+    # is the served arc's own state, which is a fact about the hub.
     # EVERY member's gap, in `gaps`, at every set size (Story 20.99, #1077).
     # `gap` — the FIRST member's, computed from the deleted `candidate` — used
     # to sit beside `gaps`, byte-identical to `gaps[0]` minus its `index`. One
@@ -1057,8 +1058,7 @@ def cmd_brief(args):
     by_id = {c.get("id"): c for c in cands}
     gaps = []
     for m in out.get("members") or []:
-        g = _selection_gap(by_id.get(m.get("index")),
-                           (map_data or {}).get("recording_target"))
+        g = _selection_gap(by_id.get(m.get("index")))
         if g:
             gaps.append(dict(g, index=m.get("index")))
     if gaps:
@@ -1071,8 +1071,7 @@ def cmd_brief(args):
         # `members` claiming to be the selection. Dropping the disclosure here
         # while removing the key there would fix a naming defect by creating an
         # evidence one.
-        g = _selection_gap(out["candidate"],
-                           (map_data or {}).get("recording_target"))
+        g = _selection_gap(out["candidate"])
         if g:
             out["gap"] = g
     out["stage"] = "topic-map-brief"

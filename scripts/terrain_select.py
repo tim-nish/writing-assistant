@@ -12,8 +12,8 @@ WHAT IT CONTAINS: everything between the owner's typed answer and a resolved set
 of Strand indexes — the ordered (operator, id) terms and the set arithmetic
 (`_selection_terms`, `_selected_indexes`), the G-id expansion at the screen that
 minted it (`_screen_sections`, `_group_expander`), the composite pin's
-which-half-moved message (`_which_half_moved`), and the writability gap a
-non-matched selection discloses (`_selection_gap`). The set operators travel
+which-half-moved message (`_which_half_moved`), and the episode disclosure a
+selected element carries (`_selection_gap`). The set operators travel
 with the parser that reads them.
 
 The boundary is deliberate: this module RESOLVES a selection, it never composes
@@ -40,89 +40,40 @@ from terrain_members import (  # noqa: E402
     member_sections,
 )
 
-def _recording_form(target):
-    """WHERE the recording task lands, declared as data (Story 20.105, #1083).
+def _selection_gap(candidate):
+    """What a selected element DISCLOSES about its episode (#1044, as amended
+    2026-08-01, #1183).
 
-    THE TRACKER IS THE DEFAULT, and that is what keeps the footprint invariant
-    total. `skills/terrain/steps/gap.md` used to instruct an append into the
-    target repo's journey doc and call it "the one write this flow makes
-    outside the run workspace and the View" — a skill file declaring an
-    exception to an invariant SPEC-writing-assistant states as total, and a
-    dogfood run that stopped before drafting left exactly that residue: a new
-    tracked file in the host tree with no artifact beside it.
+    THE HOST-REPO JOIN IS GONE, AND ONLY IT. The join reported whether
+    the target repo's declared `journey:` files carried the Strand's slug; it
+    searched zero bytes wherever no such block was declared and asserted an
+    absence anyway, and its key was the hub's own filename stem, which no
+    document written for its own purpose can contain. Removed with it: the four
+    verdicts, the `host_join` block, and the recording payload this function
+    used to mint. Nothing here asks the owner anything, asserts
+    anything about the owner's repository, or mints a tracking artifact.
 
-    BOTH CONSTRAINTS ARE KEPT, rather than one traded away. The artifact is
-    still minted IN THE SAME RUN — the flywheel holds only if every emitted gap
-    gets its tracking artifact then — but an Issue is not a working-tree write,
-    so no exception is needed. The file append survives as an OWNER-CONSENTED
-    act, which makes it the owner's write rather than the plugin's.
-
-    Emitted as data because the alternative is prose in a skill file, and a
-    rule written there is advisory rather than a carrier.
-    """
-    return {
-        "default": "tracker-issue",
-        "repo": target.get("repo"),
-        "consented_alternative": {
-            "kind": "file-append",
-            "path": target.get("file"),
-            "requires": ("explicit owner consent — this is a write into the "
-                         "host working tree, which the plugin does not make "
-                         "on its own"),
-        },
-    }
-
-
-def _selection_gap(candidate, recording_target):
-    """The gap disclosure a non-matched element selection yields (#799).
-
-    Evidence-independence, enforced end to end: the verdict decided nothing
-    about APPEARING, and it decides nothing about DRAFTING either. Selecting
-    an element whose episode no declared source carries yields this block —
-    the disclosure plus the NEEDS-RECORDING tracking artifact's content for
-    the target repo (an Issue, or an append under a NEEDS-RECORDING heading
-    in the declared journey doc) — and the brief is composed exactly as for a
-    matched one. NEVER a refusal: a mechanism that stops drafting here has
-    stopped being an assistant (owner ruling, #799).
-
-    AN EPISODE THE SYSTEM IS CARRYING IS NOT AN ABSENT ONE (Story 20.91, #1044
-    AC2). The host-repo journey join is a fact about the HOST REPO and it is
-    KEPT, under `host_join`; what was wrong was REPORTING it as the episode's
-    absence while the hub was serving that very episode as the Strand's arc —
-    three selected Strands were disclosed `episodic-unrecorded` in one sitting
-    with their arcs served the whole time. So a served arc changes what this
-    block SAYS, and changes nothing about what it DOES:
+    WHAT SURVIVES IS THE EPISODE ITSELF, unchanged (Story 20.91, #1044 AC2).
+    The hub serving a Strand's arc was never the defective half:
 
       * the arc is carried, quoted at its cite — never re-expressed here;
       * `episode.served` and `not_served_reason` keep 20.90's two kinds apart,
         so *"no arc exists"* and *"no arc arrived"* remain different findings
         and never collapse into one;
-      * the NEEDS-RECORDING task is still minted (AC4). Recording the episode
-        host-side is what eventually feeds EVIDENCE; the served arc is
-        material that already existed and was simply never consumed. Adjacent,
-        not the fix — neither closes the other, and dropping the task here
-        would quietly make an arc a substitute for evidence;
-      * the article floor is untouched (AC3): an arc is material, not a Fact.
+      * the article floor is untouched: an arc is material, not a Fact.
         Repositories stay harvest scope and never evidence binding, and a
         served arc satisfies nothing at the ship gate.
+
+    Drafting is unaffected either way — this block was never a gate, and the
+    verdict that could have read as one no longer exists.
     """
     if not candidate or candidate.get("kind") != "element":
         return None
-    u = candidate.get("usability") or {}
-    verdict = u.get("verdict")
-    if not verdict or verdict == "matched":
-        return None
-    target = recording_target or {}
     slug = str(candidate.get("slug") or "").strip()
     arc = candidate.get("journey")
     arc = arc if isinstance(arc, str) and arc.strip() else None
-    gap = {"verdict": verdict, "slug": slug,
-           "checked": u.get("checked") or [],
-           "drafting": "proceeds — the verdict is a disclosure, never a gate"}
-    # The EPISODE's own state, stated beside the host join and never merged
-    # into it. Carried on every gap, including `no-episode` and
-    # `cannot-determine`, so a reader never has to infer which of the two
-    # lookups a silence belongs to.
+    gap = {"slug": slug,
+           "drafting": "proceeds — this is a disclosure, never a gate"}
     gap["episode"] = {
         "served": arc is not None,
         "arc": arc,
@@ -130,63 +81,23 @@ def _selection_gap(candidate, recording_target):
         "not_served_reason": (None if arc
                               else candidate.get("journey_unavailable")),
     }
-    if verdict == "episodic-unrecorded" and arc:
-        # NOT an unrecorded episode. The mechanical host-repo verdict is kept
-        # verbatim where it belongs — as a fact about the host repo — and the
-        # reported finding becomes the true one.
+    if arc:
         gap["verdict"] = "episode-served"
-        gap["host_join"] = {"verdict": verdict,
-                            "checked": u.get("checked") or []}
         gap["disclosure"] = (
             "the hub serves this element's episode as its journey arc, and "
             "the arc crosses into drafting as declared source material at the "
-            "recorded pin — so this is NOT an unrecorded episode. What no "
-            "declared source in the target repo carries is a HOST-SIDE "
-            "recording of it, and that gap is real and unchanged: recording "
-            "the episode there is what eventually feeds evidence, while the "
-            "served arc is material that already existed and was simply never "
-            "consumed. The two are adjacent, not substitutes, and neither "
-            "closes the other. The draft proceeds, and the article floor is "
-            "unchanged — an arc is material, never a Fact.")
-        gap["needs_recording"] = {
-            "slug": slug,
-            "target_repo": target.get("repo"),
-            "target_file": target.get("file"),
-            "heading": "NEEDS-RECORDING",
-            "form": _recording_form(target),
-            "entry": (f"{slug} — selected on the terrain (the hub serves its "
-                      "arc; no declared source here carries the episode); "
-                      "record the episode here so the next run can match it"),
-        }
-        return gap
-    if verdict == "cannot-determine":
-        gap["disclosure"] = (
-            "the evidence lookup could not determine whether a declared "
-            f"source carries this ({u.get('reason') or 'no join key'}); "
-            "an absence is asserted only where it was established, so no "
-            "recording task is minted from a lookup that did not look")
-        return gap
-    if verdict == "no-episode":
-        gap["disclosure"] = (
-            "no episode is locatable for this element, so the draft offers it "
-            "on the owner-attributed framing tier: your framing contribution, "
-            "stated as such, never sourced claims")
-        gap["tier"] = "owner-attributed framing (Story 17.1)"
+            "recorded pin. The article floor is unchanged — an arc is "
+            "material, never a Fact.")
     else:
+        # No verdict key here, deliberately: `episode-served` is the one
+        # ratified verdict this block still carries, and minting a second name
+        # for its absence would re-create a verdict axis out of the state the
+        # `episode` block already states precisely.
         gap["disclosure"] = (
-            "the hub records this element but no declared source in the "
-            "target repo carries its episode; the draft proceeds, and the "
-            "gap is recorded so the next run can locate evidence")
-    gap["needs_recording"] = {
-        "slug": slug,
-        "target_repo": target.get("repo"),
-        "target_file": target.get("file"),
-        "heading": "NEEDS-RECORDING",
-        "form": _recording_form(target),
-        "entry": (f"{slug} — selected on the terrain "
-                  f"({verdict}); record the episode here so the next "
-                  f"run can match it"),
-    }
+            "the hub serves no journey arc for this element; the reason is "
+            "carried in `episode.not_served_reason` and is relayed as given, "
+            "because *no arc exists* and *no arc arrived* are different "
+            "findings. Nothing is asserted here about the owner's repository.")
     return gap
 
 

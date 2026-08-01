@@ -562,42 +562,13 @@ else
   err "an in-temp persist was refused under the test signal (should resolve normally)"
 fi
 
-# --- Story 20.105 (#1083): the NEEDS-RECORDING task is not an exception -----
-# The invariant is stated as TOTAL in SPEC-writing-assistant, and a skill file
-# had declared an exception to it — "the one write this flow makes outside the
-# run workspace and the View". The invariant was total in prose and UNASSERTED
-# for this path, which is how a skill could contradict it unnoticed; a dogfood
-# run that stopped before drafting then left a new tracked file in the host
-# tree with no artifact beside it.
-G="skills/terrain/steps/gap.md"
-if grep -q "one write this flow makes" "$G"; then
-  err "$G re-declares a host-tree write exception; the footprint invariant is total (#1083)"
-else
-  ok "the gap step declares no exception to the footprint invariant (#1083)"
-fi
-if grep -q "tracker-issue" "$G" && grep -q "not a working-tree write" "$G"; then
-  ok "...and names the tracker form as the DEFAULT, which needs no exception"
-else
-  err "$G no longer states the tracker-issue default (#1083)"
-fi
-if grep -q "explicit owner consent" "$G"; then
-  ok "...with the file append surviving only as an owner-CONSENTED act"
-else
-  err "$G drops the owner-consent condition on the file append (#1083)"
-fi
-# The form travels as DATA, so the skill acts on the payload rather than on
-# prose — a rule in a skill file is advisory, never a carrier.
-python3 - <<'PY105' && ok "the emitted gap declares its recording form as data (#1083)" \
-  || err "the needs_recording block does not declare a form (#1083)"
-import sys
-sys.path.insert(0, "scripts")
-from terrain_select import _recording_form
-f = _recording_form({"repo": "r", "file": "/host/docs/journey.md"})
-assert f["default"] == "tracker-issue", f
-assert f["repo"] == "r", f
-alt = f["consented_alternative"]
-assert alt["kind"] == "file-append" and "consent" in alt["requires"], alt
-PY105
+# --- Story 20.134 (#1183): the exception has no mechanism left to protect ----
+# The #1083 section that stood here asserted the shape of the host-side
+# recording artifact — the tracker default, the owner-consented file append,
+# the form travelling as data. All three are RETRACTED with the artifact
+# itself, so the assertions are deleted rather than weakened. The prohibition
+# they stood in for is now carried by removing the writer, and asserted as the
+# absence of one by scripts/check-journey-writer-absent.sh.
 
 if [ "$fail" -eq 0 ]; then
   printf '\nAll footprint-invariant checks passed.\n'; exit 0

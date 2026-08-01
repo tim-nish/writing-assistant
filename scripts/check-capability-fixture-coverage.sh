@@ -175,7 +175,7 @@ else
 import json, sys
 def norm(p):
     d = json.load(open(p))
-    for k in ("articles_repo", "host_root", "recording_target"):
+    for k in ("articles_repo", "host_root"):
         d.pop(k, None)
     d.get("coverage", {}).pop("pin", None)
     return d

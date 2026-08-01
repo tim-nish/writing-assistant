@@ -278,25 +278,9 @@ def _articles_backlog_tracks(args):
     return tracks
 
 
-def validate_journey(args, findings):
-    """Relay a malformed or unreadable `journey:` block (resolver exit 6, #671)
-    as stage-0 per-key findings. An absent block is silent; a well-formed block
-    whose every declared episode-record file exists validates clean. This is the
-    config-surface half of the `journey:` writing-sources element (semantics in
-    SPEC-writing-assistant CAP-2), lint-shaped like the source `include:` and
-    variant-profile target-directory existence checks."""
-    cmd = [sys.executable, SRC_RES]
-    if args.root:
-        cmd += ["--root", args.root]
-    cmd += ["journey"]
-    p = subprocess.run(cmd, capture_output=True, text=True)
-    if p.returncode == 6:
-        for line in p.stderr.strip().splitlines():
-            m = re.match(r"^\[(.+?)\]\s+(\S+):\s+(.*)$", line)
-            if m:
-                findings.append((m.group(1), m.group(2), m.group(3)))
-            else:  # pragma: no cover - defensive
-                findings.append((SOURCES_FILE, "journey", line))
+# `validate_journey()` was REMOVED (Story 20.134, #1183) with the `journey:`
+# key it linted: there is no block left to be malformed, and a lint over a key
+# nothing reads reports a defect with no consequence.
 
 
 def validate_policy_source(args, findings, notices):
@@ -516,7 +500,6 @@ def main(argv=None):
     validate_pointer_block(args, findings)
     if not args.skip_writing_sources:
         validate_writing_sources(args, findings)
-        validate_journey(args, findings)
         validate_policy_source(args, findings, notices)
         validate_platform_profiles(args, findings, notices)
 
