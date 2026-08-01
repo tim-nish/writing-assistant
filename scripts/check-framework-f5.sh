@@ -95,19 +95,8 @@ for lbl in dp.INTENT_LABELS.values():
     if lbl not in msg: bad.append(f"invalid-type error omits {lbl!r}")
 if "all five" not in msg: bad.append("invalid-type error no longer names all five")
 
-# consume --framework working-note routes to fill (in-process, stdin doc).
-class A: doc = "-"; framework = "working-note"
-doc = "# FACT SHEET\n\n# NEEDS-OWNER\n"
-out, errbuf = io.StringIO(), io.StringIO()
-sys.stdin = io.StringIO(doc)
-with redirect_stdout(out), redirect_stderr(errbuf):
-    rc = dp.cmd_consume(A())
-sys.stdin = sys.__stdin__
-if rc != 0: bad.append(f"consume --framework working-note failed: {errbuf.getvalue().strip()}")
-else:
-    st = json.loads(out.getvalue())
-    if st.get("next_stage") != "fill": bad.append("consume slim route: next_stage != fill")
-    if st.get("profile") != "slim": bad.append("consume slim route: profile != slim")
+# The slim stage-1 routing (working-note -> fill) moved to probe with the
+# stage (#1182) and is asserted in check-probe.sh; consume retired with it.
 
 # interview rejects F5 with a named slim-profile error.
 class B: framework = "f5"; items = None

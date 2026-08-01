@@ -227,20 +227,21 @@ check(not any(c["label"].endswith(".py") or c["label"].endswith(".md")
 check("skills/terrain/" in src["why"],
       "#1103: ...while the candidates justifying the default survive in the reason")
 
-# THE TRANSITION INTO HARVEST IS A SELECTION (Story 20.136, #1176). The run
+# THE TRANSITION INTO STAGE 1 IS A SELECTION (Story 20.136, #1176). The run
 # kind is a terrain sitting ending at a STAGED stage-0 run — the case none of
 # the four enumerated run kinds matched, which is exactly why the ask reached
-# the owner as "Say the word and I'll run harvest" and was answered in free
-# text. What is asserted is the shape the total rule requires: a selection with
-# both branches offered, and a stop branch that says nothing is lost.
+# the owner as chat prose answered in free text. The stage behind the gate is
+# probe now (#1182); the shape the total rule requires is unchanged: a
+# selection with both branches offered, and a stop branch that says nothing
+# is lost.
 he = json.load(open(os.path.join(w, "harvest-entry.json")))["items"][0]
 check(he["render"]["control"] == "selection",
-      "#1176: the transition into harvest renders as a selection, not prose")
+      "#1176: the transition into stage 1 renders as a selection, not prose")
 check(len(he["choices"]) == 2,
-      "#1176: ...offering both branches — run harvest now, and stop")
-check(any("harvest" in c["label"] for c in he["choices"])
+      "#1176: ...offering both branches — run probe now, and stop")
+check(any("probe" in c["label"] for c in he["choices"])
       and any("stop" in c["label"] for c in he["choices"]),
-      "#1176: ...named as running harvest and as stopping")
+      "#1176: ...named as running probe and as stopping")
 check("brief" in he["choices"][1]["label"],
       "#1176: ...and the stop branch says what is KEPT — an owner who cannot "
       "see that stopping keeps the brief is choosing between continue and an "

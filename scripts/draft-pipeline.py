@@ -3066,93 +3066,6 @@ def cmd_staging_candidates(args):
     return 0
 
 
-def cmd_consume(args):
-    """Stage 1: consume harvest's output document (fact sheet + NEEDS-OWNER) into
-    pipeline state — WITHOUT re-reading any source. Source pointers are carried
-    verbatim; the harvest contract (KINDS, pointer forms, TOPICS) is imported
-    from the Epic 3 validators so a schema change surfaces here, not silently.
-    """
-    # Lazy import: stage 0 stays independent of these.
-    vfs = _load("validate-fact-sheet.py")
-    vno = _load("validate-needs-owner.py")
-
-    text = sys.stdin.read() if args.doc == "-" else open(args.doc, encoding="utf-8").read()
-    fs_lines, no_lines, has_no = vno.split_sections(text)
-    if not has_no:
-        sys.stderr.write("error: harvest output has no `# NEEDS-OWNER` section (contract violation)\n")
-        return 1
-
-    fact_sheet = []
-    for e in vno.entries(fs_lines):
-        parts = [p.strip() for p in e.rsplit(" / ", 2)]
-        if len(parts) != 3 or any(p == "" for p in parts):
-            sys.stderr.write(f"error: malformed fact-sheet entry (want `CLAIM / SOURCE / KIND`): {e}\n")
-            return 1
-        claim, source, kind = parts
-        if kind not in vfs.KINDS:
-            sys.stderr.write(f"error: fact-sheet KIND {kind!r} outside the harvest contract: {e}\n")
-            return 1
-        # Use the validator's shared SOURCE grammar so consume can never diverge
-        # from it (Story 13.8): a multi-line `quote` range that validate-fact-sheet
-        # accepts must not be rejected here.
-        if not vfs.source_form_ok(source, kind):
-            sys.stderr.write(f"error: fact-sheet SOURCE {source!r} is not a valid pointer form for KIND {kind!r}: {e}\n")
-            return 1
-        fact_sheet.append({"claim": claim, "source": source, "kind": kind})   # source verbatim
-
-    needs_owner = []
-    for e in vno.entries(no_lines):
-        # Pull the optional trailing `premise:` clause off FIRST (#736): the
-        # clause is sanctioned producer grammar (#526/#567, enforced in
-        # lockstep at validate-needs-owner.py), and parsing it as part of
-        # TOPIC rejected conformant harvest documents at the Stage-1 handoff.
-        # Same shared helper as the validator — one grammar, two call sites.
-        core, premise = vno.split_premise(e)
-        if premise is not None:
-            why = vno.validate_premise(premise)
-            if why:
-                sys.stderr.write(
-                    f"error: NEEDS-OWNER premise clause rejected ({why}): "
-                    f"`premise: {premise}` — sanctioned forms are `premise: "
-                    f"unverified` or `premise: path:line@sha`: {e}\n")
-                return 1
-        parts = [p.strip() for p in core.rsplit(" / ", 2)]
-        if len(parts) != 3 or any(p == "" for p in parts):
-            sys.stderr.write(f"error: malformed NEEDS-OWNER entry (want `CANDIDATE / REASON / TOPIC [/ premise: …]`): {e}\n")
-            return 1
-        candidate, reason, topic = parts
-        if topic not in vno.TOPICS:
-            sys.stderr.write(f"error: NEEDS-OWNER TOPIC {topic!r} outside the harvest contract: {e}\n")
-            return 1
-        entry = {"candidate": candidate, "reason": reason, "topic": topic}
-        if premise is not None:
-            entry["premise"] = premise      # survives into pipeline state, never dropped
-        needs_owner.append(entry)
-
-    state = {
-        "stage": "consume",
-        "next_stage": "interview",          # NEEDS-OWNER threads into the gap interview (Story 4.3)
-        "fact_sheet": fact_sheet,
-        "needs_owner": needs_owner,
-    }
-    # Slim-profile routing (Story 13.89 / #412): the working-note profile has
-    # no interview stage by ratified contract — consume routes straight to
-    # fill. NEEDS-OWNER entries are still carried in the state (they surface
-    # as [VERIFY]/blocker material at fill), just never as interview questions.
-    if args.framework:
-        key = resolve_framework(args.framework)
-        if key is None:
-            sys.stderr.write(
-                f"error: invalid article type {args.framework!r} for --framework "
-                "(same closed set as `start`).\n")
-            return 2
-        if key in SLIM_PROFILE_FRAMEWORKS:
-            state["next_stage"] = "fill"
-            state["profile"] = "slim"
-    print(json.dumps(state, indent=2))
-    return 0
-
-
 # --- F2 narrative-structure choice (Story 18.26, SPEC-article-frameworks CAP-4)
 # The argument-plan sub-step proposes 2-3 candidate STRUCTURES for the selected
 # elements — sibling-lessons (the F2 default), chronological journey, single-
@@ -3709,14 +3622,14 @@ def cmd_progress(args):
 def cmd_resume(args):
     """Report where to resume a run from its workspace checkpoint. Prints a JSON
     object: `{"resumed": true, ...state}` when a checkpoint exists (resume from
-    its `next_stage`), or `{"resumed": false, "next_stage": "harvest"}` when none
+    its `next_stage`), or `{"resumed": false, "next_stage": "probe"}` when none
     exists yet (a fresh run starts at stage 1)."""
     if not os.path.isdir(args.ws):
         sys.stderr.write(f"error: run workspace does not exist: {args.ws}\n")
         return 1
     path = _checkpoint_path(args.ws)
     if not os.path.isfile(path):
-        print(json.dumps({"resumed": False, "next_stage": "harvest"}, indent=2))
+        print(json.dumps({"resumed": False, "next_stage": "probe"}, indent=2))
         return 0
     with open(path, encoding="utf-8") as f:
         state = json.load(f)
@@ -3955,7 +3868,7 @@ def _autostart(root, fresh=False, sitting=None, brief=None):
                 return out
     # No in-progress run — start fresh (this is the AC4 no-false-resume path).
     ws = rp.new_run(root)
-    out = {"resumed": False, "ws": ws, "run_id": os.path.basename(ws), "next_stage": "harvest"}
+    out = {"resumed": False, "ws": ws, "run_id": os.path.basename(ws), "next_stage": "probe"}
     if skipped:
         out["fresh_skipped"] = skipped
         out["fresh_note"] = _load("draft_resume.py").fresh_note(skipped,
@@ -3970,7 +3883,7 @@ def cmd_autostart(args):
     `next_stage` other than `done`) and resume it; if none exists, mint a fresh
     run at stage 1. Prints the workspace to use and where to start:
       {"resumed": true,  "ws": …, "run_id": …, "next_stage": …}  # continue here
-      {"resumed": false, "ws": …, "run_id": …, "next_stage": "harvest"}  # new run
+      {"resumed": false, "ws": …, "run_id": …, "next_stage": "probe"}  # new run
     A large draft completing across several invocations is the normal model."""
     rp = _load("resolve-paths.py")
     print(json.dumps(_autostart(rp.host_root(args.root),
@@ -4149,7 +4062,7 @@ def _run_state(framework, sources, root=None, depth=None, element=None,
         sys.stderr.write(f"error: {gate_msg}\nNothing started.\n")
         return None, 2
     state = {
-        "next_stage": "harvest",
+        "next_stage": "probe",
         "framework": key.upper(),
         "framework_file": framework_file,
         "sources_raw": list(sources),
@@ -4899,12 +4812,6 @@ def main(argv=None):
                                     "(the #431 pin rule) — CAP-9, #505")
     sp.add_argument("--root", help="host-repo root, for the framework entry-gate check "
                                    "(default: cwd; e.g. F1 requires a tagged release)")
-    sp = sub.add_parser("consume")
-    sp.add_argument("doc", nargs="?", default="-", help="harvest output document, or - for stdin")
-    sp.add_argument("--framework", default=None,
-                    help="the run's article type (same closed set as `start`); a "
-                         "slim-profile framework (working-note) routes consume's "
-                         "next_stage to fill — no interview stage (Story 13.89)")
     sp = sub.add_parser("checkpoint", help="persist a completed stage's state to <ws>/checkpoint.json (Story 13.5)")
     sp.add_argument("--ws", required=True, help="the run workspace ($WS) to checkpoint into")
     sp.add_argument("state", nargs="?", default="-", help="the stage's output state JSON, or - for stdin")
@@ -5358,7 +5265,7 @@ def main(argv=None):
     _TEST_DECLARED = (bool(getattr(args, "allow_external_draft", False))
                       or _env_test_declared())
     return {
-        "start": cmd_start, "consume": cmd_consume, "interview": cmd_interview,
+        "start": cmd_start, "interview": cmd_interview,
         "structures": cmd_structures,
         "structure-record": cmd_structure_record,
         "entry": cmd_entry,

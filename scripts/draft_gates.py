@@ -205,7 +205,7 @@ GATES = {
     },
     "sources": {
         "stage": "stage 0",
-        "owner_decision": "sources — the scope harvest reads",
+        "owner_decision": "sources — the scope stage 1 reads",
     },
     # THE TRANSITION *INTO* HARVEST (Story 20.136, #1176). It was outside the
     # registry entirely: a terrain sitting ends at a STAGED stage-0 run, and the
@@ -224,8 +224,8 @@ GATES = {
     # composition step, so `gate-inventory.py` and the checks that iterate this
     # dict now say what they do not cover, rather than reading as clean.
     "harvest-entry": {
-        "stage": "after stage 0, before harvest",
-        "owner_decision": "run harvest now, or stop with the brief kept",
+        "stage": "after stage 0, before probe",
+        "owner_decision": "run probe now, or stop with the brief kept",
     },
     "harvest-completion": {
         "stage": "after harvest",
@@ -465,7 +465,13 @@ def intent_gate(labels, ws=None):
 
 
 def harvest_entry_gate(source_count, ws=None, brief=True):
-    """"Run harvest now, or stop?" — the ask #1176 saw as chat prose.
+    """"Run probe now, or stop?" — the ask #1176 saw as chat prose.
+
+    THE STAGE BEHIND THE GATE CHANGED, NOT THE GATE (amended 2026-08-02,
+    #1182): stage 1 is `probe` — a feasibility verdict plus a handful of
+    anchors, no fact sheet — so the ask names what actually runs. The id
+    keeps its registry name; renaming it would touch every audit row for a
+    surface whose decision is unchanged.
 
     THE RUN KIND NO ENUMERATION NAMED. `skills/completion-summary.md` mandated
     a selection for four run kinds — draft, standalone harvest, review,
@@ -487,14 +493,15 @@ def harvest_entry_gate(source_count, ws=None, brief=True):
     return payload(
         where="After stage 0: the run is staged with its article type and its "
               "sources, and nothing has been read yet.",
-        why=f"Harvest reads the {source_count} declared source(s) into a fact "
-            f"sheet. The {kept} and the staged run are already written, so "
-            f"stopping loses nothing.",
+        why=f"Probe checks whether the {source_count} declared source(s) can "
+            f"ground this brief — a verdict plus anchors, no fact sheet. The "
+            f"{kept} and the staged run are already written, so stopping "
+            f"loses nothing.",
         choices=[
-            {"label": "run harvest now",
-             "effect": f"reads the {source_count} declared source(s) into a "
-                       f"fact sheet, then asks whether to carry on into "
-                       f"drafting"},
+            {"label": "run probe now",
+             "effect": f"judges feasibility against the {source_count} "
+                       f"declared source(s); a doomed article dies here, a "
+                       f"grounded one carries on into drafting"},
             {"label": f"stop with the {kept} kept",
              "effect": "keeps everything written so far exactly as it is; "
                        "nothing is read and the run stays resumable"},
@@ -682,14 +689,14 @@ def sources_gate(default_kind="all", default_detail=None, ws=None,
     # be interpolated into them. There is nothing to interpolate now but this.
     scope = declared_scope(repo_root)
     if scope:
-        all_effect = (f"harvests all {scope['files']} enumerated file(s) — "
+        all_effect = (f"reads all {scope['files']} enumerated file(s) — "
                       f"{scope['prose']} prose, {scope['code']} code/config — "
                       f"the widest scope that boundary allows")
         where_scope = (f"Enumerating what {declaring_file} declares for "
                        f"{where_repo} gives {scope['files']} file(s): "
                        f"{scope['prose']} prose, {scope['code']} code/config.")
     else:
-        all_effect = (f"harvests the whole set {declaring_file} declares, "
+        all_effect = (f"reads the whole set {declaring_file} declares, "
                       f"whose size is not stated here — the widest scope that "
                       f"boundary allows")
         where_scope = (f"What {declaring_file} declares for {where_repo} could "
@@ -709,8 +716,8 @@ def sources_gate(default_kind="all", default_detail=None, ws=None,
                         "the rest is counted as unexamined",
     }
     choices = [{"label": labels[k], "effect": effects[k]} for k in SCOPE_KINDS]
-    why = reason or ("Scope decides where harvest looks. Which files carry the "
-                     "evidence is harvest's own step, not an answer owed here.")
+    why = reason or ("Scope decides where stage 1 looks. Which files carry the "
+                     "evidence is the reading stage's own step, not an answer owed here.")
     if candidates:
         # The candidates are EVIDENCE FOR THE DEFAULT, carried in the prose the
         # owner reads — never promoted into the choice set, which is the whole

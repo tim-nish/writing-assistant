@@ -79,9 +79,9 @@ ws=$(echo "$out" | jget 'd["ws"]'); [ -d "$ws" ] && ok "stage0 returns a real wo
 python3 -c "
 import json,sys
 s=json.load(open('$ws/checkpoint.json'))
-assert s.get('next_stage')=='harvest', s
+assert s.get('next_stage')=='probe', s
 assert s.get('framework')=='F2', s
-" && ok "the persisted checkpoint carries stage0's own run_state (next_stage=harvest)" \
+" && ok "the persisted checkpoint carries stage0's own run_state (next_stage=probe)" \
   || err "stage0's checkpoint does not match its run_state"
 
 # 4. Fold is real: on a second invocation with an in-progress checkpoint, stage0
@@ -148,8 +148,8 @@ echo "$out" | jget 'd.get("syndication_warnings",[{}])[0].get("bucket")' | grep 
   && ok "the warning is in the informational bucket (not a hard fail)" || err "warning bucket wrong"
 echo "$out" | jget 'd["config_ok"]' | grep -q True \
   && ok "config_ok stays True under the informational warning" || err "warning flipped config_ok"
-echo "$out" | jget 'd["next_stage"]' | grep -q harvest \
-  && ok "next_stage still harvest under the informational warning" || err "warning changed next_stage"
+echo "$out" | jget 'd["next_stage"]' | grep -q probe \
+  && ok "next_stage still probe under the informational warning" || err "warning changed next_stage"
 
 mkdir -p "$work/pp_full"         # devto.yaml resolves → no warning
 cp config/platform-profiles/devto.example.yaml "$work/pp_full/devto.yaml"
@@ -185,8 +185,8 @@ echo "$out" | jget 'd.get("publish_blockers",[{}])[0].get("bucket")' | grep -q p
   && ok "#530 blocker is tagged for the publish-blocker bucket" || err "#530 blocker bucket wrong"
 echo "$out" | jget 'd["config_ok"]' | grep -q True \
   && ok "#530 config_ok stays True (draft start not blocked — 18.19 preserved)" || err "#530 blocker flipped config_ok"
-echo "$out" | jget 'd["next_stage"]' | grep -q harvest \
-  && ok "#530 next_stage still harvest (blocker is publish-boundary, not a halt)" || err "#530 blocker changed next_stage"
+echo "$out" | jget 'd["next_stage"]' | grep -q probe \
+  && ok "#530 next_stage still probe (blocker is publish-boundary, not a halt)" || err "#530 blocker changed next_stage"
 
 # A declared variant WITH a resolvable profile → no publish blocker (unchanged).
 out=$(python3 "$DP" stage0 F2 specs/ --root "$host" \

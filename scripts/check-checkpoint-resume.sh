@@ -38,10 +38,10 @@ python3 -c "import py_compile; py_compile.compile('$DP', doraise=True)" 2>/dev/n
 work=$(mktemp -d); trap 'rm -rf "$work"' EXIT
 WS="$work/ws"; mkdir -p "$WS"
 
-# A fresh workspace with no checkpoint resumes at stage 1 (harvest), not started.
+# A fresh workspace with no checkpoint resumes at stage 1 (probe), not started.
 out=$(python3 "$DP" resume --ws "$WS")
 echo "$out" | jget 'd["resumed"]' | grep -q False && ok "no checkpoint -> resumed=false (fresh run)" || err "fresh workspace not reported as unstarted"
-echo "$out" | jget 'd["next_stage"]' | grep -q harvest && ok "fresh run resumes at stage 1 (harvest)" || err "fresh run did not point at harvest"
+echo "$out" | jget 'd["next_stage"]' | grep -q probe && ok "fresh run resumes at stage 1 (probe)" || err "fresh run did not point at probe"
 
 # Checkpoint a stage's output state (carries next_stage), then resume from it.
 printf '{"stage":"consume","next_stage":"interview","fact_sheet":[]}' > "$work/state.json"
@@ -74,10 +74,10 @@ host="$work/host"; mkdir -p "$host"; git -C "$host" init -q
 export XDG_STATE_HOME="$work/state"
 AUTO() { python3 "$DP" autostart --root "$host"; }
 
-# 1. No runs yet -> resumed=false, fresh run at harvest (the AC4 no-false-resume path).
+# 1. No runs yet -> resumed=false, fresh run at probe (the AC4 no-false-resume path).
 out=$(AUTO)
 echo "$out" | jget 'd["resumed"]' | grep -q False && ok "autostart: no run -> resumed=false (fresh)" || err "autostart false-resumed with no run"
-echo "$out" | jget 'd["next_stage"]' | grep -q harvest && ok "autostart: fresh run starts at harvest" || err "fresh autostart not at harvest"
+echo "$out" | jget 'd["next_stage"]' | grep -q probe && ok "autostart: fresh run starts at probe" || err "fresh autostart not at probe"
 ws1=$(echo "$out" | jget 'd["ws"]')
 [ -d "$ws1" ] && ok "autostart: minted a real workspace dir" || err "autostart workspace missing"
 
