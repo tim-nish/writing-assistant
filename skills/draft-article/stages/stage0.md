@@ -70,9 +70,9 @@ config or framework:
   fuzzy-select a framework on the writer's behalf; a mapped intent resolves
   exactly as before.
 - **The sources half asks a SCOPE, never paths to retype (Story 20.109, #1103).**
-  `draft_gates.sources_gate(...)` — selection over `SCOPE_KINDS`, each narrowing
-  within `writing-sources.yaml`; candidates inform the DEFAULT, never the choice
-  set. Rationale: SPEC-article-draft-pipeline amendments 2026-08-01.
+  `draft_gates.sources_gate(..., repo_root=<host repo>)` — selection over
+  `SCOPE_KINDS`, each narrowing within `writing-sources.yaml`; candidates inform
+  the DEFAULT, never the choices; the label names whose declaration (#1141).
 - **Workspace autostart** — resumption is **automatic, not opt-in**. It resumes
   the **newest in-progress run** (a workspace whose checkpoint records a
   `next_stage` other than `done`) when one exists, returning `"resumed": true`
