@@ -16,6 +16,14 @@
 # row in `presented-payloads.jsonl` is a defect anyone can find later, which is
 # the issue's ask (a) — "a checkable defect after the sitting, not just an
 # obligation".
+#
+# AND THE DETECTION IS BOUNDED (Story 20.136, #1176). Both sides of the audit
+# are keyed on `draft_gates.GATES`, so it detects a DECLARED gate that left no
+# row and nothing else: an ask composed outside the registry passes silently.
+# The bound is `gate_inventory.BOUND`, one string, carried in the audit result,
+# in the CLI output and in --help — and this check asserts those carriers,
+# because a limit that lives only in a docstring is a limit the next citation
+# will not have read.
 set -u
 cd "$(dirname "$0")/.."
 fail=0
@@ -23,7 +31,7 @@ ok()  { printf 'ok:   %s\n' "$1"; }
 err() { printf 'FAIL: %s\n' "$1" >&2; fail=1; }
 
 report=$(python3 - <<'PY'
-import importlib.util, json, os, sys, tempfile
+import contextlib, importlib.util, io, json, os, sys, tempfile
 sys.path.insert(0, "scripts")
 
 
@@ -48,6 +56,42 @@ dg.sources_gate(11, ws=ws)
 res = gi.audit(ws, reached=["intent", "sources"])
 need(res["ok"] is True, "a run whose gates all emitted is reported clean")
 need(res["missing"] == [], "no gate is reported missing on a clean run")
+
+# --- the clean verdict CARRIES ITS BOUND (Story 20.136, #1176) --------------
+# A clean audit must not read as a clean class. The bound rides the CLEAN
+# result specifically — that is the reader who is about to over-read it.
+need("NOT" in gi.BOUND and "never declared" in gi.BOUND,
+     "gate_inventory.BOUND does not state what the audit does NOT cover — an "
+     "ask that was never declared in the registry is invisible to it")
+need(res.get("bound") == gi.BOUND,
+     "a CLEAN audit result carries no bound — a caller reading `ok` alone is "
+     "exactly the reader the limit is for (#1176)")
+need(gi.audit(ws, reached=["intent", "sources", "terrain-axis"]).get("bound"),
+     "a FAILING audit result carries no bound either")
+_out = io.StringIO()
+with contextlib.redirect_stdout(_out):
+    gi.main(["--audit", "--ws", ws, "--reached", "intent,sources"])
+need(gi.BOUND in _out.getvalue(),
+     "the --audit CLI output does not print the bound — the citation shape "
+     "the amendment names is `gate-inventory.py --audit`, so that is the "
+     "output that must say what it does not cover")
+_help = io.StringIO()
+with contextlib.redirect_stdout(_help):
+    try:
+        gi.main(["--help"])
+    except SystemExit:
+        pass
+need("never declared" in _help.getvalue(),
+     "--help does not state the bound")
+
+# THE TRANSITION INTO HARVEST IS DECLARED (Story 20.136, #1176) and appears in
+# the pending map, which is the surface the owner reads at a sitting end.
+need("harvest-entry" in dg.GATES,
+     "the transition INTO harvest is not declared — it reached the owner as "
+     "chat prose on 2026-08-01 with no ask row anywhere")
+need(list(dg.GATES).index("harvest-entry") < list(dg.GATES).index("harvest-completion"),
+     "harvest-entry is not before harvest-completion — the registry order is "
+     "the pipeline's, and entering harvest precedes leaving it")
 
 # THE MOTIVATING RUN. 20260801T091400-250105 reached the thesis gate and wrote
 # no payload for it. A check that passes on the run that motivated it is not a
@@ -139,6 +183,11 @@ if [ -z "$report" ]; then
   ok "a run's reached gates are asserted against its emitted ask rows"
   ok "a missing gate is named, and an emitted payload without render: is caught"
   ok "the 2026-08-01 thesis-gate shape fails this check"
+  ok "the audit's bound rides its result, its --audit output and its --help"
+  printf 'BOUND: the audit covers DECLARED-ID EMISSION. An owner-facing ask never\n'
+  printf '       declared in draft_gates.GATES is invisible to it and audits clean.\n'
+  printf '       The stated limit is the remedy; the reopen trigger is a harness-level\n'
+  printf '       signal for a turn that ends awaiting a reply (#1176).\n'
 else
   printf '%s\n' "$report" | while IFS= read -r l; do
     [ -n "$l" ] && printf 'FAIL: %s\n' "$l" >&2

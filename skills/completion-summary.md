@@ -82,9 +82,24 @@ that to happen in.
 
 ## Explicit next step — an in-conversation choice, never a file to open
 
-After the three buckets, present **one concrete next step as an in-conversation
-choice** (a selection UI — AskUserQuestion — where available; plain offered
-options otherwise). The owner decides by selecting, never by opening a file:
+**THE RULE IS TOTAL, AND THE LIST BELOW IS NOT ITS SCOPE (2026-08-01, #1176).**
+**Any** sitting end that stops and waits on the owner presents its next step as
+**one concrete in-conversation choice** (a selection UI — AskUserQuestion —
+where available; plain offered options otherwise) —
+**including run kinds this list does not name**.
+The owner decides by selecting, never by opening a file.
+The non-member fallback is **present it as a selection**,
+never *fall through to prose*.
+
+Why that is stated first rather than left implied: this section listed four run
+kinds and a terrain sitting ending at a **staged stage-0 run** was none of them,
+so the mandate had no case to bind and the ask reached the owner as chat prose
+— *"Say the word and I'll run harvest"* — answered in free text, with no ask
+row anywhere. For an enumeration of admissible kinds the load-bearing half is
+not the list's completeness but its non-member fallback, and this one's was
+*admit*. Adding the fifth case would have been the same defect awaiting a sixth.
+
+The cases below are **worked examples beneath that rule**:
 
 - **draft run** → "run review-article on the draft / stop here".
 - **standalone harvest** → "continue into draft-article / stop here", drafted
@@ -93,6 +108,41 @@ options otherwise). The owner decides by selecting, never by opening a file:
 - **review run** → "apply the accepted findings, then re-run review" or "the
   draft is publishable".
 - **partially-completed run** → the resume command above is the next step.
+- **a terrain sitting that ends at a staged stage-0 run** — the case none of the
+  four above matched — → "run harvest now / stop with the brief kept", through
+  its declared builder:
+
+  ```
+  draft_gates.harvest_entry_gate(<declared source count>, ws=<run ws>)
+  ```
+
+  It carries the source count as the Why (so the choice is answerable without
+  opening anything), states that stopping keeps the brief and the staged run,
+  and writes the ask row. Print what it returns; do not author the options.
+
+**A run kind not listed here is not an exception.** Compose its choice through
+`draft_gates.gate(<declared id>, …)` — and if there is no declared id for the
+boundary you are standing at, that absence is the finding: the ask is still
+presented as a selection, and the missing id is reported, never quietly
+answered in prose.
+
+**Where the next step has a composed artifact, carry a POINTER, not a
+restatement.** The brief, the fact sheet, the run workspace, the pending map:
+name them and point at them; do not re-narrate their contents into the reply.
+Restating is free composition, and free composition is the surface the
+detection layer cannot police — a pointer shrinks it, which is the whole reason
+this half rides with the rule above rather than being filed as style.
+
+**What none of this can catch, stated so the surface does not read as
+covered.** The rule binds at the agent's own composition step, a layer this
+product does not own, so it is advisory —
+real, worth writing, and **not a carrier**.
+`gate-inventory.py --audit` is coverage of **declared-id emission**
+and is **not** coverage of an ask that was never declared: a sitting that ends
+in undeclared prose audits clean. No lint or hook is added here, deliberately —
+the only available input would be self-asserted by the actor that made the
+error. The reopen trigger is a harness-level signal that fires when a turn ends
+awaiting a reply, which would give this class a real carrier.
 
 **And say which decisions remain, and where (Story 20.130, #1146/#1112).**
 Beside the next step, render the pending-decision map:

@@ -392,6 +392,29 @@ pin, **beside** the host-repo sources and never in place of them. There is no
 second argument and no second hand-off. Nothing on the owner's surface changes,
 and the extraction one-liner is gone because the pipeline reads the file.
 
+**The sitting does not end on that command. It ends on a GATE (Story 20.136,
+#1176).** Staging the run is not the same as running harvest, and the ask that
+decides which happens is an owner decision like every other one here:
+
+```
+draft_gates.harvest_entry_gate(<declared source count>, ws=<run ws>)
+```
+
+Print what it returns through the selection UI. **Do not compose this ask.**
+The observed 2026-08-01 sitting ended with *"Say the word and I'll run
+harvest"* — chat prose, answered in free text, with no ask row anywhere, on a
+sitting that had put every earlier decision through the carrier. It read as
+covered because every declared gate had emitted; the gate that had not been
+declared was the one that leaked. The id is `harvest-entry`, declared in
+`draft_gates.GATES`, and the builder carries the two branches (run harvest now
+/ stop with the brief kept) with the free-text channel intact.
+
+**Point at the brief; do not restate it.** Whichever branch the owner takes,
+the reply names the artifact and its path rather than re-narrating its members,
+its thesis or its gaps back at them. A restatement is free composition, which
+is the surface nothing downstream can police; a pointer leaves nothing to
+compose.
+
 The coupling direction is unchanged by this: stage 0 recognises a **format**,
 never a producer. It does not detect, name, import or resolve terrain, and it
 cannot tell this record from one the owner wrote by hand.

@@ -179,6 +179,26 @@ GATES = {
         "stage": "stage 0",
         "owner_decision": "sources — the scope harvest reads",
     },
+    # THE TRANSITION *INTO* HARVEST (Story 20.136, #1176). It was outside the
+    # registry entirely: a terrain sitting ends at a STAGED stage-0 run, and the
+    # ask that decides whether harvest runs at all reached the owner as chat
+    # prose — *"Say the word and I'll run harvest"* — answered in free text,
+    # with no ask row anywhere. `harvest-completion` below covers the transition
+    # OUT of harvest and covered nothing here.
+    #
+    # DECLARING IT IS NOT THE REMEDY FOR THE CLASS, and the amendment that
+    # orders this story says so in as many words (`specs/spec-writing-assistant/
+    # amendments-2026-07-24--2026-08-01.md`, 2026-08-01 #1176/#1177, clause
+    # (a)): this is the sixth surface closed by declaring the missing id, and
+    # persistence through one remedy class is evidence about the attribution
+    # rather than the dose. The entry closes this INSTANCE. What is done about
+    # the CLASS is the STATED LIMIT — no carrier is possible at the agent's own
+    # composition step, so `gate-inventory.py` and the checks that iterate this
+    # dict now say what they do not cover, rather than reading as clean.
+    "harvest-entry": {
+        "stage": "after stage 0, before harvest",
+        "owner_decision": "run harvest now, or stop with the brief kept",
+    },
     "harvest-completion": {
         "stage": "after harvest",
         # NOT None (Story 20.129, #1143). It read "next-step options; nothing
@@ -394,6 +414,46 @@ def intent_gate(labels, ws=None):
         banner="Choose the article type before drafting starts.",
         reply_line="Reply with one article type from the list, or describe "
                    "the piece you have in mind.",
+    )
+
+
+def harvest_entry_gate(source_count, ws=None, brief=True):
+    """"Run harvest now, or stop?" — the ask #1176 saw as chat prose.
+
+    THE RUN KIND NO ENUMERATION NAMED. `skills/completion-summary.md` mandated
+    a selection for four run kinds — draft, standalone harvest, review,
+    partially-completed — and a terrain sitting ending at a STAGED stage-0 run
+    is none of them, so the mandate had no case to bind and the surface fell
+    through to prose (*"Say the word and I'll run harvest"*). The list's
+    non-member fallback was `admit`; that is the defect, not the list's
+    contents, and the rule is now total. This builder is what the total rule
+    has to call at this boundary.
+
+    NOTHING IS LOST ON EITHER BRANCH, and the `why` says so, because that is
+    the fact that makes the choice answerable without opening anything: the
+    brief and the staged run are already written, so stopping is a pause rather
+    than a discard. The scope is named as a COUNT of declared sources, never as
+    a file list — which files carry the evidence is harvest's own step, exactly
+    as the sources gate records.
+    """
+    kept = "brief" if brief else "staged run"
+    return payload(
+        where="After stage 0: the run is staged with its article type and its "
+              "sources, and nothing has been read yet.",
+        why=f"Harvest reads the {source_count} declared source(s) into a fact "
+            f"sheet. The {kept} and the staged run are already written, so "
+            f"stopping loses nothing.",
+        choices=[
+            {"label": "run harvest now",
+             "effect": f"reads the {source_count} declared source(s) into a "
+                       f"fact sheet, then asks whether to carry on into "
+                       f"drafting"},
+            {"label": f"stop with the {kept} kept",
+             "effect": "keeps everything written so far exactly as it is; "
+                       "nothing is read and the run stays resumable"},
+        ],
+        gate="harvest-entry", ws=ws,
+        recommended=0,
     )
 
 
