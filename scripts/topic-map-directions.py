@@ -1083,7 +1083,23 @@ def cmd_brief(args):
     # THE LIFECYCLE (AC5), stated whether or not an artifact is written: a
     # brief that was composed and not written is still `composed`, and saying
     # so is more honest than omitting the field.
-    out["lifecycle"] = _brief_lifecycle(BRIEF_LIFECYCLE[0])
+    #
+    # RECORDING THE ADOPTED ANSWER MOVES THE LIFECYCLE IN THE SAME ACT
+    # (Story 20.141, #1208). This composition is the act that records the
+    # owner's adopted candidate — `thesis.state: adopted` — and the lifecycle
+    # is the brief's visible truth, so the two carriers must move together: an
+    # observed run left `brief-adopted.json` at `composed` with its traversal
+    # reporting "Never entered: adopted" beside an adopted thesis. The move is
+    # the same forward transition `brief-open --state` records — the history
+    # gains the state entered, through `_brief_lifecycle` — never a second
+    # hand-rolled writer; a brief with no adopted claim renders exactly as
+    # before.
+    life = _brief_lifecycle(BRIEF_LIFECYCLE[0])
+    if out.get("adopted_claim"):
+        life = _brief_lifecycle(
+            BRIEF_LIFECYCLE[-1],
+            life["history"] + [{"state": BRIEF_LIFECYCLE[-1]}])
+    out["lifecycle"] = life
     out["next"] = ("draft-pipeline.py stage0 <framework> <sources...> --brief "
                    "<this brief> — the existing stage-0 path, unchanged")
     # THE TRANSITION IS ANNOUNCED (Story 20.116, #1113). The step identity, the
@@ -1211,7 +1227,7 @@ GATE_ONLY_BLOCKS = ("consultant", "recomposition",
 RENDERED_KEYS = {
     "step": ("line",),
     "artifact": ("line", "read_back"),
-    "lifecycle": ("line", "banner", "traversal"),
+    "lifecycle": ("line", "banner", "traversal", "carrier_mismatch"),
     "iteration": ("line",),
     "thesis": ("line", "brief_string_is"),
     "candidate_theses": ("line", "label", "requirements", "recommendation",
@@ -1541,6 +1557,27 @@ def cmd_brief_open(args):
     # is unchanged; there is simply one composer instead of a composer and a
     # frozen copy that drifted from it.
     _rehydrate_lines(payload)
+    # A PRE-#1208 ARTIFACT CAN CARRY DISAGREEING CARRIERS (Story 20.141): the
+    # thesis-adoption act used to write `thesis.state: adopted` without moving
+    # the lifecycle, so an older brief on disk can be adopted on one axis and
+    # `composed` on the other. Disclosed rather than silently resolved — and
+    # per axis, because neither carrier is authoritative for the other's
+    # question: `thesis.state` records WHETHER a candidate was adopted, the
+    # lifecycle records which transitions were RECORDED. Composed at read
+    # time, after any write above, so the disclosure is never stored.
+    if (payload.get("thesis") or {}).get("state") == BRIEF_LIFECYCLE[-1] \
+            and state != BRIEF_LIFECYCLE[-1]:
+        payload["lifecycle"]["carrier_mismatch"] = {
+            "thesis_state": BRIEF_LIFECYCLE[-1],
+            "lifecycle_state": state,
+            "precedence": (
+                "per axis: `thesis.state` is authoritative for whether a "
+                "candidate was adopted; the lifecycle is authoritative for "
+                "which transitions were recorded. This artifact predates the "
+                "#1208 fix that records both in one act — record the missing "
+                f"transition with `--state {BRIEF_LIFECYCLE[-1]}`, or leave "
+                "it as the honest history of what was recorded."),
+        }
     # THE OWNER-MEANINGFUL LABEL, derived here and never written (AC7): the
     # transition above wrote the artifact, and this is composed after it so
     # nothing derived can leak into what is stored.

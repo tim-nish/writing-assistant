@@ -81,6 +81,45 @@ else
     || err "wrong rewind behaviour: $(cat "$work/brief-back.json")"
 fi
 
+# A PRE-#1208 ARTIFACT can carry an adopted thesis beside a composed
+# lifecycle — the adoption act used to write one carrier without the other.
+# `brief-open` DISCLOSES the disagreement per axis rather than silently
+# preferring either carrier, and the disclosure is never stored
+# (Story 20.141, #1208).
+python3 - "$work" <<'PYEOF'
+import json, os, sys
+w = sys.argv[1]
+os.makedirs(w + "/ws2", exist_ok=True)
+json.dump({"brief": "b", "thesis": {"state": "adopted"},
+           "lifecycle": {"state": "composed",
+                         "states": ["composed", "inspected", "adopted"],
+                         "history": [{"state": "composed"}]}},
+          open(w + "/ws2/brief.json", "w"))
+PYEOF
+if python3 "$D" brief-open --at "$work/ws2/brief.json" \
+     > "$work/brief-mismatch.json" 2>&1; then
+  python3 - "$work" <<'PYEOF' && ok "disagreeing carriers on a pre-fix artifact are disclosed, per axis" || fail=1
+import json, sys
+w = sys.argv[1]
+p = json.load(open(w + "/brief-mismatch.json"))
+cm = (p.get("lifecycle") or {}).get("carrier_mismatch") or {}
+bad = []
+if not (cm.get("thesis_state") == "adopted"
+        and cm.get("lifecycle_state") == "composed"):
+    bad.append("a pre-#1208 artifact's disagreeing carriers are not disclosed")
+if "per axis" not in (cm.get("precedence") or ""):
+    bad.append("the disclosure does not state per-axis precedence")
+if "carrier_mismatch" in (json.load(open(w + "/ws2/brief.json"))
+                          .get("lifecycle") or {}):
+    bad.append("the disclosure leaked into the stored artifact")
+for m in bad:
+    print("FAIL: %s" % m, file=sys.stderr)
+sys.exit(1 if bad else 0)
+PYEOF
+else
+  err "opening a pre-#1208 artifact failed: $(cat "$work/brief-mismatch.json")"
+fi
+
 # The selected-candidate answer derives from the candidates output, so it is
 # written between CLI calls — one short run, then the brief call it feeds.
 python3 - "$work" <<'PYEOF'
