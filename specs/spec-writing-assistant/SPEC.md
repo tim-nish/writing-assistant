@@ -1,7 +1,8 @@
 ---
 id: SPEC-writing-assistant
 companions:
-  - amendments.md                        # ratified amendment blocks, relocated 2026-07-30 (#960)
+  - amendments.md                        # ratified amendments, 2026-08-01 onward
+  - amendments-2026-07-24--2026-08-01.md # closed era (relocated verbatim 2026-08-01, #1148)
   - plugin-layout.md
   - ../spec-article-frameworks/SPEC.md
   - ../spec-article-draft-pipeline/SPEC.md
@@ -16,7 +17,7 @@ sources:
   - ../../docs/interview-architecture.md # 2026-07-11 Stage-2 interview decision behind the proposal-contract additions (d)/(e)
 ---
 
-> **Ratified amendments are recorded in the `amendments.md` companion**, newest-last, relocated verbatim 2026-07-30 (#960) per the #829 amendment-history-companion decision. This page carries the governing text; the dated blocks behind any clause on it live there. Append new amendments to that file, never here.
+> **Ratified amendments are recorded in the `amendments.md` companion**, newest-last, relocated verbatim 2026-07-30 (#960) per the #829 amendment-history-companion decision. This page carries the governing text; the dated blocks behind any clause on it live there. Append new amendments to that file, never here. Amendments dated **2026-07-24 → 2026-08-01** live in the closed `amendments-2026-07-24--2026-08-01.md`, cut 2026-08-01 (#1148) on the mechanical era-split threshold.
 
 
 
