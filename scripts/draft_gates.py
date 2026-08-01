@@ -189,6 +189,33 @@ GATES = {
         "owner_decision": "continue into drafting, or stop with the fact "
                           "sheet kept",
     },
+    # BEFORE `gap-interview`, and the order is the pipeline's: the policy-topic
+    # selection runs *before* questions are selected, because it fixes which
+    # recorded positions may raise a tension at all
+    # (`skills/draft-article/stages/stage2.md` — "Before selecting questions").
+    #
+    # IT WAS OUTSIDE THE REGISTRY ENTIRELY (Story 20.127, #1144). CAP-2's
+    # two-step selection has asked the owner to pick ≤2 topic files since #230,
+    # and declared nothing here — so it sat outside the payload audit and the
+    # pending-decision map, which is what "a run's gates are auditable"
+    # (#1132) forbids. An owner screen with no declared id leaves no event, so
+    # nothing could assert it emitted; that is the #1114 defect, reached by a
+    # surface old enough that no story had looked at it.
+    #
+    # ONLY THE COLD-RUN BRANCH IS DECLARED HERE, and the absence is deliberate
+    # rather than an oversight. The #1144 amendment ratifies a SECOND branch —
+    # for a brief-carrying run the set is DERIVED and rendered as a disclosure,
+    # which would carry `owner_decision: None` on the `resume-confirmation`
+    # shape. That branch is not implemented: its `Strand → lesson → served
+    # topic` derivation needs a join the hub does not serve (screen 1's axis is
+    # tags precisely because no served Lesson→Topic join exists), so declaring
+    # its id now would put a gate in the inventory that no code path can reach.
+    # The registry states what a run can actually present.
+    "policy-topics": {
+        "stage": "stage 2",
+        "owner_decision": "which ≤2 policy topics this article's tension "
+                          "questions may be seeded from",
+    },
     "gap-interview": {
         "stage": "stage 2",
         "owner_decision": "the gap interview — what only you can answer",
@@ -204,7 +231,10 @@ GATES = {
 }
 
 # DECLARED BUT NOT YET CODE-COMPOSED (Story 20.118 step 3, #1114): `thesis`,
-# `gap-interview`, `narrative-structure`, `visual-set`
+# `policy-topics`, `gap-interview`, `narrative-structure`, `visual-set`
+# (`policy-topics` JOINED this list at Story 20.127, #1144 — it is declared so
+# the audit can report it as reached-but-never-emitted, which is the honest
+# state of a surface that has reached owners since #230 with no ask row at all)
 # (`harvest-completion` LEFT this list at Story 20.129, #1143 — it has a
 # builder below, so its surface can no longer be composed without an ask row)
 # reach the owner from the SKILL prompt, not from a script — which is the whole
