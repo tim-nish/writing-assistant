@@ -235,5 +235,62 @@ sys.exit(1 if fail else 0)
 HIER_EOF
 [ $? -eq 0 ] || fail=1
 
+# --- summary carries the Group↔Strand mapping (Story 20.114, #1115) ---------
+python3 - <<'PY' || exit 1
+import importlib.util, sys
+sys.path.insert(0, "scripts")
+spec = importlib.util.spec_from_file_location("tm", "scripts/terrain_members.py")
+tm = importlib.util.module_from_spec(spec); spec.loader.exec_module(tm)
+
+fail = 0
+def check(cond, msg):
+    global fail
+    if cond: print("ok:   %s" % msg)
+    else: print("FAIL: %s" % msg, file=sys.stderr); fail = 1
+
+by = {"a": {"id": "L1"}, "b": {"id": "L2"}}
+flat = {"title": "t", "strands": [{"slug": "a"}, {"slug": "b"}]}
+out = tm._summary_index_lines(flat, by)
+check(any("L1" in l and "L2" in l for l in out),
+      "#1115: an unsubdivided group states its Strand indexes on the summary — "
+      "the id is shorthand that expands to them, so no surface should make the "
+      "owner open a file to learn the expansion")
+
+sub = {"title": "t", "strands": [{"slug": "a"}, {"slug": "b"}],
+       "subgroups": [{"subgroup_id": "G3-1", "claim": "shared thing",
+                      "strands": [{"slug": "a"}]},
+                     {"subgroup_id": "G3-2", "claim_declared": True,
+                      "strands": [{"slug": "b"}]}]}
+o2 = tm._summary_index_lines(sub, by)
+joined = "\n".join(o2)
+check("G3-1" in joined and "G3-2" in joined,
+      "#1115: a SUBDIVIDED group exhibits a member of the `G<n>-<m>` family — "
+      "#1075 states the count as a MINIMUM, not the whole obligation")
+check("shared thing" in joined,
+      "a subgroup carries its own claim, read from the record")
+check("no single commonality found" in joined,
+      "a subgroup that was ASKED and found nothing says so — not the same as "
+      "one never asked (the three claim states, #979/#980)")
+check("L1" in joined and "L2" in joined,
+      "per-subgroup index lists, so the mapping survives subdivision")
+check(not any(l.strip().startswith("G3-") and "Strand(s)" in l for l in o2),
+      "the subgroup head and its index list are separate lines — the head is "
+      "the claim surface, the list is the mapping")
+
+# AC1 is NOT implemented and its absence is asserted, not left silent: removing
+# the instruction block from Screen 2 contradicts four shipped amendments —
+# #1031/#1039 (the `G<n>` kind declaration, UNCONDITIONAL), 20.87 AC6 (the
+# subgroup kind, declared where rendered), #1075/#936 (announced iff rendered)
+# and #1074 (both halves of the selection contract asserted together, "because
+# either alone is what the defect looked like"). Routed to #1115, still open.
+src = open("scripts/terrain_members.py", encoding="utf-8").read()
+check("Selection is always by Strand index." in src,
+      "AC1 stays unimplemented — the selection contract remains on the screen "
+      "until #1115 reconciles its removal with #1074/#1031/#1039/20.87/#1075")
+sys.exit(fail)
+PY
+
+[ $? -eq 0 ] || fail=1
+
 [ "$fail" -eq 0 ] && echo "scripts/check-terrain-group-disclosure.sh OK"
 exit "$fail"

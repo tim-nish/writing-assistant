@@ -757,6 +757,51 @@ def _summary_head(head, sec):
                         f"{'' if n == 1 else 's'})", 1)
 
 
+def _summary_index_lines(sec, by_slug, claims=None):
+    """The group's Strand indexes on the summary — per subgroup where the group
+    is subdivided (Story 20.114, #1115).
+
+    SUBDIVISION IS SHOWN, NOT JUST COUNTED. `_summary_head` annotates a
+    subdivided group with a count, which Story 20.97 (#1075) states as the
+    MINIMUM — *"a screen that defines the `G<n>-<m>` id family and exhibits no
+    member of it leaves the owner facing the parent's fifteen members exactly
+    as before the mechanism shipped"*. That argument does not stop at a count:
+    it asks for a member of the family to be exhibited. A subgroup rendered
+    with its id, its claim and its indexes is that member.
+
+    An unsubdivided group gets one line of its own indexes.
+    """
+    def idents(strands):
+        out = []
+        for el in strands:
+            c = by_slug.get(el.get("slug"))
+            out.append(c["id"] if c else el.get("slug", "?"))
+        return out
+
+    subs = sec.get("subgroups") or []
+    if not subs:
+        ids = idents(sec["strands"])
+        return [_clip_line(f"  {len(ids)} Strand(s): {', '.join(ids)}")] if ids else []
+    out = []
+    for sub in subs:
+        ids = idents(sub["strands"])
+        # The subgroup's own claim, in the same three states the parent's uses:
+        # declared, tried-and-found-nothing, or never asked. Read from the
+        # record, never composed here.
+        claim = str(sub.get("claim") or "").strip()
+        if claim:
+            head = f"  {sub['subgroup_id']} — {claim}"
+        elif sub.get("claim_declared"):
+            head = (f"  {sub['subgroup_id']} — no single commonality found; "
+                    f"grouped as placed")
+        else:
+            head = f"  {sub['subgroup_id']}"
+        out.append(_clip_line(head))
+        if ids:
+            out.append(_clip_line(f"    {len(ids)} Strand(s): {', '.join(ids)}"))
+    return out
+
+
 def _summary_claim_line(claims, gid):
     """One group's `in common:` claim on the SUMMARY, bounded (Story 20.97).
 
@@ -1218,6 +1263,17 @@ def _compose_member_rendering(map_data, ms, cands, claims=None,
             cl = _summary_claim_line(claims, gid) if claims is not None else None
             if cl:
                 lines.append(cl)
+            # THE GROUP↔STRAND MAPPING, ON THE SUMMARY (Story 20.114, #1115).
+            # A group id is answer shorthand that expands to member indexes, and
+            # until now no surface carried the expansion compactly: the summary
+            # showed groups without members, the View showed members at full
+            # length. So the owner could read what a group MEANS and never what
+            # it EXPANDS TO without opening a file. Indexes are what the id
+            # stands for, so they belong beside it. This is a list of ids, not
+            # composer prose — the screen-height argument that governed the
+            # claim does not reach it, exactly as it does not reach the
+            # subgroup count above.
+            lines += _summary_index_lines(sec, by_slug, claims)
             continue
         lines.append(head)
         lines.append("")
