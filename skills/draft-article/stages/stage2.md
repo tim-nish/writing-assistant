@@ -46,7 +46,7 @@ dogfooding surprise this closes).
 per question or one for the batch is deliberately left to you — the interview's
 content is variable in a way the other gates' is not — but a question reaching
 the owner with no ask row is the defect #1114 names, whichever shape you pick.
-
+**So is the topic selection below** — `gate("policy-topics", …)`, 20.127/#1144.
 
 Before selecting questions, probe the host repo's optional `policy_source`
 (SPEC-policy-source-seam) — the owner's policy repo, read-only and bounded
