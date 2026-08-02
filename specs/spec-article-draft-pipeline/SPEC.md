@@ -1,7 +1,8 @@
 ---
 id: SPEC-article-draft-pipeline
 companions:
-  - amendments.md
+  - amendments.md            # 2026-08-02 onward
+  - amendments-2026-07-10--2026-08-01.md   # closed era (#1311)
   - pipeline-stages.md
   - ../spec-article-frameworks/article-frameworks.md
 sources:
@@ -14,10 +15,8 @@ sources:
 ---
 
 > **Vendored copy.** Adopted verbatim from the originating private site repo (2026-07-09) per SPEC-writing-assistant; this copy is now the canonical version for this project. Bare AP/AC numbers and archive references refer to that originating repo.
-> **Ratified amendments** live in the companion `amendments.md` — relocated
-> verbatim per the amendment-history companion decision (#829), applied on
-> this spec's own breakdown 2026-07-29 (#896). New amendments are appended
-> there, newest-last, never here.
+> **Ratified amendments** live in `amendments.md` (#829, #896), newest-last,
+> never here. 2026-07-10 -> 2026-08-01 is the closed era companion (#1311).
 
 > **Canonical contract.** This SPEC and the files in `companions:` are the complete, preservation-validated contract for what to build, test, and validate. Source documents listed in frontmatter are for traceability only — consult them only if you need narrative rationale or prose color this contract intentionally omits.
 
