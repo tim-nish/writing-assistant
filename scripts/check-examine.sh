@@ -2,8 +2,9 @@
 # parallel-safe
 # parallel-verified 2026-08-02 — all writes land in a private `mktemp -d`
 #   (fixture repo + workspace); the only reads outside it are this repo's
-#   scripts. No XDG state, no config home, no network source is consulted
-#   (the issues source is never requested by any fixture run).
+#   scripts. No XDG state, no config home, no network source is consulted —
+#   the issues source is exercised only with its transport stubbed, and its
+#   ETag cache is redirected into the same private dir via EXAMINE_ETAG_CACHE.
 # tier: inner
 # covers: scripts/examine.py scripts/terrain_scope.py skills/draft-article/stages/examine.md
 # removal-signal: retire this check when examine's contract (never-judge,
@@ -260,6 +261,109 @@ el = time.monotonic() - t0
 assert set(res) == {"commits", "issues", "prose"}, res
 assert el < 0.13, f"the three sources ran sequentially ({el:.2f}s of 0.18s)"
 assert list(examine.SOURCE_ORDER) == ["commits", "issues", "prose"]
+PY
+
+# --- the issues source's THREAD FETCHES ride the REST core pool (20.165) -----
+# Transport is STUBBED — no fixture may touch the real `gh` — and the cache is
+# redirected into the private work dir. What is asserted is the transport, the
+# conditional request, and that neither the population nor the output moved.
+H="$h" W="$work" python3 - <<'PY' && ok "issue threads ride REST core with ETag conditional requests; list call and output contract unmoved (#1249)" || err "the issues source's thread transport (#1249) does not hold — see the assertion above"
+import json, os, sys
+sys.path.insert(0, "scripts")
+import examine
+
+H, W = os.environ["H"], os.environ["W"]
+os.environ["EXAMINE_ETAG_CACHE"] = os.path.join(W, "etag-cache")
+
+ETAG = 'W/"abc123"'
+LIST = json.dumps([{"number": 7, "title": "the retry storm", "body": "body",
+                    "createdAt": "2026-07-01T09:00:00Z",
+                    "updatedAt": "2026-07-02T09:00:00Z",
+                    "url": "https://example.invalid/o/r/issues/7",
+                    "state": "OPEN", "labels": [{"name": "bug"}]}])
+COMMENTS = json.dumps([{"created_at": "2026-07-02T09:00:00Z",
+                        "body": "widening the backoff settled it"}])
+CALLS = []
+MODE = {"thread": "ok"}
+
+def fake_run(cmd, cwd=None, timeout=60):
+    CALLS.append(list(cmd))
+    if cmd[:1] == ["git"]:
+        return True, "git@example.invalid:o/r.git\n", ""
+    if cmd[:3] == ["gh", "issue", "list"]:
+        return True, LIST, ""
+    if cmd[:2] == ["gh", "api"]:
+        if MODE["thread"] == "unreachable":
+            return False, "", "gh: could not connect"
+        inm = [cmd[i + 1] for i, a in enumerate(cmd)
+               if a == "-H" and cmd[i + 1].startswith("If-None-Match:")]
+        if inm:
+            assert ETAG in inm[0], inm
+            # gh exits non-zero on a non-2xx status; `-i` still prints it.
+            return False, "HTTP/2.0 304 Not Modified\r\netag: %s\r\n\r\n" % ETAG, \
+                   "gh: HTTP 304"
+        return True, ("HTTP/2.0 200 OK\r\nETag: %s\r\n"
+                      "Content-Type: application/json\r\n\r\n%s" % (ETAG, COMMENTS)), ""
+    raise AssertionError("unexpected transport call: %r" % (cmd,))
+
+examine.run = fake_run
+TERMS = ["retry", "backoff"]
+
+first, why = examine.examine_issues(H, TERMS, 5, True)
+assert why is None, why
+
+# AC-1: the thread fetch is a REST core-pool read of the comments endpoint,
+# and `gh issue view` (GraphQL) is gone.
+api = [c for c in CALLS if c[:2] == ["gh", "api"]]
+assert len(api) == 1, CALLS
+assert "repos/{owner}/{repo}/issues/7/comments" in api[0], api[0]
+assert not any(c[:3] == ["gh", "issue", "view"] for c in CALLS), CALLS
+
+# AC-2: the term-searched list call is UNTOUCHED — still `gh issue list
+# --search`, never migrated to /search/issues (pool limit 30).
+lst = [c for c in CALLS if c[:3] == ["gh", "issue", "list"]]
+assert len(lst) == 1 and "--search" in lst[0], CALLS
+assert not any("search/issues" in a for c in CALLS for a in c), CALLS
+
+# AC-5: the emitted shape is the one the GraphQL read produced.
+assert [e["ref"] for e in first] == ["#7"], first
+e = first[0]
+assert e["source_type"] == "issue" and e["time_axis"] is True
+assert e["cite"] == e["pin"] == "https://example.invalid/o/r/issues/7"
+assert e["when"] == "2026-07-01" and e["state"] == "OPEN"
+assert e["thread"] == [{"when": "2026-07-02",
+                        "excerpt": "widening the backoff settled it"}], e["thread"]
+assert "thread_unavailable" not in e
+
+# AC-3: a thread consulted before is re-requested conditionally, the 304 is
+# not an error, and the cache scope is the individual issue thread.
+CALLS[:] = []
+second, why2 = examine.examine_issues(H, TERMS, 5, True)
+assert why2 is None
+sent = [a for c in CALLS if c[:2] == ["gh", "api"] for a in c
+        if a.startswith("If-None-Match:")]
+assert sent and ETAG in sent[0], CALLS
+cached = [n for n in os.listdir(os.environ["EXAMINE_ETAG_CACHE"])
+          if n.endswith(".json")]
+assert len(cached) == 1, cached
+
+# AC-4 + AC-5: population and output are byte-identical across the fresh read
+# and the 304 — the 304 path serves the same thread, it does not empty it.
+assert json.dumps(second, sort_keys=True) == json.dumps(first, sort_keys=True)
+
+# AC-6: an unreachable endpoint is CANNOT-DETERMINE — thread_unavailable —
+# never an empty thread read as absence.
+MODE["thread"] = "unreachable"
+third, why3 = examine.examine_issues(H, TERMS, 5, True)
+assert why3 is None and len(third) == 1, third
+assert third[0].get("thread_unavailable") is True, third[0]
+assert third[0]["thread"] == [], third[0]
+
+# The cache key carries the repository: issue numbers collide across repos.
+p1 = examine._thread_cache_path(H, 7, "git@example.invalid:o/r")
+p2 = examine._thread_cache_path(H, 7, "git@example.invalid:o/other")
+assert p1 != p2, p1
+assert examine._thread_cache_path(H, 7, "x") != examine._thread_cache_path(H, 8, "x")
 PY
 
 [ "$fail" -eq 0 ] || { printf '\nexamine checks FAILED.\n' >&2; exit 1; }
