@@ -6,7 +6,7 @@
 #   the issues source is exercised only with its transport stubbed, and its
 #   ETag cache is redirected into the same private dir via EXAMINE_ETAG_CACHE.
 # tier: inner
-# covers: scripts/examine.py scripts/terrain_scope.py skills/draft-article/stages/examine.md
+# covers: scripts/examine.py scripts/terrain_scope.py skills/draft-article/stages/examine.md skills/draft-article/stages/fan-out.md
 # removal-signal: retire this check when examine's contract (never-judge,
 #   anchored commits, derived-scope refusal, coverage separation, at-the-read
 #   pin recording) is enforced by a schema over the emitted record rather than
@@ -365,6 +365,40 @@ p2 = examine._thread_cache_path(H, 7, "git@example.invalid:o/other")
 assert p1 != p2, p1
 assert examine._thread_cache_path(H, 7, "x") != examine._thread_cache_path(H, 8, "x")
 PY
+
+# --- the fill's fan-out, and the trigger it must NOT widen (Story 20.164) ----
+# The scheduling contract is prose (the dispatch has no code carrier — the fill
+# is an LLM step), so what is checkable is that the prose exists, names the
+# flags examine.py actually ships, and carries the constraint the whole
+# amendment turns on: enumeration never becomes a stockpile.
+FO="skills/draft-article/stages/fan-out.md"
+[ -f "$FO" ] && ok "the fan-out scheduling companion exists" \
+  || err "skills/draft-article/stages/fan-out.md missing (#1248)"
+grep -q -- '--defer-ledger' "$FO" && grep -q -- '--derive-ledger' "$FO" \
+  && grep -q -- '--claim-id' "$FO" \
+  && ok "fan-out dispatches with the flags examine.py ships for it" \
+  || err "fan-out.md does not use --claim-id/--defer-ledger/--derive-ledger"
+grep -q 'byte-identical' "$FO" \
+  && ok "fan-out states the derived ledger's byte-identity acceptance" \
+  || err "fan-out.md omits the byte-identity acceptance (absence-of-crash is not it)"
+grep -q 'claims we might need' "$FO" && grep -qi 'stockpile' "$FO" \
+  && ok "fan-out FORBIDS widening enumeration to speculative claims (the ratified reading-pattern ruling)" \
+  || err "fan-out.md does not forbid the speculative widening — AC-3's failure mode is unguarded"
+grep -qi 'emerge mid-fill\|emerges mid-fill\|emerging mid-fill' "$FO" \
+  && ok "fan-out keeps a mid-fill claim inline, as today" \
+  || err "fan-out.md does not state that mid-fill claims stay inline"
+grep -qi 'stockpile' skills/draft-article/stages/examine.md \
+  && ok "examine.md restates the trigger against the fan-out's scheduling" \
+  || err "examine.md does not hold the trigger against the fan-out"
+grep -q 'fan-out.md' skills/draft-article/stages/stage3.md \
+  && grep -q 'fan-out.md' skills/draft-article/SKILL.md \
+  && ok "the fill and the dispatcher both point at the scheduling contract" \
+  || err "fan-out.md is unreachable from stage3.md or the dispatcher"
+# The win is reported honestly: owner-paced gates and composition are excluded
+# BY NAME, because an end-to-end wall-clock claim would silently include them.
+grep -qi 'owner-paced' "$FO" && grep -qi 'composition' "$FO" \
+  && ok "fan-out names what its timings do NOT improve (owner-paced gates, composition)" \
+  || err "fan-out.md does not exclude owner-paced gates / composition from the win"
 
 [ "$fail" -eq 0 ] || { printf '\nexamine checks FAILED.\n' >&2; exit 1; }
 printf '\nAll examine checks passed.\n'

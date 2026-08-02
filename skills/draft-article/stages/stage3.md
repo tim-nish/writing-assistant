@@ -4,7 +4,7 @@
 
 ## Stage 3 — fill the framework (with `[VERIFY]` markers)
 
-Fill the chosen framework's slots from the interview answers, the brief's material, and **per-claim examinations** — harvest is retired and no fact sheet exists (#1182): a claim needing repository grounding gets one `examine.py` question at the read that produces its pin. Read [`examine.md`](examine.md) before grounding the first claim; every fact-sheet-entry reference below reads as the run's recorded examination pins (`$WS/examination-pins.txt`) plus interview answer ids.
+Fill the chosen framework's slots from the interview answers, the brief's material, and **per-claim examinations** — harvest is retired and no fact sheet exists (#1182): a claim needing repository grounding gets one `examine.py` question at the read that produces its pin. Read [`examine.md`](examine.md) before grounding the first claim; every fact-sheet-entry reference below reads as the run's recorded examination pins (`$WS/examination-pins.txt`) plus interview answer ids. **Once the argument plan and the section intents exist, the claims needing repository grounding are enumerable and their examinations FAN OUT — read [`fan-out.md`](fan-out.md) for the scheduling contract (enumerate with ids, dispatch concurrently with `--defer-ledger`, derive the ledger once at the join), which also carries the judge sharding and the visual-set/judging concurrency. The TRIGGER is unchanged and only the schedule differs: every read is still triggered by a stated claim that exists before the read, enumeration is never widened to "claims we might need", and a claim emerging mid-fill stays inline (#1248, story 20.164).**
 
 **Who performs each sub-step.** Stage 3 is the one stage that interleaves
 authoring with validation, so read this before running anything: *you* write
@@ -20,8 +20,8 @@ produce.
 | per-section fill | **you (LLM)** | write the draft body against the section intents, with `[VERIFY]` markers |
 | provenance map (sidecar) | **you (LLM)** | author the per-position map alongside the draft; type a came-to-be claim `episode` (`P4.S6[L35]: sourced episode <- a1b2c3d`) — it is admissible only against a **time axis** source and `verify-provenance` refuses it otherwise, deny-never-warn (#1184; `docs/pipeline-vocabulary.md` §Episode vs state claims). A `state` claim (the default) is unconstrained. |
 | `draft-pipeline.py provenance` / `verify-provenance` | mechanical | validate the map against the draft; never write prose |
-| visual-set plan | **you (LLM)**, ratified mechanically | propose the set; the ratification refuses a non-conforming plan |
-| isolated provenance judge | **LLM, separate context** | grades positions independently of the author |
+| visual-set plan | **you (LLM)**, ratified mechanically | propose the set; the ratification refuses a non-conforming plan — its machine-paced half runs BESIDE the judging ([`fan-out.md`](fan-out.md)) |
+| isolated provenance judge | **LLM, separate context** | grades positions independently of the author; **shardable** — one isolated subagent per shard, each returning its OWN attested file ([`fan-out.md`](fan-out.md)) |
 
 **Stage 3 opens with an argument-plan sub-step (CAP-1, #440/#434).** Before
 filling any slot, compose an explicit **argument plan** from the fact sheet
@@ -361,7 +361,7 @@ a checkable proposition **fails the falsifiability test** (a gate failure), and 
 `--list-narration` / `--list-derived` surface **plus the fact-sheet entries they
 cite** — never the drafting rationale, the interview, or your reasons for each
 classification. The subagent writes its attestation + verdicts to
-`$WS/provenance-verdicts.txt`, which the command consumes. **Every revision
+`$WS/provenance-verdicts.txt`, which the command consumes. **When the judging is SHARDED, each shard returns ONE ATTESTED FILE OF ITS OWN — `--judge-findings` repeats, coverage is checked over the union of the `graded:` sets, any draft-hash disagreement fails the whole gate, and concatenating shards into one file is REFUSED by name; instruct each shard verbatim per [`fan-out.md`](fan-out.md) §4 (story 20.163's emission contract). The single-file form above stays exactly valid for one shard.** **Every revision
 cycle re-spawns the judge**: after any edit to the draft or map, the old
 attestation's draft hash no longer matches, so a fresh isolated judge run is
 the only way back to PASS — the drafting context never authors or amends the
@@ -430,7 +430,7 @@ whole** — one owner-ratifiable item under the
 [**owner-facing proposal contract**](../../owner-facing-proposal-contract.md)
 (Where/Why/Effect labels; plain-text payload per contract section (g)). The
 set-level question is always asked **deliberately**, instead of the effective
-zero-or-one outcome the per-slot reactive flow produced. The plan enumerates,
+zero-or-one outcome the per-slot reactive flow produced. **This track's machine-paced work RUNS BESIDE THE PROVENANCE JUDGING and joins it at the quality gate ([`fan-out.md`](fan-out.md) §5): the plan and its proposals depend on the draft and the argument plan, the judging depends on neither, and the gate already requires both.** The plan enumerates,
 as a whole:
 
 - **how many** visuals — `0..cap`, where the cap is the framework's **declared
