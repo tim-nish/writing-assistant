@@ -52,7 +52,10 @@ big='{"fact_sheet":[],"needs_owner":[{"topic":"warning"},{"topic":"significance"
 #    re-pointed — the covered-and-unraised topic is absent, and a raised one is
 #    present even when the fact sheet also covers it.
 dd='{"fact_sheet":[{"claim":"This guide is written for backend engineers"}],"needs_owner":[]}'
-iv "$dd" F3 | jget 'any("audience" in q["id"] for q in d["questions"])' | grep -q False \
+#    Scoped to the CAPPED pool: the property is about the candidate set, and the mandated
+#    tier is by definition not candidates (Story 20.172 put the audience declaration there,
+#    where it is an obligation the pipeline owes regardless of what harvest raised).
+iv "$dd" F3 | jget 'any("audience" in q["id"] for q in d["questions"] if q["id"] not in d["mandated"])' | grep -q False \
   && ok "a covered topic the material did not raise is never asked" || err "de-dup did not suppress"
 rr='{"fact_sheet":[{"claim":"a known caveat: do not use on TPUs"}],"needs_owner":[{"topic":"warning"}]}'
 iv "$rr" F3 | jget 'any(q["id"]=="g-warning" for q in d["questions"])' | grep -q True \
@@ -144,13 +147,16 @@ iv "$nod" F1 | jget '"depth" in d["mandated"] and d["asked"] <= 5' | grep -q Tru
   || err "depth offer counted against the cap or missing from the tier"
 # It TRAILS the capped set: the claim/angle question keeps presentation slot 1
 # (CAP-4), which the editorial anchor reads.
-iv "$nod" F4 | jget 'd["presentation_order"][0] != "depth" and d["presentation_order"][-1] == "depth"' \
+# (The tail is the whole TRAILING group, not one item, since Story 20.172 added the
+# audience declaration beside the depth offer — what is asserted is that the offer is in
+# it and not in slot 1, which is what the CAP-4 reason actually says.)
+iv "$nod" F4 | jget 'd["presentation_order"][0] != "depth" and "depth" in d["presentation_order"][-2:]' \
   | grep -q True \
   && ok "depth: the offer trails the capped set (claim/angle keeps slot 1)" \
   || err "depth offer displaced the claim/angle lead"
 # A directive already given -> no re-ask, in either state shape.
 iv '{"depth":{"level":"deep-dive"},"fact_sheet":[],"needs_owner":[]}' F1 \
-  | jget 'd["depth_offer"] == "directive-present" and d["mandated"] == []' | grep -q True \
+  | jget 'd["depth_offer"] == "directive-present" and "depth" not in d["mandated"]' | grep -q True \
   && ok "depth: a top-level directive is not re-offered (no double-ask)" \
   || err "depth offer re-presented despite a directive"
 iv '{"run_state":{"depth":{"scope":"just the retry bug"}},"fact_sheet":[],"needs_owner":[]}' F1 \
@@ -176,6 +182,89 @@ rm -rf "$tmpd"
 grep -q 'depth-check' "$SKILL" && grep -qi 'fresh or re-opened' "$SKILL" \
   && ok "SKILL states the depth offer is guaranteed on every run (incl. re-entry)" \
   || err "SKILL missing the mechanical depth-offer guarantee"
+
+# --- The AUDIENCE DECLARATION rides the same tier (Story 20.172, #1283) -------
+# The stage 3->4 quality gate hard-fails on frontmatter `audience`/`audience_id`
+# (draft_variants.py:219-237) but its interview producer went with the question
+# bank (#1147), leaving agent composition at the fill as the only live path.
+# The ask is now GENERATED from run state as the third mandated-tier member, so
+# no invocation path can omit it, and it is a SELECTION over the installed
+# profiles' audience vocabulary plus a free-form named reader.
+PROFD="${TMPDIR:-/tmp}/da-profiles.$$"
+mkdir -p "$PROFD"
+cp config/platform-profiles/zenn.example.yaml "$PROFD/zenn.yaml"
+cp config/platform-profiles/devto.example.yaml "$PROFD/devto.yaml"
+ivp() { printf '%s' "$1" | python3 "$DP" interview --framework "$2" --profiles-dir "$PROFD"; }
+
+ivp "$nod" F1 | jget 'd["audience_declaration"]' | grep -q '^presented$' \
+  && ok "audience: no declaration in run state -> the ask is generated (never prompt-trusted)" \
+  || err "audience declaration not generated on a declaration-less run"
+ivp "$nod" F1 | jget '"audience" in d["mandated"] and d["asked"] <= 5' | grep -q True \
+  && ok "audience: the ask rides the mandated tier, outside the ≤5 cap" \
+  || err "audience ask counted against the cap or missing from the tier"
+# It TRAILS with the depth offer — BLOCKING_MANDATED is unchanged, so the
+# claim/angle question keeps presentation slot 1 (CAP-4).
+ivp "$nod" F4 | jget 'd["presentation_order"][0] != "audience" and "audience" in d["presentation_order"][-2:]' \
+  | grep -q True \
+  && ok "audience: the ask trails the capped set (claim/angle keeps slot 1)" \
+  || err "audience ask displaced the claim/angle lead"
+grep -q 'BLOCKING_MANDATED = ("policy-reconciliation",)$' "$DP" \
+  && ok "audience: BLOCKING_MANDATED is unchanged (obligations do not lead)" \
+  || err "BLOCKING_MANDATED changed — a non-blocking obligation must not lead presentation"
+# `audience_id` is a SELECTION over the resolved profiles' audience vocabulary.
+ivp "$nod" F1 | jget 'json.dumps(d["audience_vocabulary"])' \
+  | grep -q 'en-practitioner' \
+  && ok "audience: options are drawn from the resolved platform profiles" \
+  || err "audience options not drawn from the resolved profiles"
+ivp "$nod" F1 \
+  | jget '[q["options"] for q in d["questions"] if q["id"]=="audience"] == [d["audience_vocabulary"]]' \
+  | grep -q True \
+  && ok "audience: the ask carries the vocabulary as its selectable options" \
+  || err "audience ask does not carry selectable options"
+# No second capped-set audience question — one ask, never two.
+aud_gap='{"fact_sheet":[],"needs_owner":[{"topic":"audience","candidate":"a practitioner"}]}'
+ivp "$aud_gap" F1 \
+  | jget 'sum(1 for q in d["questions"] if q["topic"]=="audience") == 1 and "audience" in d["mandated"]' \
+  | grep -q True \
+  && ok "audience: a capped-set audience question is absorbed, never asked twice" \
+  || err "audience asked twice (capped-set question survived beside the mandated ask)"
+ivp "$aud_gap" F1 | jget 'json.dumps([q.get("recommended_from") for q in d["questions"] if q["id"]=="audience"])' \
+  | grep -q 'g-audience' \
+  && ok "audience: the absorbed question rides the ask as its recommended default" \
+  || err "absorbed audience question dropped instead of carried"
+# A declaration already in run state -> no re-ask, in either state shape.
+ivp '{"audience":{"audience_id":"en-practitioner"},"fact_sheet":[],"needs_owner":[]}' F1 \
+  | jget 'd["audience_declaration"] == "directive-present" and "audience" not in d["mandated"]' \
+  | grep -q True \
+  && ok "audience: a top-level declaration is not re-asked (no double-ask)" \
+  || err "audience ask re-presented despite a declaration in run state"
+ivp '{"run_state":{"audience":{"audience_id":"ja-practitioner"}},"fact_sheet":[],"needs_owner":[]}' F1 \
+  | jget 'd["audience_declaration"] == "directive-present"' | grep -q True \
+  && ok "audience: a nested run_state declaration is honored too" \
+  || err "nested run_state audience declaration ignored"
+# No installed profile -> the ask DEGRADES to free text rather than refusing.
+EMPTYD="${TMPDIR:-/tmp}/da-profiles-empty.$$"
+mkdir -p "$EMPTYD"
+printf '%s' "$nod" | python3 "$DP" interview --framework F1 --profiles-dir "$EMPTYD" \
+  | jget 'd["audience_vocabulary"] == [] and "audience" in d["mandated"]' | grep -q True \
+  && ok "audience: no installed profile degrades to a free-text ask (never a refusal)" \
+  || err "audience ask refused or vanished with no installed profile"
+rmdir "$EMPTYD"
+rm -f "$PROFD"/*.yaml; rmdir "$PROFD"
+# The rationale is in the tier, and the anchor guard moved WITH it (lockstep).
+grep -q '"audience-declaration"' "$DP" \
+  && ok "audience: 'audience-declaration' is a MANDATED_RATIONALES member" \
+  || err "audience-declaration rationale not in the mandated tier"
+grep -q 'CAP-8 depth offer, the' "$DP" \
+  && ok "audience: the editorial-anchor guard enumerates the third member (lockstep)" \
+  || err "the anchor guard's tier enumeration did not move with MANDATED_RATIONALES"
+# Skill prose names the shipped producer, in both directions.
+grep -qi 'mandated audience declaration' "$SKILL" \
+  && ok "skill names the mandated audience declaration as the fill's producer" \
+  || err "skill prose still describes the producerless state"
+grep -q 'no interview producer' "$SKILL" \
+  && err "the interim 'no interview producer today (#1283)' prose survived the code" \
+  || ok "the interim producerless prose is gone"
 
 if [ "$fail" -eq 0 ]; then
   printf '\nAll stage-2 interview checks passed.\n'; exit 0

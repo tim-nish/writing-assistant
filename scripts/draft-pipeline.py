@@ -2100,8 +2100,8 @@ def _anchor_rejection(anchor, mandated_ids=(), rationale_by_id=None):
 
       editorial-anchor-empty        — no owner text; an empty anchor is a lost
                                       anchor, and #545 shipped exactly that.
-      editorial-anchor-is-gate-item — a mandated/gate item (CAP-7
-                                      reconciliation, CAP-8 depth offer) is a
+      editorial-anchor-is-gate-item — a mandated/gate item (CAP-7 reconciliation,
+                                      CAP-8 depth offer, the audience declaration) is a
                                       config/obligation answer, never a claim.
 
     Kept beside MANDATED_RATIONALES so the two move in lockstep."""
@@ -2118,20 +2118,11 @@ def _anchor_rejection(anchor, mandated_ids=(), rationale_by_id=None):
 
 
 # --- Mandated/gate tier (Story 18.40, #542/#545) -----------------------------
-# Pipeline-MANDATED items are NOT interview candidates and must never compete
-# for the <=5 NEEDS-OWNER cap: the CAP-7 config<->policy reconciliation gate is
-# a blocking gate ("surfaced and answered -> gate cleared"), and the CAP-8 depth
-# offer is an "offer it once" obligation. Conflating them with owner-knowledge
-# candidates produced both #545 (a reconciliation item consumed the #302
-# RESERVED policy-seed slot, starving a valid tension item) and #542 (a mandated
-# depth offer silently absent). They are now partitioned out of the candidate
-# pool BEFORE the cap and the reservation run, and presented as their own
-# guaranteed tier ahead of the capped set — so the cap and the #302 reserved
-# slot govern only NEEDS-OWNER candidates and policy-seeds, exactly as
-# SPEC-article-draft-pipeline (2026-07-22, #542/#545) now states. The tier is
-# bounded by construction (at most the reconciliation gate + the depth offer),
-# so the <=10-minute owner-attention budget still holds.
-MANDATED_RATIONALES = ("policy-reconciliation", "depth-offer")
+# Pipeline-MANDATED items are NOT interview candidates and never compete for the
+# <=5 NEEDS-OWNER cap; they are partitioned out BEFORE the cap and the #302
+# reservation and presented as their own guaranteed tier. `mandated_audience.py`
+# carries the full reasoning, the #542/#545 history, and the FOURTH-member rule.
+MANDATED_RATIONALES = ("policy-reconciliation", "depth-offer", "audience-declaration")
 
 # Within the tier, only a BLOCKING gate leads presentation. A CAP-7
 # reconciliation must be cleared before the run proceeds, so it comes first; the
@@ -2139,7 +2130,8 @@ MANDATED_RATIONALES = ("policy-reconciliation", "depth-offer")
 # push the claim/angle question out of presentation slot 1 — the slot CAP-4
 # pins and the editorial anchor reads (SPEC-policy-editorial-direction CAP-2).
 # So obligations TRAIL the capped set: outside the cap either way, but the
-# owner still meets the claim/angle question first.
+# owner still meets the claim/angle question first. The audience declaration is an obligation too,
+# so it joins the depth offer in the trailing group and this tuple is UNCHANGED (20.172, #1283).
 BLOCKING_MANDATED = ("policy-reconciliation",)
 
 # CAP-8's "offer it once" obligation, made MECHANICAL (Story 18.42, #542).
@@ -2331,6 +2323,9 @@ def cmd_interview(args):
                          "topic": "other", "outcome": "open",
                          "rationale": "depth-offer"})
 
+    audience_directive, audience_vocab = _load("mandated_audience.py").attach(  # 20.172, #1283
+        state, getattr(args, "root", None), getattr(args, "profiles_dir", None), mandated, survivors)
+
     if len(survivors) > QUESTION_BUDGET:
         # The reservation now sees only NEEDS-OWNER candidates + policy-seeds,
         # so `seeds[0]` is necessarily a policy-seeded tension item (#302's
@@ -2366,6 +2361,7 @@ def cmd_interview(args):
                   "rationale": r["rationale"],
                   **({"grounding": r["grounding"]} if "grounding" in r else {}),
                   **({"seed": r["seed"]} if "seed" in r else {}),
+                  **_load("mandated_audience.py").item_extras(r),
                   **({"positions": r["positions"]} if "positions" in r else {})}
                  for r in presented]
     out = {
@@ -2384,6 +2380,8 @@ def cmd_interview(args):
         # this: a run either carried a directive or was offered the choice.
         # There is no third state in which the depth was silently defaulted.
         "depth_offer": ("directive-present" if depth_directive else "presented"),
+        # Audience accounting (20.172, #1283): declared or asked, never agent-composed at the fill.
+        **_load("mandated_audience.py").accounting(audience_directive, audience_vocab),
         "presentation_order": [q["id"] for q in questions],
         "questions": questions,
         "triage": triage,
@@ -5094,6 +5092,8 @@ def main(argv=None):
     sp.add_argument("--framework", required=True)
     sp.add_argument("--items", help="candidate interview-item JSON (e.g. policy-seeded questions); "
                                     "schema-validated before triage — invalid items halt the stage")
+    sp.add_argument("--root", help="host repo root (default: git toplevel); resolves the platform profiles supplying the audience vocabulary")
+    sp.add_argument("--profiles-dir", help="override the platform-profiles dir (tests)")
     sp.add_argument("state", nargs="?", default="-", help="stage-1 pipeline state JSON, or - for stdin")
     sp = sub.add_parser("structures",
                         help="propose 2-3 candidate narrative structures for the selected "

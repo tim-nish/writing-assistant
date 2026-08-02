@@ -333,10 +333,11 @@ The surviving (non-suppressed) questions are returned as `questions`, and are:
   padded to five.
 
 **Mandated/gate items are a tier OUTSIDE the ≤5 cap (Story 18.40, #542/#545).**
-Two items are pipeline **obligations**, not owner-knowledge candidates: the
+**Three** items are pipeline **obligations**, not owner-knowledge candidates: the
 **CAP-7 config↔policy reconciliation gate** (a blocking gate — "surfaced and
-answered → gate cleared") and the **CAP-8 depth offer** ("offer it once"). They
-are partitioned out **before** the cap and the #302 reservation run, so they:
+answered → gate cleared"), the **CAP-8 depth offer** ("offer it once"), and the
+**audience declaration** (Story 20.172, #1283). They are partitioned out
+**before** the cap and the #302 reservation run, so they:
 
 - **never consume a capped slot** (they do not displace NEEDS-OWNER candidates,
   and candidates never displace them), and
@@ -345,13 +346,9 @@ are partitioned out **before** the cap and the #302 reservation run, so they:
   broke when a reconciliation item took it and the editorial anchor was recorded
   as an empty-text gate item.
 
-They **lead presentation** (a gate the owner must clear comes first) and are
-reported separately: `interview`'s JSON carries `mandated: [<id>…]` beside
-`asked` — where **`asked` counts only the capped pool**, so `asked <= budget`
-still holds and the total shown is `asked + len(mandated)`. The tier is bounded
-by construction (at most those two items), so the ≤10-minute owner-attention
-budget is unaffected, and every item is still presented under the owner-facing
-proposal contract.
+The **audience declaration** is one ask producing **both** fields the stage 3→4 quality gate hard-fails on: its free-form half names the **one named reader** (`audience`), its **selection** half fixes `audience_id` from the installed platform profiles' `audience` vocabulary (echoed as `audience_vocabulary`; with no profile installed it degrades to free text, never a refusal). Any capped-set `audience` question is **absorbed into it** as its recommended default — the owner answers the audience exactly once per run — and a declaration already in run state suppresses the ask entirely.
+
+A **blocking gate leads** presentation (it must be cleared first); the depth offer and the audience declaration are obligations, so they **trail** the capped set and the claim/angle question keeps slot 1. They are reported separately: `interview`'s JSON carries `mandated: [<id>…]` beside `asked` — where **`asked` counts only the capped pool**, so `asked <= budget` still holds and the total shown is `asked + len(mandated)`. The tier is bounded by construction (at most those three), so the ≤10-minute owner-attention budget still holds — but the growth is real, and a **fourth** member must not be added without re-deriving that budget rather than asserting it. Every item is still presented under the owner-facing proposal contract.
 
 Present a policy-seeded question under the same proposal contract as every
 other: its **Why** context is the seed — the verbatim quote plus its

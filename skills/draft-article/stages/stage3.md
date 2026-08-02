@@ -192,19 +192,19 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/render-frontmatter.py --language <en|ja>
 
 **Fill `audience` and `audience_id` here (Stories 13.41 and 13.71 — this is
 where both fields are born).** The skeleton carries pipeline-internal
-`audience: {audience}` and `audience_id: {audience_id}` slots. Replace
-`audience` with the **one named reader** — from the backlog item's declared
-audience, or the owner's draft-start declaration. **No interview producer
-exists today (#1283):** `q5` went with the framework generator (#1147), so
-**ask the owner**; composing the field here is the untraceable path the
-provenance rules refuse. Replace `audience_id` with the **stable compatibility
-identifier** the owner declared with that reader, **chosen from the installed
-platform profiles' audience vocabulary** (list the profiles' `audience` values
-and have the owner pick the matching id at the audience declaration — e.g.
-`en-practitioner`); it never replaces the free-text named reader and is
-**never re-inferred at emission**. Never leave either placeholder: the stage
-3→4 quality gate fails on both (a stage-progression precondition), and the
-variant stage hard-stops as backstop. Both fields are pipeline-internal —
+`audience: {audience}` and `audience_id: {audience_id}` slots. Both are
+produced by the **mandated audience declaration** the gap interview now raises
+(Story 20.172, #1283): one mandated-tier ask whose free-form half names the
+**one named reader** (`audience`) and whose **selection** half fixes the stable
+compatibility identifier `audience_id` from the installed platform profiles'
+`audience` vocabulary (e.g. `en-practitioner`) — the `interview` output carries
+it as the `audience` item, with `audience_vocabulary` echoing the options that
+were offered. The backlog item's declared audience or the owner's draft-start
+declaration still serve when one exists; **composing either field here does
+not** — that is the untraceable path the provenance rules refuse. The
+identifier never replaces the free-text named reader and is **never re-inferred
+at emission**. Never leave either placeholder: the stage 3→4 quality gate fails
+on both (a stage-progression precondition), and the variant stage hard-stops as backstop. Both fields are pipeline-internal —
 variant packaging strips them, and they never enter the site schema.
 
 **Provenance — every sentence is one of three classes (Story 11.1;
