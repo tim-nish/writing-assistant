@@ -726,7 +726,7 @@ backstop either way.
 
 ---
 
-**Stage 0 exit → Stage 1.** Read [`stage1.md`](stage1.md) and run:
+**Start exit → probe.** Read [`stage1.md`](stage1.md) and run:
 
 ```
 python3 ${CLAUDE_PLUGIN_ROOT}/scripts/probe.py record --ws "$WS" --root <host-repo>

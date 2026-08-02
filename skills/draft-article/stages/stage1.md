@@ -118,7 +118,7 @@ here runs exactly as the full pipeline does:
 
 ---
 
-**Stage 1 exit → Stage 2.** Read [`stage2.md`](stage2.md) and run:
+**Probe exit → the gap interview.** Read [`stage2.md`](stage2.md) and run:
 
 ```
 python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py interview --framework <F> [--items …] <state>

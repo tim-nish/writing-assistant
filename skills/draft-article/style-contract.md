@@ -1,5 +1,5 @@
 <!-- style-contract.md — draft-article companion (Story 20.139, #1201; umbrella
-     #1191). Read on entry to stage 3, alongside stages/stage3.md: the style
+     #1191). Read on entry to the fill, alongside stages/stage3.md: the style
      contract is consumed AT GENERATION. -->
 
 ## The style contract — read once per run, at generation
