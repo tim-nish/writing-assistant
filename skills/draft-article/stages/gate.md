@@ -37,14 +37,14 @@ the others is a defect.
 ```
 python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py quality-gate \
   --draft <draft> --map "$WS/provenance-map.txt" --judge "$WS/rubric-verdicts.txt" \
-  --framework-file "$FRAMEWORK_FILE" --state "$WS/checkpoint.json"
+  --framework-file "$FRAMEWORK_FILE" --pin-ledger "$WS/examination-pins.txt"
 ```
 
 - **Per-section minimum evidence types are checked mechanically here (Story
   13.90, #416):** pass `--framework-file` (the run state's `framework_file`)
-  and `--state` (the checkpoint carrying the fact sheet) so the gate verifies
-  every slot carrying an authored `[EVIDENCE: …]` tag against the fact-sheet
-  KINDs anchored into that section. **Two failure classes, routed differently
+  and `--pin-ledger` (the run's examination pin ledger) so the gate verifies
+  every slot carrying an authored `[EVIDENCE: …]` tag against the pointers
+  anchored into that section. **Two failure classes, routed differently
   (Story 19.12, #750):** `classification: "section-not-found"` means the join
   never located the section — a **draft-shape defect** (renamed heading) whose
   `upstream` names the expected slot key and the actual headings; repair it
@@ -57,16 +57,19 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py quality-gate \
   success past an unresolved finding. An unrepaired
   absence after the shared two-cycle bound surfaces as a publish blocker
   naming the section and the missing type. The gate **fails closed** (exit
-  2) if the framework declares types but `--map`/`--state` are missing.
+  2) if the framework declares types but `--map`/`--pin-ledger` are missing.
 - **The carrier is the examination pin ledger, and the unrunnable case is a
   NAMED STATE — never a dropped flag (#1288, SPEC-article-draft-pipeline
   amended 2026-08-02):** the fact sheet `--state` used to carry no longer
-  exists (producer retired with harvest, #1182/#1224), so the KIND source is
-  `$WS/examination-pins.txt` — the run's declared pointer set, derived from
-  the examination records — read beside the provenance map's per-section
-  sourced/derived distribution. It is the same file stage 3 already hands
-  `verify-provenance` as `--fact-sheet`. **Never respond to the refusal by
-  re-running the gate without `--framework-file`/`--state`**: that omits the
+  exists (producer retired with harvest, #1182/#1224), so the carrier is
+  `--pin-ledger "$WS/examination-pins.txt"` — the run's declared pointer set,
+  derived from the examination records — read beside the provenance map's
+  per-section sourced/derived distribution (only `sourced`/`derived` positions
+  bear evidence; `narration`/`verify` carry no pin). It is the same file stage
+  3 already hands `verify-provenance` as `--fact-sheet`, and **no second store
+  is written** — `--state` is still accepted and is no longer consulted by this
+  check. **Never respond to the refusal by
+  re-running the gate without `--framework-file`/`--pin-ledger`**: that omits the
   check in silence and is the exact vacuous pass the three-valued rule exists
   to prevent. Where a declared type has no resolvable predicate over what the
   run carries, the gate's output carries
@@ -83,16 +86,19 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py quality-gate \
   `verdict: "cannot-determine"` when nothing else in the check failed. Two
   routes produce it today: the gate invoked **without `--framework-file`**
   (the declarations were never read, so the check did not run — the omission
-  itself is now disclosed, never silent), and a **section whose anchored
-  pointers the supplied carrier resolves to no KIND**. It is **not a pass**
+  itself is now disclosed, never silent), a **section declaring only
+  `example`/`measurement`**, a section whose decidable half is refuted while an
+  undecidable type remains in the declared disjunction, and a **section whose
+  anchored pointers the pin ledger does not carry**. It is **not a pass**
   (never counted toward one), **not a `missing_input[]` finding** (so the
   `episode-candidates` hop below is unreachable from it), and **not a publish
   blocker on its own** — it never joins `failing_dimensions`; carry it into
-  the completion summary as the disclosed state. The two exit-2 refusals stand
-  **beside** it, unchanged: a missing `--map`/`--state` flag while the
-  framework declares types, and a `--state` with no fact sheet at all, are
+  the completion summary as the disclosed state. The exit-2 refusals stand
+  **beside** it, re-pointed: a missing `--map`/`--pin-ledger` flag while the
+  framework declares types, and an **unreadable** `--pin-ledger`, are
   invocation defects to fix by re-invoking, not corpus preconditions to
-  disclose.
+  disclose. An **empty but readable** ledger is the other way round — a corpus
+  precondition — and reports cannot-determine per section.
 - **Dimension 4 (readability mechanics) is checked mechanically** here (zero
   tokens): sentence/paragraph-length distributions, heading density, and — from
   the provenance map — the **stitched-fact-sheet** signature (wall-to-wall
@@ -159,7 +165,7 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py quality-gate \
      ```
      python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py quality-gate \
        --draft <draft> --map "$WS/provenance-map.txt" --judge "$WS/rubric-verdicts.txt" \
-       --framework-file "$FRAMEWORK_FILE" --state "$WS/checkpoint.json" \
+       --framework-file "$FRAMEWORK_FILE" --pin-ledger "$WS/examination-pins.txt" \
        --cycle 2 --prior-locations "Section 2, para 3; Section 4"
      ```
 2. **At most 2 revision cycles.** If the gate still fails after two, the failure

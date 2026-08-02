@@ -5195,9 +5195,17 @@ def main(argv=None):
                          "enables the per-section minimum evidence-type check (Story "
                          "13.90) from its authored [EVIDENCE: …] heading tags")
     sp.add_argument("--state",
-                    help="consume/checkpoint state JSON carrying the fact sheet (KIND "
-                         "per pointer) — required whenever --framework-file declares "
-                         "evidence types; the check fails closed without it")
+                    help="consume/checkpoint state JSON. NOTE (#1288, Story 20.174): the "
+                         "evidence-type check no longer reads its `fact_sheet` — that "
+                         "producer was retired with harvest — and takes --pin-ledger "
+                         "instead. The flag is accepted and unused by that check")
+    sp.add_argument("--pin-ledger", dest="pin_ledger",
+                    help="the run's examination pin ledger ($WS/examination-pins.txt, "
+                         "DERIVED from the examination records in claim order) — the "
+                         "evidence-type carrier, and the same file stage 3 hands "
+                         "verify-provenance as --fact-sheet. Required whenever "
+                         "--framework-file declares evidence types; the check fails "
+                         "closed without it")
     sp.add_argument("--profile", choices=("full", "slim"), default="full",
                     help="gate profile: `full` (default) requires the dim1-2 rubric judge; "
                          "`slim` (working-note, Story 13.89) waives dims 1-2 by ratified "
