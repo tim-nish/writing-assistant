@@ -205,14 +205,14 @@ GATES = {
     },
     # `sources` WAS HERE (stage 0) and is retired (Story 20.147, #1209): the
     # scope-selection ask retired with harvest — scope is derived from the
-    # brief's harvest_scope, never composed or approved at a gate. See the
+    # brief's examine_scope, never composed or approved at a gate. See the
     # retirement note at the end of this module.
     # THE TRANSITION *INTO* HARVEST (Story 20.136, #1176). It was outside the
     # registry entirely: a terrain sitting ends at a STAGED stage-0 run, and the
-    # ask that decides whether harvest runs at all reached the owner as chat
+    # ask that decides whether stage 1 runs at all reached the owner as chat
     # prose — *"Say the word and I'll run harvest"* — answered in free text,
-    # with no ask row anywhere. `harvest-completion` below covers the transition
-    # OUT of harvest and covered nothing here.
+    # with no ask row anywhere. `harvest-completion` covered the transition
+    # OUT of harvest, covered nothing here, and is itself retired below.
     #
     # DECLARING IT IS NOT THE REMEDY FOR THE CLASS, and the amendment that
     # orders this story says so in as many words (`specs/spec-writing-assistant/
@@ -223,20 +223,23 @@ GATES = {
     # the CLASS is the STATED LIMIT — no carrier is possible at the agent's own
     # composition step, so `gate-inventory.py` and the checks that iterate this
     # dict now say what they do not cover, rather than reading as clean.
-    "harvest-entry": {
+    "probe-entry": {
         "stage": "after stage 0, before probe",
         "owner_decision": "run probe now, or stop with the brief kept",
     },
-    "harvest-completion": {
-        "stage": "after harvest",
-        # NOT None (Story 20.129, #1143). It read "next-step options; nothing
-        # is carried forward" — but a two-option owner choice recorded as no
-        # owner decision is invisible to the pending-decision map, which is
-        # why nothing forced it through the selection UI and it reached the
-        # owner as prose answered by free text on 2026-08-01.
-        "owner_decision": "continue into drafting, or stop with the fact "
-                          "sheet kept",
-    },
+    # `harvest-completion` WAS HERE and is RETIRED (Story 20.148, #1223).
+    # It declared `owner_decision: "continue into drafting, or stop with the
+    # fact sheet kept"` — an owner choice about leaving a stage that no longer
+    # exists, and the last remnant of harvest reaching the owner's screen
+    # verbatim (observed in the 2026-08-02 run). There is no fact sheet to keep
+    # and no transition out of harvest to gate, so the entry is deleted rather
+    # than reworded: a gate is retired at the registry that declares it, never
+    # at the surface that renders it.
+    #
+    # The gate id above was `harvest-entry` until the same story. It has always
+    # named the transition into stage 1; stage 1 has been `probe` since Story
+    # 20.146 (#1210), and the id reached the owner as a `gate:` field, so the
+    # stale name was owner-facing rather than internal.
     # BEFORE `gap-interview`, and the order is the pipeline's: the policy-topic
     # selection runs *before* questions are selected, because it fixes which
     # recorded positions may raise a tension at all
@@ -284,8 +287,9 @@ GATES = {
 # (`policy-topics` JOINED this list at Story 20.127, #1144 — it is declared so
 # the audit can report it as reached-but-never-emitted, which is the honest
 # state of a surface that has reached owners since #230 with no ask row at all)
-# (`harvest-completion` LEFT this list at Story 20.129, #1143 — it has a
-# builder below, so its surface can no longer be composed without an ask row)
+# (`harvest-completion` LEFT this list at Story 20.129, #1143 when it gained a
+# builder, and the gate itself is RETIRED at Story 20.148, #1223 — the stage
+# it gated no longer exists)
 # reach the owner from the SKILL prompt, not from a script — which is the whole
 # of what #1114 reports: a surface with no code site leaves no event, so nothing
 # can assert it emitted. They are declared here anyway, deliberately: story
@@ -464,7 +468,7 @@ def intent_gate(labels, ws=None):
     )
 
 
-def harvest_entry_gate(source_count, ws=None, brief=True):
+def probe_entry_gate(source_count, ws=None, brief=True):
     """"Run probe now, or stop?" — the ask #1176 saw as chat prose.
 
     THE STAGE BEHIND THE GATE CHANGED, NOT THE GATE (amended 2026-08-02,
@@ -506,55 +510,18 @@ def harvest_entry_gate(source_count, ws=None, brief=True):
              "effect": "keeps everything written so far exactly as it is; "
                        "nothing is read and the run stays resumable"},
         ],
-        gate="harvest-entry", ws=ws,
+        gate="probe-entry", ws=ws,
         recommended=0,
     )
 
 
-def harvest_completion_gate(fact_count, needs_owner_count, ws=None,
-                            blockers=0):
-    """"Continue, or stop with the fact sheet?" — the gate #1143 saw as prose.
-
-    THE CONTRACT EXISTED TWICE AND THE EMITTER DID NOT. `GATES` declared this
-    gate, `skills/harvest/SKILL.md` mandated the carrier and even recorded the
-    2026-08-01 failure shape, and `skills/completion-summary.md` named the
-    selection UI — and the choice still reached the owner as two prose bullets
-    answered by typing, on a run at code that already carried all three. A
-    surface with no builder to call is composed freely every time, however many
-    documents say it should not be.
-
-    THE COUNTS ARE THE WHY, NOT DECORATION. What makes this answerable without
-    opening the fact sheet is knowing what the harvest produced — so the counts
-    ride in the `why`, which is the field the owner reads before choosing. That
-    is the interaction contract's own requirement: the choice is "drafted from
-    what this run produced… so the owner decides by selecting, not by opening
-    the fact sheet".
-
-    A run with publish blockers says so HERE. Continuing past one is a
-    different decision from continuing past none, and a gate that renders both
-    identically has hidden the difference at the moment it mattered.
-    """
-    why = (f"Harvest produced {fact_count} sourced fact(s) and "
-           f"{needs_owner_count} item(s) only you can answer.")
-    if blockers:
-        why += f" {blockers} publish blocker(s) are open."
-    return payload(
-        where="After harvest: the fact sheet is written and validated; "
-              "drafting has not started.",
-        why=why,
-        choices=[
-            {"label": "continue into draft-article",
-             "effect": f"runs the gap interview over the {needs_owner_count} "
-                       f"open item(s), then framework fill and verification"},
-            {"label": "stop here",
-             "effect": "keeps the fact sheet as it is; the run stays "
-                       "resumable from harvest and nothing is discarded"},
-        ],
-        gate="harvest-completion", ws=ws,
-        recommended=0,
-    )
-
-
+# `harvest_completion_gate` WAS HERE and is RETIRED with its registry entry
+# (Story 20.148, #1223). It was built at Story 20.129 (#1143) to give the
+# "continue into drafting, or stop with the fact sheet kept" surface a builder,
+# because a surface with no builder is composed freely every time. That reason
+# was right and is now moot: the surface itself is gone with the stage, so
+# there is nothing left to compose. The counts-in-the-`why` pattern it
+# introduced survives in the gates that still exist.
 
 # THE SOURCES GATE IS RETIRED (Story 20.147, #1209; amended 2026-08-02,
 # #1182/#1097/#1185/#1209). `sources_gate`, its scope vocabulary

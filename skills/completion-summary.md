@@ -113,7 +113,7 @@ The cases below are **worked examples beneath that rule**:
   its declared builder:
 
   ```
-  draft_gates.harvest_entry_gate(<declared source count>, ws=<run ws>)
+  draft_gates.probe_entry_gate(<declared source count>, ws=<run ws>)
   ```
 
   It carries the source count as the Why (so the choice is answerable without

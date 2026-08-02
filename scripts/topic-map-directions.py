@@ -242,7 +242,7 @@ from terrain_select import (  # noqa: E402
 # The brief's harvest scope, derived from the selected members' served
 # `projects:` — the one computation of the union (Story 20.144, #1097).
 from terrain_scope import (  # noqa: E402
-    harvest_scope_block,
+    examine_scope_block,
 )
 from terrain_brief import (  # noqa: E402
     BRIEF_FILENAME,
@@ -618,7 +618,7 @@ def _brief_from_index(answer, cands, map_pin, map_data=None,
             # field, the three-valued absence shape renders with a reason
             # true of THAT pin — stated staleness, never a claim the pin
             # falsifies.
-            "harvest_scope": harvest_scope_block(members),
+            "examine_scope": examine_scope_block(members),
             # THE MEMBER SET IS NOT BOOKKEEPING (Story 20.54 AC4): the
             # completeness invariant follows it into drafting — every selected
             # Strand placed or its omission disclosed — so with no members

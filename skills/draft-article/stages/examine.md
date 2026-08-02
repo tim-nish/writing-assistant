@@ -44,7 +44,7 @@ history be searched by claim keywords.
 
 ### Scope is derived, not chosen (#1097, #1185)
 
-Where the run's brief carries `harvest_scope` (a terrain-originated brief —
+Where the run's brief carries `examine_scope` (a terrain-originated brief —
 the union of the selected Strands' served `projects:`), pass it as `--scope`,
 and `--member <index>` when the claim belongs to one selected Strand. The
 refusal layer is `scripts/terrain_scope.py`'s, consumed not restated: a

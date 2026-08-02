@@ -52,8 +52,8 @@ def need(c, m):
 # A run that emitted every gate it reached is clean.
 ws = tempfile.mkdtemp()
 dg.intent_gate({"f%d" % i: "t%d" % i for i in range(1, 6)}, ws=ws)
-dg.harvest_entry_gate(3, ws=ws)
-res = gi.audit(ws, reached=["intent", "harvest-entry"])
+dg.probe_entry_gate(3, ws=ws)
+res = gi.audit(ws, reached=["intent", "probe-entry"])
 need(res["ok"] is True, "a run whose gates all emitted is reported clean")
 need(res["missing"] == [], "no gate is reported missing on a clean run")
 
@@ -66,11 +66,11 @@ need("NOT" in gi.BOUND and "never declared" in gi.BOUND,
 need(res.get("bound") == gi.BOUND,
      "a CLEAN audit result carries no bound — a caller reading `ok` alone is "
      "exactly the reader the limit is for (#1176)")
-need(gi.audit(ws, reached=["intent", "harvest-entry", "terrain-axis"]).get("bound"),
+need(gi.audit(ws, reached=["intent", "probe-entry", "terrain-axis"]).get("bound"),
      "a FAILING audit result carries no bound either")
 _out = io.StringIO()
 with contextlib.redirect_stdout(_out):
-    gi.main(["--audit", "--ws", ws, "--reached", "intent,harvest-entry"])
+    gi.main(["--audit", "--ws", ws, "--reached", "intent,probe-entry"])
 need(gi.BOUND in _out.getvalue(),
      "the --audit CLI output does not print the bound — the citation shape "
      "the amendment names is `gate-inventory.py --audit`, so that is the "
@@ -86,17 +86,19 @@ need("never declared" in _help.getvalue(),
 
 # THE TRANSITION INTO HARVEST IS DECLARED (Story 20.136, #1176) and appears in
 # the pending map, which is the surface the owner reads at a sitting end.
-need("harvest-entry" in dg.GATES,
-     "the transition INTO harvest is not declared — it reached the owner as "
+need("probe-entry" in dg.GATES,
+     "the transition INTO stage 1 is not declared — it reached the owner as "
      "chat prose on 2026-08-01 with no ask row anywhere")
-need(list(dg.GATES).index("harvest-entry") < list(dg.GATES).index("harvest-completion"),
-     "harvest-entry is not before harvest-completion — the registry order is "
-     "the pipeline's, and entering harvest precedes leaving it")
+# THE ORDERING ASSERTION WAS HERE and is REMOVED with `harvest-completion`
+# (Story 20.148, #1223). It required `harvest-entry` before `harvest-completion`
+# on the ground that entering a stage precedes leaving it — true, and vacuous
+# once one of the two gates no longer exists. An assertion over a pair whose
+# second member is gone is not stale wording; it has no subject.
 
 # THE MOTIVATING RUN. 20260801T091400-250105 reached the thesis gate and wrote
 # no payload for it. A check that passes on the run that motivated it is not a
 # check, so the shape is a fixture here.
-res2 = gi.audit(ws, reached=["intent", "harvest-entry", "terrain-member"])
+res2 = gi.audit(ws, reached=["intent", "probe-entry", "terrain-member"])
 need(res2["ok"] is False,
      "a gate the run REACHED with no ask row is not reported — this is the "
      "2026-08-01 thesis-gate shape, which must fail (#1114)")

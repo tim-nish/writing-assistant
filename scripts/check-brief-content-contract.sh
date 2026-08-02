@@ -159,7 +159,7 @@ CARRIED = {
     # #1080: the composer's own summary, labelled as the composer's and sitting
     # BESIDE the owner's slot rather than inside it; and the harvest scope,
     # which is owed but not emittable here (see the assertions below).
-    "selection_summary", "harvest_scope",
+    "selection_summary", "examine_scope",
     # #1118: the record ATTESTS to the owner's answer. Without these the record
     # is byte-identical to what a silent, machine-initiated adoption would have
     # produced — which is why an incomplete transcript was enough to make a
@@ -271,7 +271,7 @@ for name, b in (("a 3-member set", s), ("a 1-member set", one)):
 # `served: false` branch and its manifest-falsified reason are GONE from the
 # served case, and per-member provenance survives the union so a later
 # refusal can name its Strand.
-hs = s.get("harvest_scope") or {}
+hs = s.get("examine_scope") or {}
 check(hs.get("served") is True
       and hs.get("projects") == ["repo-a", "repo-b", "portfolio-wide"],
       "#1097: harvest scope is the union of the selected members' served "
@@ -284,11 +284,11 @@ check(hs.get("by_member") == [{"index": "L1", "projects": ["repo-a"]},
                               {"index": "L3", "projects": ["portfolio-wide"]}],
       "#1097: per-member provenance survives the union — which member "
       "contributed which values")
-hs1 = one.get("harvest_scope") or {}
+hs1 = one.get("examine_scope") or {}
 check(hs1.get("served") is True and hs1.get("projects") == ["repo-a"],
       "#1097: a 1-member selection unions its one member's values")
 old = json.load(open(w + "/old.json"))
-ho = old.get("harvest_scope") or {}
+ho = old.get("examine_scope") or {}
 check(ho.get("served") is False and ho.get("projects") is None
       and "predates" in (ho.get("not_served_reason") or ""),
       "#1097: at an older pin with no served `projects:` the three-valued "
@@ -311,7 +311,7 @@ check(cd.get("values") == ["repo-a", "repo-b"]
       "#1185: the repository-vs-scope-claim class is CANNOT-DETERMINE — "
       "parked behind the upstream carrier, never re-derived here")
 claims = json.load(open(w + "/claims.json"))
-hc = claims.get("harvest_scope") or {}
+hc = claims.get("examine_scope") or {}
 check((hc.get("portfolio_wide") or {}).get("members") == ["L3"]
       and "scope claim" in (hc.get("portfolio_wide") or {}).get(
           "classification", ""),

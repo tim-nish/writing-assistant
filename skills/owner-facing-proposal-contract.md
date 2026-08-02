@@ -124,8 +124,7 @@ which validates the id against `draft_gates.GATES` and writes the ask row to
 | gate id | where it is asked |
 |---|---|
 | `thesis` | terrain step 3 — candidates you composed |
-| `harvest-entry` | after stage 0 — run harvest now / stop with the brief kept |
-| `harvest-completion` | after harvest — continue into draft / stop |
+| `probe-entry` | after stage 0 — run probe now / stop with the brief kept |
 | `gap-interview` | stage 2 — the questions only the owner can answer |
 | `narrative-structure` | stage 3 — the candidates `structures` derived |
 | `visual-set` | stage 3 — the set-level plan |

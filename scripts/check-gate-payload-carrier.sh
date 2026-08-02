@@ -38,7 +38,7 @@ import importlib.util, json, os, sys
 sys.path.insert(0, "scripts")
 spec = importlib.util.spec_from_file_location("dp", "scripts/draft-pipeline.py")
 dp = importlib.util.module_from_spec(spec); spec.loader.exec_module(dp)
-from draft_gates import intent_gate, harvest_entry_gate
+from draft_gates import intent_gate, probe_entry_gate
 from draft_resume import confirmation
 w = sys.argv[1]
 json.dump(intent_gate(dp.INTENT_LABELS), open(os.path.join(w, "intent.json"), "w"))
@@ -46,9 +46,9 @@ json.dump(intent_gate(dp.INTENT_LABELS), open(os.path.join(w, "intent.json"), "w
 # with the run staged and harvest not yet run. It is the run kind none of the
 # four enumerated in skills/completion-summary.md matched, which is why it fell
 # through to prose, so it is the one this check exercises by fixture.
-json.dump(harvest_entry_gate(11), open(os.path.join(w, "harvest-entry.json"), "w"))
+json.dump(probe_entry_gate(11), open(os.path.join(w, "probe-entry.json"), "w"))
 # (The sources gate retired with harvest — Story 20.147, #1209: scope is
-# derived from the brief's harvest_scope, never composed at a gate.)
+# derived from the brief's examine_scope, never composed at a gate.)
 json.dump(confirmation("20260718T000000-111111", "/ws", {"next_stage": "harvest"},
                        "started 14 days ago, on a different calendar day"),
           open(os.path.join(w, "resume.json"), "w"))
@@ -58,7 +58,7 @@ PY
 # --require-render (Story 20.107, #1102) is what turns this from an EXISTENCE
 # assertion into a CONFORMANCE one: a gate must declare how it renders, or the
 # rendering step is free to compose prose from it, which is #1102 exactly.
-for g in intent resume harvest-entry; do
+for g in intent resume probe-entry; do
   if python3 scripts/validate-proposal-payload.py --require-render "$work/$g.json" >/dev/null 2>"$work/$g.err"; then
     ok "the $g gate emits a PRESENTABLE payload (shipped validator, #1081)"
   else
@@ -80,7 +80,7 @@ def check(cond, msg):
         fail = 1
 
 
-for name in ("intent", "resume", "harvest-entry"):
+for name in ("intent", "resume", "probe-entry"):
     item = json.load(open(os.path.join(w, name + ".json")))["items"][0]
     # OPTIONS PLUS FREE FORM, never options alone: options-only is a different
     # violation of the same clause that prose-only violates.
@@ -123,7 +123,7 @@ check(_v.OVERFLOW_MARGIN == BUILDER_MARGIN,
       f"#1206: builder and validator agree on the overflow margin "
       f"({BUILDER_MARGIN})")
 
-for name in ("intent", "resume", "harvest-entry"):
+for name in ("intent", "resume", "probe-entry"):
     item = json.load(open(os.path.join(w, name + ".json")))["items"][0]
     r = item.get("render")
     check(isinstance(r, dict),
@@ -215,7 +215,7 @@ check("sources" not in _dg_mod.GATES,
 # probe now (#1182); the shape the total rule requires is unchanged: a
 # selection with both branches offered, and a stop branch that says nothing
 # is lost.
-he = json.load(open(os.path.join(w, "harvest-entry.json")))["items"][0]
+he = json.load(open(os.path.join(w, "probe-entry.json")))["items"][0]
 check(he["render"]["control"] == "selection",
       "#1176: the transition into stage 1 renders as a selection, not prose")
 check(len(he["choices"]) == 2,
@@ -273,10 +273,10 @@ for gid, spec in dg.GATES.items():
 
 ws = tempfile.mkdtemp()
 dg.intent_gate({"f%d" % i: "type %d" % i for i in range(1, 6)}, ws=ws)
-dg.harvest_entry_gate(3, ws=ws)
+dg.probe_entry_gate(3, ws=ws)
 rows = [json.loads(l) for l in
         open(os.path.join(ws, "presented-payloads.jsonl"), encoding="utf-8")]
-need([r["gate"] for r in rows] == ["intent", "harvest-entry"],
+need([r["gate"] for r in rows] == ["intent", "probe-entry"],
      "the declared gates did not both emit: %s" % [r.get("gate") for r in rows])
 need(all(r.get("stage") for r in rows),
      "an emitted row carries no stage — the inventory cannot place it")
