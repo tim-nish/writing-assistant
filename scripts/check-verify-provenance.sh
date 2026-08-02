@@ -442,6 +442,103 @@ grep -q 'ONE ATTESTED FILE OF ITS OWN' "$SKILL" \
   && ok "stage3.md's judge section points at the per-shard form (single-file stays valid)" \
   || err "stage3.md still documents only the single-file attestation grammar"
 
+# --- Story 20.170 (#1287): the RUN-SCOPED carried verdict ledger -------------
+# A verdict is keyed by (position, sha256 of the SEGMENTED sentence) and carried
+# for the whole run — pass OR fail — so a position whose text is unchanged is
+# never re-graded. The observed defect: nine pre-gate judge rounds, and P11
+# passing one round and failing the next on identical text.
+ws="$work/ws"; mkdir -p "$ws"
+printf '{}\n' > "$ws/checkpoint.json"   # the run-workspace marker the ledger anchors on
+cp "$work/sh-draft.md" "$ws/draft.md"
+cp "$work/sh-map.txt" "$ws/provenance-map.txt"
+LH=$(python3 -c "import hashlib;print(hashlib.sha256(open('$ws/draft.md',encoding='utf-8').read().encode()).hexdigest())")
+vpws() { python3 "$VP" --map "$ws/provenance-map.txt" --draft "$ws/draft.md" "$@"; }
+
+# AC-3/AC-8 — round 1: no ledger yet, and the ABSENCE IS DISCLOSED. It must no
+# longer read as an ordinary full re-grade; the caller supplied no basis.
+out=$(vpws --list-narration 2>&1 >/dev/null)
+printf '%s' "$out" | grep -q 'ledger carry unavailable — full re-grade' \
+  && ok "20.170: an unresolvable ledger falls back to a full grade WITH the reason printed" \
+  || err "ledger fallback was silent: $out"
+# The sentence the hand-off PRINTS is the text the key hashes — captured now,
+# because after round 1 this position is carried and no longer listed.
+S2SEG=$(vpws --list-narration 2>/dev/null | awk -F': ' '/^P1.S2 /{sub(/^[^:]*: /,""); print; exit}')
+S2H=$(python3 -c "import hashlib,sys;print(hashlib.sha256(sys.argv[1].encode()).hexdigest())" "$S2SEG")
+# AC-1/AC-2 — consumption records the run ledger, keyed by the segmented sentence.
+{ printf 'attestation: draft-sha256=%s\ngraded: P1.S1,P1.S2,P1.S3\n' "$LH"
+  printf 'P1.S2: narration asserts a checkable proposition\n'; } > "$ws/provenance-verdicts.txt"
+vpws --judge-findings "$ws/provenance-verdicts.txt" >/dev/null 2>&1 || true
+[ -f "$ws/provenance-ledger.tsv" ] \
+  && ok "20.170: the ledger is written to the RUN WORKSPACE the map lives in (no caller flag)" \
+  || err "no run ledger was written beside the map"
+grep -q "^P1.S2	$S2H	fail	" "$ws/provenance-ledger.tsv" \
+  && ok "20.170: the key is (position, sha256 of the SEGMENTED sentence) from segment_draft" \
+  || err "the ledger key is not the segmented sentence hash"
+# AC-2/AC-4 — round 2 over UNCHANGED text: every position carries, the FAIL
+# included, and the worklist handed to the judge is empty.
+out=$(vpws --list-narration 2>&1 >/dev/null)
+printf '%s' "$out" | grep -q 'ledger carry: 3 carried (2 pass, 1 fail), 0 re-graded' \
+  && ok "20.170: an unchanged position is never re-graded — pass AND fail carry" \
+  || err "the run ledger did not carry both outcomes: $out"
+vpws --list-narration 2>/dev/null | grep -q '^carried: P1.S1,P1.S2,P1.S3' \
+  && ok '20.170: the carry rides the carried: header the judge echoes (NFR13 isolation)' \
+  || err "carried positions did not reach the hand-off header"
+vpws --list-narration 2>/dev/null | grep -q '^graded:' \
+  && err "a fully-carried round still handed the judge a worklist" \
+  || ok "20.170: a fully-carried round hands the judge a SMALLER worklist, never prior verdicts"
+# AC-4 — the carried FAIL is still a gate failure: carrying must not launder it.
+printf 'attestation: draft-sha256=%s\ncarried: P1.S1,P1.S2,P1.S3\n' "$LH" > "$ws/v2.txt"
+out=$(vpws --judge-findings "$ws/v2.txt" 2>&1) && rc=0 || rc=$?
+[ "$rc" -eq 1 ] && printf '%s' "$out" | grep -q 'CARRIED FAIL' \
+  && ok "20.170: a carried FAIL surfaces as a gate failure, never laundered by a round that skipped it" \
+  || err "a carried fail vanished (rc=$rc): $out"
+# AC-5 — a disagreement on unchanged text: the CARRIED verdict stands and the
+# disagreement is disclosed BY NAME with both outcomes. This is the P11 case.
+{ printf 'attestation: draft-sha256=%s\ngraded: P1.S1,P1.S2,P1.S3\n' "$LH"
+  printf 'P1.S1: narration asserts a checkable proposition\n'; } > "$ws/v3.txt"
+out=$(vpws --judge-findings "$ws/v3.txt" 2>&1) && rc=0 || rc=$?
+printf '%s' "$out" | grep -q 'LEDGER DISAGREEMENT — P1.S1' \
+  && printf '%s' "$out" | grep -q 'carries PASS for this exact text' \
+  && ok "20.170: a judge disagreeing with a carried PASS is disclosed by name, carried stands" \
+  || err "the pass-side disagreement was absorbed: $out"
+printf '%s' "$out" | grep -q 'LEDGER DISAGREEMENT — P1.S2' \
+  && printf '%s' "$out" | grep -q 'carries FAIL for this exact text' \
+  && ok "20.170: a judge silently clearing a carried FAIL is disclosed, carried stands (P11)" \
+  || err "the fail-side disagreement was absorbed: $out"
+printf '%s' "$out" | grep -q '  P1.S1:' \
+  && err "the disagreeing verdict overwrote the carried pass" \
+  || ok "20.170: the disagreeing verdict does not become a finding — first-wins, never last-wins"
+# AC-1 — an EDITED position's key moves, so it is re-graded; its neighbours carry.
+sed -i '2s/.*/A shorter sentence./' "$ws/draft.md"
+out=$(vpws --list-narration 2>&1 >/dev/null)
+printf '%s' "$out" | grep -q 'ledger carry: 2 carried (2 pass, 0 fail), 1 re-graded' \
+  && ok "20.170: an edited position's key moves and it IS re-graded (the carry bounds waste, not work)" \
+  || err "an edited position was wrongly carried: $out"
+# AC-9 — no round cap. Ten rounds, each over genuinely-changed text, and nothing
+# refuses on round count: this story bounds WASTE, never COST.
+capped=0
+i=1; while [ "$i" -le 10 ]; do
+  sed -i "3s/.*/The bench recorded drop number $i./" "$ws/draft.md"
+  vpws --list-narration >/dev/null 2>&1 || capped=1
+  i=$((i + 1))
+done
+[ "$capped" -eq 0 ] && ok "20.170: ten judge rounds over changed text all run — no round cap is introduced" \
+  || err "a round cap was introduced (AC-9 forbids it)"
+# AC-3 — outside a run workspace there is nothing to scope a run ledger to, and
+# that is DISCLOSED rather than silently written next to a stray map.
+out=$(python3 "$VP" --map "$work/sh-map.txt" --draft "$work/sh-draft.md" --list-narration 2>&1 >/dev/null)
+printf '%s' "$out" | grep -q 'no run workspace beside the map' \
+  && [ ! -f "$work/provenance-ledger.tsv" ] \
+  && ok "20.170: no run workspace => disclosed fallback, and no stray ledger is written" \
+  || err "ledger resolution outside a run workspace misbehaved: $out"
+# The stage-3 SKILL carries the contract (the judge-spawning step is prose-driven).
+grep -qi 'provenance-ledger.tsv' "$SKILL" \
+  && ok "20.170: stage3 names the run ledger the rounds share" \
+  || err "stage3.md does not name the run verdict ledger"
+grep -qi 'never re-graded, pass or fail' "$SKILL" && grep -qi 'CARRIED FAIL' "$SKILL" \
+  && ok "20.170: stage3 states that an unchanged position is never re-graded, pass or fail" \
+  || err "stage3.md does not state the symmetric carry"
+
 if [ "$fail" -eq 0 ]; then
   printf '\nAll verify-provenance checks passed.\n'; exit 0
 else

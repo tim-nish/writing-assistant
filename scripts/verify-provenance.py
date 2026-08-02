@@ -53,6 +53,22 @@ its own `graded:` line, coverage is checked over the UNION of those lines, and
 ANY hash disagreement fails the whole gate. A stale shard is "not judged",
 never dropped.
 
+RUN-SCOPED VERDICT LEDGER (Story 20.170, #1287): a verdict is keyed by
+`(position, sha256 of that position's SEGMENTED sentence text)` and CARRIED for
+the whole run — across every judge round, the pre-gate fill respawn rounds
+included — so a position whose keyed text is unchanged is never re-graded, pass
+OR fail. Carrying a FAIL is the load-bearing half: an unedited failing position
+is still failing, and re-asking a judge about it is how a bound becomes a coin
+flip (the observed run's P11 passed one round and failed the next on identical
+text). The carry is MECHANICAL, not caller-supplied: the ledger is
+`provenance-ledger.tsv` in the run workspace the map already lives in, appended
+at every consumption and read at every emission, so nine rounds share ONE
+ledger. When a verdict arrives for a key the ledger already holds and DISAGREES,
+the CARRIED verdict stands and the disagreement is disclosed by name — the same
+refusal of last-wins the concatenation rule below makes. An unresolvable ledger
+falls back to a full grade WITH the reason printed, never silently. This bounds
+WASTE, never COST: no number of judge rounds is capped.
+
 CONCATENATION IS REFUSED. Two attestation headers inside ONE file used to parse
 without complaint, last-wins — so a concatenation whose final shard was fresh
 silently accepted a stale earlier shard, which is exactly the fail-open the
@@ -401,6 +417,99 @@ def delta_basis(prior_worklist_text, prior_verdicts_text):
     return passing, prior_hash
 
 
+# --- the run-scoped verdict ledger (Story 20.170, #1287) -------------------
+# The ledger is a run artifact, so it anchors on the RUN WORKSPACE the map
+# already lives in (`$WS/provenance-map.txt`, stage3.md) — nothing is asked of
+# the caller, which is the whole point: the fill's pre-gate respawn loop passes
+# no basis, and that absence must stop reading as an ordinary full re-grade.
+LEDGER_FILE = "provenance-ledger.tsv"
+# A directory is a run workspace when it carries one of the run's own artifacts.
+# Deriving the ledger instead of writing it was considered and NOT chosen: the
+# per-round artifacts (`provenance-verdicts.txt`, `judge-narration.txt`) are
+# written to FIXED paths and so are OVERWRITTEN each round — a derived ledger
+# could recover one round, never the run's nine.
+WS_MARKERS = ("checkpoint.json", "examination-pins.txt", "run-events.jsonl",
+              "argument-plan.md", "interview-journal.json")
+
+
+def position_text(pos, anchor, seg_by_pos, draft_lines):
+    """The ONE text a position resolves to — the same string the hand-off
+    prints, so the key hashes exactly what the judge was handed. Story 19.16
+    (#755) segmentation first; the anchored physical line only for positions the
+    skeleton does not carry (a bare paragraph-level `P<n>`)."""
+    return seg_by_pos.get(pos) or anchored_text(anchor, draft_lines)
+
+
+def verdict_key(pos, text):
+    """`(position, sha256 of that position's segmented sentence text)` — the
+    #1287 key. Not the draft hash: a draft hash moves on every edit anywhere,
+    which is exactly why nine rounds re-graded text nobody had touched."""
+    return (pos, hashlib.sha256(text.encode("utf-8")).hexdigest())
+
+
+def resolve_ledger(explicit, map_path):
+    """(path, None) or (None, reason). The reason is DISCLOSED by the caller —
+    a full re-grade is never silent (AC-8)."""
+    if explicit:
+        return explicit, None
+    if not map_path or map_path == "-":
+        return None, ("the map arrived on stdin, so no run workspace can be "
+                      "resolved to scope a ledger to")
+    d = os.path.dirname(os.path.abspath(map_path))
+    if not any(os.path.exists(os.path.join(d, m)) for m in WS_MARKERS):
+        return None, (f"no run workspace beside the map ({d} carries none of "
+                      f"{', '.join(WS_MARKERS)}) — a verdict ledger is "
+                      "run-scoped and has nothing to scope to")
+    return os.path.join(d, LEDGER_FILE), None
+
+
+def read_ledger(path):
+    """{(pos, texthash): (outcome, reason)} or (None, reason).
+
+    Append-only TSV: `pos<TAB>texthash<TAB>pass|fail<TAB>draft-sha256<TAB>reason`.
+    Later rows never overwrite earlier ones — FIRST-WINS is the carry rule
+    itself: the held verdict stands and a disagreeing one is disclosed, never
+    absorbed."""
+    if not os.path.exists(path):
+        return None, f"no verdict ledger yet at {path} (first judge round of this run)"
+    held = {}
+    try:
+        for lineno, raw in enumerate(open(path, encoding="utf-8"), 1):
+            ln = raw.rstrip("\n")
+            if not ln.strip() or ln.startswith("#"):
+                continue
+            parts = ln.split("\t")
+            if len(parts) < 4 or parts[2] not in ("pass", "fail"):
+                return None, (f"verdict ledger {path} is malformed at line {lineno} "
+                              "— a ledger that cannot be trusted is not used")
+            held.setdefault((parts[0], parts[1]), (parts[2], parts[4] if len(parts) > 4 else ""))
+    except OSError as e:
+        return None, f"verdict ledger {path} is unreadable: {e}"
+    return held, None
+
+
+def append_ledger(path, rows):
+    """Append (pos, texthash, outcome, draft_hash, reason) rows. Best-effort:
+    an unwritable ledger degrades the NEXT round to a disclosed full grade, and
+    must never fail a gate the judge already decided."""
+    if not rows:
+        return None
+    try:
+        new = not os.path.exists(path)
+        with open(path, "a", encoding="utf-8") as fh:
+            if new:
+                fh.write("# provenance verdict ledger (Story 20.170, #1287) — "
+                         "run-scoped, append-only, first-wins.\n"
+                         "# position\tsha256(segmented sentence)\tpass|fail\t"
+                         "draft-sha256\treason\n")
+            for pos, th, outcome, dh, reason in rows:
+                clean = " ".join((reason or "").split())
+                fh.write(f"{pos}\t{th}\t{outcome}\t{dh}\t{clean}\n")
+    except OSError as e:
+        return f"verdict ledger {path} could not be written: {e}"
+    return None
+
+
 def _episode_findings(pos, cls, ptrs):
     """The ship-gate refusal for a claim typed `episode` (#1184 clause (iii)).
 
@@ -472,6 +581,12 @@ def main(argv=None):
                         "full re-grade with a disclosed reason. REPEATABLE when the prior "
                         "cycle was judged sharded — the shards' graded sets and verdicts are "
                         "unioned, and every shard must attest to the same draft")
+    p.add_argument("--ledger", dest="ledger",
+                   help="EXPLICIT path to the run's verdict ledger (Story 20.170, #1287). "
+                        "Normally omitted: the ledger resolves MECHANICALLY to "
+                        f"`{LEDGER_FILE}` in the run workspace the --map lives in, because "
+                        "the fill's pre-gate respawn loop supplies no basis and that absence "
+                        "must not read as an ordinary full re-grade")
     args = p.parse_args(argv)
 
     try:
@@ -500,6 +615,42 @@ def main(argv=None):
         # never sees prior verdicts (NFR13) — only a smaller worklist plus the
         # `carried:` header it echoes like `graded:`.
         carried = []
+        # Story 19.16 (#755): the printed text is the FULL RECONSTRUCTED
+        # SENTENCE from the one segmentation authority (`segment_draft`), not
+        # the hard-wrapped physical line — the judge grades exactly what the
+        # tool prints, and boundary reconstruction stops being judge work.
+        # Fallback (a bare paragraph-level P<n>, or a position the skeleton
+        # does not carry): the anchored physical line, as before. The #1287 key
+        # hashes THIS text, so the key and the hand-off can never disagree.
+        seg_by_pos = ({p: s for p, _a, s in segment_draft(_read(args.draft))}
+                      if args.draft else {})
+        # --- the run ledger carry (Story 20.170, #1287) ---
+        # Runs BEFORE the caller-supplied delta basis and needs nothing from the
+        # caller. A position whose keyed text is already graded — pass OR fail —
+        # leaves the worklist; the fail half is the load-bearing one.
+        if args.draft:
+            ledger_path, why = resolve_ledger(args.ledger, args.map)
+            held = None
+            if ledger_path is not None:
+                held, why = read_ledger(ledger_path)
+            if held is None:
+                sys.stderr.write(f"ledger carry unavailable — full re-grade: {why}\n")
+            else:
+                keep, n_pass, n_fail = [], 0, 0
+                for e in listed:
+                    text = position_text(e[0], e[3], seg_by_pos, draft_lines)
+                    prior = held.get(verdict_key(e[0], text)) if text else None
+                    if prior is None:
+                        keep.append(e)
+                        continue
+                    carried.append(e)
+                    n_pass += prior[0] == "pass"
+                    n_fail += prior[0] == "fail"
+                listed = keep
+                sys.stderr.write(
+                    f"ledger carry: {len(carried)} carried ({n_pass} pass, "
+                    f"{n_fail} fail), {len(listed)} re-graded "
+                    f"(run ledger {ledger_path})\n")
         if args.prior_worklist and args.prior_verdicts and args.draft:
             passing, basis = delta_basis(_read(args.prior_worklist),
                                          [_read(pv) for pv in args.prior_verdicts])
@@ -520,16 +671,8 @@ def main(argv=None):
                 print(f"graded: {','.join(pos for pos, _, _, _, _ in listed)}")
             if carried:
                 print(f"carried: {','.join(pos for pos, _, _, _, _ in carried)}")
-        # Story 19.16 (#755): the printed text is the FULL RECONSTRUCTED
-        # SENTENCE from the one segmentation authority (`segment_draft`), not
-        # the hard-wrapped physical line — the judge grades exactly what the
-        # tool prints, and boundary reconstruction stops being judge work.
-        # Fallback (a bare paragraph-level P<n>, or a position the skeleton
-        # does not carry): the anchored physical line, as before.
-        seg_by_pos = ({p: s for p, _a, s in segment_draft(_read(args.draft))}
-                      if args.draft else {})
         for pos, cls, ptrs, anchor, _ctype in listed:
-            text = seg_by_pos.get(pos) or anchored_text(anchor, draft_lines)
+            text = position_text(pos, anchor, seg_by_pos, draft_lines)
             if cls_wanted == "narration":
                 print(f"{pos} [L{anchor}]: {text}" if text is not None else pos)
             else:
@@ -590,6 +733,13 @@ def main(argv=None):
     if verdict_lines is not None:
         anchors = {pos: anchor for pos, _, _, anchor, _ in entries}
         known = set(anchors)
+        seg_by_pos = ({p: s for p, _a, s in segment_draft("\n".join(draft_lines))}
+                      if draft_lines is not None else {})
+        # This round's accepted judge verdicts, held back from `findings` until
+        # the run ledger has arbitrated them (Story 20.170): a verdict that
+        # disagrees with a carried one on IDENTICAL text does not get to
+        # overwrite it, and the disagreement is disclosed by name.
+        round_fail, discarded = {}, set()
         for ln in verdict_lines:
             m = JUDGE_ECHO.match(ln)
             if m:
@@ -600,6 +750,7 @@ def main(argv=None):
             if pos not in known:
                 findings.append((pos, f"judge graded position {pos!r}, which is not in the map "
                                       "— the verdict cannot be trusted"))
+                discarded.add(pos)
                 continue
             if quoted is not None:
                 # Story 19.16 (#755): when the segmentation resolves this
@@ -608,32 +759,90 @@ def main(argv=None):
                 # nothing and a paraphrase is a mislocation signal. Positions
                 # the skeleton does not carry keep the anchored-line
                 # containment check.
-                seg_sentence = None
-                if draft_lines is not None:
-                    if "_seg_cache" not in dir():
-                        _seg_cache = {p: s for p, _a, s in
-                                      segment_draft("\n".join(draft_lines))}
-                    seg_sentence = _seg_cache.get(pos)
+                seg_sentence = seg_by_pos.get(pos) if draft_lines is not None else None
                 if seg_sentence is not None:
                     if quoted.strip() != seg_sentence:
                         findings.append((pos, f"ANCHOR MISMATCH: judge graded "
                                               f"{quoted.strip()!r} but {pos} is the "
                                               f"sentence {seg_sentence!r} — the verdict "
                                               "is about different text and is discarded"))
+                        discarded.add(pos)
                         continue
-                    findings.append((pos, reason or "judge flagged a provenance violation"))
+                    round_fail[pos] = reason or "judge flagged a provenance violation"
                     continue
                 actual = anchored_text(anchors[pos], draft_lines)
                 if actual is None:
                     findings.append((pos, "judge echoed a sentence but the map gives no "
                                           "resolvable anchor to check it against"))
+                    discarded.add(pos)
                     continue
                 if quoted.strip() not in actual:
                     findings.append((pos, f"ANCHOR MISMATCH: judge graded {quoted.strip()!r} "
                                           f"but {pos} anchors to {actual!r} — the verdict is "
                                           "about a different sentence and is discarded"))
+                    discarded.add(pos)
                     continue
-            findings.append((pos, reason or "judge flagged a provenance violation"))
+            round_fail[pos] = reason or "judge flagged a provenance violation"
+
+        # --- run-ledger arbitration and recording (Story 20.170, #1287) -----
+        # The ledger is keyed by (position, sha256 of the segmented sentence),
+        # so "same text" is arithmetic rather than a judgement. FIRST-WINS: the
+        # carried verdict stands and a disagreeing one is DISCLOSED BY NAME,
+        # for the reason the concatenation refusal gives — whichever verdict
+        # won, one of them would have ridden in unexamined.
+        keys = {pos: verdict_key(pos, position_text(pos, anchor, seg_by_pos, draft_lines))
+                for pos, _c, _p, anchor, _t in entries
+                if position_text(pos, anchor, seg_by_pos, draft_lines)}
+        ledger_path, why = resolve_ledger(args.ledger, args.map)
+        held = None
+        if ledger_path is not None:
+            held, why = read_ledger(ledger_path)
+        if held is None:
+            sys.stderr.write(f"ledger carry unavailable — full re-grade: {why}\n")
+            held = {}
+            if carried:
+                sys.stderr.write(
+                    "  cannot-determine: this round's hand-off carried "
+                    f"{len(carried)} position(s) whose verdicts the ledger cannot "
+                    "produce — their carried outcomes are neither pass nor fail here\n")
+        disagreements = []
+        for pos, reason in round_fail.items():
+            prior = held.get(keys.get(pos))
+            if prior and prior[0] == "pass":
+                disagreements.append(
+                    f"{pos}: the run ledger carries PASS for this exact text "
+                    f"(sha256 {keys[pos][1][:12]}), this round's judge returned FAIL "
+                    f"({reason}) — the CARRIED verdict stands")
+                continue
+            findings.append((pos, reason))
+        for pos in sorted(set(graded) | set(carried)):
+            prior = held.get(keys.get(pos))
+            if not prior or prior[0] != "fail":
+                continue
+            if pos in round_fail or pos in discarded:
+                continue
+            if pos in graded:
+                disagreements.append(
+                    f"{pos}: the run ledger carries FAIL for this exact text "
+                    f"(sha256 {keys[pos][1][:12]}), this round's judge returned no "
+                    "verdict for it — the CARRIED verdict stands, and an unedited "
+                    "failing position is still failing")
+            findings.append((pos, f"CARRIED FAIL (run ledger, unchanged text): {prior[1]}"))
+        for d in disagreements:
+            sys.stderr.write(f"LEDGER DISAGREEMENT — {d}\n")
+        if ledger_path is not None and args.draft:
+            rows = [(pos, keys[pos][1],
+                     "fail" if pos in round_fail else "pass",
+                     att_hash or "",
+                     round_fail.get(pos, ""))
+                    for pos in sorted(graded)
+                    if pos in keys and pos not in discarded and keys[pos] not in held]
+            err = append_ledger(ledger_path, rows)
+            if err:
+                sys.stderr.write(f"ledger not recorded — next round re-grades: {err}\n")
+            elif rows:
+                sys.stderr.write(f"ledger: {len(rows)} verdict(s) recorded for the run "
+                                 f"({ledger_path})\n")
 
     if not findings:
         print("verify-provenance: PASS (no findings)")
