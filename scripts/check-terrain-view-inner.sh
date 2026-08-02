@@ -365,21 +365,17 @@ check(dirs.lint_owner_lines([offender]), "the render-boundary lint flags an inte
 hits = dirs.lint_owner_lines(reading.splitlines())
 check(not hits, f"the reading path carries no internal vocabulary ({hits[:2]})")
 
-# Registration is a contract, not a convenience list: a depth level or source
-# family the assembler grows and nobody registers would silently stop being
-# gated (the check-internal-vocabulary.sh pattern, applied to the map).
-levels = {s.get("depth", {}).get("level") for t in d["topics"] for s in t["subtopics"]}
-families = {i.get("family") for t in d["topics"] for s in t["subtopics"]
-            for i in s.get("items", [])}
-# Story 20.56 (#938): the candidate-directions layer, INTERNAL_VOCAB with it,
-# is the extracted leaf scripts/terrain_directions.py; the registration
-# contract is asserted against its single declaration, wherever it lives.
-import terrain_directions as _td
-vocab = {v.lower() for v in _td.INTERNAL_VOCAB}
-unregistered = [x for x in (levels | families) if x
-                and x.lower().replace(" ", "-") not in vocab and x.lower() not in vocab]
-check(not unregistered,
-      f"every depth level and source family is registered in INTERNAL_VOCAB ({unregistered})")
+# THE REGISTRATION ASSERTION WAS HERE and is REMOVED as a dead input (Story
+# 20.159, #1245/#1254, clause (6)). It read `subtopics[].depth.level` and
+# `subtopics[].items[].family` and checked them against INTERNAL_VOCAB — but
+# the only producer of `topics[].subtopics` is `terrain_map.py`, which sets it
+# unconditionally to [] (the cluster unit and the depth estimator retired with
+# Story 20.7/#809; check-topic-map.sh independently asserts the emptiness).
+# Both comprehensions were empty sets on every possible input, so the
+# assertion could never fire: a check reading an input whose only writer
+# forces it empty is the fixture-that-lied shape with zero fixtures. The
+# vocabulary boundary itself is still guarded — the lint contract above fires
+# on a planted offender, which is the live half of what this block claimed.
 
 # The remediation prompt and the counters were DELETED with their sections,
 # not relocated — and that is the story's point: they were ~2,300 lines nobody

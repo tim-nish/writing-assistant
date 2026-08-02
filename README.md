@@ -55,6 +55,14 @@ Matching fingerprints = the cache is current; a mismatch means the session is
 running a pre-update snapshot (for a checkout, `git -C <path> rev-parse
 --short HEAD` names the commit).
 
+**Verbose turns for one sitting** — owner-facing turns are budgeted to one
+status line plus the decision payload (`scripts/turn_budget.py`, Story
+20.153); everything else lands in the run workspace behind one pointer line.
+To lift the budget note for a debugging sitting, start the session with
+`WA_VERBOSE=1` in the environment. It is off by default and deliberately an
+env var rather than a config key: verbosity is a property of one sitting, and
+a durable preference would silently re-flood the surface months later.
+
 ## Configure
 
 **The supported first-run path is the `setup` skill** (SPEC-repo-onboarding):
