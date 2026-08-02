@@ -2340,9 +2340,14 @@ def cmd_interview(args):
             survivors = survivors[:QUESTION_BUDGET]
 
     # Presentation reorder (Story 13.30, CAP-4): selection above is untouched;
-    # the asked set is SHOWN claim/angle → audience → significance → color.
+    # the asked set is SHOWN tension-first, then the rest in selection order.
+    # The old `claim/angle -> audience -> significance -> color` sequence went
+    # with the question bank (Story 20.131, #1147) — it ranked framework
+    # vocabulary topics that no longer exist; `presentation_slot` keeps only the
+    # tension lead, whose reason sits outside the generator.
     # Python's sort is stable, so ties keep the selection order within a slot.
-    # The mandated tier is prepended, never interleaved with the capped set.
+    # The mandated tier is never interleaved with the capped set: a blocking
+    # gate leads, obligations trail (BLOCKING_MANDATED, above).
     capped = sorted(survivors, key=presentation_slot)
     leading = [r for r in mandated if r.get("rationale") in BLOCKING_MANDATED]
     trailing = [r for r in mandated if r.get("rationale") not in BLOCKING_MANDATED]
