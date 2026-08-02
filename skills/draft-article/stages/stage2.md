@@ -514,7 +514,7 @@ attributable from run state — never discovered by the owner mid-interview:
 
 ```
 python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py journal \
-  --interview <interview.json> --answers <answers.json> \
+  --interview <interview.json> --answers <answers.json> --ws "$WS" \
   [--policy-note "policy_source unavailable: <reason>"] \
   [--events "$WS/interview-events.jsonl"] > "$WS/interview-journal.json"
 ```

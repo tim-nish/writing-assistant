@@ -771,3 +771,43 @@ def main(argv=None):
 
 if __name__ == "__main__":
     sys.exit(main())
+
+
+# --- CAP-5: reasons derived from the workspace, never read off a flag --------
+
+POLICY_SURFACE_NAMES = ("policy-surface.txt", "policy-surface.filtered.txt")
+
+
+def policy_surface_read(ws):
+    """True when the run's workspace HOLDS evidence the policy surface was read.
+
+    A zero-byte artifact is not a read: `policy-surface.filtered.txt` can
+    legitimately be empty, and an empty file proves nothing about consumption.
+    """
+    if not ws:
+        return False
+    return any(os.path.isfile(os.path.join(ws, n))
+               and os.path.getsize(os.path.join(ws, n)) > 0
+               for n in POLICY_SURFACE_NAMES)
+
+
+def consulted_reason(explicit, ws=None, fallback_path=None):
+    """The `consulted: none (<reason>)` reason, in THREE states (#1289).
+
+    An explicit degradation reason is the reader's own evidence, so it outranks
+    the artifact test. Otherwise a policy-surface artifact in the workspace
+    proves the source was configured AND read — the empty seed map is then an
+    EDITORIAL fact ("no seeds authored"), not a configuration one. Only its
+    absence licenses `policy_source unset`, which the run this repairs recorded
+    beside a 57,885-byte surface.
+
+    `fallback_path` covers a missing `--ws`: the journal's own input sits IN the
+    run workspace, so its directory is the same evidence, and a forgotten flag
+    must not restore the false record.
+    """
+    if explicit:
+        return explicit
+    if not ws and fallback_path not in (None, "-"):
+        ws = os.path.dirname(os.path.abspath(fallback_path))
+    return ("policy surface read; no seeds authored" if policy_surface_read(ws)
+            else "policy_source unset")

@@ -2852,8 +2852,8 @@ def cmd_journal(args):
         mapping = "; ".join(f"{ptr.rsplit('@', 1)[0]} → {qid}" for ptr, qid in seeds)
         consulted = f"consulted: product-lab@{pin} — {mapping}"
     else:
-        consulted = ("consulted: none "
-                     f"({_bare_policy_reason(args.policy_note) or 'policy_source unset'})")
+        consulted = "consulted: none (%s)" % run_record.consulted_reason(  # CAP-5, #1289
+            _bare_policy_reason(args.policy_note), getattr(args, "ws", None), getattr(args, "interview", None))
 
     out = {"stage": "interview", "journal": entries, "consulted": consulted}
     # #758 (Story 19.13): a run that PRESENTED owner-facing gates but left no
