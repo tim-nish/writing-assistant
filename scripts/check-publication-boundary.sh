@@ -1,5 +1,16 @@
 #!/usr/bin/env sh
 # parallel-safe
+# covers: **
+# ^ WIDENED BY HAND from the derived proposal (#1318). scripts/derive-check-coverage.py
+#   read this file's prose and proposed `config/** docs/** scripts/** skills/**
+#   specs/**`, flagging it `broad-only` for exactly this review. Rule set A
+#   below follows the VALUE, not the directory, over the COMPLETE Git-tracked
+#   tree — the 2026-07-17 widening exists because three fixtures and four spec
+#   citations carried real hub pins past a specs/-only check. A declaration
+#   naming five trees would re-introduce that boundary in the SELECTOR, so this
+#   check covers everything: any changed path selects it. That is deliberate
+#   cost — ~1.3s on every per-edit run — bought against a leak class the scoped
+#   loop otherwise cannot see at all.
 # check-publication-boundary.sh — reject private provenance in the public tree
 # (owner decision 2026-07-16; SPEC-writing-assistant "Publication boundary",
 # #211). This repo is public; the ratified boundary is "mechanism public,

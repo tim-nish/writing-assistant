@@ -1,6 +1,7 @@
 #!/usr/bin/env sh
 # parallel-safe
 # tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
+# covers: scripts/draft-pipeline.py skills/draft-article/stages/stage2.md
 # check-stage2-triage.sh — verify the three-outcome triage over harvest output
 # (Story 10.2). POSIX shell + stdlib Python.
 #
