@@ -1,6 +1,7 @@
 #!/usr/bin/env sh
 # parallel-safe
 # tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
+# covers: scripts/mint_guard.py scripts/detect-policy-divergence.py
 # check-policy-divergence-detector.sh — verify the consumer-side
 # policy-divergence detector's mechanical core (SPEC-policy-divergence-detector,
 # #436, Story 13.99). POSIX shell + stdlib Python only.
@@ -10,6 +11,15 @@
 # reason + duplicate-key refusal; CAP-5 direction guard (both verdicts); and the
 # CAP-3/#436 ratification invariant — the staging block is a CONFORMANCE COPY of
 # the hub §3.1 schema with declared precedence, not an independent definition.
+#
+# It also carries the mint-guard COMPOSE refusal, re-homed here when
+# check-minted-issue-denominator.sh retired (#1278). The retirement's premise is
+# that the typed filing seam now refuses an empty denominator, so an unguarded
+# composition can no longer reach the tracker — true, and verified at delivery.
+# But the seam guards FILING, and this detector composes proposal-only bodies
+# that are never filed: their guard is mint_guard.py itself. Retiring the whole
+# fixture would have left a live module with zero coverage, so the one polarity
+# the seam cannot reach moved here rather than being dropped with the rest.
 
 set -eu
 
@@ -111,6 +121,30 @@ printf '%s' "$F" | grep -qi 'hub schema is the authority' \
 printf '%s' "$F" | grep -qi 'Not the only emitter' \
   && ok "CAP-3: does not assume it is the sole emitter (fork-triage cites the same authority)" \
   || err "detector-formats §4 missing the not-sole-emitter clause"
+
+# --- mint-guard compose refusal, re-homed from #1278's retired fixture --------
+# The seam refuses an empty denominator at FILING. This asserts the same refusal
+# at COMPOSE, which is the surface this detector actually uses.
+G="$(dirname "$0")/mint_guard.py"
+mwork=$(mktemp -d)
+printf '# divergence: probe\n\nbody\n' > "$mwork/body.md"
+printf '{"checked": []}' > "$mwork/empty.json"
+if python3 "$G" compose --record "$mwork/empty.json" --body-file "$mwork/body.md" \
+     --run-record "$mwork/rr.json" --detected 2026-08-02 >"$mwork/out.md" 2>"$mwork/err.txt"; then
+  err "#1278: an empty-enumeration record composed a body (exit 0) — the #1171-#1175 shape is representable again"
+else
+  ok "#1278: empty enumeration refuses to compose (non-zero exit)"
+fi
+[ -s "$mwork/out.md" ] \
+  && err "#1278: refusal still composed a body on stdout" \
+  || ok "#1278: refusal composes NOTHING — no body exists to file"
+printf '{"checked": ["a.md", "b.md"]}' > "$mwork/full.json"
+python3 "$G" compose --record "$mwork/full.json" --body-file "$mwork/body.md" \
+    --run-record "$mwork/rr2.json" --detected 2026-08-02 >"$mwork/out2.md" 2>/dev/null \
+  && [ -s "$mwork/out2.md" ] \
+  && ok "#1278: a non-empty enumeration composes, denominator visible" \
+  || err "#1278: a non-empty record was refused or composed nothing"
+rm -rf "$mwork"
 
 if [ "$fail" -eq 0 ]; then
   printf '\nAll policy-divergence-detector checks passed.\n'; exit 0
