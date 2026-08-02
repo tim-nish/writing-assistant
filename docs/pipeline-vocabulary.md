@@ -15,18 +15,23 @@ and its companion
 `draft article <type> from <sources>` runs a fixed sequence:
 
 ```
-stage 0        harvest        gap interview     framework fill    verify        complete
-(invocation) → (fact sheet) → (owner answers) → (Stage 3 draft) → (provenance) → (canonical + plan)
+stage 0        probe          gap interview     framework fill    verify        complete
+(invocation) → (verdict +    → (owner answers) → (Stage 3 draft, → (provenance) → (canonical + plan)
+                anchors)                          examine per claim)
 ```
 
 - **Stage 0 — invocation.** Validates configuration and classifies the source
-  tokens (path / glob / commit-range); emits the run-state harvest consumes.
-- **Stage 1 — harvest.** Builds the **fact sheet** — candidate claims each
-  carrying a resolvable source pointer (see the nine-KIND vocabulary below).
+  tokens (path / glob / commit-range); emits the run-state probe consumes.
+- **Stage 1 — probe.** Checks whether the declared sources can ground this
+  brief at all — a verdict plus a handful of anchors saying where evidence
+  sits. **No fact sheet is built**: there is no pre-extraction pass anywhere in
+  the pipeline (retired 2026-08-02, #1182/#1220).
 - **Stage 2 — gap interview.** At most five questions covering only what the
   sources cannot answer; answers return as owner input for Stage 3.
-- **Stage 3 — fill.** Populates the framework's slots from the fact sheet and
-  the interview answers, classifying every sentence in a provenance map.
+- **Stage 3 — fill.** Populates the framework's slots from the interview
+  answers and from **examine**, which grounds each claim at the read that
+  produced it, classifying every sentence in a provenance map. The pin is born
+  with the claim rather than two stages before it.
 - **Verify.** An independent `verify-provenance` check and the Stage 3→4
   quality gate.
 - **Complete.** Durably writes the two declared products: the canonical draft
@@ -39,7 +44,7 @@ CAP-3 of the pipeline spec.
 
 **Stage 3 opens with an argument-plan sub-step (#440/#434).** Before filling any
 slot, it composes an explicit **argument plan** — thesis, arc, per-section
-content intents — from the fact sheet (including the narrative kinds) and the
+content intents — from the examined claims (including the narrative kinds) and the
 interview, then fills **from that plan**, so the article is an argument rather
 than a framework skeleton stitched from fact-sheet prose. A framework governs
 each section's **content obligations, not a literal heading skeleton** — a
@@ -48,7 +53,7 @@ is a run-workspace intermediate, owner-visible; at completion the plan-record
 `plans/<slug>.md` projects the thesis/arc from it. The Stage 3→4 quality gate
 fails stitched-fact-sheet and per-lesson-skeleton drafts **before** review.
 
-- **Inputs:** the fact sheet (Stage 1) and the interview answers (Stage 2).
+- **Inputs:** the interview answers (Stage 2) and, per claim, what `examine` grounds during fill.
 - **Outputs:** a slot-filled draft with schema-conformant frontmatter, plus a
   **sidecar provenance map** classifying every body sentence.
 - **Restrictions — the three provenance classes** (every claim-classed
@@ -88,7 +93,7 @@ nine (`pipeline-stages.md`) — five atomic kinds plus four **narrative** kinds
 
 The four narrative kinds admit **pointer-backed** narrative material and may use
 a multi-line span pointer like `quote`. Anything that does not fit one of these
-nine KINDs cannot enter the fact sheet — it routes elsewhere (below).
+nine KINDs cannot be pinned as evidence — it routes elsewhere (below).
 
 ## Episode vs state claims, and the time axis of a source
 
@@ -119,7 +124,7 @@ class — `P4.S6[L35]: sourced episode <- a1b2c3d`:
 refuses a claim typed `episode` whose every pin resolves to a `time_axis:
 false` source, naming the claim and the source that failed it; the Stage 3→4
 gate blocks on it like any other finding. This is a **predicate on the shipped
-mechanism**, not a second one — harvest is unchanged and stays capture-only.
+mechanism**, not a second one — examine is unchanged and stays per-claim.
 
 **What a given repository can ground is readable before drafting:**
 `resolve-writing-sources.py time-axis --root <host-repo>`. A declaration that
@@ -131,19 +136,19 @@ grounds no episode claim is reported as a **fact about the declaration**, exit
 The pipeline deliberately loses material at each boundary; knowing where keeps
 its output auditable.
 
-- **Harvest → fact sheet.** Only source-pointable material becomes a fact-sheet
-  entry. Facts the harvester wants but cannot source go to a **`NEEDS-OWNER`**
-  list, never into the draft unmarked.
+- **Claim → examine.** Only source-pointable material gets a pin. A claim the
+  fill wants but examine cannot ground goes to a **`NEEDS-OWNER`** item or
+  carries `[VERIFY]`, never into the draft unmarked.
 - **Owner-judgment dimensions route off the sheet.** Owner judgment —
   **surprise, significance, tradeoff, warning, opinion** — is not source-checkable,
   so it routes to `NEEDS-OWNER` and reaches the draft (if at all) through the
   **interview**, the gate between evidence and prose. **Pointer-backed narrative
   material** (chronology, problem statements, motivation, failure/cost, reversals)
-  is different: since #438 it **does** enter the fact sheet, under the four
-  narrative KINDs above — the interview stays the judgment gate, but the
-  narrative *evidence* is now harvestable rather than routed off.
+  is different: since #438 it **does** get pinned, under the four narrative
+  KINDs above — the interview stays the judgment gate, but the narrative
+  *evidence* is grounded rather than routed off.
 - **Interview → draft.** An **approved** recommended answer keeps its source
-  pointers and grounds sourced claims like a fact-sheet entry; **modified** or
+  pointers and grounds sourced claims like an examined claim; **modified** or
   **replaced** answers become interview-sourced material.
 - **Policy source absent → generic mode.** When the host repo declares no
   `policy_source` (or the gateway is unavailable), the policy-seam steps
