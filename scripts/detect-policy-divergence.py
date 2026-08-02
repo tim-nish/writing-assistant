@@ -29,8 +29,17 @@ Subcommands:
            deduped (occurrence bumped), not re-surfaced.
         4. Cap at --cap (default 3), highest-leverage first (input order);
            capped candidates are COUNTED, never silently dropped.
-      Prints {candidates, routed_to_seam, deduped, capped, errors}. Exits 4 if
-      any surviving flag fails record validation (fail-closed).
+      Prints {candidates, routed_to_seam, deduped, capped, errors,
+      denominator}. Exits 4 if any surviving flag fails record validation
+      (fail-closed).
+
+      The `denominator` block (Story 20.167, #1260) carries what this pass
+      actually examined — flags received, and the consult points they came
+      from — from fields this driver already holds. Any
+      tracker-issue emission downstream (SKILL.md "report upstream" /
+      "fix here") composes its body THROUGH `scripts/mint_guard.py compose`
+      with this block as the record: the body then states the denominator,
+      and an empty one refuses to mint instead of filing an absence.
 
   disposition --ledger LEDGER.json --key KEY --disposition D --pin PIN
       [--reason R] [--ref REF] [--detected YYYY-MM-DD]
@@ -134,8 +143,16 @@ def cmd_run(args):
         capped = len(candidates) - args.cap
         candidates = candidates[:args.cap]
 
+    # The mint denominator (Story 20.167, #1260): what this pass examined,
+    # from values already in hand. `checked` names the consult points the
+    # received flags came from — the enumeration a tracker-issue emission is
+    # relative to; mint_guard.py refuses to compose a body when it is empty.
+    checked = sorted({f.get("consult_point") for f in flags
+                      if f.get("consult_point")})
     out = {"candidates": candidates, "routed_to_seam": routed,
-           "deduped": deduped, "capped": capped, "errors": errors}
+           "deduped": deduped, "capped": capped, "errors": errors,
+           "denominator": {"checked": checked,
+                           "records_read": len(flags)}}
     print(json.dumps(out, indent=2))
     # Fail-closed: a surviving flag that could not validate is a hard error.
     return REFUSED if errors else 0
