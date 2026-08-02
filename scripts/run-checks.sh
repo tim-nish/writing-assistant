@@ -299,7 +299,7 @@ if [ "$LIST" -eq 1 ]; then
   exit 0
 fi
 
-fails=0; ran=0; skipped=0; total_ms=0
+fails=0; ran=0; skipped=0; total_ms=0; fam_ms=0; union_ms=0
 
 # report FILE MS RC [PROMOTED] — the single place a check's outcome becomes a
 # line. Both the serial path and the parallel wave call it from the PARENT
@@ -337,6 +337,10 @@ report() {
   printf '%6sms  %-8s %s\n' "$2" "$status" "$1"
   ran=$((ran+1))
   total_ms=$((total_ms + $2))
+  case " $PREFIX_FILES " in
+    *" $1 "*) fam_ms=$((fam_ms + $2)) ;;
+    *)        union_ms=$((union_ms + $2)) ;;
+  esac
 }
 
 # is_parallel_safe FILE — an AFFIRMATIVE declaration only. The line must be
@@ -429,18 +433,36 @@ fi
 # (#998). The scoped exemption above rests on a blast-radius run being bounded
 # by its family SIZE; coverage-selected members are not in the family and are
 # bounded by nothing but the declared globs, so the ceiling is what keeps a
-# too-broad glob visible. A union that routinely breaches it means the globs
-# are too broad — that is a finding, never a reason to raise the ceiling.
-# A PROMOTED run binds for the same reason and more strongly (#1321): a
-# promoted check is exempt from the per-check ceiling, so this total is the
-# ONLY ceiling standing between coverage promotion and a slow edit loop.
-if [ "$TIER" = "inner" ] && { [ "$SCOPED" = "no" ] || [ "$UNION_ADDED" -gt 0 ] || [ "$PROMOTED_N" -gt 0 ]; } && [ "$total_ms" -gt "$INNER_TOTAL_MS" ]; then
-  echo "run-checks: FAMILY-VIOLATION: inner run ${total_ms}ms > ${INNER_TOTAL_MS}ms (#944)" >&2
+# too-broad glob visible.
+#
+# THE CEILING'S SEMANTICS FOLLOW THE REMEDY'S AVAILABILITY (#1326, owner
+# decision 2026-08-02). The FAMILY portion (checks the GLOB selected,
+# promoted members included — promotion is GLOB-bounded, so narrowing the
+# glob removes them) FAILS on breach: its named remedy, scope the run, is
+# actionable. The UNION portion (checks added because their `# covers:`
+# matched a changed path) REPORTS against the same number and never fails:
+# its cost cannot be removed by any scoping, because the union ignores the
+# GLOB by design (#998) — completing the declarations took a scoped run over
+# scripts/draft-pipeline.py from 6,831ms to 32,077ms with 32 fast inner
+# members each under INNER_MS, and a ceiling that fails while naming
+# remedies that cannot apply is a signal firing where it is least
+# actionable. This is the FULL tier's own deliberate asymmetry ("a breach is
+# a finding to act on, never a red suite") applied to the one inner portion
+# whose remedy moved out of the operator's hands. INNER_TOTAL_MS itself is
+# unchanged; a union breach remains a finding — fixture-ise covering
+# members, narrow a too-broad `# covers:` glob — never a number to raise.
+if [ "$TIER" = "inner" ] && [ "$fam_ms" -gt "$INNER_TOTAL_MS" ]; then
+  echo "run-checks: FAMILY-VIOLATION: family portion ${fam_ms}ms > ${INNER_TOTAL_MS}ms (#944)" >&2
   echo "  — scope the per-edit run to the blast-radius family (e.g. run-checks.sh 'scripts/check-terrain*')," >&2
-  echo "    narrow a too-broad '# covers:' glob (#998) — never raise the ceiling," >&2
   echo "    declare slow members '# tier: full', or make their assertions fixture-based." >&2
   echo "    The full suite still runs unscoped once, pre-PR: run-checks.sh --tier full" >&2
   fails=$((fails+1))
+fi
+if [ "$TIER" = "inner" ] && [ "$union_ms" -gt "$INNER_TOTAL_MS" ]; then
+  echo "run-checks: UNION-BUDGET: coverage-selected portion ${union_ms}ms > ${INNER_TOTAL_MS}ms — reported, not failing (#1326):" >&2
+  echo "    scoping cannot remove this cost (the union ignores the GLOB by design, #998);" >&2
+  echo "    the findings-shaped remedies are fixture-ising covering members or narrowing a" >&2
+  echo "    too-broad '# covers:' glob — never raising the ceiling." >&2
 fi
 par_note=''
 [ "$PARALLEL" -gt 0 ] && par_note=" parallel=$PARALLEL"
