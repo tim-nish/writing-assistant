@@ -1,6 +1,7 @@
 #!/usr/bin/env sh
 # parallel-safe
 # tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
+# covers: config/language-conventions.yaml config/platform-profiles/devto.example.yaml config/platform-profiles/zenn.example.yaml scripts/adapt-canonical.py scripts/draft-pipeline.py scripts/resolve-user-config.py scripts/validate-proposal-payload.py skills/adapt-canonical/SKILL.md skills/draft-article/** skills/emit-variants/**
 # check-canonical-adaptation.sh — verify canonical adaptation as a STANDALONE,
 # OWNER-GATED invocation (Story 18.56, SPEC-canonical-adaptation CAP-1 + CAP-3):
 # the source is the persisted, reviewed canonical (an unreviewed draft, a
