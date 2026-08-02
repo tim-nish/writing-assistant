@@ -330,6 +330,56 @@ python3 "$DP" journal --interview "$wpc/iv.json" --answers "$wpc/answers.json" \
   --ws "$wpc" 2>/dev/null | grep -q payload_capture_warning \
   && err "#758: warning emitted although the payload log exists" \
   || ok "#758: a present payload log journals silently"
+
+# --- #1289 (Story 20.182): the consulted: line's THREE states, each DERIVED
+# from what the workspace holds (SPEC-run-record CAP-5, record-formats §3).
+# Asserted here rather than in a new checker, per the checker-growth ruling.
+cline() { python3 "$DP" journal --interview "$wpc/iv.json" \
+    --answers "$wpc/answers.json" "$@" 2>/dev/null \
+    | python3 -c "import json,sys; print(json.load(sys.stdin)['consulted'])"; }
+
+# (i) no policy-surface artifact in the workspace -> the unset state.
+c=$(cline --ws "$wpc")
+[ "$c" = "consulted: none (policy_source unset)" ] \
+  && ok "#1289 (i): no surface artifact -> policy_source unset" \
+  || err "#1289 (i): expected the unset state, got '$c'"
+
+# (ii) a surface artifact present, seed map empty -> source read, no seeds.
+#      This is the state run 20260802T185710-622820 had and could not express.
+printf 'a served policy line\n' > "$wpc/policy-surface.txt"
+: > "$wpc/policy-surface.filtered.txt"
+c=$(cline --ws "$wpc")
+case "$c" in
+  *"policy_source unset"*) err "#1289 (ii): unset recorded beside a read surface: '$c'" ;;
+  "consulted: none (policy surface read; no seeds authored)")
+    ok "#1289 (ii): surface present, zero seeds -> the source-read state" ;;
+  *) err "#1289 (ii): unexpected consulted line '$c'" ;;
+esac
+# the flag is not what is read: the same run with no --ws derives the same
+# state from the workspace its own interview.json sits in.
+c=$(cline)
+[ "$c" = "consulted: none (policy surface read; no seeds authored)" ] \
+  && ok "#1289: the state is derived from the workspace, not from --ws" \
+  || err "#1289: derivation depends on a flag, got '$c'"
+# an empty surface artifact is not a read: zero bytes proves nothing.
+mv "$wpc/policy-surface.txt" "$wpc/surface.bak"; : > "$wpc/policy-surface.txt"
+c=$(cline --ws "$wpc")
+[ "$c" = "consulted: none (policy_source unset)" ] \
+  && ok "#1289: a zero-byte surface artifact is not evidence of a read" \
+  || err "#1289: empty surface treated as read, got '$c'"
+mv "$wpc/surface.bak" "$wpc/policy-surface.txt"
+
+# (iii) the reader's own degradation reason outranks the artifact test.
+c=$(cline --ws "$wpc" --policy-note "policy_source unavailable: gateway down")
+[ "$c" = "consulted: none (policy_source unavailable: gateway down)" ] \
+  && ok "#1289 (iii): an explicit degradation reason outranks the artifact test" \
+  || err "#1289 (iii): the note was overridden, got '$c'"
+
+# AC-3: the pin path is untouched — seeds present, surface present, same line.
+c=$(cline --ws "$wpc" --seed-extra "LESSONS.md:41@8f3c2d1abcdef01=article-type")
+[ "$c" = "consulted: product-lab@8f3c2d1abcdef01 — LESSONS.md:41 → article-type" ] \
+  && ok "#1289: the seeded pin + mapping line is unchanged" \
+  || err "#1289: the pin path changed, got '$c'"
 rm -rf "$wpc"
 
 if [ "$fail" -eq 0 ]; then
