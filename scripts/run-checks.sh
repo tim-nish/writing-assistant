@@ -246,12 +246,14 @@ for f in $GLOB; do
   [ -f "$f" ] || continue
   case "$f" in *run-checks.sh) continue ;; esac
   FILES="$FILES $f"
+  PREFIX_FILES="$PREFIX_FILES $f"
 done
 #
 # COVERED is the coverage-matched set, and it is computed for EVERY check, not
 # only the ones the GLOB missed: it is also the PROMOTION signal (#1321), and a
 # check can be both prefix-selected and coverage-matched.
 COVERED=''
+PROMOTED=''
 UNION_ADDED=0
 PROMOTED_N=0
 if [ -n "$CHANGED" ]; then
@@ -264,10 +266,27 @@ if [ -n "$CHANGED" ]; then
     FILES="$FILES $f"
     UNION_ADDED=$((UNION_ADDED + 1))
   done
-  # Counted here, before anything runs, so --list can disclose the promotion
-  # set without executing it.
+  # PROMOTION IS BOUNDED BY THE GLOB; SELECTION IS NOT (#1321, owner decision
+  # 2026-08-02). The asymmetry is deliberate and is not promotion half-wired:
+  #
+  #   SELECTION (an inner check the GLOB missed) stays UNBOUNDED, because #998's
+  #   gap was a check asserting a repo-wide property ABOUT what you edited never
+  #   being selected. That gap stays fully closed.
+  #
+  #   PROMOTION runs a check its author deliberately tiered OUT of the edit
+  #   loop, so the operator's own scope bounds it. Measured before this bound:
+  #   an inner run over scripts/draft-pipeline.py promoted 32 full-tier checks
+  #   for 177s, breaching INNER_TOTAL_MS — and the runner's own documented
+  #   per-edit remedy (scope with a GLOB) could not reach it, because this set
+  #   ignored the GLOB. The ceiling fired with remedies that did not apply.
+  #
+  # An unscoped inner run still promotes everything, which is correct: it is
+  # already documented as failing its ceiling by design.
   for f in $COVERED; do
-    grep -m1 -E '^# tier: full' "$f" >/dev/null 2>&1 && PROMOTED_N=$((PROMOTED_N + 1))
+    grep -m1 -E '^# tier: full' "$f" >/dev/null 2>&1 || continue
+    case " $PREFIX_FILES " in
+      *" $f "*) PROMOTED="$PROMOTED $f"; PROMOTED_N=$((PROMOTED_N + 1)) ;;
+    esac
   done
 fi
 
@@ -393,7 +412,7 @@ else
     # construction — a full-tier check runs early only when a path it DECLARES
     # changed, never on every edit.
     if [ "$TIER" = "inner" ] && [ "$declared" = "full" ]; then
-      case " $COVERED " in
+      case " $PROMOTED " in
         *" $f "*) promoted=yes ;;
         *) skipped=$((skipped+1)); continue ;;
       esac
