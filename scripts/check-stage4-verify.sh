@@ -20,8 +20,9 @@ ok()  { printf 'ok:   %s\n' "$1"; }
 python3 -c "import py_compile; py_compile.compile('$DP', doraise=True)" 2>/dev/null \
   && ok "pipeline helper compiles" || { err "helper syntax error"; printf '\nFAILED.\n' >&2; exit 1; }
 
-# 1. Skill documents the Stage-4 contract.
-grep -q 'Stage 4 — owner verification pass' "$SKILL" && ok "documents Stage 4" || err "Stage 4 not documented"
+# 1. Skill documents the verification contract. Named by PROCESS, never by a
+# number (#1247) — the heading is an owner-facing composition source.
+grep -q 'Verification — owner verification pass' "$SKILL" && ok "documents verification" || err "verification not documented"
 grep -qi 'zero .*VERIFY.* markers remain' "$SKILL" && ok "states the zero-marker exit criterion" || err "exit criterion missing"
 grep -qi '4 minute' "$SKILL" && ok "states the ≤4-minute owner budget" || err "owner budget missing"
 grep -qi 'routes back to a question' "$SKILL" && ok "documents the >1-rewrite reroute rule" || err "reroute rule missing"

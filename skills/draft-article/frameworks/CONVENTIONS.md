@@ -33,7 +33,7 @@ prompt reads as not-publishable.
 
 A slot **fed by an interview input** declares what happens when the owner
 **skips** that question, as a `[SKIP: <effect>]` tag on the slot heading. The
-interview engine records only the skip disposition (Story 10.3); **stage 3
+interview engine records only the skip disposition (Story 10.3); **the fill
 applies the slot's declared effect** — the engine never decides it. The skip
 choice's label in the interview states that slot's declared effect, so the owner
 sees the consequence before choosing.
@@ -42,10 +42,10 @@ sees the consequence before choosing.
 
 - **omit** — drop the slot from the article (structurally optional; no residue);
 - **defer** — leave the slot for a later pass, unfilled but not blocking;
-- **accept-later** — adopt the recommended answer at stage 3 without owner
+- **accept-later** — adopt the recommended answer during the fill without owner
   confirmation (used when a source-grounded default is safe to take silently);
 - **verify** — fill the slot from inference and mark it `[VERIFY]` for the
-  stage-4 owner pass;
+  owner pass at verification;
 - **blocker** — raise a publish blocker: the slot cannot be skipped away.
 
 **Every GATE slot's skip effect is `blocker`** — a GATE is mandatory by
@@ -59,7 +59,7 @@ authored with the templates exactly like `[SKIP: …]`. The vocabulary is
 closed: `episode | example | measurement | none` (`none` stands alone and
 equals no tag; alternation means *any one* of the listed types satisfies the
 slot). Enforcement is the pipeline's contract
-(SPEC-article-draft-pipeline, evidence-type constraint): at the stage 3→4
+(SPEC-article-draft-pipeline, evidence-type constraint): at the fill→verify
 boundary, `quality-gate --framework-file … --state …` maps each declared
 section's anchored provenance pointers to fact-sheet KINDs
 (`episode→event; example→event|quote|result; measurement→number|result`) —

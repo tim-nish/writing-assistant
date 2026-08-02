@@ -75,7 +75,7 @@ live in [`review-prompts.md`](review-prompts.md).
 
 | Phase | Enter by reading | The one command |
 |---|---|---|
-| **Entry & setup** (picker or direct path; starter template on a blank repo; footprint; pre-review checkpoint proposal; stage-0 config validation) | [`phases/entry.md`](phases/entry.md) | `draft-pipeline.py review-checkpoint-proposal --draft … --slug …` |
+| **Entry & setup** (picker or direct path; starter template on a blank repo; footprint; pre-review checkpoint proposal; config validation) | [`phases/entry.md`](phases/entry.md) | `draft-pipeline.py review-checkpoint-proposal --draft … --slug …` |
 | **Passes 1–5** (halt semantics; findings contract; intent anchors; shared preamble; model routing; lint → structure → prose → policy → cold read) | [`phases/passes.md`](phases/passes.md) | `lint-article <draft>` then the four LLM passes per the phase file |
 | **Arbitration** (pinned consolidated list; reject-only defaults; policy three-way; events emission; second-cycle gate) | [`phases/arbitration.md`](phases/arbitration.md) | `emit-arbitration-events.py <dispositions.jsonl> --ws "$WS" --scenario <slug>` |
 | **Re-entry & report** (provenance/quality re-entry by artifact class; before/after diff; completion summary) | [`phases/reentry.md`](phases/reentry.md) | `draft-pipeline.py review-reentry --draft … --slug … --root … --ws "$WS" --applied <n>` |

@@ -2,12 +2,12 @@
      SKILL.md dispatcher; carries the stage's full operating detail,
      moved verbatim from the pre-split SKILL.md. -->
 
-## Stage 3→4 — mandatory quality gate (Story 11.4)
+## Fill → verification — mandatory quality gate (Story 11.4)
 
 Before the draft reaches the owner's verification pass, it must **pass the
 article-quality gate** ([`quality-rubric.md`](../quality-rubric.md)). This is a
 **stage-progression precondition** — like `verify-markers`, not an advisory
-review finding: **Stage 3 does not complete until the gate passes**, so the
+review finding: **the fill does not complete until the gate passes**, so the
 owner's ~4-minute budget never lands on a draft that reads like a stitched fact
 sheet.
 
@@ -25,7 +25,7 @@ gate**; the gate itself neither dispatches nor waits.
 second-net *before* review, not after: the **narrative-arc dimension fails**
 stitched-fact-sheet and **per-lesson-skeleton** drafts (a framework skeleton
 reproduced verbatim per lesson), and a **plan-conformance** check requires the
-draft to advance the argument plan's thesis (Stage-3 sub-step above). A
+draft to advance the argument plan's thesis (the fill's sub-step above). A
 mechanical **per-lesson skeleton detector** (an identical `##` heading repeated
 ≥3×) is the zero-token backstop; the dim1 judge owns the varied-structure and
 plan-conformance judgment. **This contract lives in three enforcement copies
@@ -64,7 +64,7 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py quality-gate \
   `sourced` claims, no `derived`/`narration` tissue).
 - **Audience presence is checked mechanically here too (Story 13.41):** an
   absent or unfilled `audience` fails the gate — the named reader must be set at
-  stage-3 fill before the draft can progress.
+  the fill before the draft can progress.
 - **Dimensions 1–2** are judged by **one single-pass cheap-tier rubric judge**
   emitting **pass/fail per dimension + failing locations, no rewritten text**;
   its verdicts feed `--judge`. **Verdict grammar (exact — instruct the judge
@@ -105,7 +105,7 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py quality-gate \
 
 **On failure — bounded retry, then surface (never silent):**
 
-1. Stage 3 **revises against the named failing dimensions only** (Read the
+1. The fill **revises against the named failing dimensions only** (Read the
    current draft and provenance map before re-writing either — the
    artifact-write precondition; every cycle here is an overwrite), then re-runs
    **both** the quality gate **and** `verify-provenance` — readability revision
@@ -158,7 +158,7 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py episode-candidates \
   --state "$WS/checkpoint.json" --section "<failing section>"
 ```
 
-- The command reads **only the fact sheet** (never a source — the Stage-1
+- The command reads **only the fact sheet** (never a source — probe's
   scope boundary holds on the hop) and groups event-kind facts by source
   file, with same-source result/number/quote facts as support. Each
   candidate's `frame` is null: **author the one-line narrative frame
@@ -180,7 +180,7 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py episode-candidates \
 
   The selected episode enters the fact sheet as a pinned entry (claim =
   frame, SOURCE = primary constituent, KIND `event` — harvest grammar
-  unchanged); checkpoint the printed state, re-enter stage-3 fill, and the
+  unchanged); checkpoint the printed state, re-enter the fill, and the
   re-run gate can now satisfy the section's declared type.
 - **Decline-all, or `episode-candidates` reports no candidates
   (`action: publish-blocker-path`):** the absence follows Story 13.90's
@@ -216,7 +216,7 @@ it forward. A hop interrupted at the turn ceiling resumes from the checkpoint
 like any stage.
 
 A **fact-sheet-stitched draft fails** this gate (dimension 4) and does **not**
-reach Stage 4 unrevised.
+reach verification unrevised.
 
 
 ---
@@ -224,8 +224,8 @@ reach Stage 4 unrevised.
 **Gate exit — two directions.** This is the pipeline's one non-linear
 transition, so it names both:
 
-- **Pass → Stage 4.** Read [`stage4.md`](stage4.md) and run
+- **Pass → verification.** Read [`stage4.md`](stage4.md) and run
   `draft-pipeline.py verify <draft>`, driving `verify-markers --count` to 0.
-- **Fail → back to Stage 3.** Return to [`stage3.md`](stage3.md) for the
+- **Fail → back to the fill.** Return to [`stage3.md`](stage3.md) for the
   bounded repair hop, then re-run the gate. The cycle is bounded; a
-  fact-sheet-stitched draft does not reach Stage 4 unrevised.
+  fact-sheet-stitched draft does not reach verification unrevised.

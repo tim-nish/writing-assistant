@@ -1,9 +1,9 @@
 <!-- stages/stage1.md — draft-article stage companion (Story 19.3, #744/#740). Loaded on entry to this stage by the
      SKILL.md dispatcher; carries the stage's full operating detail. -->
 
-## Stage 1 — probe: can this repository ground the brief?
+## Probe — can this repository ground the brief?
 
-Stage 1 is a **configuration and permission check** (amended 2026-08-02,
+Probe is a **configuration and permission check** (amended 2026-08-02,
 #1224 — the amendments companion is the authority). It asks one question:
 **can this run read what it was granted?** It does not enumerate files, hunt
 anchors, or judge feasibility.
@@ -15,7 +15,7 @@ anchors, and a coverage ledger. Two of its own clauses could not both hold —
 declared source — and the ledger won in practice: one 2026-08-02 run read 168
 files to certify an empty result from a source that contributed nothing.
 Underneath that was a deeper problem: the article's structure is fixed at
-stage 3, so a verdict here judges a thesis that does not yet exist.
+the fill, so a verdict here judges a thesis that does not yet exist.
 
 **Feasibility is discovered where it binds.** A claim that cannot be grounded
 is an ungrounded **claim**, found at [`examine`](examine.md) — a finding the
@@ -24,7 +24,7 @@ Die-early folds into the first failed examine.
 
 **The declaration splits in two, and only one half lives here.** As a
 **permission boundary** — what may be read at all — `writing-sources.yaml` is
-untouched, and the invariants resting on it are unchanged: the stage-0
+untouched, and the invariants resting on it are unchanged: the run mint's
 selection is a **filter, never a scope widener**, and out-of-scope repos are
 never searched automatically. As a **coverage denominator** it is retired:
 certifying coverage of a declared universe makes cost scale with the
@@ -44,7 +44,7 @@ there is nothing for the model to supply. It reports:
 - **`unreadable`** — any granted source the run cannot read, named with its
   path. This is the **one** condition that stops the run here, and it is a
   configuration error rather than a verdict about the article.
-- **`elapsed_s` / `budget_s` / `over_budget`** — the stage-1 **time budget**,
+- **`elapsed_s` / `budget_s` / `over_budget`** — probe's **time budget**,
   declared at `probe.py:TIME_BUDGET_S` and asserted by `check-probe.sh`.
   #1224 observed that no performance budget existed anywhere and the only cost
   language was relative ("a fraction of harvest's cost"), which bounds nothing
@@ -65,7 +65,7 @@ counted-never-read.
 
 **Checkpoint/resume contract (the SPEC's per-stage obligation).** Probe is
 atomic at `record`: an interrupted probe leaves the run's checkpoint at
-`next_stage: probe` (the stage-0 mint), so a resumed run re-enters probe from
+`next_stage: probe` (written at the run mint), so a resumed run re-enters probe from
 the top — there is no partial probe state to reconcile. A recorded probe
 persists `$WS/probe.json` and the routed checkpoint in one invocation, and
 re-running `record` replaces probe.json idempotently.
@@ -87,7 +87,7 @@ here runs exactly as the full pipeline does:
   activity **plus the owner's policy recall surface via the policy-source
   seam — read-only, pinned, lessons first**; the policy hub's **Q&A history
   archive is never a declared source**; **published text carries public
-  repository links only**. State these bounds to the owner at Stage 0.
+  repository links only**. State these bounds to the owner at the run mint.
 - **The one-lesson block is told as a narrative arc (Story 13.93, #425;
   SPEC-article-frameworks "Fill — narrative-arc sourcing").** At fill, select
   the lesson from a recall-surface `## Journey` section (original framing →
@@ -100,7 +100,7 @@ here runs exactly as the full pipeline does:
   marker to the owner at selection**. No usable Journey/reversal record →
   a plain one-lesson claim, arc not invented. F5's own template carries the
   full contract.
-- **No Stage 2 interview:** `probe.py record --framework working-note` routes
+- **No gap interview:** `probe.py record --framework working-note` routes
   `next_stage: fill` (`interview` rejects F5 with a named error).
 - **Lighter quality gate:** run `quality-gate --profile slim` — the dim1–2
   rubric judge is waived by contract (do not spawn a judge subagent);

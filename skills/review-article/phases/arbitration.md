@@ -125,7 +125,7 @@ arc, paragraph flow, explanation calibration, readability mechanics — the same
 dimensions a blocker's `Why blocker:` rationale names, per Story 12.1) is
 **blocker-eligible**: it may be assigned `blocker`, exactly as a cold-read Q1/Q2
 mismatch or a configuration defect. Review is a real **second net** for the
-Stage 3→4 quality gate, not merely advisory — a rubric violation that slipped the
+fill→verify quality gate, not merely advisory — a rubric violation that slipped the
 gate is a publication-stopping finding here.
 
 **Second-cycle gate.** After the round:

@@ -66,7 +66,7 @@ them here, and do not write a second copy of any of them:
 
 - the **persisted canonical** exists at `<output.drafts>/<slug>.md` — a
   run-workspace copy is refused, with `complete` named as the remedy;
-- the draft carries **zero `[VERIFY]` markers** (Stage 4 finished, review done);
+- the draft carries **zero `[VERIFY]` markers** (verification finished, review done);
 - the draft declares a resolved **`audience`**, **`audience_id`** and
   **`language`**;
 - the target profile resolves, and its reader/language actually differ from the

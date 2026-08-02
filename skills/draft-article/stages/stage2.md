@@ -1,9 +1,9 @@
 <!-- stages/stage2.md — draft-article stage companion (Story 19.3, #744/#740). Loaded on entry to this stage by the
      SKILL.md dispatcher; carries the stage's full operating detail, moved verbatim from the pre-split SKILL.md. -->
 
-## Stage 2 — bounded gap interview
+## Gap interview — bounded, at most five questions
 
-**Harvest is retired and no fact sheet exists (#1182; Story 20.147) — the interview is TOTAL ON EMPTY ITEMS.** Probe (stage 1) produces no fact sheet and no NEEDS-OWNER list, so `interview` normally runs over an empty item set: every clause below that reads "fact sheet", "NEEDS-OWNER entry", or "harvest output" applies only when such items exist (a brief gap, a repair-hop item) and is vacuous otherwise — the thesis/arc/stakes items, the policy-seeded tension questions, and the free-form channel are what the interview asks. A deep rewrite of this file's harvest-era framing is left open (recorded in the 20.147 delivery notes), not silently reinterpreted.
+**Harvest is retired and no fact sheet exists (#1182; Story 20.147) — the interview is TOTAL ON EMPTY ITEMS.** Probe produces no fact sheet and no NEEDS-OWNER list, so `interview` normally runs over an empty item set: every clause below that reads "fact sheet", "NEEDS-OWNER entry", or "harvest output" applies only when such items exist (a brief gap, a repair-hop item) and is vacuous otherwise — the thesis/arc/stakes items, the policy-seeded tension questions, and the free-form channel are what the interview asks. A deep rewrite of this file's harvest-era framing is left open (recorded in the 20.147 delivery notes), not silently reinterpreted.
 
 ### Owner thesis, arc, and stakes as first-class items (Story 17.1, #439)
 
@@ -17,7 +17,7 @@ budget** and the same journal/disposition machinery as every other question;
 they are owner judgment (opinion), so they are **`open`** items (owner-only
 knowledge, [`SPEC-policy-source-seam CAP-2`](../../../specs/spec-policy-source-seam/SPEC.md)),
 never a source-pointed recommendation. Their answers come back as **owner
-opinion** and reach the draft as **attributed prose spans** (Stage 3 below),
+opinion** and reach the draft as **attributed prose spans** (the fill, below),
 not as atomic sourced claims — this is the prose-shaped channel the owner's
 story needs. When no recorded material covers the thesis, the owner's answer
 is the article's spine.
@@ -185,7 +185,7 @@ dependency; no exit code here may abort the run**:
   generic, record it via `--policy-note`. **Never substitute a whole-surface
   `read` for an unavailable query** — that reinstates the pre-declared universe
   this step retired.
-- **4** (malformed block) — a stage-0 configuration error slipped through;
+- **4** (malformed block) — a configuration error slipped through;
   halt and report it like any CAP-5 finding (this cannot happen after a clean
   `stage0`).
 
@@ -261,7 +261,7 @@ open pass-throughs) as the `--items` file below, and carry its
   policy by later stages of the same run** — the plan-side conformance gate
   that enforces this at draft time is Story 13.76's, not this step's.
 
-Then select the interview questions from the stage-1 state (with policy items
+Then select the interview questions from probe's state (with policy items
 when the probe produced them):
 
 ```
@@ -374,7 +374,7 @@ echoes the order, so a mis-ordered run is attributable. Selection priority
 yields **no `number`/`result` fact**, the bank's conditional evidence-fallback
 question ("what result or worked example would convince a skeptical reader?")
 joins the candidates automatically (CAP-5) — the evidence GATE's interview
-fallback, surfacing the gap here instead of failing late at Stage 3.
+fallback, surfacing the gap here instead of failing late at the fill.
 
 Present each surviving question under the
 [owner-facing proposal contract](../../owner-facing-proposal-contract.md): show
@@ -389,7 +389,7 @@ the presentable payload is **captured verbatim** to
 `$WS/presented-payloads.jsonl` at ask time, and record the owner's selection +
 free text against the returned `ask_id` with `--answer` (contract (f), Story
 13.28) — every owner-facing ask in this pipeline (interview, visual proposals,
-Stage-4 verification) captures this way.
+verification) captures this way.
 
 ### Recommended answers with dispositions (Story 10.3)
 
@@ -398,14 +398,14 @@ the default choice**, and dispositions **labeled by concrete effect**:
 
 - **Approve** → "adopt this answer as written" — the recommendation becomes the
   interview answer **verbatim** and **keeps its source pointers**, grounding
-  sourced claims in stage 3 exactly like a fact-sheet entry;
+  sourced claims at the fill exactly like a fact-sheet entry;
 - **Modify** → "edit this answer, then use it" — the owner's edit is their
   contribution on top of the grounding; the answer is **interview-sourced**;
 - **Replace** → "discard this and use my own" — the owner's bullet; also
   **interview-sourced**;
 - **Skip** → the question goes unanswered; **only the skip is recorded** — what
   it *means* is the target framework slot's declared effect (Story 10.5),
-  resolved at stage 3, never by the interview engine. The skip choice's label
+  resolved at the fill, never by the interview engine. The skip choice's label
   states that slot's declared effect.
 
 An **open** question carries **bullet free-text** as its primary input (no
@@ -421,7 +421,7 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py answer --id <qid> \
 It enforces the D2 rules — an **approved** answer must inherit ≥1 pointer;
 **modified/replaced/answered** carry owner text and **no** pointers (owner
 judgment); a **skip** carries neither. The recorded answer text is kept
-**verbatim**, keyed by question `id`, for stage-3 traceability.
+**verbatim**, keyed by question `id`, for traceability during the fill.
 
 ### Recommended defaults for editorial-judgment gaps (SPEC-policy-editorial-direction CAP-6, Story 13.60)
 
@@ -489,7 +489,7 @@ Each list entry is `{"id", "disposition", "text"?, "pointers"?}` — the same
 fields and the **same D2 rules** as the single form. A clean batch emits the
 records as a JSON list; any rejection names the offending `id` and the fix, and
 the whole batch is a hard gate (non-zero exit) so a malformed answer never
-reaches stage 3.
+reaches the fill.
 
 **Offered-candidate provenance on a tension question (Story 18.28, #515).** When
 a consult-first tension question presented **1–3 pinned candidate answers**,
@@ -510,7 +510,7 @@ not let the machine pick it.
 
 ### Interview journal — the boundary diagnostic (Story 10.4)
 
-When Stage 2 finishes, write an **interview journal** to the run workspace, one
+When the interview finishes, write an **interview journal** to the run workspace, one
 entry per **candidate** question, so a mis-asked or mis-suppressed question is
 attributable from run state — never discovered by the owner mid-interview:
 
@@ -641,10 +641,10 @@ never an empty block. When candidates were emitted, the completion summary's
 **informational notes** must name the file (`$WS/staging-candidates.md`) and
 the block count, so a proposal is never silently buried in run output.
 
-### Stage 2→3 policy-block gate — draft generation blocks on a conflict/stale plan (Story 13.77)
+### Interview→fill policy-block gate — draft generation blocks on a conflict/stale plan (Story 13.77)
 
 **After the answers are recorded (and staging candidates emitted), before any
-Stage 3 fill**, run the stage-progression precondition
+the fill**, run the stage-progression precondition
 (SPEC-article-draft-pipeline, 2026-07-18 amendment: draft generation blocks on
 a conflict or stale plan — like the quality gate, never silently proceeded
 past). It is mechanical (no LLM):
@@ -657,7 +657,7 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py policy-block-check \
 
 **Resumed-run half (autostart):** when a resumed run already has an emitted
 article plan (a prior invocation reached plan emission), the plan's recorded
-CAP-4 conformance status **re-validates before Stage 3+ continues** — pass the
+CAP-4 conformance status **re-validates before the fill continues** — pass the
 plan, and the fresh surface so the status is **recomputed at the current pin**
 through the 13.76 `conformance` machinery (read-only — same table, same rules,
 one implementation):
@@ -671,7 +671,7 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py policy-block-check \
 Branch on the JSON:
 
 - **`blocked: false`** (`conformant` / `open` / answered reconciliation) —
-  proceed to Stage 3 unchanged.
+  proceed to the fill unchanged.
 - **`blocked: true`** (`action: publish-blocker`) — **surface the
   `publish_blocker` payload in-conversation** (it names the conflicting
   positions with their pointers, or the moved pin/configVersion — never a bare
@@ -680,7 +680,7 @@ Branch on the JSON:
   `{"stage": "policy-block", "next_stage": "interview"}` — via
   `checkpoint --ws "$WS"`, so the run resumes **at the block** and the
   reconciliation question **re-presents on resume**; never checkpoint before
-  Stage 2, and never `next_stage: fill` (that would resume past the gate).
+  the interview, and never `next_stage: fill` (that would resume past the gate).
   The completion summary's **publish-blockers bucket** carries the payload
   (positions/pin delta included) and the resume path.
 - **In-run repair** — the block is repairable in the same invocation:
@@ -705,7 +705,7 @@ gate: it changes nothing about the quality gate or `[VERIFY]` markers.
 
 ---
 
-**Stage 2 exit → Stage 3.** Write the journal to `$WS/interview-journal.json`
-(above), then read [`stage3.md`](stage3.md). Stage 3 opens with the
+**Interview exit → the fill.** Write the journal to `$WS/interview-journal.json`
+(above), then read [`stage3.md`](stage3.md). The fill opens with the
 argument-plan sub-step, which **you** author — see that file's "Who performs
 each sub-step" table before running any command.

@@ -60,7 +60,7 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/validate-proposal-payload.py <payload.json
 
 A non-zero exit means the payload is not presentable — fix the named field and
 re-validate. This gate is **engine-wide**: the gap interview, review arbitration,
-Stage-4 verification, and visual proposals all inherit it by referencing this
+verification, and visual proposals all inherit it by referencing this
 convention, with no restated wording.
 
 ## (f) Presented payloads are captured verbatim (Story 13.28)

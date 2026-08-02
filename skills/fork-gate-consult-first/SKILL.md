@@ -188,7 +188,7 @@ pass locally and fail on a fresh checkout) — it asserts the **in-repo** side i
 clean and that these three are documented here as the owner-side wiring.
 
 **In-repo exemptions — no policy/architecture/prior-decision fork table:**
-- **The gap interview** (`draft-article` Stage 2) — already applies consult-first
+- **The gap interview** (`draft-article`) — already applies consult-first
   natively (Story 14.4 policy-seeded tension items + the editorial anchor); its
   own consult path stands, not re-wrapped here.
 - **Review arbitration** (`review-article`) — presents the article's own review

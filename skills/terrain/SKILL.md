@@ -9,7 +9,7 @@ description: >
   Gloss rendering — navigate it
   in TWO SCREENS (the served-tag axis, then one member's complete material)
   plus free-form, and hand the owner's chosen direction to the existing
-  stage-0 --brief path as an ordinary brief-carrying run. The contract it
+  run mint's --brief path as an ordinary brief-carrying run. The contract it
   fronts is SPEC-terrain CAP-1/CAP-2/CAP-3 as amended through 2026-07-27
   (#799, #803, #844); this skill re-implements nothing.
 ---
@@ -108,7 +108,7 @@ step files cite them and restate nothing.
 | **Step 0 — mint the run workspace** (above; the storage contract) | — (in this file) | `resolve-paths.py new-run --terrain --root <host-repo>` |
 | **Step 1 — assemble the map** (what the map carries; the tag and decision-topic axes; the served journey arc and its typed absence) | [`steps/map.md`](steps/map.md) | `terrain_map.py assemble --root <host-repo> > "$WS/map.json"` |
 | **Step 2 — two screens** (Screen 1's axis payload; Screen 2's whole-member listing, group claim, journey markers and set selection; the Full Report over named group ids; navigation over held state; the size switch) | [`steps/screens.md`](steps/screens.md) | `topic-map-directions.py axis --map "$WS/map.json"` then `topic-map-directions.py member --map "$WS/map.json" --tag <member> --axis <tag\|topic>` |
-| **Step 3 — the brief, then a normal run** (brief composition; set recomposition; the coherence consultant's four rules; the named artifact and its lifecycle; the edit-set iteration loop and its retained compositions; the stage-0 handoff) | [`steps/brief.md`](steps/brief.md) | `topic-map-directions.py brief --payloads "$WS/presented-payloads.jsonl" --map "$WS/map.json" --out "$WS/brief.json"` |
+| **Step 3 — the brief, then a normal run** (brief composition; set recomposition; the coherence consultant's four rules; the named artifact and its lifecycle; the edit-set iteration loop and its retained compositions; the run mint's handoff) | [`steps/brief.md`](steps/brief.md) | `topic-map-directions.py brief --payloads "$WS/presented-payloads.jsonl" --map "$WS/map.json" --out "$WS/brief.json"` |
 | **Step 4 — the scope statement** (only when the brief carries `gaps`) | [`steps/gap.md`](steps/gap.md) | — (a relay; this step writes nothing anywhere) |
 
 **Step routing notes (the dispatcher's whole job):**
@@ -143,7 +143,7 @@ step files cite them and restate nothing.
   intent gate** — the closed label set, a reason and a nearest fit, payload
   captured — entered, never reimplemented, with a recommended intent grounded
   in the adopted thesis and sources asked with this run's evidence state
-  attached. The composed brief is wired into the existing stage-0 `--brief`
+  attached. The composed brief is wired into the existing run mint's `--brief`
   path from the artifact rather than retyped, and the run is an ordinary
   brief-carrying run: uniform in BEHAVIOUR, while the provenance record does
   distinguish the producers (#1050).

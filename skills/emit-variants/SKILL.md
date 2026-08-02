@@ -44,7 +44,7 @@ unmet (`cmd_variants`). State them; do not re-check them here:
 
 - the **persisted canonical** exists at `<output.drafts>/<slug>.md` — a
   run-workspace copy is refused, with `complete` named as the remedy;
-- the draft carries **zero `[VERIFY]` markers** (Stage 4 finished);
+- the draft carries **zero `[VERIFY]` markers** (verification finished);
 - the draft declares a resolved **`audience`** and **`audience_id`**.
 
 If one of these aborts the invocation, relay the error verbatim — it already

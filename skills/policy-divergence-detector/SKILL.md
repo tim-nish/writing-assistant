@@ -31,7 +31,7 @@ The pass runs **after** a run has recorded which served policy lines it
 
 - **`review:policy-consistency`** — after the policy-consistency review pass
   records the served lines it weighed.
-- **`interview:seeding`** — after Stage-2 interview seeding records which policy
+- **`interview:seeding`** — after gap-interview seeding records which policy
   lines seeded questions (the journal `consulted:` line).
 - **`session:consult-first`** — after an agent session's consult-first step
   records "which served lines you applied".

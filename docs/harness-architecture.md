@@ -7,6 +7,13 @@ SPEC-writing-assistant
 (article quality)" (blocker) and "design tension: quality gating vs.
 provenance-first drafting" (friction)
 
+> **Dated note added 2026-08-02 (Story 20.158, #1247).** The owner ruling of
+> 2026-08-02 prohibits numbered process labels on every owner-facing surface.
+> This record is a **dated decision, left unrewritten on purpose** — the same
+> reason its harvest vocabulary stands. Its numbered forms name the processes
+> this pipeline now calls `start`, `probe`, the gap interview, the fill,
+> verification and `complete`; nothing composed for the owner may use them.
+
 This document resolves the design tension recorded on 2026-07-11 and defines
 the mandatory article-quality harness the owner directed. It is a decision
 record, not a spec: per SPEC-writing-assistant's adopted-contract constraint,

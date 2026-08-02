@@ -46,7 +46,7 @@ A structure/prose finding that maps to one of these is **blocker-eligible**
 
 The four are **not extended** by the declared-convention criterion below: that
 criterion is a sibling of the rubric, never a fifth dimension. `rubric-version`
-in `quality-rubric.md` is unchanged, and EN drafts and the Stage 3→4 draft gate
+in `quality-rubric.md` is unchanged, and EN drafts and the fill→verify draft gate
 see no behavior change.
 
 ## Declared-convention conformance — derived canonicals only (Story 20.4, #800)

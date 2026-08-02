@@ -2,11 +2,11 @@
      SKILL.md dispatcher; carries the stage's full operating detail,
      moved verbatim from the pre-split SKILL.md. -->
 
-## Stage 3 — fill the framework (with `[VERIFY]` markers)
+## Fill — fill the framework (with `[VERIFY]` markers)
 
 Fill the chosen framework's slots from the interview answers, the brief's material, and **per-claim examinations** — harvest is retired and no fact sheet exists (#1182): a claim needing repository grounding gets one `examine.py` question at the read that produces its pin. Read [`examine.md`](examine.md) before grounding the first claim; every fact-sheet-entry reference below reads as the run's recorded examination pins (`$WS/examination-pins.txt`) plus interview answer ids. **Once the argument plan and the section intents exist, the claims needing repository grounding are enumerable and their examinations FAN OUT — read [`fan-out.md`](fan-out.md) for the scheduling contract (enumerate with ids, dispatch concurrently with `--defer-ledger`, derive the ledger once at the join), which also carries the judge sharding and the visual-set/judging concurrency. The TRIGGER is unchanged and only the schedule differs: every read is still triggered by a stated claim that exists before the read, enumeration is never widened to "claims we might need", and a claim emerging mid-fill stays inline (#1248, story 20.164).**
 
-**Who performs each sub-step.** Stage 3 is the one stage that interleaves
+**Who performs each sub-step.** The fill is the one process that interleaves
 authoring with validation, so read this before running anything: *you* write
 the prose sub-steps, and the commands only check what you wrote. A run that
 mistakes a validator for the generator waits for a draft no command will
@@ -23,7 +23,7 @@ produce.
 | visual-set plan | **you (LLM)**, ratified mechanically | propose the set; the ratification refuses a non-conforming plan — its machine-paced half runs BESIDE the judging ([`fan-out.md`](fan-out.md)) |
 | isolated provenance judge | **LLM, separate context** | grades positions independently of the author; **shardable** — one isolated subagent per shard, each returning its OWN attested file ([`fan-out.md`](fan-out.md)) |
 
-**Stage 3 opens with an argument-plan sub-step (CAP-1, #440/#434).** Before
+**The fill opens with an argument-plan sub-step (CAP-1, #440/#434).** Before
 filling any slot, compose an explicit **argument plan** from the fact sheet
 (including the narrative kinds — `chronology | motivation | cost | reversal`,
 #438) and the interview answers, and write it to the run workspace
@@ -129,8 +129,8 @@ disclosure. When the owner makes **no** choice the shipped default
 so `--expect-choice` is passed only when a choice was actually made.
 
 Whichever structure is chosen, record it in the argument plan (`arc`) and
-compose Stage 3 from it. **Generation still owns coherence:** the chosen
-structure must **pass the existing Stage 3→4 gate** (dim1 narrative arc; the
+compose the fill from it. **Generation still owns coherence:** the chosen
+structure must **pass the existing gate** on the way to verification (dim1 narrative arc; the
 #434 skeleton-variation rules), and review never reconstructs structure.
 
 Then fill **from the plan** — each section (or beat) realizes its intent,
@@ -142,10 +142,9 @@ the completion summary names the thesis and arc the draft was composed from
 (CAP-2), and at completion the plan-record `plans/<slug>.md` projects them from
 this finalized plan (SPEC-article-plan, unchanged). A section whose intent is
 under-evidenced (its named entries are thin) is visible **here, before fill**;
-the Stage 3→4 gate fails a slot that ships as a single under-evidenced sentence.
+the fill→verify gate fails a slot that ships as a single under-evidenced sentence.
 
-**Per-section progress recording (Story 13.84, #388).** Stage 3 is a long
-stage: an evidence-heavy fill can exceed one invocation's budget by itself, so
+**Per-section progress recording (Story 13.84, #388).** The fill is long: an evidence-heavy fill can exceed one invocation's budget by itself, so
 it persists per section, in framework slot order, using the same sub-stage
 mechanism as harvest (Story 13.83). The unit is **the section plus its
 provenance** — after drafting each section: (1) append the section's prose to
@@ -180,7 +179,7 @@ contract decides the consequence**:
 - **defer** → leave the slot for a later pass, unfilled but not blocking;
 - **accept-later** → adopt the source-grounded recommended answer now, without
   further owner confirmation;
-- **verify** → fill from inference and mark the claim `[VERIFY]` for Stage 4;
+- **verify** → fill from inference and mark the claim `[VERIFY]` for verification;
 - **blocker** → raise a publish blocker (every GATE slot's skip effect) — a GATE
   is never silently dropped.
 
@@ -261,7 +260,7 @@ for a genuine owner-opinion paragraph**; a paragraph that mixes owner opinion
 with checkable claims stays per-sentence (`P<n>.S<n>`), each claim classed on
 its own.
 
-**The sidecar provenance map.** Stage 3 maintains a **sidecar provenance map**
+**The sidecar provenance map.** The fill maintains a **sidecar provenance map**
 in the run workspace, appended per section as the fill progresses (Story
 13.84 above; never inline — the draft body stays clean for variants and
 review), one line per sentence keyed by paragraph/sentence position.
@@ -277,7 +276,7 @@ After any draft edit, re-run it and re-emit the map's positions/anchors from
 the new skeleton — a hand-renumbered map fails the structural validation's
 skeleton-conformance check. The judge worklists print each position's **full
 reconstructed sentence** from this same segmentation, and the echo check
-compares the judge's quote against it byte-for-byte. When Stage 3 completes,
+compares the judge's quote against it byte-for-byte. When the fill completes,
 the full map is validated as below:
 
 ```
@@ -413,14 +412,14 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/verify-provenance.py --map "$WS/provenance
 ```
 
 The marker format is **exactly `[VERIFY: <reason>]`** (uppercase, colon-space,
-non-empty reason) so Stage 4 and the lint (Story 5.1) can find every one. Check
+non-empty reason) so verification and the lint (Story 5.1) can find every one. Check
 the filled draft with:
 
 ```
 python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py verify-markers <draft>
 ```
 
-Malformed markers fail; Stage 4 then resolves each `[VERIFY]` until
+Malformed markers fail; verification then resolves each `[VERIFY]` until
 `verify-markers --count` reports zero.
 
 ### Visual-set plan (SPEC-article-visuals CAP-2a, Story 13.58)
@@ -542,7 +541,7 @@ residue (unchanged decline semantics).
   "omit the visual; the slot
   leaves no `[Figure: …]` residue".
 
-**On approval, stage 3 inserts the workspace file's content exactly as
+**On approval, the fill inserts the workspace file's content exactly as
 written** — the sketch is presentation-only and is never re-derived into the
 draft; what the owner approved (the file at the shown path) is what lands.
 Visual-proposal payloads pass the contract-(e) validator **without
@@ -599,11 +598,11 @@ owner's tooling. The plugin bundles no such tools.
 
 ---
 
-**Stage 3 exit → the quality gate.** Read [`gate.md`](gate.md) and run:
+**Fill exit → the quality gate.** Read [`gate.md`](gate.md) and run:
 
 ```
 python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py quality-gate --draft … --map … --judge …
 ```
 
-Stage 3 does not complete until that gate passes — it is a stage-progression
+The fill does not complete until that gate passes — it is a stage-progression
 precondition, not an advisory review.

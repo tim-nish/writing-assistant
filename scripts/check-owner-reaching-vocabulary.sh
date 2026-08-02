@@ -1,6 +1,7 @@
 #!/bin/sh
 # check-owner-reaching-vocabulary.sh — no OWNER-REACHING surface carries
-# harvest vocabulary (Story 20.149, #1220).
+# harvest vocabulary (Story 20.149, #1220) or a NUMBERED PROCESS LABEL
+# (Story 20.158, #1247).
 #
 # tier: inner
 # covers: scripts/draft_gates.py scripts/owner_surface.py
@@ -84,6 +85,19 @@ dg = load("draft_gates", os.path.join("scripts", "draft_gates.py"))
 # prohibits.
 TERMS = ("harvest", "fact sheet", "fact-sheet")
 
+# THE SECOND BOUND CLASS (Story 20.158, #1247), and it RIDES HERE rather than
+# founding a family. Owner ruling 2026-08-02: *"I prohibit the expression
+# 'Stage N.' … By attaching a number, the system abandons its responsibility to
+# explain which process the Human Gate belongs to."* The remedy is at the
+# SOURCE — `draft_gates` declares process names (`terrain`/`start`/`probe`/
+# `interview`/`fill`) and the composition sources carry no numbers — so this is
+# the DETECT half of the same constrain->detect order, asserted over the same
+# emitted surface and by the same three-valued rule. It is not a per-word
+# checker: one pattern over an already-enumerated field set, in a file that
+# already exists, is what the amendment's "detection rides the existing
+# owner-surface check" names.
+NUMBERED = re.compile(r"stage\s*[-_]?\s*\d", re.I)
+
 # The presented fields of a payload item, per `draft_gates.payload`. Named
 # rather than walked, so a new field is a deliberate addition here instead of
 # silently inheriting coverage it was never checked for.
@@ -133,7 +147,7 @@ def gate_id(fn):
     src = inspect.getsource(fn)
     m = re.search(r"gate=[\"']([a-z0-9-]+)[\"']", src)
     return m.group(1) if m else None
-checked, undetermined, hits = [], [], []
+checked, undetermined, hits, numbered = [], [], [], []
 for name in sorted(builders):
     payload, why = call(builders[name])
     if payload is None:
@@ -147,6 +161,10 @@ for name in sorted(builders):
             for t in TERMS:
                 if t in low:
                     hits.append((gid, field, t, " ".join(str(value).split())))
+            m = NUMBERED.search(str(value))
+            if m:
+                numbered.append((gid, field, m.group(0),
+                                 " ".join(str(value).split())))
 
 # Declared gates with no builder reachable from here.
 built = {gate_id(fn) for fn in builders.values()} - {None}
@@ -163,11 +181,25 @@ try:
         for t in TERMS:
             if t in low:
                 hits.append(("owner_surface.BUCKETS", str(b), t, str(b)))
+        m = NUMBERED.search(str(b))
+        if m:
+            numbered.append(("owner_surface.BUCKETS", str(b), m.group(0),
+                             str(b)))
+    # The gate registry's `stage` value is the process name the payload
+    # carries into `where`/inventory rendering, so it is owner-reaching by the
+    # same TYPE argument the header states.
+    for gate, meta in dg.GATES.items():
+        v = str(meta.get("stage", ""))
+        m = NUMBERED.search(v)
+        if m:
+            numbered.append((gate, "GATES.stage", m.group(0), v))
+    checked.append("draft_gates.GATES[*].stage")
     checked.append("owner_surface.BUCKETS")
 except Exception as e:
     undetermined.append(("owner_surface", f"{type(e).__name__}: {e}"))
 
 json.dump({"checked": sorted(set(checked)), "hits": hits,
+           "numbered": numbered,
            "undetermined": [list(u) for u in undetermined]}, sys.stdout)
 PY
 )
@@ -187,6 +219,20 @@ for gate, field, term, value in json.load(sys.stdin)["hits"]:
       is not running"
 else
   ok "no owner-reaching surface carries harvest vocabulary ($CHECKED surface(s) checked)"
+fi
+
+NNUM=$(printf '%s' "$OUT" | python3 -c 'import json,sys; print(len(json.load(sys.stdin)["numbered"]))')
+if [ "$NNUM" -ne 0 ]; then
+  printf '%s' "$OUT" | python3 -c '
+import json,sys
+for gate, field, form, value in json.load(sys.stdin)["numbered"]:
+    print("  %s %s carries %r: %s" % (gate, field, form, value[:160]), file=sys.stderr)
+'
+  err "an owner-reaching surface carries a NUMBERED process label (see above) —
+      the owner cannot tell brief creation from draft creation from a number,
+      so name the process (terrain/start/probe/interview/fill)"
+else
+  ok "no owner-reaching surface carries a numbered process label"
 fi
 
 # CANNOT-DETERMINE is printed, never counted as a pass and never a failure.

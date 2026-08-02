@@ -16,7 +16,7 @@
 # policy-seeded plan) returns {blocked: false, reason: "generic-mode"}; the
 # blocked payload carries the block checkpoint
 # {"stage": "policy-block", "next_stage": "interview"} (never `fill`); and the
-# SKILL wires the gate at the Stage 2→3 boundary with the publish-blockers
+# SKILL wires the gate at the interview->fill boundary with the publish-blockers
 # bucket and the generic-mode exemption.
 
 set -eu
@@ -247,10 +247,10 @@ python3 "$PIPE" policy-block-check --classification "$work/clean-classified.json
 # --- (f) SKILL wiring ------------------------------------------------------------
 grep -q 'policy-block-check' "$SKILL" \
   && ok "SKILL runs policy-block-check" || err "SKILL missing policy-block-check"
-awk '/### Stage 2→3 policy-block gate/,/^## Stage 3/' "$SKILL" \
+awk '/### Interview→fill policy-block gate/,/^## /' "$SKILL" \
   | grep -q 'policy-block-check' \
-  && ok "SKILL wires the block at the Stage 2→3 boundary (before any Stage 3 fill)" \
-  || err "SKILL block not at the Stage 2→3 boundary"
+  && ok "SKILL wires the block at the interview->fill boundary (before any fill)" \
+  || err "SKILL block not at the interview->fill boundary"
 grep -q '"stage": "policy-block", "next_stage": "interview"' "$SKILL" \
   && ok "SKILL states the block checkpoint payload (resume at the block, next_stage: interview)" \
   || err "SKILL missing the block checkpoint payload"

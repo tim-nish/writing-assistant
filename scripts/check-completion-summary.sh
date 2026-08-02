@@ -71,12 +71,13 @@ grep -qi 'fall through to prose' "$CONV" \
   && ok "next step: the non-member fallback is named and refused" \
   || err "convention does not state the non-member fallback — an enumeration's load-bearing half"
 # THE UNNAMED RUN KIND IS THE ONE EXERCISED: a terrain sitting ending at a
-# staged stage-0 run, with its declared builder named rather than described.
-grep -qi 'staged stage-0 run' "$CONV" \
-  && ok "next step: the staged stage-0 case is present as a worked example" \
-  || err "convention omits the staged stage-0 run — the case that fell through in #1176"
+# staged, unstarted run, with its declared builder named rather than described.
+# (The run is named by its PROCESS, never by a number — #1247.)
+grep -qi 'staged, unstarted run' "$CONV" \
+  && ok "next step: the staged, unstarted case is present as a worked example" \
+  || err "convention omits the staged, unstarted run — the case that fell through in #1176"
 grep -q 'probe_entry_gate' "$CONV" \
-  && ok "next step: the staged stage-0 case NAMES its builder rather than describing a shape" \
+  && ok "next step: the staged, unstarted case NAMES its builder rather than describing a shape" \
   || err "convention describes the probe-entry choice without naming probe_entry_gate"
 # THE ROUTING HALF (AC6): a composed artifact is POINTED AT, never restated —
 # that is what shrinks the free-form surface the detect layer cannot police.

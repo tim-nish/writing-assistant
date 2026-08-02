@@ -8,6 +8,13 @@ are tracked separately and are not applied here.
 Each run is a dated section. Newest at the top. Issues carry a rough severity
 (`friction` / `papercut` / `blocker`) so they can be triaged later.
 
+> **Dated note added 2026-08-02 (Story 20.158, #1247).** The owner ruling of
+> 2026-08-02 prohibits numbered process labels on every owner-facing surface.
+> This record is a **dated decision, left unrewritten on purpose** — the same
+> reason its harvest vocabulary stands. Its numbered forms name the processes
+> this pipeline now calls `start`, `probe`, the gap interview, the fill,
+> verification and `complete`; nothing composed for the owner may use them.
+
 ---
 
 ## 2026-07-26 — Plan-schema sufficiency: cold-session reconstruction from the plan alone (#727)

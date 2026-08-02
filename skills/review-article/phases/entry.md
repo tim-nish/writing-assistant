@@ -2,7 +2,7 @@
 
 Companion of [`SKILL.md`](../SKILL.md) (the dispatcher). Read on entry to the
 **entry phase**: invocation forms, the draft picker, the starter template,
-proposal conventions, footprint, the pre-review checkpoint, and stage-0
+proposal conventions, footprint, the pre-review checkpoint, and the
 configuration validation.
 
 Take a framework-complete draft from "review requested" to "publishable" with a
@@ -176,7 +176,7 @@ the host tree:
 cp <output.drafts>/<slug>.md "$WS/pre-arbitration-<slug>.md"
 ```
 
-## Stage 0 — configuration validation
+## Configuration validation
 
 Before any review pass, validate the resolved configuration (CAP-5):
 

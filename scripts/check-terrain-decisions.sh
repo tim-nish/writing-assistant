@@ -170,7 +170,8 @@ check("nothing downstream can tell the two apart" not in B,
       "AC6: the unscoped clause is gone, not merely qualified nearby")
 
 # AC7 — entry-agnosticism, and the direction is the reason.
-check("terrain → the gate → stage 0" in end,
+# Named by PROCESS, never by a number (#1247): the run mint is `start`.
+check("terrain → the gate → the run mint" in end,
       "AC7: the coupling direction is stated")
 check("nothing in drafting branches on which producer ran" in end,
       "AC7: drafting gains no knowledge of terrain")
