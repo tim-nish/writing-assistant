@@ -2134,33 +2134,31 @@ MANDATED_RATIONALES = ("policy-reconciliation", "depth-offer", "audience-declara
 # so it joins the depth offer in the trailing group and this tuple is UNCHANGED (20.172, #1283).
 BLOCKING_MANDATED = ("policy-reconciliation",)
 
-# CAP-8's "offer it once" obligation, made MECHANICAL (Story 18.42, #542).
-# The depth offer was only ever a prompt instruction in the SKILL, so any path
-# that skipped the prompt lost it silently — run 20260722T095152 re-entered via
-# the scope-ratification screen and never presented it, defaulting the depth in
-# exactly the way the depth-over-count policy forbids ("owner intent, never a
-# tool default"). Generating it from run state instead means no invocation path
-# can omit it, and the mandated tier keeps the <=5 cap from displacing it.
+# CAP-8's "offer it once" obligation, made MECHANICAL (Story 18.42, #542): as a prompt
+# instruction it was lost by any path that skipped the prompt — run 20260722T095152
+# re-entered via the scope-ratification screen and defaulted the depth without ever
+# asking, exactly what "owner intent, never a tool default" forbids. Generated from run
+# state no path can omit it, and the mandated tier keeps the <=5 cap off it. AND IT NAMES
+# THE AXIS ITS ANSWER MOVES (Story 20.169, #1285): it read "How deep should this go — a
+# quick note, a standard piece, or a deep-dive?", a REGISTER axis CAP-8 does not control,
+# and run 20260802T185710-622820 read it as licence to leave repo-internal terms
+# unexplained. Terminology is the rubric's depth-blind Dimension 3; the directive moves
+# SCOPE, so the WORDS changed here and the semantics did not (UX defines correctness).
 DEPTH_OFFER_ID = "depth"
-DEPTH_OFFER_TEXT = ("How deep should this go — a quick note, a standard piece, "
-                    "or a deep-dive? Or name a scope in one line.")
+DEPTH_OFFER_TEXT = ("How much of the material should this article carry — all of it in one "
+                    "fuller article (deep-dive), the main part of it (standard), or a single "
+                    "point only (note)? That is scope, not reading level: repo-internal terms "
+                    "are explained at first use either way. Or name a scope in one line.")
+DEPTH_SPLIT_HINT_N = 3   # above this, the offer also asks CAP-8's split question
+_state_holders = lambda state: _load("depth_offer.py").holders(state)  # noqa: E731
+_depth_offer_text = lambda state: _load("depth_offer.py").offer_text(  # noqa: E731
+    state, DEPTH_OFFER_TEXT, DEPTH_SPLIT_HINT_N)
 
 
 def _state_depth(state):
-    """The run's depth/scope directive, or None. Accepts both shapes a state may
-    carry it in: top-level `depth` (stage-0 run state) and a nested
-    `run_state.depth` (a consume/interview state that folded the run state in),
-    so the offer is never re-presented merely because the directive travelled
-    under a different key."""
-    if not isinstance(state, dict):
-        return None
-    d = state.get("depth")
-    if d:
-        return d
-    rs = state.get("run_state")
-    if isinstance(rs, dict) and rs.get("depth"):
-        return rs["depth"]
-    return None
+    """The run's depth/scope directive, or None — from either holder, so the offer
+    is never re-presented merely because it travelled under a different key."""
+    return next((h["depth"] for h in _state_holders(state) if h.get("depth")), None)
 
 
 def cmd_interview(args):
@@ -2319,7 +2317,8 @@ def cmd_interview(args):
     depth_directive = _state_depth(state)
     if not depth_directive and not any(r.get("rationale") == "depth-offer"
                                        for r in mandated):
-        mandated.append({"id": DEPTH_OFFER_ID, "text": DEPTH_OFFER_TEXT,
+        # 20.169: wording composed from run state; generation/tier/cap untouched.
+        mandated.append({"id": DEPTH_OFFER_ID, "text": _depth_offer_text(state),
                          "topic": "other", "outcome": "open",
                          "rationale": "depth-offer"})
 

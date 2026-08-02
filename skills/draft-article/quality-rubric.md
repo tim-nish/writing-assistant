@@ -68,6 +68,15 @@ vocabulary**, not open-ended judgment: the drafting side and the gate apply the
 same written rule below, and a verdict carries the **complete** violation set —
 never one violation per pass.
 
+**This obligation is depth-blind (Story 20.169, #1285).** The CAP-8 depth/scope
+directive moves how much material an article carries; it is **not** a register or
+difficulty setting and **never** relaxes this dimension. A run that answered
+`deep-dive` owes exactly the same introduction at first load-bearing use as one
+that answered `note` — the audience the hook slot names is the only calibration
+input. (The depth ask was reworded to say so, because a run read "how deep should
+this go" as permission to leave repo-internal terms unexplained; the permission
+never existed, here or anywhere.)
+
 - **Operational check — term-introduced-at-or-before-first-use:** for each
   registered term, find its first load-bearing use; an introduction (below) must
   stand at or before it. A term used load-bearingly with no introduction is a

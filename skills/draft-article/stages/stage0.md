@@ -289,10 +289,13 @@ past the writing-sources-declared files.
 
 ### Depth/scope directive (CAP-8, #432)
 
-Article depth is **owner intent, never a tool default**. If the owner's
-invocation names a depth or scope — a level (`deep-dive` | `standard` | `note`)
-or a one-line scope statement ("just the retry bug, deeply") — pass it to
-the run mint so the run records it:
+Article depth is **owner intent, never a tool default**, and the axis it moves is
+**scope, not register** (Story 20.169, #1285): how much material the article carries,
+never how technical the prose may be. **Repo-internal terms are introduced at first
+load-bearing use whatever depth is answered** — the rubric's Dimension 3 obligation
+([`../quality-rubric.md`](../quality-rubric.md)), mechanical and depth-blind. If the owner's invocation names a
+depth or scope — a level (`deep-dive` | `standard` | `note`) or a one-line scope
+statement ("just the retry bug, deeply") — pass it to the run mint so it is recorded:
 
 ```
 python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py stage0 <framework> <sources...> --depth "<level or scope>" --root <host-repo>
@@ -304,35 +307,33 @@ the owner gave **no** directive, do not invent one — the offer is presented
 the answer is recorded; absent an answer, the run proceeds exactly as before.
 
 **The offer is generated mechanically, not left to this prompt (Story 18.42,
-#542).** It was previously only an instruction here, so any path that skipped
-the prompt lost it silently — run 20260722T095152 re-entered via the
-scope-ratification screen and defaulted the depth without ever asking, exactly
-what "owner intent, never a tool default" forbids. `interview` now emits the
-offer itself whenever run state carries no directive, as a **mandated-tier**
-item (so the ≤5 cap cannot displace it), and reports the accounting:
+#542).** As a prompt instruction it was silently lost by any path that skipped the
+prompt — run 20260722T095152 re-entered via the scope-ratification screen and
+defaulted the depth without ever asking. `interview` now emits it from run state
+as a **mandated-tier** item (the ≤5 cap cannot displace it) and reports:
 
 - `depth_offer: "presented"` — no directive, the offer was made;
 - `depth_offer: "directive-present"` — a `--depth` directive (or a prior
   invocation's recorded answer) exists, so it is **not** re-asked.
 
-This holds on **every fresh or re-opened/narrowed run** — re-entry regenerates
-it from state, so there is no path that silently defaults. The offer **trails**
-the capped questions so the claim/angle question keeps presentation slot 1.
-Before reporting completion, assert the accounting:
+This holds on **every fresh or re-opened/narrowed run** — re-entry regenerates it
+from state, so no path silently defaults; its **options are composed from that same
+state**, the brief's thesis and the selected-element count, degrading to generic
+wording when neither is recorded (20.169). The offer **trails** the capped questions
+so the claim/angle question keeps presentation slot 1. Assert the accounting before
+reporting completion:
 
 ```
 python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py depth-check --interview "$WS/interview.json"
 ```
 
-Exit 0 means the run either carried a directive or was offered the choice.
-Exit 1 means neither — **disclose the applied default in the completion
-summary's informational notes** rather than shipping a silent default.
+Exit 0: the run carried a directive or was offered the choice. Exit 1: neither —
+**disclose the applied default in the completion summary's informational notes**.
 
-**Reading-time bands as the depth-choice unit (CAP-8 clause, Story 18.27,
-#506).** The run-mint / gap-interview depth question **may** present **suggested
-reading-time bands** derived from the selected elements — `~3 min note / ~7 min
-standard / ~15 min deep-dive` — **plus a custom value** the owner can type when
-no band fits. Get the bands (scaled by the selected-element count) from:
+**Reading-time bands as the depth-choice unit (CAP-8 clause, Story 18.27, #506).**
+The depth question **may** present **suggested reading-time bands** derived from the
+selected elements — `~3 min note / ~7 min standard / ~15 min deep-dive` — **plus a
+custom value** when no band fits. Get the bands (scaled by element count) from:
 
 ```
 python3 ${CLAUDE_PLUGIN_ROOT}/scripts/reading-time.py --bands --elements <selected-element-count>
@@ -340,25 +341,24 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/reading-time.py --bands --elements <select
 
 The owner's pick is **recorded AS the depth directive** — each band maps to a
 level (`{"level": "deep-dive"}`), captured exactly like a `--depth` answer —
-and is **never a reading-time target**. Reading-time is only the *unit in which
-the owner expresses* the depth choice; fill still elaborates by depth semantics
-(above), the reading-time estimate stays **informational** (CAP-6), and
-**nothing auto-splits or auto-trims** to hit the number. A large miss between
-the chosen band and the finished estimate surfaces as an **informational FYI**
-(pass the chosen band to the estimator, `reading-time.py … --band-minutes <N>`;
-the owner decides), never an automatic cut. With **no directive** at all, the
-run is **byte-for-byte the behavior before CAP-8** — the bands are an optional
+and is **never a reading-time target**: reading-time is only the *unit in which the
+owner expresses* the choice, fill still elaborates by depth semantics (above), the
+estimate stays **informational** (CAP-6), and **nothing auto-splits or auto-trims**
+to hit the number. A large miss surfaces as an **informational FYI** (`reading-time.py
+… --band-minutes <N>`; the owner decides), never an automatic cut. A band is
+**presented in the same scope wording as the ask above** — it names how much material
+the article carries, never its reading level (20.169). With **no directive** at all,
+the run is **byte-for-byte the behavior before CAP-8** — the bands are an optional
 way to *ask*, never a new gate.
 
 **At the fill, generation consumes the directive** (`state.depth`): it governs **how
-much each slot elaborates and how many story elements the draft carries** — not
-a word count or reading-time target. A **deep-dive** keeps material a
-framework's split hint (e.g. F2's ">3 lessons") would otherwise cut in **one**
-article; a **note** stays tight. When a framework's count/length split hint
-would fire, surface it as an **owner choice** ("~N lessons — one deep-dive, or
-split?"), **never an automatic split** (the hint is a declinable suggestion per
-CAP-8). With **no directive**, fill behaves exactly as before, and the
-reading-time estimate stays informational — it drives no split.
+much each slot elaborates and how many story elements the draft carries** — not a
+word count, a reading-time target, or any licence over vocabulary. A **deep-dive**
+keeps material a framework's split hint (e.g. F2's ">3 lessons") would otherwise cut
+in **one** article; a **note** stays tight. When a count/length split hint would fire,
+surface it as an **owner choice** ("~N lessons — one deep-dive, or split?"), **never
+an automatic split** (a declinable suggestion per CAP-8). With **no directive**, fill
+behaves exactly as before, and the reading-time estimate drives no split.
 
 ### Owner coverage brief (CAP-9-aligned, Story 18.24, #505)
 
