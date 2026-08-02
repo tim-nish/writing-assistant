@@ -77,28 +77,15 @@ output:
 # This is a PRESENCE TOGGLE only (#366): the assistant holds no filesystem
 # path to your policy hub — all policy content is served by the
 # tsurezure-gateway MCP server, whose own operator config owns the hub
-# location. The read stays bounded IN CODE to GLOSSARY.md, LESSONS.md, and at
-# most 2 topics/*.md files — never the hub's history archive, never a write —
-# and every run pins the served commit. An unreachable gateway is not a
-# config error: the interview logs one line and degrades to generic questions.
-# Which topics/*.md files an article reads is chosen PER ARTICLE at draft time
-# (draft-article Stage 2 proposes <=2 and the owner approves) — it is not
-# config. The former path key was retired (Story 13.73) and the track / topics
-# keys were removed (Story 13.36); a leftover key is reported as a named
-# configuration error with a migration notice.
+# location. GLOSSARY.md and LESSONS.md stay code-whitelisted; a read that
+# needs your recorded positions beyond them is a QUERY bounded by the claim
+# it tests (`read-policy-source.py query --claim`, Story 20.160/#1246) —
+# nothing pre-picks topic files, and the gateway's grant table remains the
+# permission boundary. Every run pins the served commit. An unreachable
+# gateway is not a config error: the interview logs one line and degrades to
+# generic questions.
+# The former path key was retired (Story 13.73); the track / topics keys and
+# the #525 track_topics mapping were removed outright (Story 20.161 — no
+# per-repo topic selection exists any more; a leftover line is simply unread).
 # policy_source:
 #   enabled: true                        # presence toggle — no path; the gateway owns the hub location
-#   # Optional (#525): seed the per-article topic proposal from a track→topic
-#   # mapping. Articles-repo TRACK name (the backlog item's `track:` frontmatter,
-#   # which the articles repo OWNS) → hub TOPIC name(s). When a draft's backlog
-#   # item carries a mapped track, its topics become the default recommendation
-#   # for the ≤2-topic proposal (draft-article Stage 2); the owner still
-#   # approves/overrides. Absent = intent-driven proposal, exactly as before.
-#   # Declared precedence: hub topic files are authoritative — a mapped topic
-#   # that names no hub topic file is a config defect (topic-existence lint); a
-#   # track absent from all backlog `track:` values is a stale-mapping warning.
-#   track_topics:
-#     kagamios-lessons: kagamios
-#     eval-engineering: benchmark-engineering
-#     signature-research: signature-research
-#     claude-code-ops: claude-code-ops

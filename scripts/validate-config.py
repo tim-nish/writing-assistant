@@ -38,7 +38,6 @@ import sys
 HERE = os.path.dirname(os.path.realpath(__file__))
 USER_RES = os.path.join(HERE, "resolve-user-config.py")
 SRC_RES = os.path.join(HERE, "resolve-writing-sources.py")
-RDR_RES = os.path.join(HERE, "read-policy-source.py")
 PROFILE_RES = os.path.join(HERE, "resolve-platform-profiles.py")
 EXAMPLE = os.path.realpath(os.path.join(HERE, "..", "config", "user-config.example.yaml"))
 SOURCES_EXAMPLE = os.path.realpath(os.path.join(HERE, "..", "config", "writing-sources.example.yaml"))
@@ -207,75 +206,9 @@ def validate_writing_sources(args, findings):
                          f"as a starting point."))
 
 
-def _hub_topic_names(args):
-    """The served hub topic enumeration via read-policy-source.py `list-topics`
-    (SPEC-policy-source-seam CAP-1 existence lint, #525). Returns a set of topic
-    identifiers on a successful enumeration, or None when the gateway cannot
-    enumerate — unreachable (exit 11), a too-old surface (exit 13), or an unset
-    toggle (exit 10). A None means CANNOT VERIFY, so the existence lint degrades
-    gracefully (an unreachable gateway is never a config error, CAP-6); only a
-    successful enumeration that omits a mapped topic is a defect."""
-    cmd = [sys.executable, RDR_RES]
-    if args.root:
-        cmd += ["--root", args.root]
-    cmd += ["list-topics"]
-    p = subprocess.run(cmd, capture_output=True, text=True)
-    if p.returncode != 0:
-        return None
-    return {ln.strip() for ln in p.stdout.splitlines() if ln.strip()}
-
-
-def _articles_backlog_tracks(args):
-    """The set of `track:` frontmatter values across the articles-repo backlog
-    (the articles repo is the API — no new upstream schema artifact, #525).
-    Reached via the declared `output.drafts` location: the articles repo is the
-    directory tree that owns it, identified by a `backlog/` subdir (the same
-    articles-repo marker write-article-plan.py uses). Returns the set, or None
-    when the backlog is not reachable (no declared drafts, or no backlog dir on
-    the way up) — a None means CANNOT VERIFY, so the stale check degrades
-    silently and never crashes."""
-    cmd = [sys.executable, SRC_RES]
-    if args.root:
-        cmd += ["--root", args.root]
-    cmd += ["draft-location"]
-    p = subprocess.run(cmd, capture_output=True, text=True)
-    if p.returncode != 0 or not p.stdout.strip():
-        return None
-    d = p.stdout.strip()
-    backlog = None
-    for _ in range(8):  # walk up from the drafts dir to the articles-repo root
-        cand = os.path.join(d, "backlog")
-        if os.path.isdir(cand):
-            backlog = cand
-            break
-        parent = os.path.dirname(d)
-        if parent == d:
-            break
-        d = parent
-    if backlog is None:
-        return None
-    tracks = set()
-    try:
-        names = os.listdir(backlog)
-    except OSError:  # pragma: no cover - defensive
-        return None
-    for name in names:
-        if not name.endswith(".md"):
-            continue
-        try:
-            with open(os.path.join(backlog, name), encoding="utf-8") as fh:
-                lines = fh.read().split("\n")
-        except OSError:  # pragma: no cover - defensive
-            continue
-        if not lines or lines[0].strip() != "---":
-            continue
-        for ln in lines[1:]:
-            if ln.strip() == "---":
-                break
-            m = re.match(r"^track:\s*(.+?)\s*$", ln)
-            if m:
-                tracks.add(m.group(1).strip().strip('"').strip("'"))
-    return tracks
+# `_hub_topic_names()` and `_articles_backlog_tracks()` were REMOVED (Story
+# 20.161, #1246) with the `track_topics` mapping whose existence lint and
+# stale-mapping warning were their only consumers (#525).
 
 
 # `validate_journey()` was REMOVED (Story 20.134, #1183) with the `journey:`
@@ -292,14 +225,9 @@ def validate_policy_source(args, findings, notices):
     is deliberately NOT a config error — usability is checked at read time
     and degrades the interview instead (SPEC-policy-source-seam CAP-6).
 
-    For an optional `track_topics` mapping (#525) on a well-formed block: (1) a
-    mapped topic that names NO hub topic file (the served topic enumeration
-    omits it) is a stage-0 configuration DEFECT — the topic-existence lint,
-    same shape as the variant-profile target-directory existence check; the
-    lint degrades gracefully when the gateway cannot enumerate. (2) a mapping
-    TRACK absent from every articles-repo backlog `track:` value is a WARNING
-    (stale mapping) relayed through the non-blocking `notices` channel —
-    validation still passes."""
+    The `track_topics` topic-existence lint and stale-mapping warning (#525,
+    Story 18.33) were REMOVED with the mapping itself (Story 20.161, #1246):
+    there is no key left to lint."""
     cmd = [sys.executable, SRC_RES]
     if args.root:
         cmd += ["--root", args.root]
@@ -312,46 +240,6 @@ def validate_policy_source(args, findings, notices):
                 findings.append((m.group(1), m.group(2), m.group(3)))
             else:  # pragma: no cover - defensive
                 findings.append((SOURCES_FILE, "policy_source", line))
-        return
-    if p.returncode != 0:
-        return
-    try:
-        block = json.loads(p.stdout)
-    except json.JSONDecodeError:  # pragma: no cover - defensive
-        return
-    mapping = block.get("track_topics")
-    if not mapping:
-        return
-
-    # (1) Topic-existence lint — a mapped topic absent from the served hub
-    # enumeration is a defect (the hub is authoritative). Degrades when the
-    # gateway cannot enumerate (None → cannot verify → skip).
-    hub_topics = _hub_topic_names(args)
-    if hub_topics is not None:
-        for track, topics in mapping.items():
-            for topic in topics:
-                if topic not in hub_topics:
-                    findings.append((SOURCES_FILE,
-                                     f"policy_source.track_topics.{track}",
-                                     f"maps to hub topic '{topic}', which is absent "
-                                     "from the served hub topic enumeration (names no "
-                                     "hub topic file); hub topic files are "
-                                     "authoritative — the consumer mapping is the "
-                                     "defect. Fix: correct the topic name or remove "
-                                     "the mapping entry."))
-
-    # (2) Stale-mapping WARNING — a mapping track absent from every articles-repo
-    # backlog `track:` value (a rename or typo). Non-blocking; degrades silently
-    # when the backlog is not reachable.
-    backlog_tracks = _articles_backlog_tracks(args)
-    if backlog_tracks is not None:
-        for track in mapping:
-            if track not in backlog_tracks:
-                notices.append(
-                    f"stale mapping: policy_source.track_topics track '{track}' is "
-                    "absent from every articles-repo backlog `track:` value — a "
-                    "rename or a typo? (warning, not an error; validation still "
-                    "passes)")
 
 
 def _walk_strings(obj, prefix=""):

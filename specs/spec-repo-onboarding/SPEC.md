@@ -50,6 +50,20 @@ transcript and folded into Constraints below.
 > retirement, and deliberately not fixed there: amending a spec is a spec-lane
 > act, and a story implements a decision rather than making one.
 
+> **Amended 2026-08-02 (story 20.161, executing SPEC-policy-topic-at-draft
+> CAP-3/CAP-5 as amended 2026-08-02, #1246) — the #525 `track_topics` mapping
+> writer above is RETIRED with the mapping it wrote.** The 2026-07-21 (#525)
+> clause gave CAP-2's `set-policy-source` a `--track-topics` mapping writer
+> whose sole downstream consumer was the per-article ≤2-topic proposal; that
+> proposal retired with the policy-topic ask (#1246), and CAP-3's removal
+> condition — no owned repo config still carrying the keys — was checked at
+> delivery and holds. `set-policy-source` now writes the presence toggle only
+> (`--disable` unchanged); the `track`/`topics` config keys, their validation
+> and the `track_topics` mapping are gone from the parser entirely (a leftover
+> line is unread, per no-single-use-tooling — no permanent dead compat path).
+> The 2026-07-15 (#230) amendment above already recorded the value-flag
+> removal; this amendment retires the mapping writer that replaced them.
+
 ## Problem
 
 Preparing a repository for the article pipeline today requires manual YAML

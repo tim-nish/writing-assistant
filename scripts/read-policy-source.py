@@ -14,13 +14,16 @@ never runs `git -C <hub>`. The gateway resolves the hub from its own operator
 config; the pin and every citation are passed through from gateway payloads
 verbatim.
 
-The read scope is unchanged and still code-bounded:
+The read scope is code-bounded:
 
   * `GLOSSARY.md` and `LESSONS.md`, always (whitelist);
-  * at most 2 `topics/*.md` — the per-run `read --topics` selection the owner
-    approved in draft-article Stage 2 (Story 13.35);
   * everything else is structurally unreadable — and now also unservable: the
     gateway's grant table enforces the same boundary on its side.
+  * The per-run `read --topics` whitelist-building input (Story 13.35) was
+    REMOVED by Story 20.161 (SPEC-policy-topic-at-draft amended 2026-08-02,
+    #1246): nothing selects topic files in advance any more — a read needing
+    served policy is asked as a `query --claim`. The PERMISSION boundary is
+    unchanged: the gateway's grant table still decides what may be served.
 
 Gateway transport: the server command is resolved from the environment
 variable `WRITING_ASSISTANT_GATEWAY_CMD` (a shell-split command string — the
@@ -63,13 +66,12 @@ Subcommands (each takes --root, the HOST repo root; default: git top-level):
                    tension questions. A gateway not registering `policy_lookup`
                    is the named exit-13 gap; a served miss prints as
                    `miss: query <claim>` under the pin (exit 0).
-  read [--only NAME ...] [--topics NAME.md ...]
+  read [--only NAME ...]
                    Print the pin (`pin: <pin>`), then each served file as a
                    `=== FILE @ <sha>` section with `N: text` lines, numbers and
                    text taken verbatim from the gateway's cites:
                      * LESSONS.md    <- `lessons_index` (every index line at its
                                         true line number);
-                     * topics/*.md   <- `topic_thread` (whole file, line-quoted);
                      * GLOSSARY.md   <- `surface_names(kind=glossary)` enumerates
                                         the entry names, then per-entry
                                         `glossary_entry` calls compose the whole
@@ -78,16 +80,16 @@ Subcommands (each takes --root, the HOST repo root; default: git top-level):
                                         named exit-13 gap (not composable).
                    A gateway MISS is a served answer, not an error: it prints as
                    `miss: FILE` under the pin (exit 0) so the caller can surface
-                   it with the question (consult-first convention). --only and
-                   --topics keep their exact refusal semantics (exit 5).
+                   it with the question (consult-first convention). --only keeps
+                   its exact refusal semantics (exit 5).
 
 Exit codes — the caller keys graceful degradation (CAP-6) off these:
 
   0   success (including served misses)
   2   usage / host-root resolution errors
-  4   policy_source block malformed OR carrying a retired key (`path` — 13.73;
-      `track`/`topics` — 13.36): the resolver's report, migration notice
-      included, is relayed verbatim; a retired key is never silently honored
+  4   policy_source block malformed OR carrying the retired `path` key (13.73):
+      the resolver's report, migration notice included, is relayed verbatim; the
+      retired key is never silently honored
   5   REFUSED: a requested path is outside the code whitelist
   10  unavailable: policy_source not declared / `enabled` falsy
                                                     (degrade: generic mode, silent)
@@ -119,7 +121,6 @@ UNAVAIL_UNSET = 10
 UNAVAIL_GATEWAY = 11  # old 11 (path) and 12 (git) collapse here
 TOOL_GAP = 13
 
-MAX_TOPICS = 2  # CAP-2: at most 2 topic files per read
 BASE_FILES = ("GLOSSARY.md", "LESSONS.md")
 
 GATEWAY_CMD_ENV = "WRITING_ASSISTANT_GATEWAY_CMD"
@@ -345,29 +346,14 @@ def split_cite(cite):
     return file, int(line), commit
 
 
-def build_whitelist(override_topics=None):
-    """The code-enforced allowlist of hub-relative names: GLOSSARY + LESSONS
-    always; then the <=2 per-run `--topics` selection (Story 13.35). Static —
-    the gateway's grant table is the serving-side enforcement of the same
-    boundary."""
-    entries = list(BASE_FILES)
-    if override_topics is not None:
-        for t in override_topics[:MAX_TOPICS]:
-            entries.append("topics/" + t)
-    return entries
-
-
-def validate_run_topics(names):
-    """Validate a per-run --topics selection (Story 13.35): basenames only, at
-    most MAX_TOPICS. Returns an error string or None."""
-    if len(names) > MAX_TOPICS:
-        return (f"refused: --topics takes at most {MAX_TOPICS} files "
-                f"(got {len(names)}) — the ≤{MAX_TOPICS} cap is code-enforced")
-    for t in names:
-        if "/" in t or os.sep in t or ".." in t or t.startswith("."):
-            return (f"refused: --topics entries are basenames under topics/ "
-                    f"({t!r} is not) — no other path is readable")
-    return None
+def build_whitelist():
+    """The code-enforced allowlist of hub-relative names: GLOSSARY + LESSONS.
+    Static — the gateway's grant table is the serving-side enforcement of the
+    same boundary. The per-run `--topics` whitelist-building input was removed
+    by Story 20.161 (#1246): a read needing served policy beyond this surface
+    is asked as a `query --claim`, bounded by the claim rather than by a
+    pre-picked file set."""
+    return list(BASE_FILES)
 
 
 def _unavailable(code_reason):
@@ -521,8 +507,9 @@ def cmd_query(args):
     SPEC-policy-topic-at-draft amended 2026-08-02, #1246).
 
     This is the seeding transport for draft-article stage 2. The bound is the
-    CLAIM, not a pre-picked file set: nothing selects topic files in advance,
-    so `--topics`, the ≤2 cap and the whitelist are not consulted here at all.
+    CLAIM, not a pre-picked file set: nothing selects topic files in advance
+    (the `--topics` input itself is gone, Story 20.161), and the read whitelist
+    is not consulted here at all.
     The PERMISSION boundary is untouched — the gateway's own grant table
     decides what may be served, exactly as it does for `read` — and the output
     grammar is the same `pin:` + `=== FILE @ sha` + `N: text`, so a caller
@@ -585,13 +572,7 @@ def cmd_read(args):
     _block, err = resolve_policy_source(root)
     if err:
         return _unavailable(err)
-    override = getattr(args, "topics", None)
-    if override is not None:
-        bad = validate_run_topics(override)
-        if bad:
-            sys.stderr.write(bad + "\n")
-            return REFUSED
-    whitelist = build_whitelist(override_topics=override)
+    whitelist = build_whitelist()
     targets = []
     for name in (args.only or whitelist):
         match = next((rel for rel in whitelist
@@ -608,12 +589,9 @@ def cmd_read(args):
     # glossary_entry (Story 18.16). The others are single tool calls.
     want_glossary = "GLOSSARY.md" in targets
     simple = [rel for rel in targets if rel != "GLOSSARY.md"]
-    calls = []
-    for rel in simple:
-        if rel == "LESSONS.md":
-            calls.append(("lessons_index", {}))
-        else:  # topics/<name>.md — whitelist guarantees the shape
-            calls.append(("topic_thread", {"topic": os.path.basename(rel)[:-3]}))
+    # The whitelist admits only LESSONS.md here (topics left with the removed
+    # `--topics` input, Story 20.161).
+    calls = [("lessons_index", {}) for rel in simple if rel == "LESSONS.md"]
     pin = None
     glossary = None
     try:
@@ -672,11 +650,9 @@ def main(argv=None):
     sp = sub.add_parser("read", parents=[root_parent])
     sp.add_argument("--only", nargs="+",
                     help="restrict to these whitelist entries; anything else is refused (exit 5)")
-    sp.add_argument("--topics", nargs="+", metavar="NAME.md",
-                    help="per-run topic selection (Story 13.35): BUILD the "
-                    "whitelist from these <=2 basenames under topics/ (distinct "
-                    "from --only, which filters within an already-built "
-                    "whitelist); >2 or a non-basename is refused (exit 5)")
+    # `--topics` (the whitelist-BUILDING input, Story 13.35) was removed by
+    # Story 20.161 (#1246); `--only` filters within the computed whitelist and
+    # stays.
     args = p.parse_args(argv)
     if not hasattr(args, "root"):
         args.root = None

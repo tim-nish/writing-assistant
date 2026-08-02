@@ -4,17 +4,10 @@
  "stored": false,
  "articles_repo": "/nonexistent/articles",
  "host_root": "/nonexistent/host",
- "track_topics": {},
- "unmapped_tracks": [
-  "engineering",
-  "people"
- ],
- "stale_mapping_tracks": [],
  "subtopic_defects": [],
  "topics": [
   {
    "topic": "engineering",
-   "mapped": false,
    "tracks": [
     "engineering"
    ],
@@ -44,7 +37,6 @@
   },
   {
    "topic": "people",
-   "mapped": false,
    "tracks": [
     "people"
    ],
@@ -169,9 +161,9 @@
     "enumerated": false,
     "reason": "the policy source served no decision topics (policy_source unavailable: policy_source not declared in writing-sources.yaml (read-policy-source.py exit 10))",
     "axis": {
-     "source": "consumer-declared mapping (fallback)",
-     "fallback_reason": "policy_source unavailable: policy_source not declared in writing-sources.yaml (read-policy-source.py exit 10)",
-     "bounded_by_consumer_config": true
+     "source": "element manifest (records)",
+     "unavailable_reason": "policy_source unavailable: policy_source not declared in writing-sources.yaml (read-policy-source.py exit 10)",
+     "bounded_by_consumer_config": false
     },
     "matched": 0,
     "read": 0,
@@ -223,9 +215,9 @@
   ],
   "element_topics_skipped": [],
   "element_axis": {
-   "source": "consumer-declared mapping (fallback)",
-   "fallback_reason": "policy_source unavailable: policy_source not declared in writing-sources.yaml (read-policy-source.py exit 10)",
-   "bounded_by_consumer_config": true
+   "source": "element manifest (records)",
+   "unavailable_reason": "policy_source unavailable: policy_source not declared in writing-sources.yaml (read-policy-source.py exit 10)",
+   "bounded_by_consumer_config": false
   }
  },
  "consumption": {
