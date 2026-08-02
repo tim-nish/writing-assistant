@@ -59,6 +59,14 @@ region at the brief, and this step does the enumerating, per claim (#1209).
 With no brief-carried scope (a cold run), `--scope` is omitted and the
 declared-source boundary of `writing-sources.yaml` is the fence, as always.
 
+**The read scope INTERSECTS the declared boundary and never widens it**
+(moved here from stage 1 by story 20.154, #1224 — probe no longer reads, so
+the invariant now binds where reading happens). Whatever a claim is examined
+against must intersect the declaration: a brief-carried region can only
+NARROW what is read, never add an undeclared repository, and the enumeration
+defers to `resolve-writing-sources.py files` — the one file boundary, never a
+second walk that drifts from it.
+
 ### Coverage is reported, never implied
 
 Every examination's output separates `searched` (what was actually consulted,

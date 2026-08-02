@@ -147,7 +147,7 @@ nothing. Every owner-facing ask follows the shared
 | Stage | Enter by reading | The one command |
 |---|---|---|
 | **0 — start** (config gate, framework check, workspace autostart; optional `--depth`/`--element`/`--brief`; plan consultation, continuation, differential context; durability contract) | [`stages/stage0.md`](stages/stage0.md) | `draft-pipeline.py stage0 <framework> <sources…> --root <host-repo>` |
-| **1 — probe** (feasibility verdict + anchors, no fact sheet — #1182; routes interview/fill/done; working-note slim profile) | [`stages/stage1.md`](stages/stage1.md) | `probe.py record --ws $WS --root <host-repo> <result>` |
+| **1 — probe** (configuration + permission check, no verdict — #1224; routes interview/fill; working-note slim profile) | [`stages/stage1.md`](stages/stage1.md) | `probe.py record --ws $WS --root <host-repo>` |
 | **2 — gap interview** (policy seeds → classification → ≤5 questions + mandated tier → answers → journal → staging candidates → policy-block gate) | [`stages/stage2.md`](stages/stage2.md) | `draft-pipeline.py interview --framework <F> [--items …] <state>` |
 | **3 — fill** (argument plan, structure proposal, per-section fill + sidecar provenance map, per-claim examine — [`stages/examine.md`](stages/examine.md), #1182 — visual set, isolated provenance judge) | [`stages/stage3.md`](stages/stage3.md) **and** [`style-contract.md`](style-contract.md) | `draft-pipeline.py provenance --map <map> --draft <draft>` |
 | **3→4 — quality gate** (mechanical dims + isolated rubric judge; two-cycle bound; missing-input repair hop) | [`stages/gate.md`](stages/gate.md) | `draft-pipeline.py quality-gate --draft … --map … --judge …` |
