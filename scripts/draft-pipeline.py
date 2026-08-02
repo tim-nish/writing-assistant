@@ -1020,7 +1020,7 @@ def cmd_reroute(args):
             "section": args.section,
             "rewrites": args.rewrites,
             "decision": "reroute",
-            "next_stage": "interview",
+            "next_stage": draft_gates.INTERVIEW,
             "reason": ("past the one allowed rewrite; route to a new interview "
                        "question, not open-ended editing"),
             "question": {
@@ -1089,7 +1089,7 @@ def cmd_repair_hop(args):
             # Re-grounding is a bounded sub-step of the fill (examine.py run
             # for this one claim), never a stage re-entry — there is no
             # harvest stage to go back to (#1182).
-            "next_stage": "fill",
+            "next_stage": draft_gates.FILL,
             "cycle": args.cycle + 1,
             "cap": TWO_CYCLE_BOUND,
             "note": ("run one examination for the named claim only "
@@ -1112,7 +1112,7 @@ def cmd_repair_hop(args):
         out = {
             "stage": "repair-hop",
             "action": "elicit",
-            "next_stage": "interview",
+            "next_stage": draft_gates.INTERVIEW,
             "cycle": args.cycle + 1,
             "cap": TWO_CYCLE_BOUND,
             "question": {
@@ -2357,7 +2357,7 @@ def cmd_interview(args):
                  for r in presented]
     out = {
         "stage": "interview",
-        "next_stage": "fill",
+        "next_stage": draft_gates.FILL,
         "framework": framework,
         "budget": QUESTION_BUDGET,
         # `asked` counts the questions drawn from the CAPPED pool (NEEDS-OWNER
@@ -3569,7 +3569,28 @@ def _write_checkpoint(ws, state):
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(state, f, indent=2)
     os.replace(tmp, path)
+    _write_active_run_pointer(ws, state.get("next_stage"))
     return path
+
+
+def _write_active_run_pointer(ws, next_stage):
+    """Leave the Stop hook a subject (Story 20.156, #1245/#1247).
+
+    The stage transition is the one event that already knows both halves — the
+    workspace and the process the run is entering — so the pointer is written
+    where the checkpoint is, and nowhere else. The path is the resolver's
+    (D1); this only supplies the two facts.
+
+    NEVER FATAL. A stage that completed is complete: a pointer that could not
+    be written (unwritable state root, read-only home) must not turn a
+    persisted checkpoint into a failed one. The cost of the failure is the
+    hook going quiet for that turn, which is the direction this whole chain is
+    required to fail in.
+    """
+    try:
+        _load("resolve-paths.py").write_active_run(ws, next_stage)
+    except Exception:
+        pass
 
 
 def cmd_progress(args):
@@ -3644,7 +3665,7 @@ def cmd_resume(args):
         return 1
     path = _checkpoint_path(args.ws)
     if not os.path.isfile(path):
-        print(json.dumps({"resumed": False, "next_stage": "probe"}, indent=2))
+        print(json.dumps({"resumed": False, "next_stage": draft_gates.PROBE}, indent=2))
         return 0
     with open(path, encoding="utf-8") as f:
         state = _map_legacy_stage(json.load(f))
@@ -3835,7 +3856,7 @@ def _map_legacy_stage(state):
     not a replay. The rewrite is disclosed on the returned state and the
     checkpoint file is left as written — resuming is a read."""
     if state and state.get("next_stage") == "harvest":
-        state["next_stage"] = "probe"
+        state["next_stage"] = draft_gates.PROBE
         state["legacy_stage_note"] = (
             "this run was checkpointed at `harvest`, a stage retired by "
             "#1182 — resuming at `probe` (its replacement; safe to re-enter); "
@@ -3899,7 +3920,8 @@ def _autostart(root, fresh=False, sitting=None, brief=None):
                 return out
     # No in-progress run — start fresh (this is the AC4 no-false-resume path).
     ws = rp.new_run(root)
-    out = {"resumed": False, "ws": ws, "run_id": os.path.basename(ws), "next_stage": "probe"}
+    out = {"resumed": False, "ws": ws, "run_id": os.path.basename(ws),
+           "next_stage": draft_gates.PROBE}
     if skipped:
         out["fresh_skipped"] = skipped
         out["fresh_note"] = _load("draft_resume.py").fresh_note(skipped,
@@ -3978,6 +4000,14 @@ DEPTH_LEVELS = {"deep-dive", "standard", "note"}
 sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
 import draft_brief  # noqa: E402
 _read_brief = draft_brief._read_brief
+
+# --- The process vocabulary is DECLARED ONCE (Story 20.157, #1245/#1247) -----
+# `next_stage` is one half of the due-ness join `gate-inventory.reached_from_state`
+# computes; `draft_gates.GATES[*]["stage"]` is the other. The join is an
+# EQUALITY with no translation table, which holds only while both sides read
+# the same declaration — a string literal here is that declaration's second
+# copy, and a second copy is where a rename lands on one side only.
+import draft_gates  # noqa: E402
 
 
 # --- One entry mechanism (Story 18.47, #560; CAP-9 2026-07-22 #554 amendment) -
@@ -4093,7 +4123,7 @@ def _run_state(framework, sources, root=None, depth=None, element=None,
         sys.stderr.write(f"error: {gate_msg}\nNothing started.\n")
         return None, 2
     state = {
-        "next_stage": "probe",
+        "next_stage": draft_gates.PROBE,
         "framework": key.upper(),
         "framework_file": framework_file,
         "sources_raw": list(sources),
@@ -4539,6 +4569,10 @@ def cmd_complete(args):
         with open(tmp, "w", encoding="utf-8") as f:
             json.dump(st, f, indent=2)
         os.replace(tmp, checkpoint_path)
+        # Completion is a stage transition too, and the pointer must follow it
+        # or the last thing the hook sees for this cwd is a run still mid-flight
+        # (Story 20.156).
+        _write_active_run_pointer(args.ws, DONE_STAGE)
 
     # Browsing-surface view (Story 18.43, #540) — NOT a third declared product.
     # The articles repo declares INDEX.md "regenerated — one line per

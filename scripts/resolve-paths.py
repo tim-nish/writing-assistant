@@ -44,6 +44,10 @@ Subcommands:
                              create and print a fresh per-run workspace (Story 9.2)
   run-workspace --run-id ID [--root R]
                              print an existing run workspace path (no create)
+  active-run-pointer [--cwd D]
+                             <state-root>/<cwd-key>/active-run.json — the run
+                             pointer the checkpoint write leaves for the Stop
+                             hook, keyed on the SESSION's cwd (Story 20.156)
 """
 
 import argparse
@@ -251,6 +255,87 @@ def terrain_runs_dir(root):
     on a run id, and named for its subsystem rather than nested under it.
     """
     return os.path.join(repo_dir(root), "terrain-runs")
+
+
+# --------------------------------------------------------------------------
+# The active-run pointer — the Stop hook's SUBJECT (Story 20.156, #1245/#1247)
+#
+# The Stop hook runs outside the model, in a process the pipeline never spawns,
+# and its only documented handle on the session is the payload's `cwd`. Before
+# this, it resolved its subject from `WA_RUN_WS` or `payload["cwd_run_ws"]` —
+# an environment variable nothing set and a payload field the harness does not
+# supply — so `ws` was always None and the hook exited 0 on every turn as "not
+# a pipeline turn at all". Three cycles' worth of gates closed un-carried
+# behind that silence.
+#
+# So the pointer gets a WRITER, at the one place run state already changes: the
+# checkpoint write. It is keyed on the SESSION'S cwd rather than on the host
+# repo, because cwd is the only key both sides can compute — the pipeline from
+# its own process, the hook from the payload — without either guessing.
+#
+# THE PATH LIVES HERE, not in the hook, because D1 says every state path
+# resolves through this file; and the READ lives here beside the WRITE so the
+# two cannot drift into composing different paths, which is the failure that
+# produced the dead input in the first place.
+# --------------------------------------------------------------------------
+
+ACTIVE_RUN_FILE = "active-run.json"
+
+
+def cwd_key(cwd=None):
+    """The state key for a session working directory.
+
+    The git toplevel when `cwd` is inside a repository — so a turn taken in a
+    subdirectory resolves to the same pointer the pipeline wrote from the repo
+    root — and the realpath'd directory itself otherwise. `repo_key` does the
+    slugging, so this scheme has exactly one implementation.
+    """
+    d = os.path.realpath(cwd or os.getcwd())
+    return repo_key(_toplevel_of(d) or d)
+
+
+def active_run_pointer(cwd=None):
+    """`<state-root>/<cwd-key>/active-run.json` — where the pointer lives."""
+    return os.path.join(state_root(), cwd_key(cwd), ACTIVE_RUN_FILE)
+
+
+def write_active_run(ws, next_stage, cwd=None, now=None):
+    """Record `{ws, next_stage, written_at}` for this working directory.
+
+    `written_at` is the staleness instrument and the ONLY one: nothing here or
+    downstream may answer "which run is this" by scanning for the newest
+    workspace, because a wrong-run block is indistinguishable at the owner's
+    screen from a real one.
+
+    Atomic (temp + replace) for the same reason the checkpoint write is: a
+    half-written pointer would be read as an unparseable one, and this must
+    fail toward "no subject", never toward a corrupt one.
+    """
+    stamp = (now or datetime.datetime.now()).astimezone().isoformat(timespec="seconds")
+    rec = {"ws": os.path.realpath(ws), "next_stage": next_stage,
+           "written_at": stamp}
+    path = active_run_pointer(cwd)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(rec, f, indent=2)
+    os.replace(tmp, path)
+    return path
+
+
+def read_active_run(cwd=None):
+    """The pointer record, or None when there is none / it does not parse."""
+    try:
+        with open(active_run_pointer(cwd), encoding="utf-8") as f:
+            rec = json.load(f)
+    except (OSError, ValueError):
+        return None
+    return rec if isinstance(rec, dict) else None
+
+
+def cmd_active_run_pointer(args):
+    print(active_run_pointer(getattr(args, "cwd", None)))
+    return 0
 
 
 # --------------------------------------------------------------------------
@@ -708,6 +793,11 @@ def main(argv=None):
                         "with picker metadata (Story 13.31)")
     sp.add_argument("--root", help="host-repo root (default: git top-level of cwd; errors outside a git repo)")
 
+    sp = sub.add_parser("active-run-pointer",
+                        help="print <state-root>/<cwd-key>/active-run.json — the "
+                             "Stop hook's subject pointer (Story 20.156, #1245)")
+    sp.add_argument("--cwd", help="the session working directory (default: cwd)")
+
     sp = sub.add_parser("target", help="print the resolved target repository path (#309): the one "
                                        "call every entry flow makes before any scope read, "
                                        "workspace mint, or LLM spend")
@@ -727,6 +817,7 @@ def main(argv=None):
         "terrain-runs-root": cmd_terrain_runs_root,
         "terrain-view": cmd_topic_map_view,
         "list-drafts": cmd_list_drafts,
+        "active-run-pointer": cmd_active_run_pointer,
         "target": cmd_target,
     }[args.cmd](args)
 
