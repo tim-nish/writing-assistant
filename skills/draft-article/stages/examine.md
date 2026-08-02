@@ -39,8 +39,25 @@ HEAD is `state_only` — a state claim may ground in it, an episode claim
 mismatch deny-never-warn. Commits are **anchor-addressed, never
 keyword-searched**: without a `path:`/`symbol:`/`ref:`/date anchor the
 commits source is skipped and says so — take an address from
-`anchors_offered` (or the probe's anchors) and ask again rather than letting
-history be searched by claim keywords.
+`anchors_offered` and ask again rather than letting history be searched by
+claim keywords.
+
+**Anchor-finding lives HERE, per claim** (moved from stage 1 by story 20.155,
+#1224). Probe emits no anchors: it is a configuration and permission check and
+has no claim to find them for. `anchors_offered` derives addresses from the
+first hop's own hits — a searchable source is where an address comes from, and
+history is what you ask once you have one. They are **offered, never
+followed**: deciding which anchor is worth a second query is a judgment, and
+the tool makes none.
+
+**Reproducibility comes from the enumerator, not from a cache.** Candidate
+files arrive in `resolve-writing-sources.py files` order, which is sorted at
+the source (`resolve-writing-sources.py:1357`), so examining the same claim
+against the same pin resolves to the same pointers in the same order. CAP-10's
+per-source budget and blob-keyed cache were harvest-shaped remedies for a
+whole-corpus pass and are **not** carried here — corrected in the spec on
+2026-08-02 (#1235), with the trigger that would earn each of them stated
+there.
 
 ### Scope is derived, not chosen (#1097, #1185)
 
