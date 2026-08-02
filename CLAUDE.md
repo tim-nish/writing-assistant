@@ -135,7 +135,11 @@ edited, never one asserting a repo-wide property *about* it, which is why a
 green scoped run kept being followed by a failing full tier. An undeclared
 check covers nothing and is selected only by prefix — incomplete-but-honest
 while the declarations are populated; the full tier still runs everything
-once, so nothing goes unrun.
+once, so nothing goes unrun. **The union's added cost REPORTS against the
+family ceiling rather than failing it (#1326)** — scoping cannot remove that
+cost, since the union ignores the GLOB by design, so the ceiling's semantics
+follow the remedy's availability: the GLOB-selected family portion (promoted
+members included) keeps failing, the coverage-selected portion is a finding.
 
 **The FULL tier REPORTS against two ceilings of its own (#961), and neither
 fails the run.** Every full run discloses its *summed per-check work* against
