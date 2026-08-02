@@ -205,6 +205,253 @@ def skip(step, why):
     return {"step": step, "why": why}
 
 
+# --- per-block emission: the record as a SIDE EFFECT of running (CAP-1) ------
+#
+# THE SHAPE IS `probe.py record`'s. That command cannot run without writing
+# `probe.json`; from here on, no block command can run without writing its own
+# open and close records. The dispatcher is the only caller of `emit_block`, so
+# there is no second invocation to skip and nothing for an agent to remember —
+# which is the whole repair, because the defect being fixed is that emission
+# used to be an agent act (SPEC-run-record, Why).
+#
+# UNCONDITIONAL ON EXIT STATUS. A command that returns non-zero, raises, or
+# exits still closes, carrying its own `exit` and a `fail` outcome. A failed
+# block is the case the record exists for: the observed run stopped at the
+# quality gate and left nothing behind.
+#
+# WHY MODULE STATE AND NOT A PARAMETER. A command fixes its own judgment where
+# it concludes it (`note`), often deep inside its body. Threading a record
+# object through every frame would make emission a parameter every caller has
+# to remember to pass, which is the same defect one layer down.
+
+# The block<->command table (`skills/draft-article/SKILL.md:149-155`), read as
+# the machine mapping it always was: subcommand -> block. `probe` is keyed by
+# its own script (`probe.py record`), which passes its block explicitly.
+BLOCK_OF_COMMAND = {
+    "stage0": "start",
+    "interview": "interview",
+    "provenance": "fill",
+    "quality-gate": "quality-gate",
+    "verify": "verify",
+    "complete": "complete",
+}
+
+# The fill's fan-out legs (`skills/draft-article/stages/fan-out.md`), each
+# keyed by the artifact it leaves in the run workspace. The fill's one
+# mandatory command is `provenance`, which closes the WHOLE fill block and
+# cannot observe the legs running beside it — but their artifacts land in the
+# workspace it is closing over, so a leg that left none is a DERIVED skip
+# (CAP-3 named, CAP-5 derived) rather than a silence inside a clean `ran`.
+FILL_LEGS = (
+    ("isolated provenance judging", "provenance-verdicts",
+     "no `provenance-verdicts*` artifact in the workspace at fill close — the "
+     "judging must have passed before the fill completes (fan-out.md §5)"),
+    ("per-claim examine", "examination-pins.txt",
+     "no `examination-pins.txt` ledger in the workspace at fill close "
+     "(examine.md: a claim must be enumerable to be examined)"),
+)
+
+# The judgment the RUNNING command has fixed about itself, between
+# `open_block` and `close_block`.
+_PENDING = {}
+
+
+def _load(name):
+    """Load a sibling script by path (their filenames are hyphenated).
+
+    Returns None when it cannot be loaded — the caller degrades rather than
+    failing a block, per the seam's standing degradation discipline.
+    """
+    import importlib.util
+    path = os.path.join(os.path.dirname(os.path.realpath(__file__)), name)
+    if not os.path.isfile(path):
+        return None
+    try:
+        spec = importlib.util.spec_from_file_location(
+            "_wa_" + re.sub(r"\W", "_", name), path)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod
+    except Exception:                                    # pragma: no cover
+        return None
+
+
+def workspace_of(args):
+    """`(workspace, how it was resolved)` for the running block command.
+
+    `--ws` where the command declares one; else the `WS` the skill exports;
+    else the resolver's OWN active-run pointer (`resolve-paths.read_active_run`,
+    the Stop hook's subject) — never a scan for the newest workspace, which
+    that resolver forbids in the same breath it writes the pointer. A `None`
+    workspace means there is no journal to write to, and the block then runs
+    unrecorded rather than failing: emission never fails a run.
+    """
+    ws = getattr(args, "ws", None) or os.environ.get("WS")
+    source = "--ws/WS"
+    if not ws:
+        rp = _load("resolve-paths.py")
+        rec = rp.read_active_run() if rp is not None else None
+        ws = (rec or {}).get("ws")
+        source = "active-run pointer"
+    return (ws, source) if ws and os.path.isdir(ws) else (None, source)
+
+
+def file_sha256(path):
+    """The attestation hash of a file, or None for stdin / an unreadable path."""
+    if not path or path == "-" or not os.path.isfile(path):
+        return None
+    try:
+        with open(path, encoding="utf-8") as fh:
+            return draft_sha256(fh.read())
+    except OSError:                                      # pragma: no cover
+        return None
+
+
+def note(outcome=None, detail=None, route=None, skipped=None,
+         draft_sha256=None, map_sha256=None, status=None):
+    """The running command fixes what its own close record will say (CAP-2).
+
+    The wrapper guarantees a record EXISTS; only the command knows what it
+    concluded, so nothing here is inferred from a return code the command
+    could not distinguish. `route` and `skipped` ACCUMULATE (a block gets
+    where it got by more than one step); everything else is last-wins. A call
+    outside a block is a no-op, so no command is coupled to being wrapped.
+    """
+    if not _PENDING:
+        return
+    j = _PENDING["judgment"]
+    for key, value in (("outcome", outcome), ("detail", detail),
+                       ("status", status), ("draft_sha256", draft_sha256),
+                       ("map_sha256", map_sha256)):
+        if value is not None:
+            j[key] = value
+    if route is not None:
+        j["route"].extend([route] if isinstance(route, str) else list(route))
+    j["skipped"].extend(list(skipped or []))
+
+
+def derived_skips(ws, block):
+    """Sub-obligations the WORKSPACE says did not happen (CAP-3 over CAP-5).
+
+    Derived from what the workspace holds at close, never from an input flag.
+    Only the fill has them today — see `FILL_LEGS`.
+    """
+    if block != "fill":
+        return []
+    try:
+        present = os.listdir(ws)
+    except OSError:                                      # pragma: no cover
+        return []
+    return [skip(step, why) for step, prefix, why in FILL_LEGS
+            if not any(f.startswith(prefix) for f in present)]
+
+
+def open_block(ws, block, command, inputs=None):
+    """Enter a block: write the open record and arm its close."""
+    _PENDING.clear()
+    _PENDING.update({
+        "ws": ws, "block": block, "command": command,
+        "judgment": {"outcome": None, "detail": None, "status": None,
+                     "route": [], "skipped": [],
+                     "draft_sha256": None, "map_sha256": None}})
+    return append(ws, open_record(block, command, inputs=inputs))
+
+
+def close_block(exit_code=0):
+    """Write the armed block's close record (record-formats.md §2).
+
+    Called by the block's own command immediately BEFORE it writes
+    `checkpoint.json` (CAP-4 — see `before_checkpoint`), and by `emit_block`
+    as the backstop for a command that returned or raised without getting
+    that far. IDEMPOTENT: the second call is a no-op, so the ordering call
+    never doubles the record.
+    """
+    if not _PENDING:
+        return None
+    p = dict(_PENDING)
+    _PENDING.clear()
+    j, block = p["judgment"], p["block"]
+    skipped = j["skipped"] + derived_skips(p["ws"], block)
+    status = j["status"] or ("ran-partially" if skipped else "ran")
+    outcome = j["outcome"] or ("pass" if exit_code == 0 else "fail")
+    if status == "did-not-run":
+        outcome = "n/a"
+    detail = j["detail"] or "%s exited %d" % (p["command"], exit_code)
+    return append(p["ws"], close_record(
+        block, status, j["route"] or [p["command"]],
+        verdict=verdict(outcome, j["draft_sha256"], j["map_sha256"], detail),
+        skipped=skipped, exit_code=exit_code, command=p["command"]))
+
+
+def before_checkpoint():
+    """CAP-4's ordering, in one call at the one checkpoint write path.
+
+    The close record is durable BEFORE `checkpoint.json` is written, so no
+    resumable state exists with no record behind it: a kill between the two
+    leaves a record with no checkpoint, never the reverse. A no-op when the
+    checkpoint is not being written from inside a block — the agent-invoked
+    `checkpoint` command, whose block command already closed and exited.
+    """
+    return close_block(0)
+
+
+def emit_block(fn, args, block=None, command=None):
+    """Run one block command with its records as a side effect (CAP-1)."""
+    command = command or getattr(args, "cmd", None)
+    block = block or BLOCK_OF_COMMAND.get(getattr(args, "cmd", None))
+    ws, ws_source = workspace_of(args)
+    if block is None or ws is None:
+        return fn(args)
+    draft_hash = file_sha256(getattr(args, "draft", None))
+    inputs = {"ws_source": ws_source}
+    if draft_hash:
+        inputs["draft_sha256"] = draft_hash
+    for key in ("cycle", "framework", "profile", "slug"):
+        if getattr(args, key, None) is not None:
+            inputs[key] = getattr(args, key)
+    open_block(ws, block, command, inputs=inputs)
+    note(draft_sha256=draft_hash,
+         map_sha256=file_sha256(getattr(args, "map", None)))
+    code = 1
+    try:
+        code = fn(args) or 0
+        return code
+    except SystemExit as e:                              # pragma: no cover
+        code = e.code if isinstance(e.code, int) else 1
+        raise
+    finally:
+        close_block(code)
+
+
+def emit_start(ws, command, route, detail, exit_code=0, inputs=None):
+    """The `start` block, which MINTS the workspace it records into.
+
+    Its open record cannot precede its own mint checkpoint — there is nowhere
+    for the journal to live until `stage0` has resolved `$WS` — so both
+    records are written the moment the workspace exists, at the end of the
+    block. This is the one structural exception to open-at-entry, and it is
+    named here rather than hidden: every block after `start` records on entry.
+    """
+    if not ws or not os.path.isdir(ws):
+        return None
+    append(ws, open_record("start", command, inputs=inputs))
+    return append(ws, close_record(
+        "start", "ran", route, exit_code=exit_code, command=command,
+        verdict=verdict("pass" if exit_code == 0 else "fail", detail=detail)))
+
+
+def emit_stage0(out, framework=None, target=None):
+    """`emit_start` for stage0, composing its route and detail from the block's
+    own output so the call site stays one line in an already-ratcheted file.
+    """
+    return emit_start(
+        out.get("ws"), "stage0",
+        ["config validated", "framework accepted",
+         "resumed" if out.get("resumed") else "workspace minted"],
+        "run may begin: next_stage=%s" % out.get("next_stage"),
+        inputs={"framework": framework, "target": target})
+
+
 # --- classification and validation -------------------------------------------
 
 def classify(rec):

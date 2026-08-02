@@ -69,6 +69,9 @@ import os
 import sys
 import time
 
+sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
+import run_record  # noqa: E402
+
 # THE STAGE-1 TIME BUDGET (Story 20.154, #1224), in seconds. A permission check
 # reads a declaration and stats a handful of roots; five seconds is generous
 # for that and tight enough to fail loudly if enumeration ever creeps back in,
@@ -173,6 +176,18 @@ def record(ws, root, framework=None):
         json.dump(result, f, indent=2)
     os.replace(tmp, os.path.join(ws, "probe.json"))
 
+    # What the block CONCLUDED, in the record's own terms (CAP-2): #1224 removed
+    # probe's source-grounding verdict, not its permission verdict or its route.
+    run_record.note(outcome="pass",
+                    route=["permission check over the declared roots",
+                           "slim profile" if slim else "full profile"],
+                    detail="every granted source readable; next_stage=%s"
+                           % result["next_stage"])
+
+    # CAP-4: the probe block's close record is durable BEFORE the checkpoint
+    # this command writes, so no resumable state exists with no record behind it.
+    run_record.close_block(0)
+
     cp = os.path.join(ws, "checkpoint.json")
     state = {}
     try:
@@ -225,7 +240,12 @@ def main(argv=None):
                                         "profile routes to fill, all others "
                                         "to interview")
     args = p.parse_args(argv)
-    return {"check": cmd_check, "record": cmd_record}[args.cmd](args)
+    fn = {"check": cmd_check, "record": cmd_record}[args.cmd]
+    if args.cmd != "record":
+        return fn(args)
+    # `record` cannot run without writing `probe.json`; from here it cannot run
+    # without writing the probe block's records either (SPEC-run-record CAP-1).
+    return run_record.emit_block(fn, args, block="probe", command="probe.py record")
 
 
 if __name__ == "__main__":

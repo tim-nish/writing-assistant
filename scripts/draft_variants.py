@@ -33,6 +33,9 @@ import os
 import re
 import sys  # noqa: F401  (kept: extracted code may reach for it)
 
+sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
+import run_record  # noqa: E402  (the gate's record is a side effect of running)
+
 # The host (`draft-pipeline.py`), bound once at import by the dispatcher. Never
 # imported here: the host owns these helpers, and a second import path to them
 # would be the drift this extraction exists to remove. The binding is over the
@@ -158,6 +161,9 @@ def cmd_quality_gate(args):
                        "the completion summary's publish-blocker bucket, never a "
                        "third revision cycle"),
         }, indent=2))
+        run_record.note(outcome="blocked", route="two-cycle bound exhausted",
+                        detail="cycle %s past the bound: publish-blocker, never a "
+                               "third cycle" % args.cycle)
         return 1
     draft = sys.stdin.read() if args.draft == "-" else open(args.draft, encoding="utf-8").read()
     prov_entries = []
@@ -623,6 +629,27 @@ def cmd_quality_gate(args):
                              f"{args.verdicts_out}: {e}\n")
             return 2
 
+    # The gate block's judgment, in the record's terms (CAP-2/CAP-3). The SKIPS
+    # are the sub-obligations this invocation did not discharge — named, so a
+    # partial gate can never close as a clean `ran`. The per-section
+    # evidence-type check is NOT among them: its repair is #1288's.
+    run_record.note(
+        outcome="pass" if not failing else "fail",
+        route=["profile=%s" % getattr(args, "profile", "full"),
+               "cycle=%s" % getattr(args, "cycle", 1)]
+              + (["delta re-check suppressed %d interpretive finding(s)"
+                  % len(delta_suppressed)] if delta_suppressed else []),
+        detail=("all dimensions pass" if not failing
+                else "failing: " + ", ".join(failing)),
+        skipped=([run_record.skip(
+            "dim1-2 rubric judge",
+            "profile slim (working-note): the interpretive dimensions are waived "
+            "by ratified contract, so this gate judged 3-4 only")]
+                 if getattr(args, "profile", "full") == "slim" else [])
+                + ([run_record.skip(
+                    "provenance-map checks (stitched-fact-sheet, dim4 density)",
+                    "no --map supplied, so the map-dependent half of the gate had "
+                    "nothing to read")] if not args.map else []))
     print(json.dumps(out, indent=2))
     return 0 if not failing else 1
 
