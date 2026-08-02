@@ -35,7 +35,7 @@ contract the judge grades against), and this section — a change to one without
 the others is a defect.
 
 ```
-python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py quality-gate \
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py quality-gate --ws "$WS" \
   --draft <draft> --map "$WS/provenance-map.txt" --judge "$WS/rubric-verdicts.txt" \
   --framework-file "$FRAMEWORK_FILE" --pin-ledger "$WS/examination-pins.txt"
 ```
@@ -163,7 +163,7 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py quality-gate \
      what it suppressed under `delta_recheck` for the audit trail.
 
      ```
-     python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py quality-gate \
+     python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py quality-gate --ws "$WS" \
        --draft <draft> --map "$WS/provenance-map.txt" --judge "$WS/rubric-verdicts.txt" \
        --framework-file "$FRAMEWORK_FILE" --pin-ledger "$WS/examination-pins.txt" \
        --cycle 2 --prior-locations "Section 2, para 3; Section 4"
@@ -272,7 +272,7 @@ reach verification unrevised.
 transition, so it names both:
 
 - **Pass → verification.** Read [`stage4.md`](stage4.md) and run
-  `draft-pipeline.py verify <draft>`, driving `verify-markers --count` to 0.
+  `draft-pipeline.py verify --ws "$WS" <draft>`, driving `verify-markers --count` to 0.
 - **Fail → back to the fill.** Return to [`stage3.md`](stage3.md) for the
   bounded repair hop, then re-run the gate. The cycle is bounded; a
   fact-sheet-stitched draft does not reach verification unrevised.
