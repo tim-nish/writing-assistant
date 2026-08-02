@@ -14,6 +14,9 @@
 # repo's git status/index: no shared write.
 # tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
 # covers: config/platform-profiles/devto.example.yaml docs/storage-architecture.md scripts/*.py skills/draft-article/SKILL.md skills/review-article/SKILL.md skills/terrain/SKILL.md specs/spec-writing-assistant/plugin-layout.md
+# grep-binding: token/anchor — greps layout path tokens ('repos/<repo-key>/',
+#   '<host-repo>/writing-sources.yaml') and the dated '#211' resolution
+#   marker, durable identifiers rather than relocatable prose.
 # covers-note (#1321): flag `dynamic-path:WS,outside` ANSWERED as understood-and-narrow —
 #   both name scratch trees ($HOME/.writing-assistant-check-NNN, a per-run workspace), and a
 #   scratch path carries no coverage. scripts/*.py is KEPT and is the point of the

@@ -6,7 +6,11 @@
 #   the issues source is exercised only with its transport stubbed, and its
 #   ETag cache is redirected into the same private dir via EXAMINE_ETAG_CACHE.
 # tier: inner
-# covers: scripts/examine.py scripts/terrain_scope.py skills/draft-article/stages/examine.md skills/draft-article/stages/fan-out.md
+# covers: scripts/examine.py scripts/terrain_scope.py skills/draft-article/**
+# grep-binding: file-set (#1325) — the no-file-list/anchor-finding denials and
+#   contract sentences read the skill's whole file set; the remaining single-file
+#   greps match stage-specific terms ('stockpile' restated in examine vs fan-out,
+#   'fan-out.md' filename tokens) whose per-file placement IS the assertion.
 # removal-signal: retire this check when examine's contract (never-judge,
 #   anchored commits, derived-scope refusal, coverage separation, at-the-read
 #   pin recording) is enforced by a schema over the emitted record rather than
@@ -116,23 +120,25 @@ python3 "$EX" --root "$h" --claim "x" --scope "$work/scope2.json" --member 1.2 \
 
 # 6. The retired sources gate stays unconstructible here too (AC4): the skill
 #    text carries no sources-gate instruction, and no gate composes a file list.
-grep -q 'sources_gate' skills/draft-article/stages/stage0.md \
-  && err "stage0.md still instructs composing the retired sources gate (#1209)" \
-  || ok "stage0.md carries no sources-gate instruction (#1209)"
-grep -q 'compose or approve a file list' \
-  skills/draft-article/stages/examine.md \
-  && ok "examine.md states the no-file-list-gate contract" \
-  || err "examine.md missing the no-file-list-gate statement"
+#    These assertions read the skill's whole FILE SET (#1322/#1325): a denial
+#    must hold wherever a stage relocates, and a contract sentence stays
+#    contract wherever in the set it sits.
+grep -rq 'sources_gate' skills/draft-article/ \
+  && err "the skill still instructs composing the retired sources gate (#1209)" \
+  || ok "the skill carries no sources-gate instruction (#1209)"
+grep -rq 'compose or approve a file list' skills/draft-article/ \
+  && ok "the skill states the no-file-list-gate contract" \
+  || err "the skill is missing the no-file-list-gate statement"
 
 # --- anchor-finding lives here, and reproducibility is the enumerator's ------
 # (Story 20.155, #1224.) Probe is a permission check now and emits no anchors,
 # so a dangling reference to "the probe's anchors" would send the model looking
 # for a field that no longer exists.
-grep -q "the probe's anchors" skills/draft-article/stages/examine.md \
-  && err "examine still points at probe's anchors — probe emits none (#1224)" \
+grep -rq "the probe's anchors" skills/draft-article/ \
+  && err "the skill still points at probe's anchors — probe emits none (#1224)" \
   || ok "no dangling reference to probe anchors"
-grep -q "Anchor-finding lives HERE" skills/draft-article/stages/examine.md \
-  && ok "examine states that anchor-finding is its own, per claim" \
+grep -rq "Anchor-finding lives HERE" skills/draft-article/ \
+  && ok "the skill states that anchor-finding is examine's own, per claim" \
   || err "the relocation of anchor-finding is undocumented"
 
 # DETERMINISTIC ENUMERATION is CAP-10's one surviving mechanism, so it is

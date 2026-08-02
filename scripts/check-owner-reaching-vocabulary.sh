@@ -5,6 +5,8 @@
 #
 # tier: inner
 # covers: scripts/draft_gates.py scripts/owner_surface.py
+# grep-binding: denial-tree — whole-tree denial greps over scripts/ and
+#   skills/, relocation-proof by construction.
 # serial-reason: ends with a whole-tree content grep over scripts/ skills/
 #   docs/ README.md, which is the shape that collides with a concurrently
 #   running check writing a fixture into one of those trees even when the two

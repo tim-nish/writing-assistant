@@ -2,6 +2,8 @@
 # parallel-safe
 # tier: inner
 # covers: scripts/draft_gates.py scripts/gate-inventory.py
+# grep-binding: none — asserts over emitted gate records and this repo's
+#   code; no spec or skill prose is content-grepped.
 # removal-signal: every gate surface is composed through the one typed seam
 #   SPEC-writing-assistant's owner-surface register describes, at which point a
 #   surface that reached the owner without an ask row is unrepresentable and

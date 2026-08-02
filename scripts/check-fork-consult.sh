@@ -2,6 +2,8 @@
 # parallel-safe
 # tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
 # covers: scripts/fork-consult.py skills/draft-article/SKILL.md skills/fork-gate-consult-first/SKILL.md skills/review-article/SKILL.md
+# grep-binding: self-owned — the only content grep reads this check's own
+#   source ($0), text the file itself carries.
 # check-fork-consult.sh — verify the fork-gate consult-first contract
 # (SPEC-policy-fork-consultation, #480, Stories 18.11/18.12). POSIX shell +
 # stdlib Python only. Carries the four acceptance criteria the sitting named

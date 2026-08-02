@@ -7,6 +7,8 @@
 #   scripts/probe.py scripts/draft_variants.py skills/draft-article/SKILL.md
 #   skills/draft-article/stages/fan-out.md skills/draft-article/stages/stage3.md
 #   skills/draft-article/stages/gate.md
+# grep-binding: token — the skill greps match run-event command strings
+#   across the skill's file set (SKILL.md + stages/*.md), already set-wide.
 # removal-signal: the run record acquires a declared JSON schema enforced at
 #   the write site by every block command (so a malformed record cannot reach
 #   the file at all), or `run-events.jsonl` stops being the journal

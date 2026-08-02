@@ -16,6 +16,8 @@
 #   before ever declaring it — an inherited exemption signals nothing.
 # tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
 # covers: scripts/draft-pipeline.py skills/completion-summary.md skills/draft-article/**
+# grep-binding: token — the one skill grep matches the 'budget_stop' event
+#   token in completion-summary.md, not relocatable prose.
 # covers-note (#1321): flag `sparse:3-paths/456-lines` ANSWERED BY NARROWING. The derivation
 #   proposed scripts/*.py, from the line that copies the whole scripts/ tree into the fixture
 #   plugin root. That copy is SETUP — it builds a plugin that can run at all — not an

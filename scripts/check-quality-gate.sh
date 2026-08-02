@@ -1,7 +1,12 @@
 #!/usr/bin/env sh
 # parallel-safe
 # tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
-# covers: scripts/draft-pipeline.py scripts/resolve-writing-sources.py skills/draft-article/frameworks/F1-project-introduction.md skills/draft-article/quality-rubric.md skills/draft-article/stages/gate.md
+# covers: scripts/draft-pipeline.py scripts/resolve-writing-sources.py skills/draft-article/**
+# grep-binding: file-set (#1325) — the rubric's judged/mechanical split is read
+#   across the skill's whole file set. The remaining $SKILL greps assert
+#   gate.md's own wording ('stage-progression precondition', '--audience-known',
+#   retry bounds); widening those generic words over the family would weaken
+#   them, so they stay single-file and ride gate.md's own relocation.
 # check-quality-gate.sh — verify the mandatory Stage 3→4 quality gate with
 # bounded retry (Story 11.4). POSIX shell + stdlib Python.
 #
@@ -280,7 +285,10 @@ grep -qi 'stage-progression precondition' "$SKILL" && ok "SKILL: gate is a stage
 grep -qi 'mechanically' "$SKILL" && grep -qi 'single-pass' "$SKILL" \
   && grep -qi 'Dimensions 1–2' "$SKILL" && grep -qi 'Dimension 3 is mechanical' "$SKILL" \
   && ok "SKILL: dims 3+4 mechanical, dims 1-2 single-pass judge (#305)" || err "SKILL missing gate composition"
-grep -qi 'Dimensions 1–2 are judged' "skills/draft-article/quality-rubric.md" \
+# The rubric belongs to the draft-article skill's file set; the split statement
+# is contract wherever in that set it sits (#1322/#1325), so the assertion
+# reads the set rather than one file.
+grep -rqi 'Dimensions 1–2 are judged' skills/draft-article/ \
   && ok "rubric: states the judged/mechanical split (dims 1-2 judged)" || err "rubric missing the split"
 grep -qi -- '--audience-known' "$SKILL" \
   && ok "SKILL: the audience allowlist is passed once, from the ratified answer" \

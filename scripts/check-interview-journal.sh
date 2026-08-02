@@ -2,6 +2,8 @@
 # parallel-safe
 # tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
 # covers: scripts/draft-pipeline.py skills/draft-article/stages/stage2.md
+# grep-binding: denial-tree — the content grep is a denial over the whole
+#   skills/ tree (no stray journal path), relocation-proof by construction.
 # covers-note (#1321): flags `dynamic-path:WS sparse:2-paths/389-lines` BOTH ANSWERED, both
 #   as understood-and-narrow. WS is the per-run mktemp workspace this check drives the
 #   pipeline into — scratch, so it carries no coverage — and once it is discounted the two

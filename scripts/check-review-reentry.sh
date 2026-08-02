@@ -2,6 +2,8 @@
 # parallel-safe
 # tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
 # covers: scripts/draft-pipeline.py scripts/resolve-writing-sources.py skills/draft-article/quality-rubric.md skills/review-article/SKILL.md skills/review-article/phases/arbitration.md skills/review-article/phases/entry.md skills/review-article/phases/passes.md skills/review-article/phases/reentry.md
+# grep-binding: anchor — counts the rubric's own '## Dimension N' headings,
+#   structure the file declares rather than relocatable prose.
 # check-review-reentry.sh — verify review's post-arbitration re-entry (Story
 # 13.70, #371, umbrella #362; SPEC-article-review "Post-arbitration re-entry",
 # SPEC-platform-variants CAP-3). An arbitration round that applied >=1 edit

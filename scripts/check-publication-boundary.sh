@@ -1,6 +1,8 @@
 #!/usr/bin/env sh
 # parallel-safe
 # covers: **
+# grep-binding: denial-tree — a denial sweep for forbidden pin shapes over
+#   specs/, relocation-proof by construction.
 # ^ WIDENED BY HAND from the derived proposal (#1318). scripts/derive-check-coverage.py
 #   read this file's prose and proposed `config/** docs/** scripts/** skills/**
 #   specs/**`, flagging it `broad-only` for exactly this review. Rule set A

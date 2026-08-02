@@ -1,6 +1,9 @@
 #!/usr/bin/env sh
 # parallel-safe
 # covers: scripts/draft-pipeline.py scripts/fixtures/interview-items/r6-default-ineligible-class.json scripts/fixtures/interview-items/r7-default-on-tension.json scripts/resolve-writing-sources.py scripts/validate-fact-sheet.py scripts/validate-interview-items.py skills/policy-influence-report.md
+# grep-binding: token — the skill grep matches the terms of art
+#   'recommended default'/'ratified' in a single-file skill that is its own
+#   whole file set today.
 # check-recommended-default-provenance.sh — end-to-end guards for the
 # recommended-default feature (Story 13.61, SPEC-policy-editorial-direction
 # CAP-6). POSIX shell + stdlib Python, real git fixtures.
