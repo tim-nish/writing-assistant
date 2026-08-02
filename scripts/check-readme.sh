@@ -37,10 +37,16 @@ grep -qiE 'no default|no fixed|asks once|write.*back' "$README" \
   && ok "documents the no-default / ask-once output.drafts behavior" \
   || err "output.drafts no-default behavior not documented"
 
-# Usage: the three skills.
+# Usage: the invocable skills.
+# `harvest` WAS asserted here and is REMOVED with the stage (Story 20.150,
+# #1223). The assertion required the README to document an invocation that no
+# longer exists — skills/harvest/ held only a .gitkeep — so this check was
+# actively holding the stale documentation in place: story 20.150 could not
+# correct the README without turning this check red. A check that pins
+# documentation to a retired capability is not a safety net, it is the defect
+# with a green light, and it fails in the direction nobody looks.
 has 'draft article'                        "documents the draft-article invocation"
 has 'review article'                       "documents the review-article invocation"
-has 'harvest'                              "documents the harvest invocation"
 
 # Development mode retained.
 grep -qi 'development mode' "$README" && ok "documents local-skill development mode" \

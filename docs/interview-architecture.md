@@ -9,6 +9,16 @@ contract)
 worked); 2026-07-10 "cross-cutting (interview & review UX)" and
 "draft-article run (gap interview)" entries
 
+> **Dated note added 2026-08-02 (Story 20.150, #1223).** This record describes
+> the **pre-reorder** pipeline, in which stage 1 was `harvest` and built a fact
+> sheet. That stage is retired: stage 1 is now `probe` (a feasibility verdict
+> plus anchors) and grounding happens per claim at `examine` during fill
+> (#1182, #1220/#1223). The record is left **unrewritten on purpose** — it is a
+> dated decision with an accepted status, and editing it to match the present
+> would destroy the thing it exists to preserve. Read every "harvest" below as
+> naming the stage that then occupied slot 1.
+
+
 This document closes the last of the four 2026-07-11 finding clusters at the
 architecture level: recommended answers, the harvest→interview de-dup
 boundary with diagnostics, and the selective interview flow — the final

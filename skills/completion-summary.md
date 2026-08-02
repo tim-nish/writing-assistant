@@ -1,6 +1,6 @@
 # Completion summary
 
-Every run of this plugin — draft, review, or **standalone harvest** — ends with
+Every run of this plugin — draft or review — ends with
 the same completion summary, then an explicit next step. No run ends by only
 reporting results.
 
@@ -9,7 +9,7 @@ reporting results.
 Partition everything the run surfaced into exactly three labelled buckets:
 
 1. **Informational notes** — things worth knowing that need no action (counts,
-   what was harvested, and — for an article body — the reading-time estimate).
+   what was examined, and — for an article body — the reading-time estimate).
    For a run that reached Stage 5, this bucket also records the **emission
    choice and its outcome** (the platforms offered vs. the owner's `chosen`
    subset, and where each variant file landed — FR57) and, when one fired, the
@@ -102,14 +102,11 @@ not the list's completeness but its non-member fallback, and this one's was
 The cases below are **worked examples beneath that rule**:
 
 - **draft run** → "run review-article on the draft / stop here".
-- **standalone harvest** → "continue into draft-article / stop here", drafted
-  from what the run just produced (fact-sheet entry count, NEEDS-OWNER count) so
-  the choice is informed without opening anything.
 - **review run** → "apply the accepted findings, then re-run review" or "the
   draft is publishable".
 - **partially-completed run** → the resume command above is the next step.
 - **a terrain sitting that ends at a staged stage-0 run** — the case none of the
-  four above matched — → "run harvest now / stop with the brief kept", through
+  three above matched — → "run probe now / stop with the brief kept", through
   its declared builder:
 
   ```
@@ -180,8 +177,10 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/reading-time.py --language <en|ja> <file>
 - **EN**: words ÷ **~200 wpm**.
 - **JA**: characters ÷ **~500 cpm**.
 
-A **standalone harvest** run has **no article body to measure and omits** the
-reading-time estimate — it has a fact sheet, not prose.
+A run with **no article body** — one that stops before fill — **omits** the
+reading-time estimate: there is no prose to measure. (This clause was written
+for standalone harvest, which is retired; the property it states is about the
+absence of a body, so it outlives the run kind that motivated it.)
 
 ## Quality-gate dimension count — from the rubric, never a literal (Story 18.21, #496)
 

@@ -1,9 +1,11 @@
 # writing-assistant
 
 A Claude Code plugin that turns a repository's own specs, docs, and git history
-into publishable articles: a **harvest** step gathers source-pointed facts, a
-**draft** pipeline fills a chosen framework, and a **review** workflow checks the
-result. Installable per-repository so it runs *inside* the repo it writes about.
+into publishable articles: a **probe** checks whether the repository can ground
+the brief at all, a **draft** pipeline fills a chosen framework and **examines**
+each claim against the sources that produced it, and a **review** workflow checks
+the result. Installable per-repository so it runs *inside* the repo it writes
+about.
 
 ## Install
 
@@ -16,7 +18,7 @@ fresh clone of the project you want to write about), run:
 /plugin install writing-assistant@writing-assistant
 ```
 
-That makes the `harvest`, `draft-article`, and `review-article` skills available
+That makes the `draft-article` and `review-article` skills available
 in the host repo as `/writing-assistant:<skill>`. To develop against the plugin
 without installing it, see [Development mode](#development-mode-run-skills-before-packaging).
 
@@ -130,12 +132,12 @@ output:
 (A legacy in-repo `writing-sources.yaml` is still read during migration, with a
 deprecation notice; when both exist the machine-global file wins.)
 
-`harvest` reads **only** the declared `sources` (undeclared repos are never
-read). For a whole-repo scope (`path: .`), add an **`include:` allowlist** so
-harvest reads article material and skips tool/editor/build directories
-(`.claude/`, `_bmad/`, `node_modules/`, …); without one, `path: .` sweeps the
-whole tree and harvest **warns** about the noise it pulled in (the default scope
-is never silently narrowed). **`output.drafts` has no default** — the pipeline
+The pipeline reads **only** the declared `sources` (undeclared repos are never
+read). For a whole-repo scope (`path: .`), add an **`include:` allowlist** so it
+reads article material and skips tool/editor/build directories (`.claude/`,
+`_bmad/`, `node_modules/`, …); without one, `path: .` sweeps the whole tree and
+the run **warns** about the noise it pulled in (the default scope is never
+silently narrowed). **`output.drafts` has no default** — the pipeline
 writes drafts and platform variants there; if the key is missing it asks once
 and offers to write your choice back into `writing-sources.yaml`.
 
@@ -143,15 +145,14 @@ and offers to write your choice back into `writing-sources.yaml`.
 
 ```
 setup                                          # once per repo: guided onboarding, no manual YAML
-harvest                                        # standalone source-pointed fact sheet
-draft article <article-type> from <sources>    # harvest → interview → fill → variants
+draft article <article-type> from <sources>    # probe → interview → fill → examine → variants
 review article <draft>                         # lint → structure → prose → cold read
 ```
 
 - Article types are **intent labels**: "introduce the project", "share
   engineering lessons", "explain the evaluation methodology", "survey a
-  research area". (`F1`–`F4` keep working as the internal/expert alias for the
-  same four, in that order.)
+  research area", "write a working note". (`F1`–`F5` keep working as the
+  internal/expert alias for the same five, in that order.)
 - The draft pipeline marks every inferred claim with `[VERIFY]` and resolves them
   in a bounded owner pass; the review workflow emits capped, severity-tagged
   findings and never auto-edits — you arbitrate.
@@ -162,9 +163,8 @@ review article <draft>                         # lint → structure → prose �
 .claude-plugin/    plugin.json + marketplace.json (repo-as-marketplace packaging)
 skills/
   setup/           once-per-repo guided onboarding: sources, drafts, policy_source
-  draft-article/   harvest → interview → framework fill → variants; frameworks/ assets
+  draft-article/   probe → interview → framework fill → examine → variants; frameworks/ assets
   review-article/  lint → structure → prose → cold read
-  harvest/         source-pointed fact sheet (used by draft-article, invocable alone)
 scripts/           stdlib-only Python / POSIX-shell helpers (no JS/TS)
 config/            user-config + writing-sources examples (identity/engine split)
 specs/             canonical specs: this one + the vendored article specs
@@ -225,7 +225,7 @@ scripts/dev-link.sh plugin-dir-cmd
 claude --plugin-dir /path/to/writing-assistant
 ```
 
-The `harvest`, `draft-article`, and `review-article` skills are then invocable
+The `draft-article` and `review-article` skills are then invocable
 in that host repo (as `/writing-assistant:<skill>` once a manifest names the
 plugin, or `/<skill>` in local mode).
 
@@ -249,7 +249,7 @@ root.
 
 **In dev mode the normal rules still apply:** identity resolves from
 `~/.config/writing-assistant/user-config.yaml` (not this repo's working tree),
-and harvest reads only the sources declared in the host repo's
+and the pipeline reads only the sources declared in the host repo's
 `writing-sources.yaml`. See [`config/README.md`](config/README.md).
 
 Packaging (`plugin.json` + `marketplace.json`) is finalized in Epic 6 once
