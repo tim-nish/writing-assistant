@@ -466,7 +466,7 @@ def cmd_variants(args):
     unresolved = [c for c in _host.VERIFY_CANDIDATE.findall(text) if _host.VERIFY_CANONICAL.match(c)]
     if unresolved:
         sys.stderr.write(f"error: draft still has {len(unresolved)} unresolved [VERIFY] "
-                         "marker(s); complete Stage 4 before emitting variants\n")
+                         "marker(s); complete verification before emitting variants\n")
         return 1
 
     fields, body = _host._read_frontmatter(text)

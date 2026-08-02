@@ -1,6 +1,6 @@
-# Step 3 — the brief, then a normal run
+# Compose the brief, then a normal run
 
-**Read this file on entry to Step 3 of [`../SKILL.md`](../SKILL.md)** — never up
+**Read this file on entry to compose-the-brief of [`../SKILL.md`](../SKILL.md)** — never up
 front, and never because the skill was merely invoked. It carries this step's
 operating detail verbatim; the dispatcher carries the sequence and the
 commands.
@@ -21,7 +21,7 @@ and the command returns all three — **relay them, never paraphrase**:
 - **the named step** (`step.line`) — the act that produced the brief, so the
   owner refers to it rather than to "the message above";
 - **the artifact path** (`artifact.line`) — `--out` writes the composed brief
-  to `$WS/brief.json`. `$WS` came from the path resolver in Step 0 and is
+  to `$WS/brief.json`. `$WS` came from the path resolver at the workspace mint and is
   **outside every working tree**; nothing is written into the host repo, and
   the artifact is the owner's route back to what this step decided;
 - **the lifecycle** (`lifecycle.line`) — `composed → inspected → adopted`,
@@ -40,8 +40,8 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/topic-map-directions.py brief-open \
 ### The named trigger: `open the brief [<path>]` (Story 20.92, #1042)
 
 The move above already shipped; what was missing was **words that reach it**.
-Every accepted invocation phrase began at Step 0, so an owner holding a brief
-had no way to Step 3. `open the brief [<path>]` is that way in — **discovery
+Every accepted invocation phrase began at the workspace mint, so an owner holding a brief
+had no way to compose-the-brief. `open the brief [<path>]` is that way in — **discovery
 for the existing move, not a new capability.** A diff that adds capability here
 has exceeded the story.
 
@@ -58,7 +58,7 @@ heuristic the owner cannot predict:
 
 A workspace may also hold recompositions from the edit-set loop under their own
 names. Those are **named, never guessed between**. And when no brief exists
-anywhere, the trigger **says so plainly** — it does not fall through to Step 0
+anywhere, the trigger **says so plainly** — it does not fall through to the workspace mint
 and it composes nothing.
 
 **The cross-workspace boundary is preserved, and it is the criterion most at
@@ -346,7 +346,7 @@ the owner **compares theses across set variants** instead of remembering them.
 **Retention is WITHIN-SITTING, and that is not a technicality.** The chain
 lives in this run workspace's own brief artifacts; an edit whose `--from` and
 `--out` are in different workspaces is **refused**. A new invocation mints a
-new `$WS` at Step 0 and therefore starts with an empty chain — nothing is
+new `$WS` at the workspace mint and therefore starts with an empty chain — nothing is
 carried across invocations, which is exactly what keeps this comparison clear
 of the cross-invocation cache the never-read-back rule forbids.
 

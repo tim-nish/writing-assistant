@@ -781,7 +781,7 @@ def _render_verdict_record(results, vocab_stamp, dim4_measures, draft_text=None)
     while stale)."""
     def verdict(dim):
         return results.get(dim, ("missing", ""))[0]
-    lines = ["# Stage 3->4 quality-gate verdict record — all four dimensions "
+    lines = ["# fill->verify quality-gate verdict record — all four dimensions "
              "(dim3 inventory + dim4 measures stamped, Story 18.18; sha-bound, "
              "Story 19.15).",
              f"dim1: {verdict('dim1')}",
@@ -979,7 +979,7 @@ def cmd_verify(args):
         if not VERIFY_CANONICAL.match(frag):
             sys.stderr.write(
                 f"error: malformed marker at line {lineno}: {frag}   "
-                "(must be exactly `[VERIFY: <reason>]`; resolve Stage 3 first)\n"
+                "(must be exactly `[VERIFY: <reason>]`; resolve the fill first)\n"
             )
             return 1
         reason = " ".join(frag[len("[VERIFY: "):-1].split())
@@ -4464,7 +4464,7 @@ def cmd_complete(args):
             if gaps:
                 return product_error(
                     "quality verdict record (rubric-verdicts.txt)", verdict_path,
-                    "the Stage 3->4 verdict record is partial — missing "
+                    "the fill->verify verdict record is partial — missing "
                     + ", ".join(gaps) + "; the gate must write all four dimension "
                     "verdicts (dim3 with its inventory stamp, dim4 with measured "
                     "values) before the run may complete")

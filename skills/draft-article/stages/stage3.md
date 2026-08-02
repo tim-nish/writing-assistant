@@ -515,15 +515,15 @@ shared
 [**owner-facing proposal contract**](../../owner-facing-proposal-contract.md)
 (`${CLAUDE_PLUGIN_ROOT}/skills/owner-facing-proposal-contract.md`):
 
-**Step 1 — intent.** Ask "what should a visual in {section} communicate?" with
+**The intent step.** Ask "what should a visual in {section} communicate?" with
 **draft-grounded options** derived from what that section actually argues —
 e.g. *pipeline flow* / *comparison* / *timeline* / *none needed* — never a
 fixed menu. The **table-vs-diagram** decision of the fallback ladder is made
 here (comparative content → table; topological → diagram). **Declining at
-step 1 skips step 2 entirely** and omits the slot with no `[Figure: …]`
+the intent step skips the source step entirely** and omits the slot with no `[Figure: …]`
 residue (unchanged decline semantics).
 
-**Step 2 — source.** For the chosen intent, propose the concrete visual:
+**The source step.** For the chosen intent, propose the concrete visual:
 
 - **where** it lands in the outline (the framework slot, or the section an
   opportunistic visual would sit in);

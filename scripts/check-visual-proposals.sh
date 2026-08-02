@@ -47,11 +47,11 @@ hasin "$sec" 'capped at 2\|at most two'       "opportunistic visuals capped at 2
 hasin "$sec" 'omitted entirely\|no.*residue\|placeholder residue' "declined proposal leaves no residue"
 
 # Two-step intent-before-source (Story 13.29, SPEC-draft-article-ux CAP-3).
-hasin "$sec" 'Step 1.*intent\|step 1 — intent' "step 1 asks the visual's intent"
+hasin "$sec" 'intent step.*Ask\|The intent step' "the intent step asks the visual's intent"
 hasin "$sec" 'communicate'                     "intent question asks what the visual should communicate"
 hasin "$sec" 'draft-grounded'                  "intent options are draft-grounded, not a fixed menu"
 hasin "$sec" 'table-vs-diagram\|table over a diagram' "table-vs-diagram decided at the intent step"
-hasin "$sec" 'skips step 2\|skip step 2'       "declining at step 1 skips step 2"
+hasin "$sec" 'skips the source step\|skip the source step' "declining at the intent step skips the source step"
 hasin "$sec" 'same two-step'                   "opportunistic extras follow the same two-step"
 
 # Story 13.48: a conforming step-2 payload (plain-text sketch + workspace path)

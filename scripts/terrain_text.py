@@ -56,8 +56,8 @@ BUDGETS = {"where": 240, "why": 200, "effect": 140}
 # are this consumer's to choose").
 # --------------------------------------------------------------------------
 
-BRIEF_STEP_ID = "terrain/step-3-compose-the-brief"
-BRIEF_STEP_NAME = "Step 3 — compose the brief"
+BRIEF_STEP_ID = "terrain/compose-the-brief"
+BRIEF_STEP_NAME = "Compose the brief"
 
 # The three states, IN ORDER. The order is the contract: a lifecycle is only
 # legible if the owner can see which state follows which, and transitions are

@@ -3,7 +3,8 @@ name: terrain
 description: >
   Show the terrain before choosing what to write. Invoke as "show the terrain"
   (also accepted, unchanged: "show the topic map", "what could I write about";
-  and "open the brief [<path>]" to re-enter an existing brief at Step 3)
+  and "open the brief [<path>]" to re-enter an existing brief at
+  compose-the-brief)
   to assemble the derived, bounded ELEMENT SURVEY of the hub — every Lesson
   and Journey an individually selectable Strand, quoting its served
   Gloss rendering — navigate it
@@ -35,12 +36,13 @@ open the brief [<path>]
 
 `show the topic map` and `what could I write about` remain accepted triggers —
 the rename is owner-facing vocabulary, not a change to what the owner may type
-(SPEC-terrain, 2026-07-26 amendment). All three still start at **Step 0**,
-unchanged.
+(SPEC-terrain, 2026-07-26 amendment). All three still start at **the workspace
+mint**, unchanged.
 
-**`open the brief [<path>]` enters at Step 3** (Story 20.92, #1042). Re-opening
-was already a first-class move and the subcommand already shipped; what was
-missing was **words that reach it** — every accepted phrase began at Step 0, so
+**`open the brief [<path>]` enters at compose-the-brief** (Story 20.92, #1042).
+Re-opening was already a first-class move and the subcommand already shipped;
+what was missing was **words that reach it** — every accepted phrase began at
+the workspace mint, so
 an owner holding a brief had no way in. This adds discovery for the existing
 move and no capability: it runs `brief-open`, relays the artifact's
 `lifecycle.line`, and walks no screens and loads no corpus. **With no path**
@@ -56,7 +58,7 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-paths.py target --root <host-repo>
 
 Relay it as `Operating on host repo: <path>`.
 
-## Step 0 — mint the run workspace
+## Mint the run workspace
 
 Everything this flow writes is an **intermediate**, never a product: the map,
 the payload, the recorded answer. They go to the run's **workspace under the
@@ -81,11 +83,11 @@ working tree, so the path is the owner's only route back to what a run wrote —
 an exit that names none of its state leaves a question no later query answers
 (#935).
 
-## How to run — the step sequence (dispatcher)
+## How to run — the process sequence (dispatcher)
 
 This file is the **dispatcher** (Story 20.64, #962; the Story 19.3 packaging
 pattern, applied here after the breakdown selected the seam): it carries the
-step sequence, the one command per step, the relay-and-stop rules, and the
+process sequence, the one command per step, the relay-and-stop rules, and the
 standing boundaries — and **nothing else**. Each step's full operating detail
 lives in its companion under [`steps/`](steps/); **on entry to a step, read
 exactly that step's file** and execute it. No companion is read because the
@@ -100,22 +102,23 @@ step files cite them and restate nothing.
 - **Nothing is decided for the owner.** Every screen offers **name your own
   direction** and **stop here**, every Strand is selectable, and stopping is an
   outcome that costs nothing.
-- **One invocation, one corpus load.** The map is assembled once, in Step 1;
-  navigation re-presents held state and never re-assembles or re-invokes.
+- **One invocation, one corpus load.** The map is assembled once, at the map
+  assembly; navigation re-presents held state and never re-assembles or
+  re-invokes.
 
-| Step | Enter by reading | The one command |
+| Process | Enter by reading | The one command |
 |---|---|---|
-| **Step 0 — mint the run workspace** (above; the storage contract) | — (in this file) | `resolve-paths.py new-run --terrain --root <host-repo>` |
-| **Step 1 — assemble the map** (what the map carries; the tag and decision-topic axes; the served journey arc and its typed absence) | [`steps/map.md`](steps/map.md) | `terrain_map.py assemble --root <host-repo> > "$WS/map.json"` |
-| **Step 2 — two screens** (Screen 1's axis payload; Screen 2's whole-member listing, group claim, journey markers and set selection; the Full Report over named group ids; navigation over held state; the size switch) | [`steps/screens.md`](steps/screens.md) | `topic-map-directions.py axis --map "$WS/map.json"` then `topic-map-directions.py member --map "$WS/map.json" --tag <member> --axis <tag\|topic>` |
-| **Step 3 — the brief, then a normal run** (brief composition; set recomposition; the coherence consultant's four rules; the named artifact and its lifecycle; the edit-set iteration loop and its retained compositions; the run mint's handoff) | [`steps/brief.md`](steps/brief.md) | `topic-map-directions.py brief --payloads "$WS/presented-payloads.jsonl" --map "$WS/map.json" --out "$WS/brief.json"` |
-| **Step 4 — the scope statement** (only when the brief carries `gaps`) | [`steps/gap.md`](steps/gap.md) | — (a relay; this step writes nothing anywhere) |
+| **mint the run workspace** (above; the storage contract) | — (in this file) | `resolve-paths.py new-run --terrain --root <host-repo>` |
+| **assemble the map** (what the map carries; the tag and decision-topic axes; the served journey arc and its typed absence) | [`steps/map.md`](steps/map.md) | `terrain_map.py assemble --root <host-repo> > "$WS/map.json"` |
+| **the two screens** (Screen 1's axis payload; Screen 2's whole-member listing, group claim, journey markers and set selection; the Full Report over named group ids; navigation over held state; the size switch) | [`steps/screens.md`](steps/screens.md) | `topic-map-directions.py axis --map "$WS/map.json"` then `topic-map-directions.py member --map "$WS/map.json" --tag <member> --axis <tag\|topic>` |
+| **compose the brief, then a normal run** (brief composition; set recomposition; the coherence consultant's four rules; the named artifact and its lifecycle; the edit-set iteration loop and its retained compositions; the run mint's handoff) | [`steps/brief.md`](steps/brief.md) | `topic-map-directions.py brief --payloads "$WS/presented-payloads.jsonl" --map "$WS/map.json" --out "$WS/brief.json"` |
+| **the scope statement** (only when the brief carries `gaps`) | [`steps/gap.md`](steps/gap.md) | — (a relay; this step writes nothing anywhere) |
 
-**Step routing notes (the dispatcher's whole job):**
+**Routing notes (the dispatcher's whole job):**
 
-- **Step 1:** exit 3 means no articles repo is resolvable — relay the error,
-  which already names the missing declaration, and stop.
-- **Step 2:** Screen 1 offers **both** axes (by tag, by topic) and is the
+- **assemble the map:** exit 3 means no articles repo is resolvable — relay the
+  error, which already names the missing declaration, and stop.
+- **the two screens:** Screen 1 offers **both** axes (by tag, by topic) and is the
   owner's first choice; picking a member leads to Screen 2, and there is no
   third screen. Above the screen budget, Screen 2 becomes a summary plus a
   **View** file path — the composer switches on size and the skill decides
@@ -126,7 +129,7 @@ step files cite them and restate nothing.
   an **inspection** is the `report` subcommand —
   the Full Report relays those groups whole, selects nothing, and never
   recomposes a claim (`steps/screens.md`).
-- **Step 3:** free text always wins. A set of two or more returns the
+- **compose the brief:** free text always wins. A set of two or more returns the
   `consultant` block, whose four rules bind you and may not be traded against
   each other (`steps/brief.md`). The brief is a **named artifact** written to
   `$WS/brief.json`: relay its `step.line`, `artifact.line` and
@@ -147,7 +150,7 @@ step files cite them and restate nothing.
   path from the artifact rather than retyped, and the run is an ordinary
   brief-carrying run: uniform in BEHAVIOUR, while the provenance record does
   distinguish the producers (#1050).
-- **Step 4:** runs **beside** the draft, never instead of it, and only when
+- **the scope statement:** runs **beside** the draft, never instead of it, and only when
   the brief carries `gaps`. It is a relay — a scope statement over the
   selection plus each member's episode disclosure — and it writes nothing,
   asks nothing, and mints no tracking artifact (#1183).
