@@ -48,8 +48,12 @@ cov='{"fact_sheet":[{"claim":"this guide is written for backend engineers"}],"ne
 iv "$cov" F3 | jget 'all(t["rationale"] == "evidence-fallback" for t in d["triage"])' | grep -q True \
   && ok "a covered topic the material did not raise is never a candidate" \
   || err "a question appeared that no NEEDS-OWNER item raised"
-iv "$cov" F3 | jget 'all(q["id"] in ("q8", "depth") for q in d["questions"])' | grep -q True \
-  && ok "...and only the material-raised fallback and the mandated offer reach the owner" \
+# The mandated tier is not material-raised BY DEFINITION and sits outside the
+# capped set, so its members are listed here rather than making this assertion
+# fail every time the tier gains one (Story 20.172, #1283 added `audience`).
+# The property under test is unchanged: no BANK-supplied question may appear.
+iv "$cov" F3 | jget 'all(q["id"] in ("q8", "depth", "audience") for q in d["questions"])' | grep -q True \
+  && ok "...and only the material-raised fallback and the mandated tier reach the owner" \
   || err "an unraised question was presented"
 
 # 3. A NEEDS-OWNER re-raise is ALWAYS recommended — even when the fact sheet also
