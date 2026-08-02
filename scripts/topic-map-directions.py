@@ -134,6 +134,7 @@ from terrain_text import (  # noqa: E402
     BRIEF_LIFECYCLE,
     BRIEF_STEP_ID,
     BRIEF_STEP_NAME,
+    JOURNEY_INCORPORATION_OPTION_LABEL,
     PARTITION_OPTION_LABEL,
     THESIS_CANDIDATES_OPTION_LABEL,
     VIEW_LINE_CHARS,
@@ -146,6 +147,7 @@ from terrain_text import (  # noqa: E402
     _brief_traversal_line,
     _elide,
     _fit,
+    _journey_incorporation_line,
     _partition_proposal_line,
     _short_path,
     _substituted_paths,
@@ -168,6 +170,13 @@ from terrain_theses import (  # noqa: E402
     partition_proposal_block,
     thesis_candidates_block,
     verify_cover,
+)
+
+# JOURNEY-INCORPORATION options over an adopted brief (Story 20.166, #1045).
+# The same mechanism one gate later: composition inputs and requirements out,
+# composed options counted after the fact through the same `cover` dispatch.
+from terrain_journey import (  # noqa: E402
+    journey_incorporation_block,
 )
 
 # The candidate-directions layer this surface proposes with (Story 20.56,
@@ -419,7 +428,8 @@ def _consultant_block(matches, cands, map_data):
 
 
 def _brief_from_index(answer, cands, map_pin, map_data=None,
-                      composed_block=None, judge=None):
+                      composed_block=None, judge=None,
+                      incorporation_block=None):
     """An INDEXED selection from the View: `{index, note}` (Story 18.67, #602),
     where `index` names a SET (Story 20.54, #937).
 
@@ -712,11 +722,36 @@ def _brief_from_index(answer, cands, map_pin, map_data=None,
                 "backlog_line": _fit(_backlog_line(PARTITION_MIN_GROUPS)),
                 **part,
             }
+    # JOURNEY INCORPORATION, AFTER THESIS ADOPTION (Story 20.166, #1045). A
+    # DISCLOSURE riding the brief, never a required slot: the block is absent
+    # on a brief whose members carry no served arc — the gate is simply not
+    # raised — and absent before a thesis is adopted, because the options are
+    # composed against the adopted reading and nothing exists to compose
+    # against earlier. Outside the set-only branch above deliberately: a
+    # one-member brief with an adopted claim and a served arc still owes the
+    # register its disclosure, and the degenerate case takes the same path.
+    ji = journey_incorporation_block(
+        members, answer_pin, claim or None,
+        adopted=answer.get("journey_incorporation"))
+    if ji:
+        out["journey_incorporation"] = {
+            "label": JOURNEY_INCORPORATION_OPTION_LABEL,
+            "line": _fit(_journey_incorporation_line(
+                len(ji["with_journey"]), len(members))),
+            **ji,
+        }
+        # THE COMPOSED OPTIONS ARE RECORDED HERE, by the same rule as the
+        # candidate theses (#1079): an adopted register with no record of
+        # what it was adopted from keeps the answer while losing the
+        # question.
+        if incorporation_block:
+            out["journey_incorporation"].update(incorporation_block)
     return out
 
 
 def brief_from_answer(answer, cands, map_pin=None, map_data=None,
-                      composed_block=None, judge=None):
+                      composed_block=None, judge=None,
+                      incorporation_block=None):
     """The owner's outcome as the brief string for stage-0 `--brief`.
 
     Free text ALWAYS wins: machine-proposed wording becomes the brief only when
@@ -737,7 +772,7 @@ def brief_from_answer(answer, cands, map_pin=None, map_data=None,
     # proposed direction".
     if _selection_terms(answer):
         return _brief_from_index(answer, cands, map_pin, map_data,
-                                 composed_block, judge)
+                                 composed_block, judge, incorporation_block)
     for c in cands:
         if selection == c["direction"]:
             return {"brief": c["direction"], "provenance": "owner-authored",
@@ -918,6 +953,27 @@ def _composed_candidates(doc):
     return block
 
 
+def _composed_incorporation(doc):
+    """The composed incorporation options, as the brief records them (Story
+    20.166, #1045 — the same rule #1079 fixed for the thesis).
+
+    THE WHOLE OFFER SURVIVES, not the adopted one: the rejected options are
+    the provenance of the register choice as much as the taken one is. Read
+    from the same file `cover` reads, so there is one composed artifact and
+    not two.
+    """
+    if not isinstance(doc, dict):
+        raise ValueError("composed incorporation options must be an object")
+    opts = doc.get("options")
+    if not isinstance(opts, list) or not opts:
+        raise ValueError("composed incorporation carries no `options` list")
+    block = {"composed": True, "options": opts}
+    for key in ("recommendation", "over", "pin"):
+        if doc.get(key) is not None:
+            block[key] = doc[key]
+    return block
+
+
 def cmd_brief(args):
     try:
         if getattr(args, "payloads", None):
@@ -960,6 +1016,27 @@ def cmd_brief(args):
             "evidence are the provenance of the choice, and a pinned decision "
             "artifact that drops them keeps the answer while losing the "
             "question.")
+    # THE SAME RULE FOR THE REGISTER (Story 20.166, #1045): adoption may not
+    # outrun the record of what was adopted from. The composed options are
+    # the provenance of the incorporation choice, read from the same file
+    # `cover` counted.
+    incorporation_block = None
+    if getattr(args, "incorporation", None):
+        try:
+            with open(args.incorporation, encoding="utf-8") as fh:
+                incorporation_block = _composed_incorporation(json.load(fh))
+        except (OSError, ValueError) as exc:
+            return _err(f"unreadable composed incorporation options at "
+                        f"{args.incorporation}: {exc}")
+    if str(answer.get("journey_incorporation") or "").strip() \
+            and incorporation_block is None:
+        return _err(
+            "this answer adopts a journey incorporation "
+            "(`journey_incorporation`) but no composed options were given, so "
+            "the brief would record an ADOPTED register with no record of "
+            "what it was adopted from. Pass `--incorporation <the options "
+            "file>` — the same file `cover` reads. The rejected options are "
+            "the provenance of the choice.")
     # THE ITERATION LOOP (Story 20.77, #997). An edit is resolved to a member
     # set BEFORE composition, so everything below is the ordinary indexed
     # path: recomposition is REACHED here, never re-implemented.
@@ -1035,7 +1112,8 @@ def cmd_brief(args):
             # the owner did not restate simply is not there to inherit.
             answer = dict(answer, index=indexes, note=note)
     out = brief_from_answer(answer, cands, map_pin, map_data,
-                            composed_block, getattr(args, 'judge', None))
+                            composed_block, getattr(args, 'judge', None),
+                            incorporation_block)
     # What each selected element's episode DISCLOSES travels beside the brief
     # and the run proceeds — there is no refusal path here on evidence. The
     # host-repo join that used to compute a writability verdict and mint a
@@ -1228,6 +1306,12 @@ RENDERED_KEYS = {
     "candidate_theses": ("line", "label", "requirements", "recommendation",
                          "answer", "inputs"),
     "partition_proposal": ("line", "label", "backlog_line"),
+    # The incorporation block follows candidate_theses' split exactly (Story
+    # 20.166): the requirements, the fill-in template and the recomputable
+    # inputs are gate rendering; the offered options and the adopted register
+    # are decision content and stay.
+    "journey_incorporation": ("line", "label", "requirements",
+                              "payload_contract", "answer", "inputs"),
 }
 
 
@@ -1303,6 +1387,10 @@ def _rehydrate_lines(payload):
         # A re-opened brief derives the count from `n`, which is the stored
         # state — one composer, reading the record rather than a frozen copy.
         it["line"] = _brief_iteration_line(it["n"], max(0, it["n"] - 1))
+    ji = payload.get("journey_incorporation")
+    if isinstance(ji, dict) and isinstance(ji.get("with_journey"), list):
+        ji["line"] = _fit(_journey_incorporation_line(
+            len(ji["with_journey"]), len(payload.get("members") or [])))
     return payload
 
 
@@ -1366,6 +1454,13 @@ def _recompose_gate_blocks(payload, at):
         if isinstance(ct, dict):
             ct["inputs"] = [_member_record(m) for m in matches]
             note["recomposed"].append("candidate_theses.inputs")
+    ji = payload.get("journey_incorporation")
+    if isinstance(ji, dict):
+        ji["inputs"] = {
+            "thesis": (payload.get("adopted_claim")
+                       or (payload.get("thesis") or {}).get("text")),
+            "members": [_member_record(m) for m in matches]}
+        note["recomposed"].append("journey_incorporation.inputs")
     payload["recomposition"] = {
         "authoring": "machine-composed at render time, marked",
         "over": [m.get("id") for m in matches],
@@ -1825,6 +1920,12 @@ def main(argv=None):
                         "#1079): a brief may not reach `adopted` while the "
                         "candidates it was adopted FROM live only in a sibling "
                         "file nothing points at.")
+    b.add_argument("--incorporation", metavar="PATH",
+                   help="the composed journey-incorporation options (the same "
+                        "file `cover` reads). Adopting a register "
+                        "(`journey_incorporation` in the answer) REQUIRES "
+                        "this, by the #1079 rule: the rejected options are "
+                        "the provenance of the choice (Story 20.166, #1045).")
     b.add_argument("--out", metavar="PATH",
                    help=f"write the brief as a durable artifact here — pass "
                         f"the run workspace's {BRIEF_FILENAME} (Story 20.75). "
@@ -1857,8 +1958,10 @@ def main(argv=None):
     cv.add_argument("--composed", required=True, metavar="PATH",
                     help="the composed candidates as JSON: `kind` is "
                          "`candidate-theses` (2–3 candidates, each with its "
-                         "`places`, `omits` and `grounds`) or `partition` "
-                         "(k groups, plus any `dropped` the owner named). "
+                         "`places`, `omits` and `grounds`), `partition` "
+                         "(k groups, plus any `dropped` the owner named), or "
+                         "`journey-incorporation` (2+ options, each with its "
+                         "`incorporation`, `places`, `omits` and `grounds`). "
                          "Read as EMITTED — never re-derived from the inputs "
                          "it was composed from.")
     cv.add_argument("--from", dest="from_brief", required=True, metavar="PATH",

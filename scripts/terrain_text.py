@@ -285,6 +285,27 @@ def _thesis_state_line(state):
             "candidate, or write your own.")
 
 
+JOURNEY_INCORPORATION_OPTION_LABEL = (
+    "choose how the journey material enters — options composed from this "
+    "brief's own thesis and members")
+
+
+def _journey_incorporation_line(n_with, n_members):
+    """The incorporation step, offered after the thesis is adopted (Story
+    20.166, #1045).
+
+    Names how much of the selection actually carries an arc, because that is
+    the fact that makes the choice concrete — and says where the options come
+    from, because "composed from this brief" versus "picked from a menu" is
+    the whole ruling.
+    """
+    return (f"Journey incorporation: {n_with} of {n_members} selected "
+            f"Strand(s) carry a served arc. Options for how that material "
+            f"enters the article are composed from this brief's adopted "
+            f"thesis and members — never from a fixed menu. Your own wording "
+            f"wins over every option.")
+
+
 def _partition_proposal_line(n, k_min):
     """The k-group proposal, offered as a proposal.
 

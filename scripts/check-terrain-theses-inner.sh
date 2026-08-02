@@ -4,7 +4,7 @@
 # every answer, every composed-candidate file and every output; the repository
 # is only read. No shared path, no ambient state, no network.
 # covers: scripts/topic-map-directions.py scripts/terrain_theses.py
-#   scripts/terrain_text.py scripts/strand_cover.py
+#   scripts/terrain_journey.py scripts/terrain_text.py scripts/strand_cover.py
 #   skills/terrain/steps/brief.md
 # tier: inner — CANDIDATE THESES and the k-GROUP PROPOSAL (Story 20.78,
 #   #995/#988) against a derived fixture map; no seam, no corpus, no assembly.
@@ -26,6 +26,12 @@
 # count is the story's own falsifier: a composer that cannot omit in principle
 # can still omit in fact, so the assertions below drive the shipped command
 # over compositions that DO omit, and require the omission to be caught.
+#
+# It also covers the JOURNEY-INCORPORATION option composer (Story 20.166,
+# #1045) — the same mechanism one selection later, asserted in the same file
+# rather than a sibling check, because the falsifiers are the same class: a
+# composition that omits, invents a cite, or narrows, caught by the same
+# after-composition cover.
 set -eu
 
 root=$(git rev-parse --show-toplevel 2>/dev/null) || {
@@ -60,7 +66,12 @@ for n in range(8):
         "date": f"2026-07-{n + 1:02d}",
         "gloss": f"A claim the material itself makes, number {n}",
         "situation": f"LESSONS.md:{n + 10}@abc1234",
-        "evidence": [f"LESSONS.md:{n + 10}@abc1234"], "consumed": False})
+        "evidence": [f"LESSONS.md:{n + 10}@abc1234"], "consumed": False,
+        # A served arc on every widened Strand (Story 20.166): the small
+        # selection then mixes arc-carrying and arc-less members, which is
+        # the state the incorporation cover must count honestly.
+        "journey": f"we assumed one thing, it broke, we hold another ({n})",
+        "journey_cite": f"journeys/w.md:{n + 10}@abc1234"})
 d["elements"] = strands
 json.dump(d, open(w + "/map.json", "w"))
 PYEOF
@@ -143,7 +154,82 @@ put("p-machine-drop", mach)
 solo = json.loads(json.dumps(part))
 solo["groups"] = [{"label": "all of it", "members": big}]
 put("p-one-group", solo)
+# The INCORPORATION fixtures (Story 20.166, #1045). The small selection holds
+# one arc-carrying member (the widened Strand) beside two arc-less ones, so
+# the cover must count over the served material only while the block
+# discloses the rest.
+mem = {m["index"]: m for m in b["members"]}
+served = [i for i in ids if (mem[i].get("journey") or {}).get("served")]
+arc = {i: mem[i]["journey"]["arc_cite"] for i in served}
+gj = lambda xs: [{"index": i, "cite": arc[i]} for i in xs]
+inc = {"kind": "journey-incorporation", "over": ids, "pin": b["pin"],
+       "options": [
+    {"incorporation": "the arc opens its lesson's section as a worked scene",
+     "places": served, "grounds": gj(served)},
+    {"incorporation": "one short story carries the arc, with the thesis as "
+                      "its conclusion",
+     "places": [], "grounds": [],
+     "omits": [{"index": served[0],
+                "why": "the arc restates the thesis at this length"}]}]}
+put("i-good", inc)
+# THE SAME FALSIFIER CLASS: the disclosure removed, the choice removed, the
+# cite invented, and a placement of material the pin does not serve.
+isilent = json.loads(json.dumps(inc)); isilent["options"][1].pop("omits")
+put("i-silent", isilent)
+ione = json.loads(json.dumps(inc)); ione["options"] = ione["options"][:1]
+put("i-one", ione)
+iinv = json.loads(json.dumps(inc))
+iinv["options"][0]["grounds"][0]["cite"] = "INVENTED.md:1@deadbeef"
+put("i-invented", iinv)
+iuns = json.loads(json.dumps(inc))
+iuns["options"][0]["places"] = served + [ids[0]]
+put("i-unserved", iuns)
+# The adoption answers: a thesis adopted alone, and a thesis plus register.
+put("a-adopt", {"index": ids, "note": "n", "pin": b["pin"],
+                "claim": "one reading"})
+put("a-adopt-reg", {"index": ids, "note": "n", "pin": b["pin"],
+                    "claim": "one reading",
+                    "journey_incorporation": inc["options"][1]
+                    ["incorporation"]})
 PYEOF
+
+# --- the incorporation gate is raised by ADOPTION, and travels the same
+# cover (Story 20.166) --------------------------------------------------------
+python3 "$D" brief --answer "$work/a-adopt.json" --map "$work/map.json" \
+  --composed "$work/c-good.json" --out "$work/ws/brief-adopted.json" \
+  > "$work/b-adopted.json" 2>"$work/e-adopt" \
+  && ok "an adopted brief composes with the incorporation block offered" \
+  || err "adoption failed: $(cat "$work/e-adopt")"
+# Adoption of a register may not outrun the record of what it was adopted
+# from — the #1079 rule, applied to the incorporation.
+if python3 "$D" brief --answer "$work/a-adopt-reg.json" \
+     --map "$work/map.json" --composed "$work/c-good.json" \
+     >/dev/null 2>"$work/e-reg-refuse"; then
+  err "a register was adopted with NO composed options recorded"
+else
+  grep -q 'adopted from' "$work/e-reg-refuse" \
+    && ok "adopting a register without the composed options is refused" \
+    || err "wrong register-adoption refusal: $(cat "$work/e-reg-refuse")"
+fi
+python3 "$D" brief --answer "$work/a-adopt-reg.json" --map "$work/map.json" \
+  --composed "$work/c-good.json" --incorporation "$work/i-good.json" \
+  --out "$work/ws/brief-final.json" > "$work/b-final.json" \
+    2>"$work/e-final" \
+  && ok "adopting a register WITH the composed options succeeds" \
+  || err "register adoption failed: $(cat "$work/e-final")"
+python3 "$D" cover --composed "$work/i-good.json" \
+  --from "$work/ws/brief-adopted.json" > "$work/r-inc.json" \
+    2>"$work/e-inc-good" \
+  && ok "a conforming incorporation set passes the cover" \
+  || err "a conforming incorporation set was refused: $(cat "$work/e-inc-good")"
+if python3 "$D" cover --composed "$work/i-silent.json" \
+     --from "$work/ws/brief-adopted.json" >/dev/null 2>"$work/e-inc-silent"; then
+  err "the cover accepted an option that silently dropped a member's arc"
+else
+  grep -q 'says nothing about' "$work/e-inc-silent" \
+    && ok "a silent arc omission is refused, with the member named" \
+    || err "wrong incorporation-omission behaviour: $(cat "$work/e-inc-silent")"
+fi
 
 # --- the COMMAND, at its two ends: a conforming set, and the falsifier ------
 # Two CLI runs, not thirteen. The shipped entry point is exercised here — exit
@@ -172,8 +258,12 @@ for token in 'CANDIDATE THESES' 'never a narrowing of it' \
              'cover counted in placements' 'runs AFTER composition' \
              'Nothing already computes them' 'Free text wins' \
              'must not filter' 'only explicitly' \
-             'never k' 'not a fixed procedure'; do
-  grep -q -- "$token" "$SKILL" && ok "the skill carries: $token" \
+             'never k' 'not a fixed procedure' \
+             'A fixed menu of registers is exactly what must not ship' \
+             'never collapses to rule-statement register' \
+             'never a required slot' \
+             'draft_gates.gate("journey-incorporation"'; do
+  grep -qF -- "$token" "$SKILL" && ok "the skill carries: $token" \
     || err "the skill is missing the contract text: $token"
 done
 
@@ -368,6 +458,64 @@ check(free["brief"] == "my own thesis, in my own words"
       "free text still wins, unchanged")
 check("candidate_theses" not in free and "partition_proposal" not in free,
       "a free-form brief proposes nothing over a set it does not have")
+
+# --- JOURNEY INCORPORATION (Story 20.166, #1045) ----------------------------
+# A disclosure riding the brief, never a required slot; options composed from
+# THIS brief's state; the four ratified requirements frozen; the same
+# after-composition cover.
+adopted = json.load(open(w + "/b-adopted.json"))
+final = json.load(open(w + "/ws/brief-final.json"))
+check("journey_incorporation" not in s,
+      "before a thesis is adopted the register question does not exist — "
+      "the block is absent, not present-and-empty")
+check("journey_incorporation" not in free,
+      "a free-form brief raises no incorporation gate")
+ji = adopted.get("journey_incorporation") or {}
+check(ji.get("state") == "options-pending" and ji.get("composed") is False,
+      "adoption raises the incorporation block, composed by nobody yet — "
+      "`composed: false` is literal, exactly as the thesis block's is")
+check(len(ji.get("with_journey") or []) == 1
+      and len(ji.get("without_journey") or []) == 2
+      and all(x.get("reason") for x in ji.get("without_journey") or []),
+      "the block names which members carry a served arc and discloses the "
+      "rest with a reason — the omission the options never owe")
+reqs = ji.get("requirements") or []
+check(len(reqs) == 4,
+      f"the four ratified requirements travel frozen ({len(reqs)}) — a "
+      "silently dropped requirement still fails this check")
+for phrase in ("cover counted in placements", "SERVED arc rendering",
+               "rule-statement register", "ENUMERATED, never ranked-and-trimmed"):
+    check(any(phrase in r for r in reqs),
+          f"the requirements carry: {phrase}")
+check("options" not in ji,
+      "no option is authored at the gate — a fixed register enumeration is "
+      "exactly what must not ship (per-brief composition, never a menu)")
+check((ji.get("inputs") or {}).get("thesis") == "one reading",
+      "the composition inputs carry THIS brief's adopted thesis — the state "
+      "the options are composed against")
+jf = final.get("journey_incorporation") or {}
+check(jf.get("state") == "adopted" and jf.get("adopted")
+      and len(jf.get("options") or []) == 2,
+      "an adopted register records the WHOLE offer beside the choice — the "
+      "rejected option is the provenance of the choice (#1079's rule)")
+for k in ("line", "label", "requirements", "answer", "inputs",
+          "payload_contract"):
+    check(k not in jf,
+          f"the artifact stores no `journey_incorporation.{k}` — rendering "
+          "and process documentation are composed at the screen (#1078)")
+# The cover, over the emitted options, against the served material only.
+r = json.load(open(w + "/r-inc.json"))
+o1, o2 = r["options"]
+check(r.get("counted") == "after-composition"
+      and o1["placed"] == o1["selected"] == 1 and o1["complete"],
+      "an option placing every served arc is counted complete")
+check(o2["placed"] == 0 and o2["disclosed"] and not o2["undisclosed"]
+      and not r["refusals"],
+      "a DISCLOSED omission is named and offered anyway — annotation, "
+      "never narrowing")
+refuses("i-one", "brief-adopted.json", "at least")
+refuses("i-invented", "brief-adopted.json", "invented material")
+refuses("i-unserved", "brief-adopted.json", "not served at this pin")
 sys.exit(1 if fail else 0)
 PYEOF
 [ $? -eq 0 ] || fail=1

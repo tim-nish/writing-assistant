@@ -170,6 +170,11 @@ CARRIED = {
     # declares which question the note answered, since the adoption gate
     # inherits the selection gate's free text.
     "thesis_origin", "answer_as_given", "note_is",
+    # Story 20.166 (#1045): the journey-incorporation disclosure — present
+    # only on a brief with an adopted thesis and served arcs, asserted below
+    # on the adopted fixture. A DISCLOSURE, never a required slot: its
+    # absence from the claim-less briefs is asserted too.
+    "journey_incorporation",
 }
 INTERIM = {  # present today, scheduled for removal, named with its issue
     "step": 1079, "lifecycle": 1079, "artifact": 1079, "iteration": 1079,
@@ -189,6 +194,8 @@ RENDERED = {
     "candidate_theses": ("line", "label", "requirements", "recommendation",
                          "answer", "inputs"),
     "partition_proposal": ("line", "label", "backlog_line"),
+    "journey_incorporation": ("line", "label", "requirements",
+                              "payload_contract", "answer", "inputs"),
 }
 
 s = json.load(open(w + "/set.json"))
@@ -240,6 +247,22 @@ check(_lf.get("state") == "adopted"
 check((s.get("lifecycle") or {}).get("state") == "composed",
       "#1208: ...and a brief whose thesis was never adopted stays `composed`, "
       "exactly as before")
+
+# THE JOURNEY-INCORPORATION DISCLOSURE (Story 20.166, #1045). It RIDES the
+# adopted brief — these fixture members all carry served arcs — and never
+# exists as a required slot: the claim-less briefs carry no block at all.
+_ji = adopted.get("journey_incorporation") or {}
+check(_ji.get("state") == "options-pending" and _ji.get("composed") is False
+      and _ji.get("with_journey") == ["L1", "L2", "L3"],
+      "20.166: an adopted brief over arc-carrying members raises the "
+      "incorporation disclosure, composed by nobody yet")
+for k in RENDERED["journey_incorporation"]:
+    check(k not in _ji,
+          f"20.166: `journey_incorporation.{k}` is not stored — the screen "
+          "composes it at render time (#1078)")
+check("journey_incorporation" not in s and "journey_incorporation" not in one,
+      "20.166: before a thesis is adopted no incorporation slot exists — a "
+      "disclosure is absent, never present-and-empty")
 
 for name, b in (("a 3-member set", s), ("a 1-member set", one)):
     keys = set(b)

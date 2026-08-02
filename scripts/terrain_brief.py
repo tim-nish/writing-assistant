@@ -157,6 +157,13 @@ BRIEF_KEYS = frozenset({
     "partition_proposal",  # the k-group partition OFFERED at the gate (#988) —
                            # provenance of the owner's approve/modify/decline,
                            # the same role `candidate_theses` plays for a thesis
+    "journey_incorporation",  # how the members' journey material enters the
+                              # article (Story 20.166, #1045) — a DISCLOSURE
+                              # riding the brief, present only where served
+                              # arcs exist and a thesis is adopted; carries
+                              # the offered options and the adopted choice,
+                              # the same provenance role `candidate_theses`
+                              # plays for the thesis
     "edit",                # the signed set change (`+L12 −L3`) that produced a
                            # recomposition (#997). The owner names what changes,
                            # so this is unrecomposable owner history, not a
