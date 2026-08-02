@@ -263,12 +263,29 @@ if ! printf '%s' "$out" | grep -q 'policy_source.track_topics.ghost-track'; then
   ok "existence lint degrades when the gateway cannot enumerate (unreachable ≠ config error)"
 else err "existence lint hard-failed on an unreachable gateway (out='$out')"; fi
 
-# 8e. The draft SKILL documents the mapped default-recommendation behavior.
-grep -q 'track_topics' "$DRAFT" \
-  && grep -qi 'default recommendation' "$DRAFT" \
-  && grep -qi 'never.*silently\|approves/overrides' "$DRAFT" \
-  && ok "draft SKILL documents the mapped default recommendation (never silently applied)" \
-  || err "draft SKILL missing the track_topics default-recommendation contract"
+# 8e. The topic ask is RETIRED (Story 20.160, #1255; SPEC-policy-topic-at-draft
+#     amended 2026-08-02, #1246 — owner ruling). This assertion used to require
+#     the draft SKILL to document `track_topics` seeding a DEFAULT
+#     RECOMMENDATION for the ≤2-topic proposal. There is no proposal any more,
+#     so that contract is obsolete — and an assertion guarding a retired
+#     mechanism is worse than none: it fails green work and teaches the reader
+#     that the mechanism still lives. Inverted rather than deleted, so the
+#     retirement keeps a carrier: the ask must be ABSENT and the claim-bounded
+#     transport PRESENT.
+#     The `track_topics` CONFIG KEY itself is still validated by 8a-8d above;
+#     removing the key is story 20.161's, not this assertion's.
+#     Asserted on the INVOCATION, not on the prose: stage2.md quotes the
+#     retired question verbatim in its own retirement note, so a string-absence
+#     sweep over the text cannot tell a mention from a use — the enumerated-
+#     prohibition trap. The registry is the real carrier for the gate's absence
+#     (`check-gate-inventory.sh`); here the carrier is what the stage RUNS.
+if grep -qE '(^|[^-])read --topics' "$DRAFT"; then
+  err "the draft SKILL still invokes the retired \`read --topics\` pre-pick (#1246)"
+elif grep -q 'query --claim' "$DRAFT"; then
+  ok "topic ask retired; the policy read is claim-bounded (#1246)"
+else
+  err "draft SKILL invokes neither \`read --topics\` nor \`query --claim\`"
+fi
 
 # 9. The `journey:` config key is RETIRED (Story 20.134, #1183). Its only
 #    consumer was the host-repo episode join, which is removed, so the key, its
