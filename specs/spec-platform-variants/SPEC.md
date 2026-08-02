@@ -195,7 +195,13 @@ per publish decision.**
 - **Emission asserts the reviewed-canonical promise it makes (amended
   2026-07-25, triage #716).** This spec and SPEC-article-draft-pipeline both
   describe emission as consuming the "persisted, **reviewed** canonical"
-  (`:74` here; `specs/spec-article-draft-pipeline/SPEC.md:30`, `:76`). Only
+  (`:74` here; `specs/spec-article-draft-pipeline/SPEC.md:42` — CAP-4's
+  intent — and that spec's 2026-07-18 #361/#362 amendment,
+  `specs/spec-article-draft-pipeline/amendments-2026-07-10--2026-08-01.md:29`.
+  Pointer repaired 2026-08-02, #1317: the citation was written as
+  `SPEC.md:30`, `:76`, correct at the amendment commit, and drifted as that
+  spec grew and relocated its amendments (#829/#1311) and constraints
+  (#1294); the cited clauses are unchanged and still say this). Only
   *persisted* was ever checked, so "reviewed" was a promise no mechanism
   carried — the enforced-mechanism invariant (#534) applied and was unmet.
   Emission therefore reads what durable review evidence exists for the source
