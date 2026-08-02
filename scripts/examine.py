@@ -278,6 +278,134 @@ def anchors_offered(evidence):
             + [f"ref:{r}" for r in sorted(refs)[:12]])
 
 
+def _etag_cache_dir():
+    """Where conditional-request ETags live (Story 20.165, #1249).
+
+    A LONGER-LIVED cache dir, not the run workspace: the amendment's stated
+    win is repeat consultations "across claims AND RUNS" returning 304, and a
+    workspace-scoped cache buys only the within-run half. The invalidation
+    story a long-lived cache normally owes is discharged by the protocol
+    itself — every use RE-REQUESTS conditionally, so a stale entry can only be
+    served after GitHub answers 304, i.e. after the origin has confirmed it is
+    current. What is not discharged is unbounded growth: entries are small
+    (one thread each) and are never evicted here.
+    """
+    override = os.environ.get("EXAMINE_ETAG_CACHE")
+    if override:
+        return override
+    base = (os.environ.get("XDG_CACHE_HOME")
+            or os.path.join(os.path.expanduser("~"), ".cache"))
+    return os.path.join(base, "writing-assistant", "issue-threads")
+
+
+def _repo_identity(root):
+    """Stable per-repository key. Issue numbers collide across repositories,
+    so the cache key carries the repository. Read from the local remote —
+    never a network call, which would defeat the point of the cache."""
+    ok, out, _ = run(["git", "-C", root, "remote", "get-url", "origin"],
+                     timeout=10)
+    ident = (out or "").strip()
+    if not ok or not ident:
+        ident = os.path.realpath(root)
+    return re.sub(r"\.git$", "", ident)
+
+
+def _thread_cache_path(root, number, ident=None):
+    key = f"{ident if ident is not None else _repo_identity(root)}#{number}"
+    digest = hashlib.sha256(key.encode("utf-8")).hexdigest()[:24]
+    return os.path.join(_etag_cache_dir(), f"{digest}.json")
+
+
+def _read_thread_cache(path):
+    try:
+        with open(path, encoding="utf-8") as fh:
+            data = json.load(fh)
+    except (OSError, ValueError):
+        return None
+    if isinstance(data, dict) and isinstance(data.get("thread"), list):
+        return data
+    return None
+
+
+def _parse_http_response(text):
+    """(status, headers, body) from `gh api -i` output.
+
+    `--include` prints the status line and response headers before the body,
+    and gh still exits non-zero on a non-2xx status — which is how a 304 is
+    told apart from an unreachable endpoint: the status line is present.
+    """
+    head, sep, rest = text.partition("\r\n\r\n")
+    if not sep:
+        head, sep, rest = text.partition("\n\n")
+    if not sep:
+        return None, {}, text
+    lines = head.replace("\r\n", "\n").split("\n")
+    if not lines or not lines[0].startswith("HTTP"):
+        return None, {}, text
+    parts = lines[0].split()
+    status = int(parts[1]) if len(parts) > 1 and parts[1].isdigit() else None
+    headers = {}
+    for ln in lines[1:]:
+        k, s, v = ln.partition(":")
+        if s:
+            headers[k.strip().lower()] = v.strip()
+    return status, headers, rest
+
+
+def fetch_issue_thread(root, number, ident=None):
+    """One issue's comments, over the REST CORE pool, conditionally (#1249).
+
+    Returns `(thread, ok)`. `ok` false is CANNOT-DETERMINE — `gh` missing or
+    the endpoint unreachable — and the caller marks the item
+    `thread_unavailable` rather than recording an empty thread as absence.
+
+    The endpoint is `repos/{owner}/{repo}/issues/{number}/comments`; the
+    `{owner}`/`{repo}` placeholders are gh's own, resolved from `cwd`, so this
+    reads the same repository the list call does. Only the THREAD fetch moves:
+    the term-searched list call above stays on GraphQL, because the REST
+    endpoint preserving its semantics is `/search/issues` at a limit of 30.
+    """
+    path = _thread_cache_path(root, number, ident)
+    cached = _read_thread_cache(path)
+    cmd = ["gh", "api", "-i", "-H", "Accept: application/vnd.github+json",
+           "--method", "GET",
+           f"repos/{{owner}}/{{repo}}/issues/{number}/comments",
+           "-F", "per_page=100"]
+    if cached and cached.get("etag"):
+        cmd += ["-H", "If-None-Match: " + cached["etag"]]
+    ok, out, _err = run(cmd, cwd=root, timeout=60)
+    status, headers, body = _parse_http_response(out or "")
+    if status == 304:
+        # Costs nothing against the rate limit, and the origin has just
+        # confirmed the cached thread is current.
+        return list(cached["thread"]) if cached else [], True
+    if not ok or status is None or not (200 <= status < 300):
+        return None, False
+    try:
+        rows = json.loads(body)
+    except ValueError:
+        return None, False
+    if not isinstance(rows, list):
+        return None, False
+    # AC-7 (pull requests are not admitted) has NO live case here: this is the
+    # comments collection of ONE already-selected issue, not a list of issues,
+    # so no row can carry a `pull_request` key and no filter is introduced. The
+    # guard belongs wherever a list-shaped REST *issues* response is added —
+    # this story adds none, because the selecting list call does not move.
+    thread = [{"when": (c.get("created_at") or "")[:10],
+               "excerpt": (c.get("body") or "").strip()[:800]}
+              for c in rows if isinstance(c, dict)]
+    etag = headers.get("etag")
+    if etag:
+        try:
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            _atomic_write(path, json.dumps({"etag": etag, "thread": thread}))
+        except OSError:
+            pass    # a cache that cannot be written is a slower read, not a
+                    # different finding
+    return thread, True
+
+
 def examine_issues(root, terms, limit, with_comments):
     """Issues and their threads. A thread is a position moving in public —
     the problem, the deliberation, and what was decided, in order."""
@@ -295,6 +423,7 @@ def examine_issues(root, terms, limit, with_comments):
     except ValueError:
         return [], "gh returned unparseable JSON"
     items = []
+    ident = _repo_identity(root) if with_comments else None
     for r in rows:
         item = {
             "source_type": "issue",
@@ -314,18 +443,14 @@ def examine_issues(root, terms, limit, with_comments):
             # is a marked partial: the decision usually lives in the comments,
             # which is exactly the property that makes an issue an episode
             # source rather than another state document.
-            ok2, cout, _ = run(
-                ["gh", "issue", "view", str(r["number"]), "--json", "comments"],
-                cwd=root, timeout=60)
+            #
+            # This read rides the REST CORE pool with a conditional request
+            # (#1249): it is the term that multiplies with claim count, so it
+            # is the one that moves off GraphQL, and a thread consulted before
+            # answers 304 and costs nothing.
+            thread, ok2 = fetch_issue_thread(root, r["number"], ident)
             if ok2:
-                try:
-                    for c in json.loads(cout).get("comments", []):
-                        item["thread"].append({
-                            "when": (c.get("createdAt") or "")[:10],
-                            "excerpt": (c.get("body") or "").strip()[:800],
-                        })
-                except ValueError:
-                    pass
+                item["thread"] = thread
             else:
                 item["thread_unavailable"] = True
         items.append(item)
