@@ -258,6 +258,176 @@ def _render_errors(item, tag, choices):
                    "belongs to the block form; this payload fits the control")
 
 
+# --- DECIDABILITY (Story 20.152, #1222) ----------------------------------
+# The THIRD axis on a gate item. The owner-facing proposal contract binds an
+# ask's FORM (`SPEC.md:76`), gate-item content grounding binds its PREMISES
+# (`:79`), and the owner-surface register binds its REGISTER (`:80`). None of
+# them tests whether the recipient can DECIDE. On 2026-08-02 a run was
+# abandoned at Stage 3 after the owner answered several gates by picking the
+# first option every time — "I selected the first option because the question
+# was incomprehensible" — and every shipped check passed. The recorded answers
+# were then consumed downstream as authoritative, which is why this is a
+# correctness rule and not a politeness one.
+#
+# THE SPLIT IS THE DESIGN, and it comes from `SPEC.md:80`'s own discriminator:
+# a check deciding a MECHANICAL FACT is an ordinary check; a check that must
+# READ A PROPOSAL AND RULE ON IT is a judgment and "may not become an automated
+# blocking member". So of #1222's five obligations, exactly the two that are
+# mechanical are enforced here, and the three that are judgments are reported
+# for a human-present gate — never silently dropped, and never quietly
+# promoted to blockers.
+#
+#   DENIED here (mechanical):
+#     3. a recommendation exists, or its absence is declared
+#     5. a stage transition carries no stage name
+#   REPORTED, not denied (judgment):
+#     1. the ask names the concrete thing being decided
+#     2. evidence precedes the options, or its absence is stated
+#     4. no derivable parameter is asked as a blank
+#
+# Stage names are DERIVED from the gate registry, never listed here: a literal
+# list would be a conformance copy that drifts the first time a stage is
+# renamed, which is exactly what happened to `harvest-entry`.
+
+_dg_mod = None
+
+
+def _dg():
+    """The gate registry, loaded lazily and defensively. `draft_gates` imports
+    nothing from this module, so there is no cycle — but a failure here must
+    degrade to "no stage names known" rather than breaking every payload
+    validation in the repository."""
+    global _dg_mod
+    if _dg_mod is None:
+        here = os.path.dirname(os.path.realpath(__file__))
+        spec = importlib.util.spec_from_file_location(
+            "draft_gates_for_stages", os.path.join(here, "draft_gates.py"))
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        _dg_mod = mod
+    return _dg_mod
+
+
+def _stage_names():
+    try:
+        names = {str(v.get("stage") or "") for v in _dg().GATES.values()}
+    except Exception:
+        return set()
+    out = set()
+    for n in names:
+        n = n.strip().lower()
+        if n:
+            out.add(n)
+            # "stage 2" also appears bare as "stage 2" inside prose; the
+            # multi-word forms ("after stage 0, before probe") are matched
+            # whole, and their bare "stage N" component separately.
+            for tok in ("stage 0", "stage 1", "stage 2", "stage 3",
+                        "stage 4", "stage 5"):
+                if tok in n:
+                    out.add(tok)
+    return out
+
+
+# A continuation ask is the shape obligation 5 governs: a two-option
+# proceed/stop pair. Detected by SHAPE, never by gate id, so a new
+# continuation gate inherits the rule instead of having to be added to a list.
+_CONTINUE = ("continue", "proceed", "run ", "go on", "next")
+_STOP = ("stop", "keep", "pause", "halt", "leave it")
+
+
+def _is_continuation(choices):
+    if len(choices) != 2:
+        return False
+    labels = [" ".join(str((c or {}).get("label") or "").split()).lower()
+              for c in choices]
+    has_go = any(any(t in l for t in _CONTINUE) for l in labels)
+    has_stop = any(any(t in l for t in _STOP) for l in labels)
+    return has_go and has_stop
+
+
+def _decidability_errors(item, tag):
+    """Yield (path, reason) for the MECHANICAL half of #1222 only."""
+    choices = item.get("choices")
+    if not isinstance(choices, list) or not choices:
+        return
+
+    # Obligation 3 — a recommendation, or a declared reason there is none.
+    # `render.recommended` is the shipped field (Story 20.107); an item with
+    # more than one option and no recommendation leaves the owner to weigh
+    # the alternatives with nothing from the machine, which is the input the
+    # fork-gate rule calls the hardest one.
+    render = item.get("render")
+    if len(choices) > 1 and isinstance(render, dict):
+        if render.get("recommended") is None and not item.get("no_recommendation"):
+            yield (f"{tag}.render.recommended",
+                   "no recommendation and no declared reason for its absence "
+                   "— an ask offering several options owes the machine's own "
+                   "comparison, or an explicit `no_recommendation` saying why "
+                   "it cannot make one")
+
+    # Obligation 5 — a stage transition is Yes/No in plain terms, never a
+    # stage name. "Next is Stage 3" is the observed shape: the owner's own
+    # finding was that nobody, including the designer, knew what Stage 3 was.
+    if _is_continuation(choices):
+        stages = _stage_names()
+        for field in ("where", "why"):
+            text = " ".join(str(item.get(field) or "").split()).lower()
+            for name in sorted(stages, key=len, reverse=True):
+                if name and name in text:
+                    yield (f"{tag}.{field}",
+                           f"a continuation ask names the stage {name!r}; say "
+                           "plainly what happens next and what it costs — a "
+                           "stage name is the pipeline's vocabulary, not the "
+                           "owner's")
+                    break
+        for j, ch in enumerate(choices):
+            label = " ".join(str((ch or {}).get("label") or "").split()).lower()
+            for name in sorted(stages, key=len, reverse=True):
+                if name and name in label:
+                    yield (f"{tag}.choices[{j}].label",
+                           f"a continuation option names the stage {name!r}; "
+                           "the label states the effect, never the stage")
+                    break
+
+
+def decidability_reports(payload):
+    """The JUDGMENT half of #1222 — surfaced for a gate where a human is
+    present, never raised as a blocking defect.
+
+    `SPEC.md:80` is explicit that a check which must read a proposal and rule
+    on it "rides an existing gate rather than becoming a new blocking hook,
+    otherwise the remedy for too many enumerated gates is a new enumerated
+    gate". These three obligations cannot be decided without reading intent,
+    so they are reported and the human arbitrates.
+    """
+    items = payload["items"] if isinstance(payload, dict) and "items" in payload \
+        else payload if isinstance(payload, list) else [payload]
+    out = []
+    for i, item in enumerate(items):
+        if not isinstance(item, dict):
+            continue
+        tag = f"item[{i}]"
+        why = " ".join(str(item.get("why") or "").split())
+        # Obligation 2 — evidence, or an explicit statement that there is none.
+        # The mechanical proxy is deliberately weak and labelled as such: a
+        # `why` carrying no digit, no pointer and no lacks-marker is a
+        # CANDIDATE for the judgment, never a verdict on it.
+        if why and not any(ch.isdigit() for ch in why) \
+                and "://" not in why and ":" not in why \
+                and "no " not in why.lower() and "cannot" not in why.lower():
+            out.append((f"{tag}.why", "obligation 2 (judgment): carries no "
+                        "number, pointer, or explicit statement that the "
+                        "system lacks the evidence — check it gives the owner "
+                        "a basis to decide"))
+        # Obligations 1 and 4 need intent, so they are named for the reader
+        # rather than guessed at here.
+        out.append((tag, "obligations 1 and 4 (judgment): confirm the ask "
+                    "names the concrete thing being decided (which repository, "
+                    "which file, which sentence) and asks for nothing the "
+                    "system could derive"))
+    return out
+
+
 def validate(payload, require_render=False):
     """Yield (path, reason) for every defect; empty iterator means presentable."""
     if isinstance(payload, dict) and "items" in payload:
@@ -296,6 +466,7 @@ def validate(payload, require_render=False):
                    "no render directive — a gate declares how it renders, or "
                    "the rendering step is free to compose prose from it")
         yield from _render_errors(item, tag, choices)
+        yield from _decidability_errors(item, tag)
 
 
 CAPTURE_FILE = "presented-payloads.jsonl"

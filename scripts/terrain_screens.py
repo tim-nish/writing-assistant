@@ -39,6 +39,20 @@ from draft_gates import CONTROL_CAPACITY, OVERFLOW_MARGIN  # noqa: E402
 from draft_gates import emit, render_form  # noqa: E402
 
 
+# THE DECLARED ABSENCE OF A RECOMMENDATION (Story 20.152, #1222).
+# The decidability axis denies a multi-option ask that neither recommends nor
+# says why it cannot. Terrain screens are the honest exception, and the reason
+# is a RATIFIED REFUSAL rather than an oversight: Top-N was WITHDRAWN because
+# it "HID groups by a machine judgment about which mattered — a narrowing the
+# owner did not make", and the compact all-groups form replaced it precisely so
+# that nothing reaching the owner is smaller than what exists. A `recommended`
+# index here would re-introduce that judgment one field over. Declaring it in
+# the payload makes the refusal visible to every reader instead of leaving an
+# empty field that looks like a gap.
+NO_RECOMMENDATION = ("this screen navigates rather than proposes; ranking "
+                     "members would be a narrowing the owner did not make")
+
+
 def _render(choices, banner, reply_line):
     """A screen's render directive.
 
@@ -345,6 +359,7 @@ def compose_axis_payload(map_data, ws=None):
                      "is shown whole.",
                      BUDGETS["why"]),
         "choices": choices,
+        "no_recommendation": NO_RECOMMENDATION,
         "render": _render(
             choices,
             "Choose where to look first — one member, by tag or by topic.",
@@ -408,6 +423,7 @@ def compose_payload(map_data, cands, view_path=None, ws=None):
             + (f" {note}" if note else ""), BUDGETS["where"]),
         "why": _fit(WHY_TEXT, BUDGETS["why"]),
         "choices": choices,
+        "no_recommendation": NO_RECOMMENDATION,
         "render": _render(
             choices,
             "Choose a direction to draft, or name your own.",
@@ -454,6 +470,7 @@ def _compose_summary_payload(map_data, view_path, ws=None):
         ], view_path, BUDGETS["where"]),
         "why": _fit(WHY_TEXT, BUDGETS["why"]),
         "choices": choices,
+        "no_recommendation": NO_RECOMMENDATION,
         "render": _render(
             choices,
             "Choose a direction from the View, or name your own.",

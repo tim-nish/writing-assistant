@@ -342,7 +342,8 @@ def emit(built, ws, gate):
 
 
 def payload(where, why, choices, free_text=True, recommended=None,
-            banner=None, reply_line=None, gate=None, ws=None):
+            banner=None, reply_line=None, gate=None, ws=None,
+            no_recommendation=None):
     """One gate item in the shipped payload shape.
 
     `free_text` is TRUE by default and is the contract's other half: options
@@ -369,6 +370,15 @@ def payload(where, why, choices, free_text=True, recommended=None,
                     for c in choices],
         "render": form,
     }
+    if no_recommendation:
+        # THE DECLARED ABSENCE (Story 20.152, #1222). An ask with several
+        # options owes the machine's comparison; where the machine genuinely
+        # has no basis to rank — an owner's editorial intent, say — the
+        # honest form is to SAY SO in the payload rather than to leave the
+        # field empty, because an empty field and a considered "I cannot
+        # rank these" are indistinguishable to every reader and every check.
+        item["no_recommendation"] = _plain(no_recommendation,
+                                           "no_recommendation")
     if form.get("overflow"):
         # DISCLOSED, NEVER HIDDEN (#1206): an overflow member's entry path is
         # the free-text channel, so the channel must exist and the member must
@@ -460,11 +470,22 @@ def intent_gate(labels, ws=None):
         named = "; ".join(f"'{p}'" for p in ordered[CONTROL_CAPACITY:])
         why += f" Also on offer, entered as free text: {named}."
     return payload(
-        where="Stage 0, before any workspace is minted: the article type "
-              "decides which framework the draft is filled from.",
+        where="Before any drafting starts: the article type decides which "
+              "shape the draft is written in.",
         why=why,
         choices=choices,
         gate="intent", ws=ws,
+        # NO RECOMMENDATION, DECLARED (Story 20.152, #1222). An ask offering
+        # several options owes the machine's own comparison — that is the
+        # standing fork-gate rule and this validator now enforces it. This is
+        # the honest exception rather than a waiver: the five article types are
+        # the OWNER'S EDITORIAL INTENT, and nothing the machine has read ranks
+        # "introduce the project" against "share engineering lessons". A
+        # recommendation here would be a default wearing a suggestion's
+        # clothes, which is exactly what that rule forbids.
+        no_recommendation="the article type is the owner's editorial intent; "
+                          "nothing the machine has read ranks one against "
+                          "another",
     )
 
 
@@ -495,8 +516,8 @@ def probe_entry_gate(source_count, ws=None, brief=True):
     """
     kept = "brief" if brief else "staged run"
     return payload(
-        where="After stage 0: the run is staged with its article type and its "
-              "sources, and nothing has been read yet.",
+        where="The run is set up with its article type and its sources, and "
+              "nothing has been read yet.",
         why=f"Probe checks whether the {source_count} declared source(s) can "
             f"ground this brief, and points at where the evidence sits. The "
             f"{kept} and the staged run are already written, so stopping "
