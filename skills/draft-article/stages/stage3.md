@@ -300,7 +300,7 @@ Structurally validate it — pass `--draft` so the anchors are checked against
 the draft they claim to describe — and write it to `$WS`:
 
 ```
-python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py provenance --map <map> --draft <draft> \
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py provenance --ws "$WS" --map <map> --draft <draft> \
   && cp <map> "$WS/provenance-map.txt"
 ```
 
@@ -602,7 +602,7 @@ owner's tooling. The plugin bundles no such tools.
 **Fill exit → the quality gate.** Read [`gate.md`](gate.md) and run:
 
 ```
-python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py quality-gate --draft … --map … --judge …
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py quality-gate --ws "$WS" --draft … --map … --judge …
 ```
 
 The fill does not complete until that gate passes — it is a stage-progression

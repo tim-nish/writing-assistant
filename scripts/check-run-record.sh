@@ -5,7 +5,8 @@
 #   adoption (2026-08-02) well under the runner's INNER_MS ceiling.
 # covers: scripts/run_record.py specs/spec-run-record/** scripts/draft-pipeline.py
 #   scripts/probe.py scripts/draft_variants.py skills/draft-article/SKILL.md
-#   skills/draft-article/stages/fan-out.md
+#   skills/draft-article/stages/fan-out.md skills/draft-article/stages/stage3.md
+#   skills/draft-article/stages/gate.md
 # removal-signal: the run record acquires a declared JSON schema enforced at
 #   the write site by every block command (so a malformed record cannot reach
 #   the file at all), or `run-events.jsonl` stops being the journal
@@ -431,6 +432,30 @@ else
 fi
 grep -q -- '--event subagent' skills/draft-article/stages/fan-out.md \
   || err "the fan-out's `--event subagent` basis was neither preserved nor re-homed (AC-4)"
+
+# --- CAP-1: every DOCUMENTED block invocation passes --ws, by construction ----
+# `run_record.workspace_of` falls back to $WS and then to the resolver's
+# active-run pointer, so an omitted `--ws` ships INERT rather than broken — the
+# shape that would have shipped story 20.182 dead (stage2.md) and recurred in
+# #1306 (review-article/phases/passes.md) and #1313 (stage3.md, gate.md). Assert
+# the flag at each documented call site so a fourth omission is a red check.
+ws_flag_miss=0
+for f in skills/draft-article/SKILL.md skills/draft-article/stages/stage3.md \
+         skills/draft-article/stages/gate.md; do
+  for cmd in provenance quality-gate verify; do
+    # A bare `draft-pipeline.py <cmd>` in backticks is a NOUN (a table row
+    # naming the command), not a call site; only a form with arguments after it
+    # is an invocation, so the trailing space/continuation is required.
+    miss=$(grep -nE "draft-pipeline\.py ${cmd}( |\\\\)" "$f" | grep -v -- '--ws' || true)
+    if [ -n "$miss" ]; then
+      ws_flag_miss=1
+      err "$f documents \`$cmd\` without --ws — that block would reach its workspace by resolver fallback, not by construction (CAP-1, #1313): $miss"
+    fi
+  done
+done
+if [ "$ws_flag_miss" -eq 0 ]; then
+  ok "every documented provenance/quality-gate/verify invocation passes --ws (CAP-1, #1313)"
+fi
 
 # --- AC-6: the spec carrier this check answers to still exists ---------------
 for f in specs/spec-run-record/SPEC.md specs/spec-run-record/record-formats.md; do
