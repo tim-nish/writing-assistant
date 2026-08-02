@@ -224,7 +224,11 @@ grep -qi 'staleness routing' "specs/spec-policy-source-seam/SPEC.md" \
 grep -qi 'one slot reserved for policy tension' "$SKILL" \
   && ok "SKILL: the reserved tension slot is documented (#302)" \
   || err "SKILL missing the reserved-slot rule"
-grep -qi 'one slot is reserved' "specs/spec-article-draft-pipeline/SPEC.md" \
+# The pipeline spec is SPEC.md plus its companions since #1294 relocated the
+# Constraints verbatim; the clause is contract wherever in that set it sits, so
+# the assertion reads the set rather than one file.
+grep -qi 'one slot is reserved' specs/spec-article-draft-pipeline/SPEC.md \
+                                specs/spec-article-draft-pipeline/constraints.md \
   && ok "pipeline SPEC: the reserved slot is contract (CAP-2)" \
   || err "pipeline SPEC missing the reserved-slot amendment"
 
