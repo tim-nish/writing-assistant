@@ -1,5 +1,6 @@
 #!/usr/bin/env sh
 # parallel-safe
+# covers: scripts/draft-pipeline.py scripts/fixtures/interview-items/** skills/draft-article/stages/stage2.md
 # check-staging-candidates.sh — verify the staging-candidate block emitter
 # (Story 14.5, SPEC-policy-source-seam CAP-4; seam-formats.md §3).
 # POSIX shell + stdlib Python only.

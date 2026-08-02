@@ -1,5 +1,9 @@
 #!/bin/sh
 # serial-reason: it mutates THIS REPOSITORY'S GIT INDEX (`git add -f`, then
+# covers: scripts/resolve-paths.py
+# covers-note (#1321): flag `dynamic-path:rel` ANSWERED as understood-and-narrow — `rel` is
+#   a path this check COMPUTES from a temporary root to assert the boundary holds, not a
+#   tracked file it reads. One subject, and it is declared.
 #   `git reset`) as its negative test — a shared resource behind index.lock,
 #   not a temp dir. Re-verified 2026-07-31 (#999): check-skeleton,
 #   check-dev-harness and check-release-strip all read that index with `git

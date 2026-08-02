@@ -1,5 +1,6 @@
 #!/usr/bin/env sh
 # parallel-safe
+# covers: scripts/draft-pipeline.py skills/draft-article/frameworks/F5-working-note.md
 # check-framework-f5.sh — verify the F5 working-note framework and its slim
 # entry path (Story 13.89, #412). POSIX shell + stdlib Python.
 #

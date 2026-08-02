@@ -1,6 +1,7 @@
 #!/usr/bin/env sh
 # parallel-safe
 # tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
+# covers: config/platform-profiles/** scripts/draft-pipeline.py scripts/draft_review.py scripts/lint-platform-variant scripts/resolve-paths.py
 # check-delivered-basename.sh — verify the DELIVERED basename comes from the
 # profile's declared mapping, that every basename join still resolves, and that
 # an illegal delivered slug is a named publish blocker (Story 18.115, #715;

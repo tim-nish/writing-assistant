@@ -9,6 +9,7 @@
 # consumer in the suite sets XDG_STATE_HOME). The residue is a HYGIENE defect,
 # not a concurrency one, and the undeclared default is not the tool for it.
 # tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
+# covers: scripts/draft-pipeline.py skills/draft-article/stages/stage0.md
 # check-named-element-pin.sh — verify CAP-9 named-element pin (#431): a
 # `--element <name>` directive at stage 0 records the pin in run state, pinning
 # selection to one story element and scoping harvest to it without widening the

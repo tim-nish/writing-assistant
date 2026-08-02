@@ -1,6 +1,7 @@
 #!/usr/bin/env sh
 # parallel-safe
 # tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
+# covers: scripts/draft-pipeline.py scripts/fixtures/policy-classification/** scripts/validate-interview-items.py skills/draft-article/stages/stage2.md
 # check-policy-classification.sh — verify CAP-7 policy-result classification
 # (Story 13.75, SPEC-policy-source-seam CAP-7 added 2026-07-18, umbrella #365;
 # seam-formats.md §2 reconciliation item). POSIX shell + stdlib Python only.

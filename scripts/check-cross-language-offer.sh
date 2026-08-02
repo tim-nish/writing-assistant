@@ -1,6 +1,7 @@
 #!/usr/bin/env sh
 # parallel-safe
 # tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
+# covers: config/platform-profiles/devto.example.yaml config/platform-profiles/zenn.example.yaml scripts/adapt-canonical.py scripts/draft-pipeline.py scripts/lint-platform-variant scripts/resolve-paths.py scripts/validate-proposal-payload.py skills/draft-article/** skills/emit-variants/**
 # check-cross-language-offer.sh — verify a cross-language target is offered as
 # "adapt first", never as a direct projection (Story 18.60, #587;
 # SPEC-platform-variants CAP-3 as amended 2026-07-22 for #582). POSIX sh +

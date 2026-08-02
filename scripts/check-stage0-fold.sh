@@ -1,6 +1,7 @@
 #!/usr/bin/env sh
 # parallel-safe
 # tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
+# covers: config/platform-profiles/devto.example.yaml scripts/draft-pipeline.py skills/draft-article/stages/stage0.md
 # check-stage0-fold.sh — verify the folded Stage-0 command (Story 13.13):
 # config validation + framework check + workspace autostart in ONE invocation,
 # halting on the first problem, preserving each check's diagnostics, and never

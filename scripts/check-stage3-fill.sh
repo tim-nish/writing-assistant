@@ -1,6 +1,7 @@
 #!/usr/bin/env sh
 # parallel-safe
 # tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
+# covers: scripts/draft-pipeline.py scripts/lint-article scripts/render-frontmatter.py skills/draft-article/stages/stage3.md
 # check-stage3-fill.sh — verify Stage 3 framework fill + the `[VERIFY]` marker
 # contract (Story 4.4). POSIX shell + stdlib Python.
 

@@ -1,5 +1,6 @@
 #!/usr/bin/env sh
 # parallel-safe
+# covers: scripts/reading-time.py skills/completion-summary.md skills/draft-article/quality-rubric.md skills/draft-article/stages/complete.md skills/review-article/SKILL.md skills/review-article/phases/arbitration.md skills/review-article/phases/entry.md skills/review-article/phases/passes.md skills/review-article/phases/reentry.md
 # check-completion-summary.sh — verify the three-bucket completion summary
 # (Story 7.5, CAP-6): every run ends with exactly three labelled buckets
 # (informational notes / publish blockers / optional cleanup) + an explicit next

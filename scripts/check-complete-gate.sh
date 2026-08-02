@@ -1,6 +1,7 @@
 #!/usr/bin/env sh
 # parallel-safe
 # tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
+# covers: scripts/draft-pipeline.py scripts/regenerate-index.py scripts/resolve-writing-sources.py scripts/write-article-plan.py skills/draft-article/SKILL.md skills/draft-article/stages/complete.md skills/draft-article/stages/gate.md skills/draft-article/stages/stage0.md skills/draft-article/stages/stage1.md skills/draft-article/stages/stage2.md skills/draft-article/stages/stage3.md skills/draft-article/stages/stage4.md
 # check-complete-gate.sh — verify the dual-product completion gate (Story
 # 13.68, SPEC-article-draft-pipeline 2026-07-18 amendment; SPEC-platform-
 # variants CAP-1). The `complete` subcommand is the only sanctioned way to

@@ -15,6 +15,16 @@
 #   header, so run-checks.sh -P leaves it in the serial remainder. Re-derive that
 #   before ever declaring it — an inherited exemption signals nothing.
 # tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
+# covers: scripts/draft-pipeline.py skills/completion-summary.md skills/draft-article/**
+# covers-note (#1321): flag `sparse:3-paths/456-lines` ANSWERED BY NARROWING. The derivation
+#   proposed scripts/*.py, from the line that copies the whole scripts/ tree into the fixture
+#   plugin root. That copy is SETUP — it builds a plugin that can run at all — not an
+#   assertion about each file it copies; nothing here would notice a change to, say,
+#   reading-time.py. The assertions are about draft-pipeline's checkpoint/resume behaviour
+#   and the skill contract pin, so the honest declaration is draft-pipeline.py plus the
+#   draft-article tree. This matters more than usual now that coverage PROMOTES a full-tier
+#   check into the inner run: at ~11s this is the slowest member in the suite, and
+#   scripts/*.py would have promoted it on every python edit in the repo.
 # check-checkpoint-resume.sh — verify per-stage checkpoint + resume (Story 13.5).
 # POSIX shell + stdlib Python. A run that stops after stage N resumes from N+1
 # rather than restarting; the checkpoint is atomic, idempotent, and lives in the

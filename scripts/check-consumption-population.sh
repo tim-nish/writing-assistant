@@ -1,5 +1,6 @@
 #!/usr/bin/env sh
 # parallel-safe
+# covers: skills/draft-article/stages/stage0.md
 # check-consumption-population.sh — a consumption statement names its population
 # (Story 18.121, #732). POSIX shell.
 #

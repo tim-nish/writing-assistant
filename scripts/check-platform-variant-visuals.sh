@@ -1,5 +1,6 @@
 #!/usr/bin/env sh
 # parallel-safe
+# covers: config/platform-profiles/devto.example.yaml config/platform-profiles/zenn.example.yaml scripts/draft-pipeline.py scripts/resolve-paths.py scripts/resolve-platform-profiles.py skills/draft-article/SKILL.md skills/draft-article/variants.md
 # check-platform-variant-visuals.sh — verify platform variants handle visual
 # rendering divergence as PROFILE-DRIVEN behavior (Story 16.8 rewrite of the
 # Story 8.5 check; SPEC-article-visuals CAP-5 amended 2026-07-16): the treatment

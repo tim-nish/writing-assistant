@@ -1,6 +1,11 @@
 #!/usr/bin/env sh
 # parallel-safe
 # tier: full — RE-TIERED 2026-07-31. This check sat on the 2s inner ceiling and
+# covers: scripts/terrain_directions.py scripts/terrain_members.py scripts/terrain_screens.py scripts/terrain_text.py scripts/topic-map-directions.py skills/terrain/SKILL.md skills/terrain/steps/brief.md skills/terrain/steps/gap.md skills/terrain/steps/map.md skills/terrain/steps/screens.md
+# covers-note (#1321): flag `sparse:10-paths/1390-lines` RECORDED AS UNDERSTOOD-AND-NARROW.
+#   Ten declared paths is not a thin derivation — it is the whole terrain module plus its
+#   SKILL and every step file. The ratio here is only the suite's longest check meeting a
+#   fixed lines-per-path threshold, and no `dynamic-path` flag accompanies it.
 #   flipped across it with load (measured 1921 / 1985 / 2058 / 2101 ms on four
 #   runs, every assertion passing each time), so it was failing the per-edit
 #   loop on variance rather than on a defect. Stories 20.96 and 20.97 added

@@ -1,5 +1,6 @@
 #!/usr/bin/env sh
 # parallel-safe
+# covers: config/user-config.example.yaml scripts/lint-article scripts/resolve-user-config.py skills/review-article/SKILL.md skills/review-article/phases/arbitration.md skills/review-article/phases/entry.md skills/review-article/phases/passes.md skills/review-article/phases/reentry.md skills/review-article/starter-article.md
 # check-review-starter.sh — verify the review-article starter template (Story 13.16):
 # a copyable draft with schema-valid frontmatter + the mandatory pointer block that
 # passes lint-article UNCHANGED, and a skill that points readers at it. POSIX shell.

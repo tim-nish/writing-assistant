@@ -1,5 +1,6 @@
 #!/usr/bin/env sh
 # parallel-safe
+# covers: skills/review-article/SKILL.md skills/review-article/phases/arbitration.md skills/review-article/phases/entry.md skills/review-article/phases/passes.md skills/review-article/phases/reentry.md
 # check-review-structural.sh — verify the structural pass rubric (Story 5.3):
 # the six-point rubric (hook, single idea, section relevance, missing
 # load-bearing content, reader-order, GATE-slot conformance), Sonnet-class +

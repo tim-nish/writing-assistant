@@ -6,6 +6,7 @@
 # (observed `-tmp-tmp-<random>-host/`), so it is unique per run, and nothing
 # declared parallel-safe reads the real state root. Residue, not a race.
 # tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
+# covers: scripts/draft-pipeline.py skills/draft-article/stages/stage0.md
 # check-one-entry-mechanism.sh — verify Story 18.47 (#560, SPEC-article-draft-
 # pipeline CAP-9 2026-07-22 #554 amendment): the #431 named-element pin is the
 # DEGENERATE CASE of the free-form entry point, not a second mechanism; and

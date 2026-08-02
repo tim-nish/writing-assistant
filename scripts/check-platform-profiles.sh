@@ -1,6 +1,7 @@
 #!/usr/bin/env sh
 # parallel-safe
 # tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
+# covers: config/platform-profiles/** scripts/resolve-platform-profiles.py skills/emit-variants/SKILL.md skills/setup/SKILL.md
 # check-platform-profiles.sh — verify machine-global platform profiles resolve
 # as declarations (Story 16.1, SPEC-platform-variants CAP-2). POSIX sh + stdlib
 # Python only.

@@ -1,6 +1,7 @@
 #!/usr/bin/env sh
 # parallel-safe
 # tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
+# covers: scripts/draft-pipeline.py skills/draft-article/SKILL.md skills/draft-article/stages/examine.md
 # check-draft-scaffold.sh — verify the draft-article skill scaffold and stage-0
 # invocation (Story 4.1). POSIX shell + stdlib Python.
 

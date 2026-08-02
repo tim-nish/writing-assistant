@@ -1,5 +1,11 @@
 #!/usr/bin/env sh
 # parallel-safe
+# covers: README.md
+# covers-note (#1321): HAND-AUTHORED — the tool derived nothing here, correctly. Its
+#   extractor only recognises paths under the tracked top-level TREES (scripts/, skills/,
+#   specs/, docs/, config/, tests/, .claude/), and this check's entire subject is a single
+#   file at the repo ROOT: README="README.md". Nothing was hiding; the token shape was
+#   simply outside what a path extractor can be asked to guess at.
 # check-readme.sh — verify the README install/usage guide (Story 6.3): documents
 # the marketplace-add/install flow, user-config.yaml and writing-sources.yaml
 # setup, the output.drafts behavior (no default), and the local-skill development

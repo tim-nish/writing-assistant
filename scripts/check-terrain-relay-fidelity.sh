@@ -21,10 +21,17 @@
 # last artifact this repository controls.
 #
 # tier: inner
+# covers: scripts/topic-map-directions.py
 # removal-signal: screen 2 stops being composed by the script — if a
 # future flow returns the relay to the presenting agent, this check is
 # asserting a property nothing upstream still guarantees, and it retires
 # with that flow rather than being repaired.
+# covers-note (#1321): flag `sparse:1-paths/152-lines` RECORDED AS UNDERSTOOD-AND-NARROW.
+#   The ratio is length, not hidden scope: this file carries one subject and no
+#   `dynamic-path` flag beside the sparse one, which means the extractor found no variable
+#   in path position it could not resolve. A long argument about one module is what it is.
+#   (Placed BELOW removal-signal on purpose: check-check-declarations.sh reads only the
+#   first 25 lines, so a note above it would push the declaration out of the window.)
 
 set -u
 D="scripts/topic-map-directions.py"

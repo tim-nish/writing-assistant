@@ -1,5 +1,6 @@
 #!/usr/bin/env sh
 # parallel-safe
+# covers: config/language-conventions.yaml scripts/resolve-user-config.py skills/draft-article/quality-rubric.md skills/review-article/SKILL.md skills/review-article/phases/arbitration.md skills/review-article/phases/entry.md skills/review-article/phases/passes.md skills/review-article/phases/reentry.md skills/review-article/review-prompts.md specs/spec-article-review/SPEC.md specs/spec-canonical-adaptation/SPEC.md
 # check-review-declared-register.sh — the review pass grades a derived
 # canonical against the register its language DECLARES (Story 20.4, #800).
 #

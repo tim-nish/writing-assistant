@@ -1,6 +1,7 @@
 #!/usr/bin/env sh
 # parallel-safe
 # tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
+# covers: scripts/draft-pipeline.py scripts/write-article-plan.py skills/draft-article/stages/stage0.md
 # check-coverage-brief.sh — verify the free-form owner coverage brief (Story
 # 18.24, #505): an OPTIONAL stage-0 input (text or file) recorded in run state
 # with owner-authored provenance and in the article plan; it maps to story-

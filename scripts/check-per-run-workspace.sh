@@ -1,5 +1,10 @@
 #!/usr/bin/env sh
 # parallel-safe
+# covers: scripts/resolve-paths.py skills/draft-article/SKILL.md
+# covers-note (#1321): flag `dynamic-path:repo_dir,ws1,ws2` ANSWERED as
+#   understood-and-narrow — all three are workspace handles this check ASKS the resolver
+#   for and then compares; they are the thing under test, never repo paths, so the derived
+#   set needs no widening.
 # check-per-run-workspace.sh — verify the per-run workspace for all
 # intermediates (Story 9.2). POSIX shell + stdlib Python only.
 #

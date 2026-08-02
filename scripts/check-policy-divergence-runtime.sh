@@ -1,5 +1,10 @@
 #!/usr/bin/env sh
 # parallel-safe
+# covers: scripts/detect-policy-divergence.py scripts/fixtures/policy-divergence/ledger.json scripts/validate-divergence-candidate.py skills/policy-divergence-detector/SKILL.md
+# covers-note (#1321): the derivation also proposed specs/spec-article-review/SPEC.md and
+#   specs/spec-platform-variants/SPEC.md. Those strings are FIXTURE PAYLOAD — `evidence:`
+#   values inside the synthetic ledger records this check feeds in — not files it opens.
+#   They pass a "not in a comment" test and are still not coverage; removed at ratification.
 # check-policy-divergence-runtime.sh — verify the divergence detector's RUNTIME
 # half (SPEC-policy-divergence-detector, #436, Story 13.99): the CAP-1 detection
 # pass and the CAP-3/CAP-4 disposition emit side, both driving the foundation

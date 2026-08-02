@@ -1,6 +1,7 @@
 #!/usr/bin/env sh
 # parallel-safe
 # tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
+# covers: scripts/draft-pipeline.py scripts/fixtures/terrain/screen-map.json scripts/resolve-paths.py scripts/resolve-writing-sources.py scripts/terrain_map.py scripts/topic-map-directions.py scripts/validate-proposal-payload.py skills/terrain/SKILL.md
 # removal-signal: the terrain area's harnesses are retired or subsumed by the
 #   #857/#858 seam under the #910 retention sweep; removed with that pass.
 # check-topic-map-screen.sh — the END-TO-END half of the screen harness

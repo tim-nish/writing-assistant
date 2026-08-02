@@ -1,5 +1,6 @@
 #!/usr/bin/env sh
 # parallel-safe
+# covers: skills/draft-article/frameworks/F3-evaluation-methodology.md
 # check-framework-f3.sh — verify the F3 evaluation/benchmark-methodology
 # framework (Story 2.4). POSIX shell only.
 #

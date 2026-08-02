@@ -1,5 +1,6 @@
 #!/usr/bin/env sh
 # parallel-safe
+# covers: config/platform-profiles/devto.example.yaml scripts/draft-pipeline.py scripts/resolve-paths.py
 # check-stale-variant.sh — verify stale-variant detection (Story 16.7,
 # SPEC-platform-variants "variants are views"): a variant whose canonical draft
 # has changed since emission is a publish blocker (CAP-6 bucket), never a silent

@@ -1,6 +1,7 @@
 #!/usr/bin/env sh
 # parallel-safe
 # tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
+# covers: scripts/fixtures/policy-gateway-stub.py scripts/resolve-writing-sources.py scripts/terrain_map.py scripts/topic-map-directions.py skills/terrain/SKILL.md skills/terrain/steps/*.md
 # check-topic-map.sh — verify the topic map is a DERIVED, BOUNDED view
 # (Story 18.61, #585; SPEC-topic-map CAP-1 + CAP-4). POSIX sh + stdlib Python.
 #

@@ -1,5 +1,14 @@
 #!/usr/bin/env sh
 # parallel-safe
+# covers: .claude-plugin/** skills/draft-article/** skills/review-article/** specs/**
+# covers-note (#1321): flag `dynamic-path:s` ANSWERED — `s` is a loop cursor over three
+#   literal spec names, so nothing is hidden. Two hand corrections: `specs/.*` was extracted
+#   from a REGEX in the BMAD-output guard and is not a path glob at all (it would match
+#   nothing under `case`); it is replaced by specs/**, which is what the SPEC.md reads and
+#   that guard both mean. .claude-plugin/** is added — this check asserts the directory
+#   exists and the derivation cannot see a bare `for d in` list. config/ and scripts/ are
+#   deliberately NOT declared: this file asserts only that those directories EXIST, never
+#   anything about their contents, so declaring them would fire on every edit for nothing.
 # check-skeleton.sh — verify the repository skeleton and the BMAD/hand-written
 # separation invariants (Story 1.1). Zero dependencies beyond POSIX shell + git;
 # no JavaScript/TypeScript, no venv. Run from anywhere inside the repo.

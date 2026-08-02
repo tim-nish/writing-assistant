@@ -1,6 +1,7 @@
 #!/usr/bin/env sh
 # parallel-safe
 # tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
+# covers: scripts/draft-pipeline.py scripts/resolve-writing-sources.py skills/draft-article/frameworks/F1-project-introduction.md skills/draft-article/quality-rubric.md skills/draft-article/stages/gate.md
 # check-quality-gate.sh — verify the mandatory Stage 3→4 quality gate with
 # bounded retry (Story 11.4). POSIX shell + stdlib Python.
 #

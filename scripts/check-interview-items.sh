@@ -9,6 +9,7 @@
 # NOT parallel-safe (#957/#964) — deliberately carries no `# parallel-safe`
 # header, so run-checks.sh -P leaves it in the serial remainder.
 # tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
+# covers: scripts/draft-pipeline.py scripts/fixtures/interview-items/** scripts/validate-interview-items.py
 # check-interview-items.sh — verify the interview-item schema validator
 # (Story 14.3, SPEC-policy-source-seam CAP-3; seam-formats.md §2).
 # POSIX shell + stdlib Python only.

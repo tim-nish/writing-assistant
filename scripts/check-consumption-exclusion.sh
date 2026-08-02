@@ -1,6 +1,7 @@
 #!/usr/bin/env sh
 # parallel-safe
 # tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
+# covers: scripts/resolve-writing-sources.py scripts/write-article-plan.py skills/completion-summary.md skills/draft-article/stages/stage0.md
 # check-consumption-exclusion.sh — verify CAP-9 consumption exclusion (#430):
 # consumed story-element ids recorded in the article plan (no new store), and
 # the consult-time `consumed_index` view regenerated from plans/*.md that a new

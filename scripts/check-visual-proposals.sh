@@ -1,5 +1,6 @@
 #!/usr/bin/env sh
 # parallel-safe
+# covers: scripts/validate-proposal-payload.py skills/draft-article/stages/stage3.md
 # check-visual-proposals.sh — verify visuals are PROPOSED, not inserted, under the
 # owner-facing proposal contract (Story 8.2, SPEC-article-visuals CAP-2): each
 # framework slot plus up to 2 opportunistic extras is proposed with rationale, a

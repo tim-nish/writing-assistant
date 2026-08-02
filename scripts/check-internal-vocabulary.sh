@@ -1,5 +1,6 @@
 #!/usr/bin/env sh
 # parallel-safe
+# covers: scripts/draft-pipeline.py skills/draft-article/internal-vocabulary.json skills/draft-article/quality-rubric.md
 # check-internal-vocabulary.sh — the dimension-3 inventory DRIFT check (#305).
 # POSIX shell + stdlib Python only.
 #

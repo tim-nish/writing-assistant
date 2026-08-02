@@ -1,5 +1,6 @@
 #!/usr/bin/env sh
 # parallel-safe
+# covers: scripts/draft-pipeline.py scripts/fixtures/interview-items/valid.json skills/review-article/SKILL.md skills/review-article/phases/arbitration.md skills/review-article/phases/entry.md skills/review-article/phases/passes.md skills/review-article/phases/reentry.md
 # check-review-coldread.sh — verify the cold-read pass (Story 5.5): context-free
 # (draft only, no repo/project context), the six-question reader rubric, the
 # comparison to the journal q2/q5 intent anchors, capped-anchor tolerance, and the severity mapping (claim/audience

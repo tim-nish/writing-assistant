@@ -9,6 +9,10 @@
 # actually writes is a `mktemp -d`, and its stderr captures are /tmp/sf_err.$$,
 # unique per check process.
 # tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
+# covers: scripts/draft-pipeline.py scripts/resolve-paths.py scripts/resolve-writing-sources.py
+# covers-note (#1321): flag `dynamic-path:hostwork` ANSWERED as understood-and-narrow —
+#   `hostwork=$(mktemp -d)` is a scratch host tree, not a repo path, so the derived set is
+#   complete as it stands.
 # check-path-resolver.sh — verify the path resolver is the single source of
 # storage paths (Story 9.1). POSIX shell + stdlib Python only.
 #

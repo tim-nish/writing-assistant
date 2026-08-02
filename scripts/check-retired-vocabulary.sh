@@ -1,5 +1,13 @@
 #!/usr/bin/env sh
 # parallel-safe
+# covers: skills/** scripts/**
+# covers-note (#1321): HAND-AUTHORED, and deliberately broad. The derivation proposed two
+#   SKILL.md files, both cited in this header's PROSE as examples of the collision that got
+#   `Seed` rejected — neither is opened. What this check actually reads is ROOTS =
+#   ["skills", "scripts"] walked whole (line ~55), plus a `grep -r ... skills/ scripts/`.
+#   So the honest declaration is the two trees: it makes the check run on nearly every edit,
+#   accepted deliberately because it is an inner-tier text scan (~0.3s) and its whole job is
+#   to catch a retired word the moment it is typed anywhere in owner-facing source.
 # check-retired-vocabulary.sh — the TOOL never calls a Strand anything else
 # (Story 20.11, #804).
 #

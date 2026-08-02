@@ -1,6 +1,7 @@
 #!/usr/bin/env sh
 # parallel-safe
 # tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
+# covers: config/platform-profiles/devto.example.yaml config/platform-profiles/zenn.example.yaml scripts/adapt-canonical.py scripts/check-stale-variant.sh scripts/draft-pipeline.py scripts/resolve-paths.py scripts/validate-proposal-payload.py skills/adapt-canonical/SKILL.md
 # check-adaptation-staleness.sh — verify staleness CHAINS through the derivation
 # (Story 18.58, #589; SPEC-canonical-adaptation CAP-5). POSIX sh + stdlib Python;
 # every fixture write lands under mktemp -d.

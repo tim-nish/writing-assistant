@@ -1,5 +1,6 @@
 #!/usr/bin/env sh
 # parallel-safe
+# covers: skills/draft-article/frameworks/** skills/draft-article/stages/stage3.md
 # check-slot-skip-semantics.sh — verify per-slot skip semantics in the
 # frameworks (Story 10.5). POSIX shell.
 #

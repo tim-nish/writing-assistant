@@ -1,5 +1,6 @@
 #!/usr/bin/env sh
 # parallel-safe
+# covers: scripts/check-publication-boundary.sh scripts/provenance-pin.py
 # check-provenance-pin.sh — the two-tier grounding pin (Story 18.120, #731).
 # POSIX shell + stdlib Python.
 #

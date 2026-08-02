@@ -1,5 +1,6 @@
 #!/usr/bin/env sh
 # parallel-safe
+# covers: scripts/terrain_members.py skills/terrain/SKILL.md skills/terrain/steps/*.md
 # check-owner-term-codebook.sh — a term meant to reach the owner is DEFINED
 # where the owner reads it (Story 20.26, #861; SPEC-writing-assistant,
 # owner-surface register, property (d)).

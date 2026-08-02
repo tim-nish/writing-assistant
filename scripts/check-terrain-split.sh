@@ -1,6 +1,7 @@
 #!/usr/bin/env sh
 # parallel-safe
 # tier: full — reads the SERVED CORPUS (terrain_map.strand_entries), so it is
+# covers: scripts/terrain_map.py
 #   seam/corpus-dependent by construction. Measured 2026-07-30: ~1.0s, which
 #   alone pushed check-terrain-code-inner.sh from 1.25s to 2.2s and tripped the
 #   INNER_MS ceiling (#913). Not the 30-second class, and the reason it cannot

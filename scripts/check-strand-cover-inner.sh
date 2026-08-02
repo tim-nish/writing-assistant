@@ -6,6 +6,7 @@
 # `py_compile`'s `scripts/__pycache__` write is atomic and already shared by 64
 # declared checks.
 # tier: inner — fixture-based: a handful of `structures` invocations over inline
+# covers: scripts/draft-pipeline.py skills/draft-article/stages/stage3.md skills/draft-article/stages/strand-cover.md
 #   JSON, no pipeline run, no seam call. Milliseconds, so it belongs in the
 #   per-edit loop that guards the composer it checks.
 # removal-signal: the placement cover stops being counted in the drafting

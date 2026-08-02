@@ -1,5 +1,6 @@
 #!/usr/bin/env sh
 # parallel-safe
+# covers: scripts/validate-fact-sheet.py scripts/verify-provenance.py scripts/write-article-plan.py specs/spec-article-plan/SPEC.md
 # check-plan-boundary.sh — verify the article-plan boundary fences (Story 13.56,
 # SPEC-article-plan constraints). POSIX shell + stdlib Python, real git fixture.
 #

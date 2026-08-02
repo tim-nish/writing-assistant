@@ -1,5 +1,9 @@
 #!/usr/bin/env sh
 # parallel-safe
+# covers: config/user-config.example.yaml scripts/lint-article scripts/release-strip.sh
+# covers-note (#1321): the derivation also proposed .claude/skills/bmad-*. Those tokens are
+#   paths inside the mktemp host tree this check BUILDS, not repo paths it reads; the
+#   extractor cannot tell "$t/.claude/skills/..." from a tracked path. Removed at ratification.
 # check-release-strip.sh — verify the mechanical release-strip guarantee (Story
 # 6.4): release-strip.sh removes EXACTLY _bmad/, _bmad-output/, and
 # .claude/skills/bmad-*; leaves a complete, functioning plugin (specs/ + all

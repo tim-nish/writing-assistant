@@ -1,5 +1,6 @@
 #!/usr/bin/env sh
 # parallel-safe
+# covers: scripts/draft-pipeline.py scripts/lint-platform-variant scripts/resolve-paths.py scripts/resolve-platform-profiles.py skills/draft-article/SKILL.md
 # check-substrate-purity.sh — enforce that platforms live ONLY in profiles and
 # config, never in the platform-agnostic substrate (Story 16.8, FR54 success
 # criterion / SPEC-platform-variants CAP-1). Grepping stages 0–3 code and the
