@@ -503,57 +503,57 @@ set.
 
 ### Visual proposals (SPEC-article-visuals CAP-2)
 
-As the framework fills, reach its **declared visual slot** (Story 8.1;
-`frameworks/CONVENTIONS.md`) — and identify **up to 2 opportunistic extra
-visuals** where one would materially help. When a **ratified visual-set plan**
-exists (CAP-2a above), these individual proposals **follow the plan's members**
-rather than re-opening the set decision; absent a plan (the owner declined it),
-this is the per-slot fallback flow. **Propose** each; never insert one
-unasked. Each proposal is **two steps** (SPEC-draft-article-ux CAP-3, Story
-13.29) — the intent decision comes before any finished source, because the
-fallback ladder's table-vs-diagram choice depends on it. Both steps follow the
-shared
+As the fill proceeds, reach **each declared visual slot of the accepted
+structure** — its `visual_slots` (#983): that structure's count and placement,
+possibly zero or several, and **never read off framework identity**
+(`frameworks/CONVENTIONS.md`'s per-framework table is a **source of defaults** a
+framework-matched proposal may draw from, Story 8.1, never the declaration).
+Also identify **up to 2 opportunistic extra visuals** where one would materially
+help. When a **ratified visual-set plan** exists (CAP-2a above), these proposals
+**follow the plan's members** rather than re-opening the set decision; absent a
+plan (the owner declined it), this is the per-slot fallback
+flow. Each proposal is **two steps** (SPEC-draft-article-ux CAP-3, Story 13.29)
+— the intent decision comes before any finished source, because the fallback
+ladder's table-vs-diagram choice depends on it. Both steps follow the shared
 [**owner-facing proposal contract**](../../owner-facing-proposal-contract.md)
 (`${CLAUDE_PLUGIN_ROOT}/skills/owner-facing-proposal-contract.md`):
 
 **The intent step.** Ask "what should a visual in {section} communicate?" with
 **draft-grounded options** derived from what that section actually argues —
-e.g. *pipeline flow* / *comparison* / *timeline* / *none needed* — never a
-fixed menu. The **table-vs-diagram** decision of the fallback ladder is made
-here (comparative content → table; topological → diagram). **Declining at
-the intent step skips the source step entirely** and omits the slot with no `[Figure: …]`
+e.g. *pipeline flow* / *comparison* / *timeline* / *none needed*, never a fixed
+menu. The **table-vs-diagram** decision of the fallback ladder is made here
+(comparative content → table; topological → diagram). **Declining at the intent
+step skips the source step entirely** and omits that slot with no `[Figure: …]`
 residue (unchanged decline semantics).
 
 **The source step.** For the chosen intent, propose the concrete visual:
 
-- **where** it lands in the outline (the framework slot, or the section an
-  opportunistic visual would sit in);
+- **where** it lands in the outline (the declared slot's placement in the
+  accepted structure, or the section an opportunistic visual would sit in);
 - **why** it is proposed (the rationale, now anchored to the approved intent);
 - a **preview** — a **plain-text structural sketch** (elements, relations,
-  emphasis — figure-spec style; contract (g), Story 13.48), never raw Mermaid
-  or fenced source in the payload. Write the concrete **Mermaid/table source**
-  the owner is approving to the **run workspace** (`$WS/visuals/<slot>.mmd` or
-  `.md`) first, and show that **path** in the payload so the owner can open it
-  rendered;
+  emphasis — figure-spec style; contract (g), Story 13.48), never raw Mermaid or
+  fenced source in the payload. Write the concrete **Mermaid/table source** the
+  owner is approving to the **run workspace** (`$WS/visuals/<slot>.mmd` or `.md`)
+  first, and show that **path** in the payload so the owner can open it rendered;
 - **choices whose labels state their concrete effect** — *approve* → "insert
   the source at the shown workspace path, exactly as written", *modify* →
   "revise the source, then insert" (a *modify* re-writes the same workspace
   path — Read it first, per the artifact-write precondition), *decline* →
-  "omit the visual; the slot
-  leaves no `[Figure: …]` residue".
+  "omit the visual; the slot leaves no `[Figure: …]` residue".
 
 **On approval, the fill inserts the workspace file's content exactly as
 written** — the sketch is presentation-only and is never re-derived into the
 draft; what the owner approved (the file at the shown path) is what lands.
-Visual-proposal payloads pass the contract-(e) validator **without
-exemption** — the plain-text marker gate (Story 13.47) applies to this surface
-like every other; the workspace path is what keeps fenced source out of the
-payload.
+Visual-proposal payloads pass the contract-(e) validator **without exemption**:
+the plain-text marker gate (Story 13.47) applies here like every other surface.
 
-**Insert nothing without explicit owner approval.** Opportunistic suggestions are
-**capped at 2 per draft** — the declared slot plus at most two extras, never
-more — and follow the **same two-step** flow. A declined proposal (either step)
-leaves the slot **omitted entirely** (Story 8.1), with no placeholder residue.
+**Insert nothing without explicit owner approval.** Opportunistic suggestions
+are **capped at 2 per draft** — the structure's declared slots plus at most two
+extras, never more; a structure declaring none caps at two, and zero is never
+padded up — and follow the **same two-step** flow. A declined proposal (either
+step) leaves that slot **omitted entirely** (Story 8.1), with no placeholder
+residue.
 Element-level sourcing (CAP-3 below) is unchanged.
 
 ### Sourced visuals (SPEC-article-visuals CAP-3)

@@ -13,9 +13,12 @@ result is structurally complete with nothing to reorganize.
 
 ## Visual slot (SPEC-article-visuals CAP-1)
 
-**F1 declares one overview diagram** — a structural picture of what the project is
-and does, placed near *What I built*. It is **proposed, not auto-inserted** (Story
-8.2). If the owner **declines** it, the slot is **omitted entirely** — no
+**F1's default visual slot is an overview diagram** — a structural picture of
+what the project is and does, placed near *What I built*. This is a **default
+offered to the structure proposer**, never the article's count: the accepted
+structure's own `visual_slots` is the declaration (#983), and it may take this
+default, take several, or take none. Where it is taken, it is **proposed, not
+auto-inserted** (Story 8.2). If the owner **declines** it, the slot is **omitted entirely** — no
 `[Figure: …]` or placeholder residue is left in the draft.
 
 ## Frontmatter
