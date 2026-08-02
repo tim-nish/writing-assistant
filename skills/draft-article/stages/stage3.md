@@ -353,43 +353,43 @@ note can never substitute for a judge run, and "never judged" is mechanically
 distinguishable from "judged clean".
 
 It resolves every `derived` (and `sourced`) pointer against the declared
-fact-sheet entries **mechanically**, and consumes the **isolated judge
-subagent's** verdicts for the semantic tests — a `narration` sentence that asserts
-a checkable proposition **fails the falsifiability test** (a gate failure), and a
-`derived` claim adding any of the six forbidden categories is a gate failure.
-**Spawn a cheap-tier judge subagent** and hand it *only* the sentences
-`--list-narration` / `--list-derived` surface **plus the fact-sheet entries they
-cite** — never the drafting rationale, the interview, or your reasons for each
-classification. The subagent writes its attestation + verdicts to
+fact-sheet entries **mechanically**, and consumes the **isolated judge subagent's**
+verdicts for the semantic tests — a `narration` sentence that asserts a checkable
+proposition **fails the falsifiability test** (a gate failure), and a `derived`
+claim adding any of the six forbidden categories is a gate failure. **Spawn a
+cheap-tier judge subagent** and hand it *only* the sentences `--list-narration` /
+`--list-derived` surface **plus the fact-sheet entries they cite** — never the
+drafting rationale, the interview, or your reasons for each classification. The
+subagent writes its attestation + verdicts to
 `$WS/provenance-verdicts.txt`, which the command consumes. **When the judging is SHARDED, each shard returns ONE ATTESTED FILE OF ITS OWN — `--judge-findings` repeats, coverage is checked over the union of the `graded:` sets, any draft-hash disagreement fails the whole gate, and concatenating shards into one file is REFUSED by name; instruct each shard verbatim per [`fan-out.md`](fan-out.md) §4 (story 20.163's emission contract). The single-file form above stays exactly valid for one shard.** **Every revision
 cycle re-spawns the judge**: after any edit to the draft or map, the old
-attestation's draft hash no longer matches, so a fresh isolated judge run is
-the only way back to PASS — the drafting context never authors or amends the
-verdicts file. A clean map passes
-with no findings; any finding blocks stage progression. (These judge spawns cost
-turns against the pipeline budget — see #118's durability/resume constraint.)
+attestation's draft hash no longer matches, so a fresh isolated judge run is the
+only way back to PASS — the drafting context never authors or amends the verdicts
+file. A clean map passes with no findings; any finding blocks stage progression.
+(These judge spawns cost turns against the pipeline budget — #118's constraint.)
 
-**A revision cycle re-grades only what changed (#738 delta re-grade).** On a
-revision cycle, build each listing with the prior cycle's hand-off and verdicts
-as the attested basis:
-
-```
-python3 /home/tomoya/work/writing-assistant/scripts/verify-provenance.py --map <map> --draft <edited> \
-  --list-narration --prior-worklist "$WS/judge-narration.txt" \
-  --prior-verdicts "$WS/provenance-verdicts.txt"
-```
-
-Sentences unchanged since the attested basis whose positions graded clean carry
-forward on a `carried:` header line — the judge echoes it with `attestation:`
-and `graded:`, grades **only** the re-graded entries, and the checker counts
-carried positions toward worklist coverage. The emission discloses the split on
-stderr (`delta re-grade: N carried, M re-graded`) — the run-workspace record
-of what each round cost. A basis that does not resolve (missing or mismatched
-attestation) falls back to a full re-grade **with the disclosed reason**, never
-silently. Isolation is unchanged: the judge receives the smaller worklist,
-never prior verdicts. The **two-cycle bound is mechanically enforced**: the
-gate refuses `--cycle` past the shared bound with a publish-blocker payload —
-a third revision round is unreachable, never merely discouraged.
+**A round re-grades only what changed, and a verdict is CARRIED FOR THE WHOLE RUN — every judge round, the pre-gate fill respawns included (#738, #1287).**
+Each verdict is keyed by `(position, sha256 of that position's segmented sentence)`
+and appended to `$WS/provenance-ledger.tsv`, the one ledger every round of the run
+shares; a position whose keyed text is unchanged is **never re-graded, pass or fail**.
+Carrying a **fail** is the load-bearing half — an unedited failing position is still
+failing, re-surfaces as a `CARRIED FAIL` finding, and re-asking a judge about it is how
+a bound becomes a coin flip. **The carry takes no flag** — the ledger resolves from the
+run workspace the `--map` already lives in, so re-running the same `--list-*` emission
+against the edited draft carries. Carried positions ride the `carried:` header the judge
+echoes with `attestation:`/`graded:`; it grades **only** the listed entries, and the
+checker counts carried positions toward worklist coverage. Isolation is unchanged — a
+**smaller worklist**, never prior verdicts as context (NFR13). Emission discloses the
+split on stderr (`ledger carry: N carried (P pass, F fail), M re-graded`); a ledger that
+cannot resolve prints `ledger carry unavailable — full re-grade: <reason>` and grades in
+full, never silently. A verdict **disagreeing** with a held one on identical text never
+overwrites it: the carried verdict stands and the disagreement is disclosed by name
+(`LEDGER DISAGREEMENT — <pos> …`, both outcomes). **This bounds waste, not cost** — no
+number of rounds is capped, and a round grading text that actually changed still runs.
+The single-cycle `--prior-worklist`/`--prior-verdicts` basis is kept as an explicit
+override, applied after the ledger. The **two-cycle bound** is separate and mechanically
+enforced at the gate's `--cycle`, after a gate verdict: a third revision round is
+unreachable, never merely discouraged. Nothing here caps rounds.
 
 **Grade `sourced` spans for ATTRIBUTION entailment, not only pointer resolution
 (Story 18.97, #672).** A sourced pointer resolving into the fact sheet proves the
