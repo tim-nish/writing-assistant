@@ -2607,20 +2607,6 @@ def _run_events_path(ws):
     return run_record.run_events_path(ws)
 
 
-def cmd_run_event(args):
-    """Append one run-journal event (Story 19.8, #742), NARROWED to the events
-    no block command can observe from inside itself — an agent-side retry, a
-    subagent spawn (SPEC-run-record, Story 20.181). A block's own start and end
-    are emitted by the block's own command at block close, and are no longer
-    anyone's to remember. Deterministic append through the one append site."""
-    rec = {"ts": run_record._now(), "stage": args.stage, "event": args.event}
-    if args.note:
-        rec["note"] = args.note
-    run_record.append(args.ws, rec)
-    print(json.dumps({"stage": "run-event", "recorded": rec}))
-    return 0
-
-
 def _read_run_events(ws):
     """The journal's ONE reader, now literally one: same tolerance (20.181)."""
     return run_record.read_records(ws)
@@ -5176,6 +5162,9 @@ def main(argv=None):
     sp.add_argument("--file", action="append", help="checked whitelist file (repeatable); no-finding files close as (no conflict)")
     sp.add_argument("--policy-note", nargs="?", const="", default=None,
                     help="skipped mode: reason for consulted: none (empty = unset)")
+    sp.add_argument("--ws", help="run workspace — the skipped-mode reason is DERIVED from what it "
+                                 "holds, so `policy_source unset` is distinguishable from a surface "
+                                 "that was read with no seeds authored (SPEC-run-record CAP-5, #1306)")
     sp = sub.add_parser("provenance-segment",
                         help="emit the deterministic {pos, anchor, sentence} skeleton the "
                              "provenance map is authored against (Story 19.16, #755) — the "
@@ -5370,7 +5359,7 @@ def main(argv=None):
         "stage0": cmd_stage0, "complete": cmd_complete,
         "classify-policy": cmd_classify_policy,
         "policy-prefilter": cmd_policy_prefilter,
-        "run-event": cmd_run_event,
+        "run-event": run_record.cmd_run_event,
         "cost-block": cmd_cost_block,
         "budget-check": cmd_budget_check,
         "policy-block-check": cmd_policy_block_check,

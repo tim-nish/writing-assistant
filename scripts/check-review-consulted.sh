@@ -1,5 +1,6 @@
 #!/usr/bin/env sh
 # parallel-safe
+# covers: scripts/draft_review.py scripts/run_record.py skills/review-article/phases/passes.md
 # check-review-consulted.sh — verify the review-side consulted line and the
 # policy pass's degradation wiring (Story 15.3, SPEC-policy-consistency-pass
 # CAP-4). POSIX shell + stdlib Python only.
@@ -65,6 +66,39 @@ line=$(python3 "$PIPE" review-consulted --policy-note "none (policy_source unava
 line=$(python3 "$PIPE" review-consulted --policy-note "consulted: none (policy_source unset)")
 [ "$line" = "consulted: none (policy_source unset)" ] \
   && ok "skipped (label+wrap): rendered phrase normalized" || err "labelled wrap not normalized: '$line'"
+
+# --- 3b. Skipped mode is THREE-state, derived from the workspace (#1306) -------------
+# SPEC-run-record CAP-5: the reason is computed from what the workspace holds,
+# never read off a flag. A derived absence reported as a configured one points
+# the next debugger at a config key when the fact is editorial (#1289).
+ws="$work/ws"; mkdir -p "$ws"
+line=$(python3 "$PIPE" review-consulted --ws "$ws" --policy-note)
+[ "$line" = "consulted: none (policy_source unset)" ] \
+  && ok "three-state: no surface artifact in the workspace → policy_source unset" \
+  || err "empty workspace should read unset: '$line'"
+
+: > "$ws/policy-surface.filtered.txt"      # zero bytes is NOT a read
+line=$(python3 "$PIPE" review-consulted --ws "$ws" --policy-note)
+[ "$line" = "consulted: none (policy_source unset)" ] \
+  && ok "three-state: a zero-byte surface artifact is not a read" \
+  || err "zero-byte artifact must not count as a read: '$line'"
+
+printf 'a served line\n' > "$ws/policy-surface.txt"
+line=$(python3 "$PIPE" review-consulted --ws "$ws" --policy-note)
+[ "$line" = "consulted: none (policy surface read; no seeds authored)" ] \
+  && ok "three-state: a surface that WAS read reports the editorial fact, not unset" \
+  || err "read-with-no-seeds must not report policy_source unset: '$line'"
+
+# The reader's own evidence outranks the artifact test.
+line=$(python3 "$PIPE" review-consulted --ws "$ws" --policy-note "policy_source unavailable: gateway down")
+[ "$line" = "consulted: none (policy_source unavailable: gateway down)" ] \
+  && ok "three-state: an explicit reader reason outranks the workspace test" \
+  || err "explicit reason must outrank the artifact test: '$line'"
+
+# The documented invocation must PASS --ws, or the derivation ships inert.
+grep -q 'review-consulted --ws' skills/review-article/phases/passes.md \
+  && ok "the documented skipped-mode invocation passes --ws" \
+  || err "skills/review-article/phases/passes.md documents review-consulted without --ws — the three-state derivation would ship inert (#1306)"
 
 # --- 4. Usage error names both modes ------------------------------------------------
 set +e; msg=$(python3 "$PIPE" review-consulted 2>&1 >/dev/null); rc=$?; set -e

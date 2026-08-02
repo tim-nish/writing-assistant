@@ -270,16 +270,28 @@ def cmd_review_consulted(args):
       * findings present: each finding's policy pointer (sans pin) -> `finding
         <n>`; whitelisted files with no finding close as `(no conflict)`;
       * pass ran, zero findings: every checked file -> `(no conflict)`;
-      * pass skipped: `consulted: none (policy_source unset)` or
-        `consulted: none (policy_source unavailable: <reason>)` via
-        --policy-note — every review run states its policy provenance.
+      * pass skipped: THREE states, not two (#1306, SPEC-run-record CAP-5) —
+        `policy_source unavailable: <reason>` when the reader itself said so
+        via --policy-note; else derived from `--ws`: a policy-surface artifact
+        in the run workspace means the source was configured AND read, so an
+        empty result is the EDITORIAL fact `policy surface read; no seeds
+        authored`, and only its absence licenses `policy_source unset`.
+        Reporting a derived absence as a configured one points the next
+        debugger at a config key when the fact is editorial (#1289).
     """
     if args.policy_note is not None:
         # Shared normalization with the interview seam (_host.cmd_journal): a caller
         # pasting the whole rendered `none (...)` phrase must not double-wrap
-        # to `consulted: none (none (...))` (F77).
-        print("consulted: none "
-              f"({_host._bare_policy_reason(args.policy_note) or 'policy_source unset'})")
+        # to `consulted: none (none (...))` (F77). The derivation is the interview
+        # seam's own (`run_record.consulted_reason`), not a second copy of it.
+        #
+        # NO `fallback_path` HERE, and that is a decline rather than an omission:
+        # `cmd_journal` could fall back to `--interview`'s directory because that
+        # input sits in the run workspace. This command's skipped mode takes no
+        # such input — `--pin`/`--file` are not paths, and `--findings` exists
+        # only when the pass RAN. Inventing a fallback would manufacture evidence.
+        print("consulted: none (%s)" % _host.run_record.consulted_reason(
+            _host._bare_policy_reason(args.policy_note), getattr(args, "ws", None)))
         return 0
     if not args.pin:
         sys.stderr.write("error: pass --pin product-lab@<sha> (seeded mode) "

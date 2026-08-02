@@ -382,12 +382,17 @@ policy lines to the findings they produced:
 python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py review-consulted \
   --pin <policy-source@sha from the reader> --findings <policy-findings.json> \
   --file GLOSSARY.md --file LESSONS.md [--file topics/<matched>.md]
-# skipped pass:  … review-consulted --policy-note ["policy_source unavailable: <reason>"]
+# skipped pass:  … review-consulted --ws "$WS" --policy-note ["policy_source unavailable: <reason>"]
 ```
 
-Checked files with no finding close as `(no conflict)`; a skipped pass records
-`consulted: none (policy_source unset | unavailable: <reason>)` — every review
-run states its policy provenance. Surface the line in the completion summary's
+Checked files with no finding close as `(no conflict)`. **A skipped pass has
+THREE states, and `--ws` is what makes them distinguishable** — pass it or the
+line reports a derived absence as a configured one (#1306):
+`policy_source unavailable: <reason>` when the reader said so; else
+`policy surface read; no seeds authored` when `$WS` holds a non-empty
+policy-surface artifact (the source was configured and read — the emptiness is
+editorial); else `policy_source unset`. Every review run states its policy
+provenance. Surface the line in the completion summary's
 **informational notes**.
 
 ## Pass 5 — Cold read
