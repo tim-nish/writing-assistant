@@ -18,7 +18,7 @@ the oracle half of "the repository is a witness, not a granary".
 
 SCOPE IS DERIVED, NOT CHOSEN (#1097, #1185)
 -------------------------------------------
-When the brief carries a derived `harvest_scope` (the union of the selected
+When the brief carries a derived `examine_scope` (the union of the selected
 Strands' served `projects:` — `scripts/terrain_scope.py`), pass it via
 `--scope` (and `--member` for a per-Strand examination): a repository outside
 the served attribution is REFUSED, NOT SEARCHED — grounding a claim in a
@@ -350,7 +350,7 @@ def examine_prose(root, terms, limit):
 def _scope_refusal(scope_path, member_index, repository):
     """The derived-scope binding (#1097/#1185), consumed from terrain_scope.
 
-    `scope_path` is JSON carrying the brief's `harvest_scope` block (either
+    `scope_path` is JSON carrying the brief's `examine_scope` block (either
     the block itself or an object holding it under that key). Returns None
     when `repository` is within the served scope; otherwise the refusal dict
     — refused, not searched. With `--member`, the refusal is per-Strand
@@ -361,9 +361,9 @@ def _scope_refusal(scope_path, member_index, repository):
             data = json.load(fh)
     except (OSError, ValueError) as e:
         raise SystemExit(f"unreadable --scope {scope_path!r}: {e}")
-    block = data.get("harvest_scope", data) if isinstance(data, dict) else None
+    block = data.get("examine_scope", data) if isinstance(data, dict) else None
     if not isinstance(block, dict) or "projects" not in block:
-        raise SystemExit(f"--scope {scope_path!r} carries no harvest_scope "
+        raise SystemExit(f"--scope {scope_path!r} carries no examine_scope "
                          "block (no `projects` key)")
     if member_index is not None:
         vals = next((b["projects"] for b in block.get("by_member", [])
@@ -376,7 +376,7 @@ def _scope_refusal(scope_path, member_index, repository):
     if not block.get("served") or not isinstance(block.get("projects"), list):
         return {"refused": True, "attribution": None,
                 "line": (f"examination against {repository} is refused: the "
-                         "brief's harvest_scope is not served at this pin — "
+                         "brief's examine_scope is not served at this pin — "
                          "cannot-determine, never searched on a guess")}
     if repository in block["projects"]:
         return None
@@ -423,7 +423,7 @@ def main():
     p.add_argument("--claim", required=True,
                    help="the concrete claim to be tested, in one sentence")
     p.add_argument("--scope",
-                   help="JSON file carrying the brief's derived harvest_scope "
+                   help="JSON file carrying the brief's derived examine_scope "
                         "(#1097/#1185); a repository outside it is refused, "
                         "not searched (exit 3)")
     p.add_argument("--member",

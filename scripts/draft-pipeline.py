@@ -1094,7 +1094,7 @@ def cmd_repair_hop(args):
             "cap": TWO_CYCLE_BOUND,
             "note": ("run one examination for the named claim only "
                      "(examine.py — declared-scope boundary, derived "
-                     "harvest_scope refusal and pin rules unchanged); the pin "
+                     "examine_scope refusal and pin rules unchanged); the pin "
                      "is recorded at the read, and a policy line never "
                      "becomes a SOURCE"),
         }

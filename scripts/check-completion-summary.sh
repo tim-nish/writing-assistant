@@ -75,9 +75,9 @@ grep -qi 'fall through to prose' "$CONV" \
 grep -qi 'staged stage-0 run' "$CONV" \
   && ok "next step: the staged stage-0 case is present as a worked example" \
   || err "convention omits the staged stage-0 run — the case that fell through in #1176"
-grep -q 'harvest_entry_gate' "$CONV" \
+grep -q 'probe_entry_gate' "$CONV" \
   && ok "next step: the staged stage-0 case NAMES its builder rather than describing a shape" \
-  || err "convention describes the harvest-entry choice without naming harvest_entry_gate"
+  || err "convention describes the probe-entry choice without naming probe_entry_gate"
 # THE ROUTING HALF (AC6): a composed artifact is POINTED AT, never restated —
 # that is what shrinks the free-form surface the detect layer cannot police.
 grep -qi 'pointer' "$CONV" && grep -qi 'restate\|restatement' "$CONV" \

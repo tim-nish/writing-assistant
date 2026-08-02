@@ -180,7 +180,7 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py episode-candidates \
 - `examine <claim>` → run **one examination** for the named claim
   ([`examine.md`](examine.md) — harvest is retired, #1182: `next_stage: fill`,
   the re-grounding happens inside the fill, never a stage re-entry); the pin
-  is recorded at the read (declared-scope boundary, derived `harvest_scope`
+  is recorded at the read (declared-scope boundary, derived `examine_scope`
   refusal and pin rules unchanged), and a policy line never becomes a SOURCE.
   The legacy `re-harvest <target>` spelling maps to this route, disclosed.
 - `ask <question>` → re-enter the **interview** with exactly one owner-facing

@@ -70,8 +70,8 @@ def examination_refusal(member, repository):
                 "experience did not happen in is a false attribution")}
 
 
-def harvest_scope_block(members):
-    """The `harvest_scope` the brief carries: the union of the selected
+def examine_scope_block(members):
+    """The `examine_scope` the brief carries: the union of the selected
     members' served `projects:` values, in first-seen member order.
 
     PER-MEMBER PROVENANCE SURVIVES THE UNION (`by_member`): a later refusal

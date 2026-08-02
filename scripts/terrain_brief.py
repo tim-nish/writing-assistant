@@ -146,7 +146,7 @@ BRIEF_KEYS = frozenset({
     "thesis",           # its state: candidates-pending | adopted
     "candidate_theses",  # what it was adopted FROM (#1079)
     "members", "pins",  # the member set with its served material, and both pins
-    "harvest_scope",    # ratified 2026-07-29 (#896): the union of members' projects
+    "examine_scope",    # ratified 2026-07-29 (#896): the union of members' projects
     "gaps",             # every member's writability verdict, not just the first
     "lifecycle",        # composed -> inspected -> adopted, with its history
     "iteration",        # the composition chain — unrecomposable owner history

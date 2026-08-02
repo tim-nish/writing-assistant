@@ -399,7 +399,7 @@ and the extraction one-liner is gone because the pipeline reads the file.
 decides which happens is an owner decision like every other one here:
 
 ```
-draft_gates.harvest_entry_gate(<declared source count>, ws=<run ws>)
+draft_gates.probe_entry_gate(<declared source count>, ws=<run ws>)
 ```
 
 Print what it returns through the selection UI. **Do not compose this ask.**
@@ -407,7 +407,7 @@ The observed 2026-08-01 sitting ended with *"Say the word and I'll run
 harvest"* — chat prose, answered in free text, with no ask row anywhere, on a
 sitting that had put every earlier decision through the carrier. It read as
 covered because every declared gate had emitted; the gate that had not been
-declared was the one that leaked. The id is `harvest-entry`, declared in
+declared was the one that leaked. The id is `probe-entry`, declared in
 `draft_gates.GATES`, and the builder carries the two branches (run probe now
 / stop with the brief kept) with the free-text channel intact.
 

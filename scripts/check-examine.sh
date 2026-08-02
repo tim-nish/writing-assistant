@@ -86,7 +86,7 @@ assert "coverage_claim" in d, "no coverage claim"
 # 4. Derived scope binds (AC2): a repository outside the served attribution is
 #    REFUSED, NOT SEARCHED — through terrain_scope's one refusal layer.
 cat > "$work/scope.json" <<'EOF'
-{"harvest_scope": {"projects": ["other-repo"], "served": true,
+{"examine_scope": {"projects": ["other-repo"], "served": true,
  "by_member": [{"index": "1.2", "projects": ["other-repo"]}]}}
 EOF
 out=$(python3 "$EX" --root "$h" --claim "x" --scope "$work/scope.json" --member 1.2)
@@ -105,7 +105,7 @@ assert "false attribution" in d["refusal"]["line"], "refusal does not name the r
 
 # 5. An in-scope repository proceeds (membership, not classification).
 cat > "$work/scope2.json" <<EOF
-{"harvest_scope": {"projects": ["host"], "served": true,
+{"examine_scope": {"projects": ["host"], "served": true,
  "by_member": [{"index": "1.2", "projects": ["host"]}]}}
 EOF
 python3 "$EX" --root "$h" --claim "x" --scope "$work/scope2.json" --member 1.2 \
