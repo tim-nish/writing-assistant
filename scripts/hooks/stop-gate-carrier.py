@@ -41,6 +41,7 @@ stderr back to the model; exit 0 lets it end. Anything this hook cannot do
 safely exits 0 — a hook that crashes must not take the session with it.
 """
 
+import importlib.util
 import json
 import os
 import subprocess
@@ -48,6 +49,22 @@ import sys
 
 HERE = os.path.dirname(os.path.realpath(__file__))
 INVENTORY = os.path.join(HERE, "..", "gate-inventory.py")
+
+
+def _budget():
+    """The turn budget module, loaded defensively (Story 20.153, #1225).
+
+    The hook MEASURES the budget and never defines it — the rule lives in
+    `turn_budget.py` and stands whether or not this hook runs.
+    """
+    try:
+        spec = importlib.util.spec_from_file_location(
+            "turn_budget", os.path.join(HERE, "..", "turn_budget.py"))
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod
+    except Exception:
+        return None
 
 
 def _run_workspace(payload):
@@ -93,6 +110,22 @@ def main():
     except (OSError, subprocess.SubprocessError):
         # The auditor could not run. That is a cannot-determine, not a finding.
         return 0
+
+    # THE VOLUME MEASUREMENT (Story 20.153, #1225), reported and never blocking.
+    # `SPEC.md:80` records that this repository cannot constrain the relay
+    # layer's WORDING. Volume is not wording — a line count is mechanical — so
+    # the budget is measurable here even though the register is not. It is a
+    # REPORT: a turn is never blocked for being long, because the cost of a
+    # wrong block (holding the owner's turn) exceeds the cost of a long turn.
+    tb = _budget()
+    if tb is not None and not tb.debug_enabled():
+        over, n = tb.over_budget(payload.get("last_assistant_message"))
+        if over:
+            sys.stderr.write(
+                f"note: this turn carried {n} owner-facing lines against a "
+                f"budget of {tb.TURN_LINE_BUDGET} outside the gate payload. "
+                f"Detail belongs in the run workspace behind one pointer "
+                f"line.\n")
 
     if proc.returncode == 0:
         return 0
