@@ -76,6 +76,23 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py quality-gate \
   established predicate over the pin ledger and are an open question** — they
   report cannot-determine, and are never converted into a missing-input
   finding on a guessed mapping.
+- **Where the state appears, and what it is not (Story 20.173, #1288):** the
+  line rides in the gate's own report — `evidence_types.cannot_determine[]`
+  with its rendered `cannot_determine_lines`, echoed into the top-level
+  `notices[]` and on stderr — and the `evidence` dimension reads
+  `verdict: "cannot-determine"` when nothing else in the check failed. Two
+  routes produce it today: the gate invoked **without `--framework-file`**
+  (the declarations were never read, so the check did not run — the omission
+  itself is now disclosed, never silent), and a **section whose anchored
+  pointers the supplied carrier resolves to no KIND**. It is **not a pass**
+  (never counted toward one), **not a `missing_input[]` finding** (so the
+  `episode-candidates` hop below is unreachable from it), and **not a publish
+  blocker on its own** — it never joins `failing_dimensions`; carry it into
+  the completion summary as the disclosed state. The two exit-2 refusals stand
+  **beside** it, unchanged: a missing `--map`/`--state` flag while the
+  framework declares types, and a `--state` with no fact sheet at all, are
+  invocation defects to fix by re-invoking, not corpus preconditions to
+  disclose.
 - **Dimension 4 (readability mechanics) is checked mechanically** here (zero
   tokens): sentence/paragraph-length distributions, heading density, and — from
   the provenance map — the **stitched-fact-sheet** signature (wall-to-wall

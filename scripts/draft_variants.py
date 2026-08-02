@@ -61,6 +61,19 @@ def bind(namespace):
     _host = _Host(namespace)
 
 
+def _evidence_cannot_determine_line(entry):
+    """The AC-1 disclosure line for one unresolvable evidence-type predicate
+    (Story 20.173, #1288). Names the section, the declared type, and WHY the
+    predicate could not be resolved — a bare `cannot-determine` would reproduce
+    the silence it replaces one level up."""
+    sec = (f"section '{entry['section']}'" if entry.get("section")
+           else "section not determined (declarations unread)")
+    dec = ("declared " + "|".join(entry["declared"]) if entry.get("declared")
+           else "declared type not determined")
+    return (f"evidence-type check: cannot-determine — {sec}, {dec}: "
+            f"{entry['reason']}")
+
+
 def cmd_quality_gate(args):
     """Stage 3→4 quality gate (Story 11.4). Dimensions 3 and 4 are mechanical
     here; dimensions 1–2 come from the single-pass judge's verdicts (--judge, a
@@ -241,8 +254,35 @@ def cmd_quality_gate(args):
     # framework file is supplied and declares types; fails CLOSED when the
     # inputs it needs are missing, because a gate that cannot check has not
     # checked.
+    #
+    # THREE outcomes, not two (Story 20.173, #1288; SPEC-writing-assistant
+    # clause (b) — "a failed corpus precondition reports DISTINCTLY … neither a
+    # pass nor a failure. A vacuous pass is the #933 failure mode exactly"). A
+    # predicate this check cannot RESOLVE is `cannot-determine`: disclosed by
+    # name with its reason, never a pass, never a missing-input finding, and
+    # never a publish blocker on its own. The two fail-closed refusals below
+    # (exit 2) stay BESIDE this state, not folded into it: a missing FLAG is an
+    # invocation defect an agent fixes by re-invoking, while an unresolvable
+    # predicate over inputs that WERE supplied is a corpus precondition.
     evidence_missing = []
+    evidence_cannot_determine = []
     evidence_checked = False
+    if not getattr(args, "framework_file", None):
+        # The #1288 defect route itself: the strict path refused, so the gate
+        # was invoked WITHOUT --framework-file/--state — which omitted the
+        # check entirely and reported nothing about the omission. Dropping the
+        # flags can no longer route around the check silently; the omission is
+        # now the state (AC-2).
+        evidence_cannot_determine.append({
+            "section": None,
+            "declared": None,
+            "reason": ("--framework-file was not passed, so this run never read "
+                       "the framework's per-section [EVIDENCE: …] declarations "
+                       "— no declared minimum evidence type was resolved for "
+                       "any section, and the check did not run. Re-invoke with "
+                       "--framework-file and --state (the documented gate "
+                       "invocation, skills/draft-article/stages/gate.md)"),
+        })
     if getattr(args, "framework_file", None):
         try:
             decls = _host.parse_evidence_declarations(_host._read_text(args.framework_file))
@@ -291,8 +331,27 @@ def cmd_quality_gate(args):
             evidence_checked = True
             for slot, types in decls:
                 sec = next((s for s in sections if s[0] == slot), None)
+                # KIND unmappable (Story 20.173): a declared type with no entry
+                # in the KIND mapping has no predicate to evaluate. Reporting
+                # the section as unsatisfied would assert an absence the check
+                # never established.
+                unmapped = sorted(t for t in types if t not in _host.EVIDENCE_KINDS)
+                if unmapped:
+                    evidence_cannot_determine.append({
+                        "section": slot,
+                        "section_present": bool(sec),
+                        "declared": sorted(types),
+                        "reason": ("declared evidence type(s) "
+                                   + ", ".join(unmapped)
+                                   + " have no KIND mapping, so there is no "
+                                     "predicate to evaluate for them — this "
+                                     "section's evidence was established "
+                                     "neither present nor absent"),
+                    })
+                    continue
                 allowed = set().union(*(_host.EVIDENCE_KINDS[t] for t in types))
                 found = set()
+                unresolved = []
                 if sec:
                     for _pos, _cls, ptrs, anchor in prov_entries:
                         if anchor and sec[1] <= anchor <= sec[2]:
@@ -300,6 +359,34 @@ def cmd_quality_gate(args):
                                 k = kinds_by_source.get(ptr)
                                 if k:
                                     found.add(k)
+                                else:
+                                    unresolved.append(ptr)
+                if not (found & allowed) and sec and unresolved:
+                    # Carrier absent FOR THIS SECTION (Story 20.173): the
+                    # section anchors pointers the carrier does not resolve to
+                    # any KIND, so "no allowed KIND found" cannot be told apart
+                    # from "the carrier does not carry these pointers" — the
+                    # #751 false-gap shape at per-section granularity. The
+                    # producer of the KIND carrier was retired with harvest
+                    # (#1182/#1224), which is why this is the ordinary case now
+                    # rather than a corner.
+                    evidence_cannot_determine.append({
+                        "section": slot,
+                        "section_present": True,
+                        "declared": sorted(types),
+                        "allowed_kinds": sorted(allowed),
+                        "found_kinds": sorted(found),
+                        "unresolved_pointers": sorted(set(unresolved)),
+                        "reason": ("carrier absent — "
+                                   + str(len(set(unresolved)))
+                                   + " anchored pointer(s) in this section "
+                                     "resolve to no KIND in the supplied "
+                                     "--state carrier (its producer was "
+                                     "retired with harvest, #1182/#1224), so "
+                                     "the declared type was neither found nor "
+                                     "established missing"),
+                    })
+                    continue
                 if not (found & allowed):
                     tlist = "|".join(sorted(types))
                     evidence_missing.append({
@@ -335,14 +422,27 @@ def cmd_quality_gate(args):
                                "the evidence may be present under the wrong "
                                "heading, #750)")),
                     })
-            results["evidence"] = ("pass", "") if not evidence_missing else (
-                "fail", "; ".join(
+            # A determinable section still reports its ordinary verdict (a
+            # cannot-determine elsewhere never converts a real finding, and
+            # never suppresses a real pass). Only when nothing failed AND
+            # something was unresolvable does the dimension itself carry the
+            # third state — `cannot-determine` is not in `failing`, so it never
+            # blocks publication on its own (AC-4), and it is not `pass`, so it
+            # is never counted toward one (AC-1).
+            if evidence_missing:
+                results["evidence"] = ("fail", "; ".join(
                     (f"{m['section']}: section not found (expected slot key "
                      f"'{m['section']}'; heading mismatch — see upstream)")
                     if m["classification"] == "section-not-found" else
                     f"{m['section']}: declared {'|'.join(m['declared'])}, found "
                     f"{','.join(m['found_kinds']) or 'nothing'}"
                     for m in evidence_missing))
+            elif evidence_cannot_determine:
+                results["evidence"] = ("cannot-determine", "; ".join(
+                    _evidence_cannot_determine_line(c)
+                    for c in evidence_cannot_determine))
+            else:
+                results["evidence"] = ("pass", "")
 
     failing = [d for d, (v, _) in results.items() if v == "fail"]
     out = {"gate": "quality", "pass": not failing,
@@ -360,6 +460,29 @@ def cmd_quality_gate(args):
                      "route, same two-cycle bound); never backfill with "
                      "unrelated factual material"),
         }
+    # The third outcome, PRINTED (Story 20.173, #1288). It rides in the report
+    # itself — the defect was silence, so a state that only a return value
+    # carried would repeat it — and is echoed on stderr for the human reading
+    # the run. It is deliberately NOT in `missing_input[]`: a cannot-determine
+    # is not an evidence gap, and routing one to `episode-candidates` would
+    # manufacture the very absence the state exists to avoid asserting (AC-3,
+    # the #751 failure the fail-closed refusals were built to prevent).
+    if evidence_cannot_determine:
+        cd_lines = [_evidence_cannot_determine_line(c)
+                    for c in evidence_cannot_determine]
+        et = out.setdefault("evidence_types", {"checked": evidence_checked,
+                                               "missing_input": []})
+        et["cannot_determine"] = evidence_cannot_determine
+        et["cannot_determine_lines"] = cd_lines
+        et["cannot_determine_note"] = (
+            "cannot-determine is neither a pass nor a failure: it is never "
+            "counted toward a pass, never enters `missing_input[]`, never "
+            "routes to `episode-candidates` or any repair hop, and is never a "
+            "publish blocker on its own — disclose it in the completion "
+            "summary (SPEC-writing-assistant clause (b); Story 20.173, #1288)")
+        out.setdefault("notices", []).extend(cd_lines)
+        for ln in cd_lines:
+            sys.stderr.write(ln + "\n")
     # Delta re-check accounting (#349): what the second cycle suppressed as a
     # fresh interpretive dim1/dim2 finding (not in cycle-1's locations), so the
     # convergence decision is auditable from the gate output alone.
