@@ -123,5 +123,29 @@ grep -q 'compose or approve a file list' \
   && ok "examine.md states the no-file-list-gate contract" \
   || err "examine.md missing the no-file-list-gate statement"
 
+# --- anchor-finding lives here, and reproducibility is the enumerator's ------
+# (Story 20.155, #1224.) Probe is a permission check now and emits no anchors,
+# so a dangling reference to "the probe's anchors" would send the model looking
+# for a field that no longer exists.
+grep -q "the probe's anchors" skills/draft-article/stages/examine.md \
+  && err "examine still points at probe's anchors — probe emits none (#1224)" \
+  || ok "no dangling reference to probe anchors"
+grep -q "Anchor-finding lives HERE" skills/draft-article/stages/examine.md \
+  && ok "examine states that anchor-finding is its own, per claim" \
+  || err "the relocation of anchor-finding is undocumented"
+
+# DETERMINISTIC ENUMERATION is CAP-10's one surviving mechanism, so it is
+# asserted rather than assumed: the enumerator sorts, and examine consumes that
+# order without re-deriving it.
+python3 - <<'PY' && ok "the declared-file enumeration is deterministic (sorted at the source)" || err "the file enumeration is not sorted — CAP-10's reproducibility does not hold"
+import re, sys
+src = open("scripts/resolve-writing-sources.py").read()
+assert re.search(r"files\s*=\s*sorted\(enumerate_files\(sources\)\)", src), \
+    "cmd_files does not sort"
+ex = open("scripts/examine.py").read()
+assert "re-derive" in ex or "single source of truth" in ex, \
+    "examine does not declare that it consumes the enumerator's order"
+PY
+
 [ "$fail" -eq 0 ] || { printf '\nexamine checks FAILED.\n' >&2; exit 1; }
 printf '\nAll examine checks passed.\n'
