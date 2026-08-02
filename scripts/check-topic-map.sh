@@ -103,15 +103,16 @@ MAP > "$work/m1.json" 2>"$work/m1.err" \
   && ok "assemble produces a map" \
   || err "assemble failed: $(cat "$work/m1.err")"
 
-python3 - "$work/m1.json" <<'PYEOF' && ok "map: topics derived from track_topics-less repo fall back to track names, items projected from frontmatter" || err "map content wrong"
+python3 - "$work/m1.json" <<'PYEOF' && ok "map: topics are the track names themselves (the track_topics mapping is removed, 20.161), items projected from frontmatter" || err "map content wrong"
 import json, sys
 d = json.load(open(sys.argv[1]))
 assert d["kind"] == "topic-map" and d["derived"] is True and d["stored"] is False, d
 topics = {t["topic"]: t for t in d["topics"]}
 assert set(topics) == {"engineering", "people"}, topics.keys()
-# no track_topics declared -> tracks show unmapped, never an invented topic
-assert topics["engineering"]["mapped"] is False, topics["engineering"]
-assert set(d["unmapped_tracks"]) == {"engineering", "people"}, d["unmapped_tracks"]
+# The mapping keys are gone from the artifact too (Story 20.161).
+for gone in ("track_topics", "unmapped_tracks", "stale_mapping_tracks"):
+    assert gone not in d, f"{gone} still emitted"
+assert "mapped" not in topics["engineering"], topics["engineering"]
 slugs = sorted(i["surface"] for i in topics["engineering"]["items"])
 assert slugs == ["backlog/cache-warmth.md", "backlog/retry-storm.md",
                  "drafts/retry-storm.md"], slugs
@@ -185,8 +186,6 @@ added = items(a) - items(b)
 assert added == {"backlog/token-budget.md"}, added
 assert items(b) - items(a) == set()
 # everything else is untouched
-for key in ("track_topics", "unmapped_tracks", "stale_mapping_tracks"):
-    assert b[key] == a[key], (key, b[key], a[key])
 assert a["coverage"]["matched"] == b["coverage"]["matched"] + 1
 PYEOF
 
@@ -205,7 +204,7 @@ MAP --emit-debug "$work/debug.json" > /dev/null 2>&1
 python3 - "$work/debug.json" <<'PYEOF'
 import json, sys
 d = json.load(open(sys.argv[1]))
-d["topics"] = [{"topic": "POISON", "mapped": True, "tracks": [], "item_count": 0, "items": []}]
+d["topics"] = [{"topic": "POISON", "tracks": [], "item_count": 0, "items": []}]
 json.dump(d, open(sys.argv[1], "w"))
 PYEOF
 MAP --emit-debug "$work/debug2.json" > "$work/m2.json" 2>/dev/null
@@ -273,97 +272,28 @@ python3 "$M" surfaces --root "$h" --max-surfaces 2 | wc -l | grep -q '^ *2$' \
   && ok "surfaces: the read bound applies to the enumeration too" \
   || err "surfaces ignored --max-surfaces"
 
-# --- 6. track_topics: the map reads the declared mapping, never invents topics ---
-printf '{"engineering": "delivery", "ghost": "nowhere"}' | \
-  python3 "$root/scripts/resolve-writing-sources.py" --root "$h" \
-    set-policy-source --track-topics >/dev/null 2>&1
+# --- 6. the track_topics mapping is REMOVED (Story 20.161, #1246) --------------
+# The consumer-declared track→topic mapping, its `--track-topics` writer and
+# the bounded raw-thread element read (`read --topics`) all went with the
+# retired topic-selection reader path. The policy source is declared here as
+# the bare presence toggle — sections 7b+ read through it.
+python3 "$root/scripts/resolve-writing-sources.py" --root "$h" \
+  set-policy-source >/dev/null 2>&1
+if printf '{"engineering": "delivery"}' | \
+     python3 "$root/scripts/resolve-writing-sources.py" --root "$h" \
+       set-policy-source --track-topics >/dev/null 2>&1; then
+  err "set-policy-source still accepts --track-topics (removed, 20.161)"
+else
+  ok "set-policy-source refuses --track-topics (removed, 20.161)"
+fi
 MAP > "$work/mapped.json" 2>/dev/null
-python3 - "$work/mapped.json" <<'PYEOF' && ok "track_topics: mapped tracks resolve to hub topic names; a stale mapping track is disclosed" || err "track_topics wiring wrong"
+python3 - "$work/mapped.json" <<'PYEOF' && ok "topics stay the track names; no mapping keys reappear in the artifact" || err "a removed mapping key resurfaced"
 import json, sys
 d = json.load(open(sys.argv[1]))
 topics = {t["topic"]: t for t in d["topics"]}
-assert "delivery" in topics, topics.keys()
-assert topics["delivery"]["mapped"] is True and topics["delivery"]["tracks"] == ["engineering"], topics["delivery"]
-assert "engineering" not in topics, topics.keys()
-assert "people" in topics and topics["people"]["mapped"] is False, topics.keys()
-assert d["stale_mapping_tracks"] == ["ghost"], d["stale_mapping_tracks"]
-PYEOF
-
-# --- 6b. hub-elements: the second projection (Story 18.79, #640) ---------------
-# Three declared topics, two servable, so the seam bound (2 per read) is
-# exercised for real rather than assumed. `zeta` is declared and never read.
-python3 - "$FX" <<'PYEOF'
-import json, sys
-fx = json.load(open(sys.argv[1]))
-sha = "1111111111111111111111111111111111111111"
-fx["topics"] = {
-    "delivery": [
-        ["topics/delivery.md", 1, "# delivery"],
-        ["topics/delivery.md", 3, "- 2026-07-20 — Ship behind a flag; the rollback path is the feature. (q_a/x D1)"],
-        ["topics/delivery.md", 4, "- 2026-07-19 — ~~Weekly release train~~ superseded 2026-07-20 by continuous deploy."],
-        ["topics/delivery.md", 6, "## Declined (things considered and rejected)"],
-        ["topics/delivery.md", 7, "- 2026-07-18 — Blue/green for every service: rejected, the fleet is too small."],
-        ["topics/delivery.md", 9, "not a dated line, so not an element"],
-    ],
-    "nowhere": [
-        ["topics/nowhere.md", 1, "# nowhere"],
-        ["topics/nowhere.md", 2, "- 2026-07-21 — A decision that mentions a declined option inline, declined as a copy. (q_a/y D2)"],
-    ],
-    "zeta": [["topics/zeta.md", 2, "- 2026-07-01 — Never read: past the seam bound."]],
-}
-fx["surface"] = dict(fx.get("surface", {}), topics=["delivery", "nowhere", "zeta"])
-json.dump(fx, open(sys.argv[1], "w"))
-PYEOF
-printf '{"engineering": "delivery", "ghost": "nowhere", "extra": "zeta"}' | \
-  python3 "$root/scripts/resolve-writing-sources.py" --root "$h" \
-    set-policy-source --track-topics >/dev/null 2>&1
-MAP > "$work/elements.json" 2>/dev/null
-python3 - "$work/elements.json" <<'PYEOF' && ok "hub-elements: decisions and reversals are projected, typed by their native markers, bounded and disclosed" || err "the element projection is wrong"
-import json, sys
-d = json.load(open(sys.argv[1]))
-els = d["elements"]
-by_cite = {e["situation"].split("@")[0]: e for e in els}
-kinds = {c: e["kind"] for c, e in by_cite.items()}
-
-# Typed by the markers the served surface actually uses.
-assert kinds.get("topics/delivery.md:3") == "decision", kinds
-assert kinds.get("topics/delivery.md:4") == "reversal", kinds   # struck-through
-assert kinds.get("topics/delivery.md:7") == "reversal", kinds   # under ## Declined
-# The word "declined" INSIDE an ordinary decision line must not type it as a
-# reversal — section membership is the marker, not the word.
-assert kinds.get("topics/nowhere.md:2") == "decision", kinds
-# A non-dated line is not an element at all.
-assert "topics/delivery.md:9" not in kinds, kinds
-# The heading itself is never an element.
-assert "topics/delivery.md:6" not in kinds, kinds
-
-e = by_cite["topics/delivery.md:3"]
-assert e["date"] == "2026-07-20" and e["topic"] == "delivery", e
-assert e["evidence"] == [e["situation"]] and "@" in e["situation"], e
-assert e["consumed"] is False and e["consumption_join"], e
-# The q_a/ provenance pointer is the hub's bookkeeping, not the decision.
-assert "q_a/" not in e["summary"], e["summary"]
-
-# Ranked by recency, deterministically — the property the E<topic>.<n> indexes
-# assigned downstream depend on.
-assert [x["date"] for x in els] == sorted((x["date"] for x in els), reverse=True), els
-
-# The seam bound is real: `zeta` is declared, never read, and NAMED as skipped.
-cov = d["coverage"]
-assert cov["element_topics_read"] == ["delivery", "nowhere"], cov["element_topics_read"]
-assert cov["element_topics_skipped"] == ["zeta"], cov["element_topics_skipped"]
-assert not any(e["topic"] == "zeta" for e in els), "an unread topic produced elements"
-skipped = [s for s in cov["skipped"] if s["family"] == "hub-elements"]
-assert len(skipped) == 1 and "seam" in skipped[0]["reason"], skipped
-assert cov["complete"] is False, cov          # a bounded run says so
-fams = {f["family"]: f for f in cov["families"]}
-f = fams["hub-elements"]
-assert f["enumerated"] is True and f["matched"] == 3, f
-assert f["read"] == 2 and f["skipped"] == 1 and f["accounting_closes"] is True, f
-
-# Elements are a SECOND projection: they never become clustered items.
-items = [i for t in d["topics"] for i in t["items"]]
-assert not any(i.get("family") == "hub-elements" for i in items), "elements leaked into items"
+assert "engineering" in topics and "people" in topics, topics.keys()
+for gone in ("track_topics", "unmapped_tracks", "stale_mapping_tracks"):
+    assert gone not in d, f"{gone} still emitted"
 PYEOF
 
 # --- 7. consumption is READ from its one implementation, not re-implemented -----
@@ -910,16 +840,15 @@ PYEOF
 # --- 8. #886/Story 20.35: the by-topic axis enumerates from the SERVED manifest -
 # The defect: the axis population was consumer config (`track_topics`, bounded
 # by ELEMENT_TOPIC_BOUND), so a repo declaring nothing offered 0 members
-# whatever the hub served, and the screen could not distinguish "the hub serves
-# one topic" from "we asked for one topic".
+# whatever the hub served. Since Story 20.161 both the mapping and the bound
+# are REMOVED outright — the served manifest is the only membership source.
 python3 - "$FX" <<'AXIS_FIXTURE'
 import json, sys
 fx = json.load(open(sys.argv[1]))
 fx["tools"] = ["glossary_entry", "lessons_index", "topic_thread", "policy_lookup",
                "surface_names", "gloss_index", "element_survey"]
-# THREE served decision topics. None is declared in `track_topics` (which still
-# maps delivery/nowhere/zeta) — so if any consumer-side gate survives, the axis
-# cannot show these at all. Three also exceeds ELEMENT_TOPIC_BOUND (2).
+# THREE served decision topics — more than the removed ELEMENT_TOPIC_BOUND (2)
+# ever allowed on the raw path, all read with none skipped.
 fx["elements"] = [
     {"slug": "q_a/2026-07-28-alpha D1", "kind": "decision", "tags": [],
      "topic": "served-a", "renderings": ["decisions/served-a"],
@@ -961,16 +890,13 @@ d = json.load(open(sys.argv[1]))
 cov, els = d["coverage"], d["elements"]
 ax = cov["element_axis"]
 
-# AC1 — members are the served topics, not the declared mapping. The repo
-# declares delivery/nowhere/zeta and NONE of them may appear.
+# AC1 — members are the served topics; no consumer-declared source exists
+# any more (the mapping is removed, 20.161).
 assert ax["source"] == "element manifest (records)", ax
 assert ax["topics"] == ["served-a", "served-b", "served-c"], ax["topics"]
-declared = {"delivery", "nowhere", "zeta"}
-assert not (set(ax["topics"]) & declared), ax["topics"]
-assert not any(e.get("topic") in declared for e in els), "a declared topic reached the axis"
 
 # AC2 — no consumer-side bound survives: three served topics is MORE than
-# ELEMENT_TOPIC_BOUND, and all three are read with none skipped.
+# the removed seam bound ever allowed, and all three are read, none skipped.
 assert ax["bounded_by_consumer_config"] is False, ax
 assert cov["element_topics_read"] == ["served-a", "served-b", "served-c"], cov
 assert cov["element_topics_skipped"] == [], cov["element_topics_skipped"]
@@ -1004,23 +930,21 @@ assert by_ptr["q_a/2026-07-27-beta D1"]["date"] == "2026-07-27", by_ptr
 AXIS_ASSERT
 
 # AC7 — a reintroduced consumer-side gate is caught mechanically, asserted on
-# the shipped source rather than on a mocked boolean.
-python3 - <<'AXIS_GUARD' && ok "#886: no consumer-declared gate stands between the manifest and the axis (regression guard)" || err "a consumer-side gate is reachable from the record-authoritative axis path"
+# the shipped source rather than on a mocked boolean. Since Story 20.161 the
+# mapping, the bound and the raw-thread read are DELETED, not just bypassed.
+python3 - <<'AXIS_GUARD' && ok "#886/20.161: no consumer-declared gate or raw-thread read path exists in the source (regression guard)" || err "a removed consumer-side mechanism is back in terrain_map.py"
 src = open("scripts/terrain_map.py").read()
+for gone in ("def track_topics(", "def element_topics(",
+             "def read_topic_elements(", "ELEMENT_TOPIC_BOUND = "):
+    assert gone not in src, f"{gone} survives — the removed mechanism grew back"
 axis = src.split("def element_axis(", 1)[1].split("\ndef ", 1)[0]
 body = axis.split('"""', 2)[2]
-# The record-authoritative branch must not consult the declared mapping or the
-# seam bound. `element_topics(mapping)` may appear ONLY on the fallback return.
-assert body.count("element_topics(") == 1, body
-assert "ELEMENT_TOPIC_BOUND" not in body, "the axis re-acquired the seam bound"
-# And the bound must still exist for whatever still reads a raw thread.
-assert "ELEMENT_TOPIC_BOUND" in src, "the raw-thread bound was deleted, not just lifted"
-rt = src.split("def read_topic_elements(", 1)[1].split("\ndef ", 1)[0]
-assert "--topics" in rt, "the raw-thread read path vanished"
+assert "element_topics(" not in body, "the axis consults a consumer-declared list again"
 AXIS_GUARD
 
-# AC5 — records unavailable degrades LOUDLY: the axis falls back to the
-# declared mapping and NAMES the reason at the point of substitution.
+# AC5 — records unavailable degrades LOUDLY: the family is declared-but-not-
+# enumerated with the reason NAMED — never a consumer-config substitution
+# (the fallback mapping was removed by Story 20.161).
 python3 - "$FX" <<'AXIS_DEGRADE'
 import json, sys
 fx = json.load(open(sys.argv[1]))
@@ -1030,12 +954,18 @@ AXIS_DEGRADE
 MAP > "$work/axis-fallback.json" 2>/dev/null \
   && ok "#886: the map still assembles when the manifest is unavailable" \
   || err "assemble failed on the degraded axis path"
-python3 - "$work/axis-fallback.json" <<'AXIS_DEGRADE_ASSERT' && ok "#886: a degraded axis NAMES its substitution and says it is consumer-bounded, never silently empty" || err "the degraded axis is silent"
+python3 - "$work/axis-fallback.json" <<'AXIS_DEGRADE_ASSERT' && ok "#886/20.161: a degraded axis is declared-but-not-enumerated with the reason NAMED — never a consumer-config substitution" || err "the degraded axis is silent or substituted"
 import json, sys
-ax = json.load(open(sys.argv[1]))["coverage"]["element_axis"]
-assert ax["source"] == "consumer-declared mapping (fallback)", ax
-assert "element_survey" in (ax.get("fallback_reason") or ""), ax
-assert ax["bounded_by_consumer_config"] is True, ax
+d = json.load(open(sys.argv[1]))
+ax = d["coverage"]["element_axis"]
+assert ax["source"] == "element manifest (records)", ax
+assert "element_survey" in (ax.get("unavailable_reason") or ""), ax
+assert ax["bounded_by_consumer_config"] is False, ax
+fams = {f["family"]: f for f in d["coverage"]["families"]}
+he = fams["hub-elements"]
+assert he["enumerated"] is False and "element_survey" in (he["reason"] or ""), he
+assert not any(e.get("kind") == "decision" for e in d["elements"]), \
+    "decisions appeared with no served manifest"
 AXIS_DEGRADE_ASSERT
 
 

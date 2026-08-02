@@ -108,11 +108,10 @@ check("SUBSTITUTED" not in row_ok,
 sys.exit(1 if fail else 0)
 PYEOF
 
-# The accumulator must never drop a served surface (#873): two files resolving
-# to one topic key extend, they do not assign.
-grep -q 'by_topic.setdefault(current, \[\]).extend(' scripts/terrain_map.py \
-  && ok "two served surfaces under one topic key EXTEND, never clobber" \
-  || err "read_topic_elements assigns by_topic[current] — an earlier set is dropped silently"
+# The #873 extend-never-assign accumulator lived in `read_topic_elements`,
+# which was REMOVED with the raw-thread read path (Story 20.161, #1246) — no
+# raw topic read remains to accumulate. The cite-passthrough contract above is
+# the surviving half and stays asserted on `parse_topic_elements` directly.
 
 # Detection is the consumer's own: no code path may gate it on an upstream
 # version, flag, or claim that a fix has landed.

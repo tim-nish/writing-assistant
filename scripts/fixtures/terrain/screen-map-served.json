@@ -4,9 +4,6 @@
   "stored": false,
   "articles_repo": "/tmp/tmp.NbyWNyYzFm/articles",
   "host_root": "/tmp/tmp.NbyWNyYzFm/host",
-  "track_topics": {},
-  "unmapped_tracks": [],
-  "stale_mapping_tracks": [],
   "subtopic_defects": [],
   "topics": [],
   "gloss": {
@@ -150,7 +147,7 @@
         "reason": "the policy source serves no decision topics"
       }
     ],
-    "surfaces_read": "index and frontmatter only — item bodies are never read; a declared source is read at heading level, never as prose",
+    "surfaces_read": "index and frontmatter only \u2014 item bodies are never read; a declared source is read at heading level, never as prose",
     "element_topics_read": [],
     "element_topics_skipped": [],
     "element_axis": {

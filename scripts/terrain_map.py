@@ -75,11 +75,11 @@ and every candidate surface carries the **source family** it came from
     element manifest's `decision` records (Story 20.35, #886): membership,
     counts and the E Strands arrive as labelled fields, so no raw
     `topics/*.md` thread is read and no consumer config bounds the axis.
-  * the **track↔topic mapping** — `policy_source.track_topics` in the host
-    repo's `writing-sources.yaml`, read through
-    `resolve-writing-sources.py policy-source` (#525). The articles repo owns
-    track names, the hub owns topic names, the mapping is consumer config —
-    and since #886 it is **not** an axis denominator.
+  * the **track↔topic mapping** (`policy_source.track_topics`, #525) is GONE
+    (Story 20.161, SPEC-policy-topic-at-draft CAP-5 as amended 2026-08-02,
+    #1246): it stopped being the axis denominator at #886 and was removed with
+    the retired topic-selection reader path. Tracks are shown under their own
+    names, always.
   * the **Lesson-consumption derived view** — READ, never re-implemented, from
     `write-article-plan.py consult` (`consumed_index` /
     `project_consumed_index`), which is the shipped instantiation of the
@@ -192,23 +192,21 @@ DECLARED_FAMILIES = (FAMILY_ARTICLES_ITEMS, FAMILY_HUB_LESSONS,
                      FAMILY_HOST_SOURCES, FAMILY_HUB_ELEMENTS,
                      FAMILY_HUB_GLOSS)
 
-# CAP-4's element bound, restated where it binds: the seam serves at most 2
-# `topics/*.md` per read (`scripts/read-policy-source.py:100`). Element coverage
-# is therefore PARTIAL BY CONSTRUCTION whenever the repo maps more topics than
-# this, and the surfaces beyond the bound are disclosed by name — never dropped
-# quietly, and never worked around with extra reads.
-ELEMENT_TOPIC_BOUND = 2
+# `ELEMENT_TOPIC_BOUND` (the seam's ≤2 `topics/*.md` per raw read) was REMOVED
+# with the raw-thread read path (Story 20.161, #1246): the `read --topics`
+# input it bounded no longer exists, and the record-authoritative axis (#886)
+# never paid it. Element membership comes from the served manifest, whole.
 
-# A lesson seed enters the topic derivation through the SAME track->topic path
-# every item uses: it carries the family name as its track, so an owner who
-# wants these under a hub topic name declares it in `policy_source.track_topics`
-# like any other track. Nothing here invents a topic.
+# A lesson seed enters the topic derivation through the SAME track path every
+# item uses: it carries the family name as its track. Nothing here invents a
+# topic — a track is shown under its own name (the consumer-declared
+# track→topic mapping was removed by Story 20.161).
 LESSON_TRACK = FAMILY_HUB_LESSONS
 LESSON_SECTION = FAMILY_HUB_LESSONS
 
 # A declared writing source enters the topic derivation the same way, for the
 # same reason: its own `track:` when it happens to declare one, else the family
-# name as a track the owner may map like any other.
+# name as its track.
 
 
 # The seam layer lives in its own module (Story 20.40, #903): invocation and
@@ -245,23 +243,11 @@ def articles_repo(root, repo_override=None):
     return os.path.dirname(drafts)
 
 
-def track_topics(root):
-    """The `policy_source.track_topics` mapping (#525) as {track: [topic,...]},
-    or {} when undeclared/unreadable. Absence is not an error — an unmapped
-    repo still has tracks, and the map says so rather than inventing topics."""
-    cmd = [sys.executable, SRC_RES]
-    if root:
-        cmd += ["--root", root]
-    cmd += ["policy-source"]
-    r = subprocess.run(cmd, capture_output=True, text=True)
-    if r.returncode != 0 or not r.stdout.strip():
-        return {}
-    try:
-        data = json.loads(r.stdout)
-    except ValueError:
-        return {}
-    mapping = data.get("track_topics") or {}
-    return {k: (v if isinstance(v, list) else [v]) for k, v in mapping.items()}
+# `track_topics()` was REMOVED (Story 20.161, #1246) with the
+# `policy_source.track_topics` config mapping it read (#525): the mapping's
+# sole function was to seed the retired per-article ≤2-topic proposal, and
+# since #886 it bounded nothing on the axis. Tracks now derive topics under
+# their own names, always.
 
 
 def consumption_view(root):
@@ -696,9 +682,8 @@ def journey_shard_read(root, shards):
 
 def decision_gloss_read(root, topics):
     """The served decision-line renderings: one tier-2 `decisions/<topic>`
-    shard per topic in the ALREADY-BOUNDED element-topic set — the run never
-    widens its own scope to reach more (CAP-4's rule, applied to the shard
-    reads the same way `read_topic_elements` applies it to the topic reads).
+    shard per topic in the element-topic set the served manifest composed —
+    the run never widens its own scope to reach more (CAP-4's rule).
 
     Returns `(by_topic, misses)`. A miss names its reason per topic; it is
     NEVER folded into an empty dict, because downstream the absence must be
@@ -751,14 +736,10 @@ def join_decision_gloss(elements, shards, misses):
              "condition to fix now, not a gap to tolerate"))
 
 
-def element_topics(mapping):
-    """FALLBACK ONLY (Story 20.35, #886): the topics a repo declared through
-    `policy_source.track_topics`. No longer the axis denominator — reached only
-    when the manifest cannot be acquired, and then the substitution is NAMED,
-    because a consumer-declared allowlist over a hub-enumerated vocabulary
-    makes the served surface's completeness unobservable from the consumer."""
-    names = {t for topics in mapping.values() for t in topics if t}
-    return sorted(names)
+# `element_topics()` — the consumer-declared fallback topic list (#886) — was
+# REMOVED with the `track_topics` mapping it projected (Story 20.161, #1246).
+# An unavailable manifest now leaves the family declared-but-not-enumerated
+# with the reason, never substituted from consumer config.
 
 
 def elements_from_records(records):
@@ -797,47 +778,13 @@ def elements_from_records(records):
     return out
 
 
-def read_topic_elements(root, topics):
-    """Read up to `ELEMENT_TOPIC_BOUND` topic files through the shipped seam
-    and parse their elements — FALLBACK ONLY since Story 20.35 (#886).
-
-    Returns `(by_topic, reason, substitutions)`. A `reason` is the family's
-    declared-but-not-enumerated disclosure, exactly as `lesson_seeds` returns
-    it. ONE read covers the whole bounded set; a run never issues extra reads
-    to widen coverage (CAP-4).
-    """
-    if not topics:
-        return {}, None, []
-    served = terrain_seam.read_served(
-        root, ["read", "--topics"] + [f"{t}.md" for t in topics])
-    if served["reason"]:
-        return {}, served["reason"], []
-    by_topic, substitutions = {}, []
-    for section in served["sections"]:
-        served_path, commit = section["path"], section["sha"]
-        name = os.path.basename(served_path)
-        current = (os.path.splitext(name)[0]
-                   if served_path.startswith("topics/") else None)
-        if not current:
-            continue
-        # A SERVED path that differs from the requested one is an abnormal
-        # condition, recorded here and announced on the screen. The key is the
-        # basename, so `topics/archive/<t>.md` answers a request for
-        # `topics/<t>.md` and every downstream consumer would otherwise see
-        # only the key. Detection is the seam layer's (#903).
-        sub = terrain_seam.substitution(f"topics/{current}.md", served_path)
-        if sub:
-            substitutions.append(sub)
-        # EXTEND, never assign: two served surfaces resolving to one topic key
-        # would otherwise drop the earlier set silently (#873).
-        by_topic.setdefault(current, []).extend(
-            parse_topic_elements(current, section["lines"], commit, served_path))
-    by_topic = {k: v for k, v in by_topic.items() if v}
-    if served["misses"] and not by_topic:
-        return {}, (f"the policy source served a miss for "
-                    f"{', '.join(served['misses'])} "
-                    f"at {served['pin'] or 'an undisclosed pin'}"), substitutions
-    return by_topic, None, substitutions
+# `read_topic_elements()` — the bounded raw-thread fallback read
+# (`read --topics`, ≤ELEMENT_TOPIC_BOUND files) — was REMOVED (Story 20.161,
+# #1246) with the reader input it invoked. The record-authoritative path
+# (#886) is the only one: elements come from the served manifest, and an
+# unavailable manifest is a disclosed non-enumeration. `parse_topic_elements`
+# stays re-exported above: cite passthrough (never recomposition, #873) is
+# still the contract for any served thread parse.
 
 
 def element_surfaces(topics):
@@ -852,25 +799,25 @@ def element_surfaces(topics):
             for t in topics]
 
 
-def element_axis(root, mapping):
+def element_axis(root):
     """The by-topic axis: members, elements, and how they were acquired
     (Story 20.35, #886; SPEC-terrain CAP-2/CAP-4 carry the reasoning).
 
-    Membership is the SERVED manifest — never consumer-declared, and never
-    bounded by `ELEMENT_TOPIC_BOUND`, which here bounds nothing: not the
-    members, not the counts, not the Strands. The promise shipped 2026-07-28
-    and the code did not, so a repo declaring no `track_topics` offered 0
-    members while four topics were served.
+    Membership is the SERVED manifest — never consumer-declared: not the
+    members, not the counts, not the Strands. The consumer-declared
+    `track_topics` fallback was removed with the mapping (Story 20.161), so
+    records unavailable now leaves the family declared-but-not-enumerated
+    with the reason NAMED in the disclosure — never a substituted membership.
 
-    Returns `(topics, elements_by_topic, disclosure)`; records unavailable
-    degrades to the declared mapping with the substitution NAMED.
+    Returns `(topics, elements_by_topic, disclosure)`.
     """
     records, reason = elements_read(root)
     if reason:
-        return element_topics(mapping), None, {
-            "source": "consumer-declared mapping (fallback)",
-            "fallback_reason": reason,
-            "bounded_by_consumer_config": True,
+        return [], {}, {
+            "source": "element manifest (records)",
+            "unavailable_reason": reason,
+            # Stated positively so the retired gate cannot quietly return.
+            "bounded_by_consumer_config": False,
         }
     elements = elements_from_records(records)
     topics = sorted(elements)
@@ -888,7 +835,7 @@ def element_axis(root, mapping):
     }
 
 
-def all_surfaces(repo, root, mapping=None):
+def all_surfaces(repo, root):
     """Every candidate surface across every DECLARED family, in family order,
     plus the family registry the coverage manifest discloses.
 
@@ -916,7 +863,7 @@ def all_surfaces(repo, root, mapping=None):
     # The element family's surfaces are the SERVED decision topics (#886).
     # The acquisition disclosure rides the family record so the screen can
     # report which source composed the axis and, when it degraded, why.
-    axis_topics, axis_elements, axis = element_axis(root, mapping or {})
+    axis_topics, axis_elements, axis = element_axis(root)
     families[FAMILY_HUB_ELEMENTS]["axis"] = axis
     families[FAMILY_HUB_ELEMENTS]["elements_by_topic"] = axis_elements
     elements = element_surfaces(axis_topics)
@@ -924,8 +871,8 @@ def all_surfaces(repo, root, mapping=None):
         families[FAMILY_HUB_ELEMENTS].update(
             enumerated=False,
             reason=(f"the policy source served no decision topics "
-                    f"({axis['fallback_reason']})"
-                    if axis.get("fallback_reason") else
+                    f"({axis['unavailable_reason']})"
+                    if axis.get("unavailable_reason") else
                     "the policy source serves no decision topics"))
     matched += elements
     gloss, strands, reason = gloss_surfaces(root)
@@ -983,7 +930,7 @@ def lesson_item(seed):
     }
 
 
-def assemble(repo, mapping, max_surfaces, root=None):
+def assemble(repo, max_surfaces, root=None):
     """Assemble the map. Returns (topics, coverage, tracks_seen).
 
     Reads ONLY the surfaces `all_surfaces` enumerates across the declared
@@ -991,7 +938,7 @@ def assemble(repo, mapping, max_surfaces, root=None):
     disclosed by name in `coverage.skipped`, never dropped quietly, and the
     closed accounting is reported per family as well as overall.
     """
-    matched, families = all_surfaces(repo, root, mapping)
+    matched, families = all_surfaces(repo, root)
     read_now = matched[:max_surfaces] if max_surfaces is not None else matched
     skipped = matched[len(read_now):]
     host_pin = repo_pin(root) if root else "unpinned"
@@ -1001,46 +948,21 @@ def assemble(repo, mapping, max_surfaces, root=None):
     # rather than substituting the destination's sha.
     hub = hub_pin(root)
 
-    # --- the element family's own bound, applied BEFORE the loop ------------
-    # The seam serves at most ELEMENT_TOPIC_BOUND topic files per read, which
-    # is a different bound from `--max-surfaces` and is not negotiable here.
-    # One read covers the whole reachable set; the topics past it are skipped
-    # by NAME with the seam as the stated reason.
+    # --- the element family's members, resolved BEFORE the loop -------------
+    # RECORD-AUTHORITATIVE, and since Story 20.161 the ONLY path (#886/#1246):
+    # membership is the served manifest, every member is read, none skipped —
+    # the bounded raw-thread fallback (`read --topics`, ELEMENT_TOPIC_BOUND)
+    # went with the retired topic-selection reader path. An unavailable
+    # manifest was already marked declared-but-not-enumerated (with reason) in
+    # `all_surfaces`, contributing no surfaces here.
     elem_surfaces = [s for s in read_now if s[0] == FAMILY_HUB_ELEMENTS]
     axis = families[FAMILY_HUB_ELEMENTS].get("axis") or {}
     # Popped, never serialized: the composed elements are the projection's
     # payload and travel in `elements`, not in the coverage manifest.
-    record_elements = families[FAMILY_HUB_ELEMENTS].pop("elements_by_topic", None)
-    if record_elements is not None:
-        # RECORD-AUTHORITATIVE (#886): no raw `topics/*.md` read to bound, so
-        # ELEMENT_TOPIC_BOUND bounds nothing here — every member is read, none
-        # skipped for a bound this path never pays. The bound itself survives
-        # for anything that still reads a raw thread.
-        elem_read, elem_over = elem_surfaces, []
-        elements_by_topic, element_reason, substitutions = record_elements, None, []
-    else:
-        # Degraded: fall back to the bounded raw-thread read, substitution
-        # named on the family.
-        elem_read = elem_surfaces[:ELEMENT_TOPIC_BOUND]
-        elem_over = elem_surfaces[ELEMENT_TOPIC_BOUND:]
-        elements_by_topic, element_reason, substitutions = read_topic_elements(
-            root, [payload for _f, _s, _r, payload in elem_read])
-    if element_reason:
-        families[FAMILY_HUB_ELEMENTS].update(enumerated=False,
-                                             reason=element_reason)
-        # A family that could not be enumerated AT ALL is declared-but-not-
-        # enumerated with its reason and contributes no denominator — the same
-        # shape `host-sources` now reports permanently. Counting its
-        # surfaces as read-with-zero-entries would instead report a successful
-        # empty projection, the "silently empty family" shape CAP-4 forbids.
-        # This is distinct from the bounded case below: reading 2 of 9 topics
-        # IS an incomplete run and says so; reading none is a family that did
-        # not report.
-        matched = [s for s in matched if s[0] != FAMILY_HUB_ELEMENTS]
-        read_now = [s for s in read_now if s[0] != FAMILY_HUB_ELEMENTS]
-        skipped = [s for s in skipped if s[0] != FAMILY_HUB_ELEMENTS]
-        elem_read, elem_over = [], []
-    read_now = [s for s in read_now if s not in elem_over]
+    elements_by_topic = families[FAMILY_HUB_ELEMENTS].pop(
+        "elements_by_topic", None) or {}
+    elem_read = elem_surfaces
+    substitutions = []
 
     items, read_disclosure = [], []
     elements = []
@@ -1113,16 +1035,6 @@ def assemble(repo, mapping, max_surfaces, root=None):
         {"family": family, "surface": rel,
          "reason": f"over the read bound (--max-surfaces={max_surfaces})"}
         for family, _s, rel, _p in skipped]
-    # Named, not counted: the owner can see exactly which topics this run's
-    # elements do NOT cover, which is what keeps a partial projection from
-    # reading as the whole record.
-    skipped_disclosure += [
-        {"family": family, "surface": rel,
-         "reason": (element_reason if element_reason else
-                    f"over the seam's element bound (at most "
-                    f"{ELEMENT_TOPIC_BOUND} topics/*.md per read); widening it "
-                    f"is a hub-side ratification, never a map-side workaround")}
-        for family, _s, rel, _p in elem_over]
 
     # Per-family accounting: the same closed read+skipped==matched rule the
     # overall manifest carries, computed within each family so a "complete"
@@ -1170,10 +1082,12 @@ def assemble(repo, mapping, max_surfaces, root=None):
         "surfaces_read": ("index and frontmatter only — item bodies are never "
                           "read; a declared source is read at heading level, "
                           "never as prose"),
-        # Which topics this run's elements actually cover, stated positively so
-        # the owner never reads a bounded projection as the whole record.
+        # Which topics this run's elements actually cover, stated positively.
+        # `element_topics_skipped` is retained as an always-empty key across
+        # the seam-bound removal (Story 20.161): the record path reads every
+        # member, and consumers of `map.json` keep their shape.
         "element_topics_read": [payload for _f, _s, _r, payload in elem_read],
-        "element_topics_skipped": [payload for _f, _s, _r, payload in elem_over],
+        "element_topics_skipped": [],
         # How the by-topic axis was acquired (#886): the served source, the
         # per-member counts that ARE its denominator, the served kinds, and —
         # when degraded — the reason, so a fallback is never silent.
@@ -1181,32 +1095,27 @@ def assemble(repo, mapping, max_surfaces, root=None):
     }
 
     # --- topics: a pure per-invocation derivation (OQ1) ---------------------
-    # A track maps to its declared hub topic(s); an unmapped track is shown
-    # under its own name with mapped=false rather than being hidden or given an
-    # invented topic. Nothing here asks the articles repo for a new key.
+    # A track is shown under its own name, always — the consumer-declared
+    # track→topic mapping (and its `mapped` marker) was removed by Story
+    # 20.161 (#1246). Nothing here asks the articles repo for a new key, and
+    # nothing invents a topic.
     topics = {}
     tracks_seen = set()
     for item in items:
         track = item["track"]
         if track:
             tracks_seen.add(track)
-        names = mapping.get(track) or []
-        mapped = bool(names)
-        if not names:
-            names = [track] if track else ["(untracked)"]
-        for name in names:
-            t = topics.setdefault(name, {"topic": name, "mapped": mapped,
-                                         "tracks": set(), "items": []})
-            t["mapped"] = t["mapped"] or mapped
-            if track:
-                t["tracks"].add(track)
-            t["items"].append(item)
+        name = track if track else "(untracked)"
+        t = topics.setdefault(name, {"topic": name, "tracks": set(),
+                                     "items": []})
+        if track:
+            t["tracks"].add(track)
+        t["items"].append(item)
     out_topics = []
     for name in sorted(topics):
         t = topics[name]
         out_topics.append({
             "topic": name,
-            "mapped": t["mapped"],
             "tracks": sorted(t["tracks"]),
             "item_count": len(t["items"]),
             "items": sorted(t["items"], key=lambda i: (i["section"], i["slug"])),
@@ -1407,10 +1316,8 @@ def build_map(args):
             "writing-sources.yaml (resolve-writing-sources.py "
             "set-draft-location) or pass --repo\n")
         raise SystemExit(NO_ARTICLES_REPO)
-    mapping = track_topics(root)
     topics, coverage, tracks_seen, elements, gloss_info = assemble(
-        repo, mapping, args.max_surfaces, root=root)
-    stale = sorted(t for t in mapping if t not in tracks_seen)
+        repo, args.max_surfaces, root=root)
     consumption = consumption_view(root)
     # The declared-subtopic defect disclosure (Story 18.74, #614) went with
     # clustering (Story 20.7, #809): it reported malformed `subtopic:`/
@@ -1450,9 +1357,10 @@ def build_map(args):
         "stored": False,
         "articles_repo": repo,
         "host_root": root,
-        "track_topics": mapping,
-        "unmapped_tracks": sorted(t for t in tracks_seen if t not in mapping),
-        "stale_mapping_tracks": stale,
+        # `track_topics`, `unmapped_tracks` and `stale_mapping_tracks` were
+        # REMOVED with the consumer-declared mapping (Story 20.161, #1246):
+        # every track is its own topic name now, so there is no mapping to
+        # echo and no unmapped/stale state left to disclose.
         # Retained as an always-empty key so a consumer reading `map.json`
         # does not KeyError across the removal; nothing populates it since
         # clustering went (Story 20.7, #809).

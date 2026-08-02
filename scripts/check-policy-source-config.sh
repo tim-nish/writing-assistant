@@ -11,11 +11,14 @@
 # toggle `enabled: true` and resolves {"declared": true} with NO path ever
 # reported; the toggle write/read round-trip through the re-shaped
 # set-policy-source (no PATH argument; --disable removes the block); a
-# malformed block — the RETIRED `path` key (13.73, migration notice), a
-# missing/unreadable `enabled` value, or a leftover track/topics key (removed
-# by Story 13.36) — exits 4 with per-key errors that stage-0 validation
-# relays as configuration findings; a bare `enabled: true` block validates
-# clean at stage 0 (gateway usability is read-time degradation, CAP-6).
+# malformed block — the RETIRED `path` key (13.73, migration notice) or a
+# missing/unreadable `enabled` value — exits 4 with per-key errors that
+# stage-0 validation relays as configuration findings; a bare `enabled: true`
+# block validates clean at stage 0 (gateway usability is read-time
+# degradation, CAP-6). The `track`/`topics` keys, their validation, the
+# `track_topics` mapping and its `--track-topics` writer flag were REMOVED
+# (Story 20.161, SPEC-policy-topic-at-draft CAP-3/CAP-5 as amended
+# 2026-08-02, #1246) — asserted absent below.
 
 set -eu
 
@@ -55,10 +58,12 @@ grep -qE '^#?[[:space:]]+track:[[:space:]]' "$EX" \
 grep -qE '^#?[[:space:]]+topics:[[:space:]]' "$EX" \
   && err "example still documents the removed topics key" \
   || ok "example no longer documents the removed topics key (Story 13.36)"
-grep -q 'track_topics:' "$EX" && ok "example documents the track_topics mapping (#525)" \
-  || err "example missing the track_topics mapping block (#525)"
-grep -qi 'per article at draft time' "$EX" && ok "example points at draft-time topic selection" \
-  || err "example missing the draft-time selection note"
+grep -q 'track_topics:' "$EX" \
+  && err "example still documents the removed track_topics mapping (20.161)" \
+  || ok "example no longer documents the track_topics mapping (removed, Story 20.161)"
+grep -qi 'claim' "$EX" \
+  && ok "example points at the claim-bounded read (#1246)" \
+  || err "example missing the claim-bounded read note (#1246)"
 
 # --- 2. Absent block: declared=false, exit 0, no stderr ----------------------
 mkdir -p "$work/plain"
@@ -160,7 +165,11 @@ set +e; msg=$($PY --root "$work/bare" policy-source 2>&1 >/dev/null); rc=$?; set
   && ok "declared block without enabled: exit 4, names the required toggle" \
   || err "bare block: rc=$rc msg='$msg'"
 
-# --- 6. Removed keys: leftover track/topics are named errors, never ignored ----
+# --- 6. Removed keys are GONE from the parser (Story 20.161, CAP-3 executed) ---
+# The keys, their validation and their migration notice were removed together
+# once no owned repo config carried them (no permanent dead compat path). A
+# leftover line is unknown to the parser and unread: the block validates on
+# `enabled` alone, and nothing is applied.
 mkdir -p "$work/many"
 cat > "$work/many/writing-sources.yaml" <<'YAML'
 sources:
@@ -168,26 +177,14 @@ sources:
 policy_source:
   enabled: true
   topics: [a.md, b.md]
-YAML
-set +e; msg=$($PY --root "$work/many" policy-source 2>&1 >/dev/null); rc=$?; set -e
-[ "$rc" -eq 4 ] && printf '%s' "$msg" | grep -q 'policy_source.topics' \
-  && printf '%s' "$msg" | grep -qi 'removed' && printf '%s' "$msg" | grep -qi 'delete this line' \
-  && ok "leftover topics key: exit 4, named as removed with the fix" \
-  || err "leftover topics key: rc=$rc msg='$msg'"
-
-mkdir -p "$work/esc"
-cat > "$work/esc/writing-sources.yaml" <<'YAML'
-sources:
-  - path: .
-policy_source:
-  enabled: true
   track: eval-engineering
+  track_topics:
+    eval-engineering: benchmark-engineering
 YAML
-set +e; msg=$($PY --root "$work/esc" policy-source 2>&1 >/dev/null); rc=$?; set -e
-[ "$rc" -eq 4 ] && printf '%s' "$msg" | grep -q 'policy_source.track' \
-  && printf '%s' "$msg" | grep -qi 'draft-article Stage 2' \
-  && ok "leftover track key: exit 4, fix points at draft-time selection" \
-  || err "leftover track key: rc=$rc msg='$msg'"
+out=$($PY --root "$work/many" policy-source 2>/dev/null); rc=$?
+[ "$rc" -eq 0 ] && [ "$out" = '{"declared": true}' ] \
+  && ok "leftover track/topics/track_topics lines: unknown keys, unread — toggle alone governs (20.161)" \
+  || err "leftover removed keys mishandled: rc=$rc out='$out'"
 
 # --- 7. Stage-0 validation relays malformed blocks as findings -----------------
 cat > "$work/clean-user.yaml" <<'YAML'
@@ -216,11 +213,20 @@ syndication:
     devto:
       canonical_url_base: "https://ada.dev/articles"
 YAML
+# A genuinely malformed block (unreadable enabled) — the removed-key fixtures
+# above no longer error (20.161), so the relay is asserted on this one.
+mkdir -p "$work/badtoggle"
+cat > "$work/badtoggle/writing-sources.yaml" <<'YAML'
+sources:
+  - path: .
+policy_source:
+  enabled: maybe
+YAML
 set +e
-msg=$(python3 "$root/$VAL" --root "$work/many" \
+msg=$(python3 "$root/$VAL" --root "$work/badtoggle" \
       --global-config "$work/clean-user.yaml" --repo-config /dev/null 2>&1); rc=$?
 set -e
-[ "$rc" -ne 0 ] && printf '%s' "$msg" | grep -q 'policy_source.topics' \
+[ "$rc" -ne 0 ] && printf '%s' "$msg" | grep -q 'policy_source.enabled' \
   && ok "validate-config reports the malformed block as a stage-0 finding" \
   || err "validate-config missed the malformed block: rc=$rc"
 
@@ -250,83 +256,35 @@ set -e
 [ "$rc" -eq 0 ] && ok "absent block: stage-0 validation clean (behavior unchanged)" \
   || err "absent block produced findings: $msg"
 
-# --- 10. track_topics mapping (#525): parse, expose, malformed → exit 4 -------
-mkdir -p "$work/map"
-cat > "$work/map/writing-sources.yaml" <<'YAML'
-sources:
-  - path: .
-policy_source:
-  enabled: true
-  track_topics:
-    eval-engineering: benchmark-engineering
-    kagamios-lessons: kagamios
-    multi-track: [topic-a, topic-b]
-YAML
-out=$($PY --root "$work/map" policy-source 2>/dev/null)
-printf '%s' "$out" | grep -q '"track_topics"' \
-  && printf '%s' "$out" | grep -q 'benchmark-engineering' \
-  && printf '%s' "$out" | grep -q 'topic-a' \
-  && ok "well-formed track_topics: parsed and exposed in policy-source JSON" \
-  || err "track_topics not exposed: $out"
+# --- 10. track_topics is REMOVED end to end (Story 20.161, CAP-5) -------------
+# The mapping's sole function was to seed the retired ≤2-topic proposal
+# (#1246): the parser no longer knows the key, the getter never echoes it, and
+# the writer flag is gone.
 
-# A block with no track_topics carries no track_topics field (byte-compat).
-printf '%s' "$($PY --root "$work/host" policy-source 2>/dev/null)" | grep -q 'track_topics' \
-  && err "toggle-only block leaked a track_topics field" \
-  || ok "toggle-only block: no track_topics field (backward compatible)"
+# The getter never exposes a track_topics field, declared or not.
+printf '%s' "$($PY --root "$work/many" policy-source 2>/dev/null)" | grep -q 'track_topics' \
+  && err "policy-source JSON leaked a track_topics field (removed, 20.161)" \
+  || ok "policy-source JSON carries no track_topics field (removed, 20.161)"
 
-# Malformed mapping — a value that is neither a string nor a list — exits 4
-# naming the offending key with the fix.
-mkdir -p "$work/badmap"
-cat > "$work/badmap/writing-sources.yaml" <<'YAML'
-sources:
-  - path: .
-policy_source:
-  enabled: true
-  track_topics:
-    broken-track:
-YAML
-set +e; msg=$($PY --root "$work/badmap" policy-source 2>&1 >/dev/null); rc=$?; set -e
-[ "$rc" -eq 4 ] && printf '%s' "$msg" | grep -q 'policy_source.track_topics.broken-track' \
-  && printf '%s' "$msg" | grep -qi 'topic name' \
-  && ok "malformed mapping value: exit 4, names the key + fix" \
-  || err "malformed mapping not caught: rc=$rc msg='$msg'"
-
-# Stage-0 validation relays the malformed mapping as a per-key finding.
-set +e
-msg=$(python3 "$root/$VAL" --root "$work/badmap" \
-      --global-config "$work/clean-user.yaml" --repo-config /dev/null 2>&1); rc=$?
-set -e
-[ "$rc" -ne 0 ] && printf '%s' "$msg" | grep -q 'policy_source.track_topics.broken-track' \
-  && ok "validate-config relays the malformed mapping as a stage-0 finding" \
-  || err "validate-config missed the malformed mapping: rc=$rc"
-
-# --- 11. Writer round-trip: set-policy-source --track-topics (JSON on stdin) --
+# The --track-topics writer flag no longer parses (usage error, nothing written).
 XDG_CONFIG_HOME="$work/xdg2"; export XDG_CONFIG_HOME
 mkdir -p "$work/wmap"
 printf '[{"path": "."}]' | $PY set-sources --root "$work/wmap" >/dev/null 2>&1
-out=$(printf '{"eval-engineering": "benchmark-engineering", "multi": ["a", "b"]}' \
-      | $PY set-policy-source --track-topics --root "$work/wmap" 2>/dev/null); rc=$?
-rt=$($PY --root "$work/wmap" policy-source 2>/dev/null)
-[ "$rc" -eq 0 ] && printf '%s' "$out" | grep -q 'benchmark-engineering' \
-  && printf '%s' "$rt" | grep -q '"track_topics"' \
-  && printf '%s' "$rt" | grep -q 'benchmark-engineering' \
-  && ok "set-policy-source --track-topics writes the mapping; getter round-trips" \
-  || err "mapping writer round-trip: rc=$rc out='$out' rt='$rt'"
-g2=$(find "$work/xdg2" -name writing-sources.yaml | head -1)
-grep -q 'track_topics:' "$g2" && grep -q 'enabled: true' "$g2" \
-  && ok "written block carries the toggle + nested track_topics (comment-preserving writer)" \
-  || err "written mapping block malformed: $(cat "$g2")"
+if printf '{"eval-engineering": "benchmark-engineering"}' \
+     | $PY set-policy-source --track-topics --root "$work/wmap" >/dev/null 2>&1; then
+  err "set-policy-source still accepts --track-topics (removed, 20.161)"
+else
+  ok "set-policy-source refuses --track-topics (removed, 20.161)"
+fi
 
-# An empty {} is a declined offer — the bare toggle is written, no mapping.
-printf '{}' | $PY set-policy-source --track-topics --root "$work/wmap" >/dev/null 2>&1
-grep -q 'track_topics:' "$g2" \
-  && err "declined mapping ({}): track_topics still written" \
-  || ok "declined mapping ({}): bare toggle written, nothing extra"
-
-# A plain toggle write (no --track-topics) never blocks on stdin.
+# A plain toggle write still works and never blocks on stdin.
 $PY set-policy-source --root "$work/wmap" </dev/null >/dev/null 2>&1 \
-  && ok "plain set-policy-source (no --track-topics) does not read stdin" \
+  && ok "plain set-policy-source writes the toggle, no stdin read" \
   || err "plain set-policy-source regressed"
+g2=$(find "$work/xdg2" -name writing-sources.yaml | head -1)
+grep -q 'enabled: true' "$g2" && ! grep -q 'track_topics:' "$g2" \
+  && ok "written block is the bare toggle — no mapping sub-block on disk" \
+  || err "written block malformed: $(cat "$g2")"
 unset XDG_CONFIG_HOME
 
 if [ "$fail" -eq 0 ]; then

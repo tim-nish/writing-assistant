@@ -178,28 +178,15 @@ if [ "$rc" -eq 0 ]; then ok "clean valid profile adds no blocking finding (exit 
 else err "clean valid profile blocked stage 0 (rc=$rc, out='$out')"; fi
 rm "$ppdir/devto.yaml"
 
-# 8. Story 18.33 (#525) — track_topics existence lint + stale-mapping warning.
-#    The topic-existence lint enumerates hub topics via read-policy-source.py
-#    list-topics; stub the gateway with the documented WRITING_ASSISTANT_GATEWAY_CMD
-#    seam. The stub enumerates {benchmark-engineering, kagamios}.
+# 8. Story 18.33's track_topics existence lint + stale-mapping warning (8a-8d)
+#    were REMOVED with the `track_topics` mapping itself (Story 20.161,
+#    SPEC-policy-topic-at-draft CAP-3/CAP-5 as amended 2026-08-02, #1246):
+#    there is no key left to lint. What is asserted instead: a leftover
+#    mapping block is inert config — unknown to the parser, no finding, no
+#    warning, nothing applied — because CAP-3's removal condition (no owned
+#    repo config carries the keys) was checked at delivery and holds.
 unset XDG_CONFIG_HOME
-STUB="scripts/fixtures/policy-gateway-stub.py"
-SHA=8f3c2d1e4a5b6c7d8e9f0a1b2c3d4e5f60718293
-printf '{"pin":"product-lab@%s","surface":{"topics":["benchmark-engineering","kagamios"]}}\n' \
-  "$SHA" > "$work/topics-fx.json"
-
-# An articles repo (drafts + backlog) so the stale check is reachable; one
-# backlog item declares track: eval-engineering.
-mkdir -p "$work/articles/drafts" "$work/articles/backlog"
-cat > "$work/articles/backlog/one.md" <<'MD'
----
-track: eval-engineering
-title: sample
----
-body
-MD
-
-# 8a. A mapped topic ABSENT from the enumeration is a blocking existence defect.
+mkdir -p "$work/articles/drafts"
 mkdir -p "$work/maproot"
 cat > "$work/maproot/writing-sources.yaml" <<YAML
 sources:
@@ -210,58 +197,14 @@ policy_source:
   enabled: true
   track_topics:
     eval-engineering: benchmark-engineering
-    ghost-track: nonexistent-topic
 YAML
 set +e
-out=$(WRITING_ASSISTANT_GATEWAY_CMD="python3 $PWD/$STUB $work/topics-fx.json" \
-      python3 "$VAL" --repo-config /dev/null --root "$work/maproot" \
+out=$(python3 "$VAL" --repo-config /dev/null --root "$work/maproot" \
       --global-config "$work/clean.yaml" 2>&1); rc=$?
 set -e
-if [ "$rc" -ne 0 ] \
-   && printf '%s' "$out" | grep -q 'policy_source.track_topics.ghost-track' \
-   && printf '%s' "$out" | grep -qi "authoritative"; then
-  ok "existence lint: a mapped topic absent from the hub enumeration is a stage-0 defect"
-else err "existence lint not raised (rc=$rc, out='$out')"; fi
-
-# 8b. A mapping TRACK absent from every backlog track: value is a non-blocking
-#     WARNING (ghost-track) relayed as a notice; a mapped-and-existing topic for
-#     a KNOWN track raises no finding on its own.
-if printf '%s' "$out" | grep -q 'notice: stale mapping'; then
-  ok "stale-mapping warning: an unknown track is relayed as a notice"
-else err "stale-mapping warning not relayed (out='$out')"; fi
-
-# 8c. A clean mapping (topic exists, track in backlog) passes with exit 0 and
-#     emits no stale warning.
-mkdir -p "$work/cleanmap"
-cat > "$work/cleanmap/writing-sources.yaml" <<YAML
-sources:
-  - path: .
-output:
-  drafts: $work/articles/drafts/
-policy_source:
-  enabled: true
-  track_topics:
-    eval-engineering: benchmark-engineering
-YAML
-set +e
-out=$(WRITING_ASSISTANT_GATEWAY_CMD="python3 $PWD/$STUB $work/topics-fx.json" \
-      python3 "$VAL" --repo-config /dev/null --root "$work/cleanmap" \
-      --global-config "$work/clean.yaml" 2>&1); rc=$?
-set -e
-if [ "$rc" -eq 0 ] && ! printf '%s' "$out" | grep -q 'stale mapping'; then
-  ok "clean mapping (topic exists, track known): exit 0, no warning"
-else err "clean mapping not silent/zero (rc=$rc, out='$out')"; fi
-
-# 8d. Gateway unreachable → existence lint degrades (cannot verify → no defect);
-#     validation is not hard-failed by an unreachable gateway (CAP-6).
-set +e
-out=$(WRITING_ASSISTANT_GATEWAY_CMD="$work/no-such-gateway-binary" \
-      python3 "$VAL" --repo-config /dev/null --root "$work/maproot" \
-      --global-config "$work/clean.yaml" 2>&1); rc=$?
-set -e
-if ! printf '%s' "$out" | grep -q 'policy_source.track_topics.ghost-track'; then
-  ok "existence lint degrades when the gateway cannot enumerate (unreachable ≠ config error)"
-else err "existence lint hard-failed on an unreachable gateway (out='$out')"; fi
+if [ "$rc" -eq 0 ] && ! printf '%s' "$out" | grep -q 'track_topics'; then
+  ok "a leftover track_topics block is inert: no lint, no warning, toggle alone governs (20.161)"
+else err "leftover track_topics still produced findings (rc=$rc, out='$out')"; fi
 
 # 8e. The topic ask is RETIRED (Story 20.160, #1255; SPEC-policy-topic-at-draft
 #     amended 2026-08-02, #1246 — owner ruling). This assertion used to require
@@ -272,8 +215,8 @@ else err "existence lint hard-failed on an unreachable gateway (out='$out')"; fi
 #     that the mechanism still lives. Inverted rather than deleted, so the
 #     retirement keeps a carrier: the ask must be ABSENT and the claim-bounded
 #     transport PRESENT.
-#     The `track_topics` CONFIG KEY itself is still validated by 8a-8d above;
-#     removing the key is story 20.161's, not this assertion's.
+#     The `track_topics` CONFIG KEY itself was removed by story 20.161,
+#     together with its validation (section 8 above asserts it is inert).
 #     Asserted on the INVOCATION, not on the prose: stage2.md quotes the
 #     retired question verbatim in its own retirement note, so a string-absence
 #     sweep over the text cannot tell a mention from a use — the enumerated-

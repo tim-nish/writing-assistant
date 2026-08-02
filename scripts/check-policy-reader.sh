@@ -17,8 +17,10 @@
 # composes on a current gateway, with the exit-13 gaps kept ONLY as the
 # older-gateway fallback (tools/list lacks surface_names); exit 10 for an
 # absent toggle or `enabled: false`;
-# exit 4 for a malformed block INCLUDING the retired path/track/topics keys
-# (the resolver's migration notice relayed, never silently honored).
+# exit 4 for a malformed block INCLUDING the retired path key (the resolver's
+# migration notice relayed, never silently honored). The per-run `read
+# --topics` whitelist-building input is GONE (Story 20.161, #1246) — asserted
+# absent below, with `--only` untouched.
 
 set -eu
 
@@ -115,14 +117,15 @@ echo "$out" | grep -qx '7: run-budget: wall-clock exemptions are explicit. #ops'
   && ok "non-consecutive served lines pass through at their own numbers" \
   || err "served line 7 lost"
 
-# --- 4. Per-run topic selection via the gateway (Story 13.35 semantics) -------
-rt=$($PY --root "$host" read --topics eval-alpha.md --only LESSONS.md topics/eval-alpha.md)
-printf '%s\n' "$rt" | grep -qx "=== topics/eval-alpha.md @ $SHA" \
-  && printf '%s\n' "$rt" | grep -qx '2: decision: alpha holds.' \
-  && ok "read --topics serves the whole selected topic thread from the gateway" \
-  || err "topic thread not served: $rt"
-printf '%s' "$rt" | grep -q 'unrelated' && err "unselected topic leaked" \
-  || ok "only the per-run selection is served"
+# --- 4. The per-run `--topics` whitelist-building input is GONE (20.161) ------
+# CAP-2's pre-pick retired with the policy-topic ask (#1246): nothing builds a
+# topic whitelist any more — a read needing served policy is a `query --claim`.
+# The flag must not parse; a topic file must not be reachable through `--only`
+# either (the PERMISSION boundary — the gateway grant table — is a different
+# fact and untouched).
+set +e; $PY --root "$host" read --topics eval-alpha.md >/dev/null 2>&1; rc=$?; set -e
+[ "$rc" -eq 2 ] && ok "read --topics no longer parses (removed input, usage error)" \
+  || err "read --topics still accepted: rc=$rc"
 
 # --- 5. Refusal by code: unchanged (exit 5), before any gateway call ----------
 set +e; msg=$($PY --root "$host" read --only q_a/secret.md 2>&1 >/dev/null); rc=$?; set -e
@@ -132,12 +135,8 @@ set +e; msg=$($PY --root "$host" read --only q_a/secret.md 2>&1 >/dev/null); rc=
 set +e; $PY --root "$host" read --only ../../etc/hostname >/dev/null 2>&1; rc=$?; set -e
 [ "$rc" -eq 5 ] && ok "path traversal refused (exit 5)" || err "traversal rc=$rc"
 set +e; $PY --root "$host" read --only topics/unrelated.md >/dev/null 2>&1; rc=$?; set -e
-[ "$rc" -eq 5 ] && ok "topic outside the per-run selection refused (whitelist, not existence)" \
-  || err "non-selected topic rc=$rc"
-set +e; $PY --root "$host" read --topics a.md b.md c.md >/dev/null 2>&1; rc=$?; set -e
-[ "$rc" -eq 5 ] && ok "read --topics refuses >2 files (exit 5, cap code-enforced)" || err "cap not enforced: rc=$rc"
-set +e; $PY --root "$host" read --topics ../q_a/secret.md >/dev/null 2>&1; rc=$?; set -e
-[ "$rc" -eq 5 ] && ok "read --topics refuses a non-basename (exit 5)" || err "non-basename accepted: rc=$rc"
+[ "$rc" -eq 5 ] && ok "a topic file is refused via --only (no whitelist path to topics remains)" \
+  || err "topic via --only rc=$rc"
 
 # --- 6. surface_names: list-topics enumerates, read composes whole GLOSSARY ----
 # tsurezure-gateway#41 shipped surface_names (bounded enumeration, identifiers
@@ -268,6 +267,10 @@ set +e; msg=$($PY --root "$work/off" pin 2>&1 >/dev/null); rc=$?; set -e
   && ok "enabled: false — exit 10, one unavailable line (same degrade as unset)" \
   || err "enabled false: rc=$rc msg='$msg'"
 
+# The `track`/`topics` keys, their validation and their migration notice were
+# REMOVED (Story 20.161, CAP-3 executed — no owned repo config carried them;
+# no permanent dead compat path). A leftover line is unknown to the parser and
+# unread: the block still validates on `enabled` alone and nothing is applied.
 cat > "$host/writing-sources.yaml" <<'YAML'
 sources:
   - path: .
@@ -275,10 +278,10 @@ policy_source:
   enabled: true
   track: eval
 YAML
-set +e; msg=$($PY --root "$host" read --only LESSONS.md 2>&1 >/dev/null); rc=$?; set -e
-[ "$rc" -eq 4 ] && printf '%s' "$msg" | grep -q 'policy_source.track' \
-  && ok "leftover track key: reader refuses (exit 4), never silently applies it" \
-  || err "leftover track: rc=$rc msg='$msg'"
+set +e; out=$($PY --root "$host" read --only LESSONS.md 2>/dev/null); rc=$?; set -e
+[ "$rc" -eq 0 ] && printf '%s\n' "$out" | grep -qx "pin: product-lab@$SHA" \
+  && ok "leftover track key: unknown to the parser, unread — the toggle alone governs (20.161)" \
+  || err "leftover track: rc=$rc out='$out'"
 
 # The RETIRED path key (13.73): exit 4 with the resolver's migration notice
 # relayed — never silently honored, never joined into the filesystem.
