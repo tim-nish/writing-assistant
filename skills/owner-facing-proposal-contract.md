@@ -121,13 +121,20 @@ through `draft_gates.gate(<id>, where=…, why=…, choices=[…], ws=<run ws>)`
 which validates the id against `draft_gates.GATES` and writes the ask row to
 `<ws>/presented-payloads.jsonl`. Composing an undeclared gate raises.
 
-| gate id | where it is asked |
+Each gate is asked in a named **process**, never a numbered stage — the
+registry's `stage` value is the process name and, for a gate inside a run, is
+the exact string the run's `checkpoint.json` carries in `next_stage` (Story
+20.157, #1247). The column below quotes the registry; it does not restate it in
+other words, because a second vocabulary is what made it impossible to tell
+brief creation from draft creation.
+
+| gate id | process it is asked in |
 |---|---|
-| `thesis` | terrain step 3 — candidates you composed |
-| `probe-entry` | after stage 0 — run probe now / stop with the brief kept |
-| `gap-interview` | stage 2 — the questions only the owner can answer |
-| `narrative-structure` | stage 3 — the candidates `structures` derived |
-| `visual-set` | stage 3 — the set-level plan |
+| `thesis` | `terrain` — candidates you composed |
+| `probe-entry` | `probe` — run probe now / stop with the brief kept |
+| `gap-interview` | `interview` — the questions only the owner can answer |
+| `narrative-structure` | `fill` — the candidates `structures` derived |
+| `visual-set` | `fill` — the set-level plan |
 
 **Why this is one rule and not five instructions.** The 2026-08-01 run relayed
 four of these as numbered prose and left **no payload for any of them**, while

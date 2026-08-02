@@ -148,6 +148,23 @@ def reached_from_state(ws):
     So the left-hand side now comes from the checkpoint, and the actor that
     failed to declare a gate is no longer the actor reporting which gates it
     reached.
+
+    `gates_reached` IS GONE (Story 20.157, #1245/#1247). Story 20.151 read a
+    `checkpoint.json:gates_reached` list, and the amendment that orders this
+    story states what triage found: its only writer in this repository was the
+    guarding check's own fixture, so the input never existed on a real run and
+    this function returned `[]` every time — an audit that cannot fail because
+    it is never given anything to audit. The list is not given a writer; it is
+    DROPPED, because the join it stood in for is computable from data both
+    sides already carry. `draft_gates.GATES` declares which PROCESS each gate
+    belongs to and the checkpoint names the process the run is entering, in
+    the same vocabulary (`draft_gates` declares it once) — so due-ness is one
+    equality, with no translation table anywhere in the path.
+
+    Due, not historical: a gate is returned when the run is entering the
+    process that gate belongs to. Gates on a pre-run process (`terrain`,
+    `start`) never match, because no checkpoint exists while they are asked —
+    stated in the registry rather than special-cased here.
     """
     path = os.path.join(ws, "checkpoint.json")
     if not os.path.isfile(path):
@@ -157,10 +174,11 @@ def reached_from_state(ws):
             state = json.load(f)
     except (OSError, ValueError) as e:
         return [], f"checkpoint unreadable: {type(e).__name__}"
-    declared = _gates()
-    reached = [g for g in state.get("gates_reached") or [] if g in declared]
     stage = state.get("next_stage")
-    return reached, None if reached else f"no gates recorded at next_stage={stage!r}"
+    reached = [gid for gid, spec in _gates().items()
+               if stage and spec.get("stage") == stage]
+    return reached, None if reached else (
+        f"no declared gate belongs to the process next_stage={stage!r}")
 
 
 

@@ -285,47 +285,37 @@ def _render_errors(item, tag, choices):
 #     2. evidence precedes the options, or its absence is stated
 #     4. no derivable parameter is asked as a blank
 #
-# Stage names are DERIVED from the gate registry, never listed here: a literal
-# list would be a conformance copy that drifts the first time a stage is
-# renamed, which is exactly what happened to `harvest-entry`.
+# WHAT OBLIGATION 5 DENIES IS THE NUMBERED FORM (Story 20.157, #1245/#1247).
+# It used to derive the denied strings from `draft_gates.GATES`, back when the
+# registry labelled gates `"stage 2"` / `"stage 3"`. The owner ruling of
+# 2026-08-02 prohibits exactly that expression — *"By attaching a number, the
+# system abandons its responsibility to explain which process the Human Gate
+# belongs to"* — and the registry now names PROCESSES (`probe`, `interview`,
+# `fill`). Keeping the derivation would therefore have inverted the rule: it
+# would deny a gate the right to say which process it belongs to, which is the
+# thing the ruling REQUIRES an ask to say, and the probe-entry gate's own
+# shipped label ("run probe now") would have become a defect.
+#
+# So the denied family is the numbered one, and it is a PATTERN rather than a
+# list — `stage 3`, `Stage 3`, `stage3` all match, and the observed defect
+# ("Next is Stage 3 — fill.") still fails. There is nothing left to drift with
+# a rename, because a process rename cannot change the shape `stage <digit>`.
+# The lazy `draft_gates` loader this file kept for the old derivation is
+# DELETED with it: an unread input left in place is what #1245 spent a
+# thirteenth cycle on.
 
-_dg_mod = None
+# The prohibited form, in one place: "stage" followed by a number, however
+# spaced or cased. Nothing else is denied by obligation 5.
+NUMBERED_STAGE = re.compile(r"stage\s*[-#]?\s*\d", re.I)
 
 
-def _dg():
-    """The gate registry, loaded lazily and defensively. `draft_gates` imports
-    nothing from this module, so there is no cycle — but a failure here must
-    degrade to "no stage names known" rather than breaking every payload
-    validation in the repository."""
-    global _dg_mod
-    if _dg_mod is None:
-        here = os.path.dirname(os.path.realpath(__file__))
-        spec = importlib.util.spec_from_file_location(
-            "draft_gates_for_stages", os.path.join(here, "draft_gates.py"))
-        mod = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(mod)
-        _dg_mod = mod
-    return _dg_mod
+def numbered_stage_forms(text):
+    """Every numbered-stage expression in `text`, as it was written.
 
-
-def _stage_names():
-    try:
-        names = {str(v.get("stage") or "") for v in _dg().GATES.values()}
-    except Exception:
-        return set()
-    out = set()
-    for n in names:
-        n = n.strip().lower()
-        if n:
-            out.add(n)
-            # "stage 2" also appears bare as "stage 2" inside prose; the
-            # multi-word forms ("after stage 0, before probe") are matched
-            # whole, and their bare "stage N" component separately.
-            for tok in ("stage 0", "stage 1", "stage 2", "stage 3",
-                        "stage 4", "stage 5"):
-                if tok in n:
-                    out.add(tok)
-    return out
+    Returned rather than a boolean so the defect message can quote the owner's
+    own words back at the author instead of naming a rule.
+    """
+    return [m.group(0) for m in NUMBERED_STAGE.finditer(str(text or ""))]
 
 
 # A continuation ask is the shape obligation 5 governs: a two-option
@@ -366,28 +356,27 @@ def _decidability_errors(item, tag):
                    "it cannot make one")
 
     # Obligation 5 — a stage transition is Yes/No in plain terms, never a
-    # stage name. "Next is Stage 3" is the observed shape: the owner's own
-    # finding was that nobody, including the designer, knew what Stage 3 was.
+    # NUMBER. "Next is Stage 3" is the observed shape: the owner's own finding
+    # was that nobody, including the designer, knew what Stage 3 was. Naming
+    # the PROCESS ("run probe now") is the remedy, not the defect — see the
+    # note above the matcher.
     if _is_continuation(choices):
-        stages = _stage_names()
         for field in ("where", "why"):
-            text = " ".join(str(item.get(field) or "").split()).lower()
-            for name in sorted(stages, key=len, reverse=True):
-                if name and name in text:
-                    yield (f"{tag}.{field}",
-                           f"a continuation ask names the stage {name!r}; say "
-                           "plainly what happens next and what it costs — a "
-                           "stage name is the pipeline's vocabulary, not the "
-                           "owner's")
-                    break
+            hits = numbered_stage_forms(" ".join(
+                str(item.get(field) or "").split()))
+            if hits:
+                yield (f"{tag}.{field}",
+                       f"a continuation ask says {hits[0]!r}; say plainly "
+                       "what happens next and what it costs — a number tells "
+                       "the owner nothing about which process this is")
         for j, ch in enumerate(choices):
-            label = " ".join(str((ch or {}).get("label") or "").split()).lower()
-            for name in sorted(stages, key=len, reverse=True):
-                if name and name in label:
-                    yield (f"{tag}.choices[{j}].label",
-                           f"a continuation option names the stage {name!r}; "
-                           "the label states the effect, never the stage")
-                    break
+            hits = numbered_stage_forms(" ".join(
+                str((ch or {}).get("label") or "").split()))
+            if hits:
+                yield (f"{tag}.choices[{j}].label",
+                       f"a continuation option says {hits[0]!r}; the label "
+                       "states the effect, and names the process if it names "
+                       "anything")
 
 
 def decidability_reports(payload):
