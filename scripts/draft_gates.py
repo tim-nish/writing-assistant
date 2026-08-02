@@ -498,7 +498,7 @@ def probe_entry_gate(source_count, ws=None, brief=True):
         where="After stage 0: the run is staged with its article type and its "
               "sources, and nothing has been read yet.",
         why=f"Probe checks whether the {source_count} declared source(s) can "
-            f"ground this brief — a verdict plus anchors, no fact sheet. The "
+            f"ground this brief, and points at where the evidence sits. The "
             f"{kept} and the staged run are already written, so stopping "
             f"loses nothing.",
         choices=[
