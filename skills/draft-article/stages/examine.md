@@ -25,9 +25,17 @@ returned material supports, refutes, or misses it. A run that reads the
 tool's output as a verdict has recreated harvest's error one layer down.
 
 **The pin is recorded at the read that produced it.** With `--ws`, every
-examination persists whole under `$WS/examinations/<claim-slug>.json` and
-each item's citable pointer (`cite`) is appended to
-`$WS/examination-pins.txt` — the run's **declared pointer set**. A sourced
+examination persists whole under `$WS/examinations/<claim-id>.json` — **its
+own record and nothing else** — and `$WS/examination-pins.txt`, the run's
+**declared pointer set**, is **derived** from those records in claim order
+rather than appended to (#1248, story 20.162), so it is byte-identical
+whether the examinations ran one after another or at once. The claim id is
+`--claim-id` when the fan-out enumerated one, else `<slug>-<digest>` over the
+whole claim; it is never a truncated slug, which used to let two long claims
+sharing a prefix overwrite each other. Pass `--defer-ledger` when running
+examinations concurrently and derive once at the join
+(`examine.py --ws "$WS" --derive-ledger [--order <claim-ids>]`); a single
+examination derives it itself and needs neither flag. A sourced
 claim in the provenance map cites the `cite` form verbatim (a bare sha for a
 commit, `path:line@sha` for prose at HEAD, the URL for an issue); `derived`
 inherits ≥2 of them. Never cite a pin no recorded examination produced.

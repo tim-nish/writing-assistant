@@ -60,14 +60,44 @@ that was not, with the reason. An empty result from a source that was never
 reachable is not the same finding as an empty result from a source that was
 read — the journey join asserted absence from a search over zero bytes (#1181)
 precisely because it did not keep those apart.
+
+THE WRITER CONTRACTS (#1248, story 20.162)
+------------------------------------------
+An examination writes ONLY ITS OWN RECORD, and the pin ledger
+(`$WS/examination-pins.txt`) is DERIVED from the records rather than appended
+to. The append this replaces read the ledger into a set and then appended, so
+two concurrent examinations could both pass the read and interleave — and a
+lock would have bought serialisation where the shape itself can buy
+determinism. Derivation is a pure function of the record set in claim order,
+so the declared pointer set `verify-provenance` resolves against is
+BYTE-IDENTICAL regardless of completion order. The acceptance is *the same
+pins from a serial and a concurrent run*, never absence-of-crash.
+
+A record is named by its CLAIM ID, never by the claim slugged and truncated:
+truncation at 60 characters made two long claims sharing a prefix silently
+overwrite each other — a defect in purely serial runs, which fan-out makes
+urgent rather than causes. `--claim-id` takes the fan-out's pre-enumerated id;
+without one the id is `<slug>-<sha256(claim)[:12]>`, so identity is a function
+of the WHOLE claim and no truncation collision is reachable.
+
+THE THREE SOURCES RUN CONCURRENTLY
+----------------------------------
+Declared prose, anchored commits and issues share no state, each is a `run()`
+with its own ceiling, and the issues source is network-bound. They are
+submitted to a thread pool (threads, not asyncio: every source shells out) and
+joined back IN THE FIXED SOURCE ORDER, so a claim's wall time is bounded by
+its slowest source while `searched`/`skipped`/`evidence` stay byte-for-byte
+what a sequential run emitted.
 """
 
 import argparse
+import hashlib
 import json
 import os
 import re
 import subprocess
 import sys
+import tempfile
 
 SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
 SRC_RES = os.path.join(SCRIPT_DIR, "resolve-writing-sources.py")
@@ -390,38 +420,192 @@ def _scope_refusal(scope_path, member_index, repository):
                      "is a false attribution")}
 
 
-def _record(ws, out):
-    """Persist the examination AT THE READ THAT PRODUCED IT (AC1): the full
-    record under $WS/examinations/, and every citable pin appended to the
-    run's pin ledger ($WS/examination-pins.txt — the declared pointer set
-    `verify-provenance` resolves sourced/derived claims against)."""
+def claim_id(claim, given=None):
+    """The record's identity. NEVER a truncation of the claim (#1248).
+
+    A slug cut at 60 characters made two long claims sharing a prefix name the
+    same file, so the second silently overwrote the first. The fan-out supplies
+    pre-enumerated ids (`--claim-id`); absent one, the id carries a digest of
+    the WHOLE claim, so distinct claims are distinct records by construction
+    while the same claim re-examined still lands on its own record.
+    """
+    if given:
+        cid = re.sub(r"[^A-Za-z0-9._-]+", "-", given).strip("-.")
+        if not cid:
+            raise SystemExit(f"unusable --claim-id {given!r}")
+        return cid
+    slug = re.sub(r"[^a-z0-9]+", "-", claim.lower()).strip("-")[:48].strip("-")
+    return f"{slug or 'claim'}-{hashlib.sha256(claim.encode()).hexdigest()[:12]}"
+
+
+def _atomic_write(path, text):
+    """Write whole or not at all — a concurrent reader never sees a half file."""
+    d = os.path.dirname(os.path.abspath(path)) or "."
+    fd, tmp = tempfile.mkstemp(dir=d, prefix=".tmp-", suffix=".part")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            fh.write(text)
+        os.replace(tmp, path)
+    except BaseException:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
+
+
+def _index_key(idx):
+    """`3`, `1.2`, `b` — order a dotted claim index numerically per segment."""
+    return tuple((0, int(p), "") if p.isdigit() else (1, 0, p)
+                 for p in str(idx).split("."))
+
+
+def read_records(ws):
+    """Every examination record in the workspace, as (claim_id, data)."""
+    exdir = os.path.join(ws, "examinations")
+    recs = []
+    for name in sorted(os.listdir(exdir)) if os.path.isdir(exdir) else []:
+        if not name.endswith(".json"):
+            continue
+        path = os.path.join(exdir, name)
+        try:
+            with open(path, encoding="utf-8") as fh:
+                data = json.load(fh)
+        except (OSError, ValueError) as e:
+            # Records are written atomically, so an unreadable one is a real
+            # defect and never a half-written file caught mid-flight.
+            raise SystemExit(f"unreadable examination record {path}: {e}")
+        recs.append((data.get("claim_id") or name[:-len(".json")], data))
+    return recs
+
+
+def derive_ledger(ws, order=None):
+    """THE JOIN. The pin ledger is DERIVED from the examination records in
+    claim order — never appended to by the examinations themselves (#1248).
+
+    Claim order is the fan-out's, when it supplies one: `order` (an explicit
+    claim-id sequence) wins, then each record's `claim_index`, then the claim
+    id itself. All three are properties of the CLAIM SET, never of completion
+    order, which is what makes a concurrent run's ledger byte-identical to its
+    serial counterpart.
+    """
+    recs = read_records(ws)
+    pos = {cid: i for i, cid in enumerate(order or [])}
+    def key(item):
+        cid, data = item
+        if cid in pos:
+            return (0, ((0, pos[cid], ""),), cid)
+        if data.get("claim_index") is not None:
+            return (1, _index_key(data["claim_index"]), cid)
+        return (2, (), cid)
+    recs.sort(key=key)
+    lines, seen = [], set()
+    for _, data in recs:
+        for e in data.get("evidence", []):
+            c = e.get("cite")
+            if c and c not in seen:
+                seen.add(c)
+                lines.append(c)
+    ledger = os.path.join(ws, "examination-pins.txt")
+    _atomic_write(ledger, "".join(ln + "\n" for ln in lines))
+    return {"pin_ledger": ledger, "records": len(recs), "pins": len(lines)}
+
+
+def derive_ledger_stable(ws, order=None, tries=6):
+    """Derive, then confirm the record set did not move under the derivation.
+
+    The serial path keeps deriving the ledger for its caller's convenience, and
+    this loop is what makes that safe if it is ever run beside another
+    examination: a derivation over a stale record set is detected and redone,
+    so no run can leave a ledger missing a record that existed when it wrote.
+    """
+    exdir = os.path.join(ws, "examinations")
+    names = lambda: (sorted(os.listdir(exdir)) if os.path.isdir(exdir) else [])
+    info = None
+    for _ in range(tries):
+        before = names()
+        info = derive_ledger(ws, order)
+        if names() == before:
+            break
+    return info
+
+
+def _record(ws, out, defer_ledger=False):
+    """Persist the examination AT THE READ THAT PRODUCED IT (AC1) — and ONLY
+    its own record. The pin ledger is derived (`derive_ledger`), never
+    appended to: the append was the one shared write between examinations and
+    it is removed rather than guarded (#1248)."""
     exdir = os.path.join(ws, "examinations")
     os.makedirs(exdir, exist_ok=True)
-    slug = re.sub(r"[^a-z0-9]+", "-", out["claim"].lower()).strip("-")[:60]
-    path = os.path.join(exdir, f"{slug or 'claim'}.json")
-    with open(path, "w", encoding="utf-8") as fh:
-        json.dump(out, fh, indent=2)
-    ledger = os.path.join(ws, "examination-pins.txt")
-    have = set()
-    if os.path.isfile(ledger):
-        with open(ledger, encoding="utf-8") as fh:
-            have = {ln.strip() for ln in fh if ln.strip()}
-    with open(ledger, "a", encoding="utf-8") as fh:
-        for e in out["evidence"]:
-            c = e.get("cite")
-            if c and c not in have:
-                fh.write(c + "\n")
-                have.add(c)
-    return {"record": path, "pin_ledger": ledger}
+    path = os.path.join(exdir, f"{out['claim_id']}.json")
+    _atomic_write(path, json.dumps(out, indent=2))
+    rec = {"record": path}
+    if defer_ledger:
+        # The fan-out's join derives the ledger once, over the whole claim set.
+        rec["pin_ledger_deferred"] = True
+    else:
+        rec.update(derive_ledger_stable(ws))
+    return rec
 
 
-def main():
+SOURCE_ORDER = ("commits", "issues", "prose")
+
+
+def gather_sources(root, want, terms, anchors, limit, with_thread):
+    """Run the wanted sources CONCURRENTLY, join them IN SOURCE ORDER (#1248).
+
+    Threads, not asyncio: every source is a blocking `run()` around a
+    subprocess or a file read, and the output contract must not move. The
+    dict is keyed by source and consumed by `SOURCE_ORDER` below, so the
+    emitted `searched`/`skipped`/`evidence` sequences are exactly the ones a
+    sequential run produced. Per-source error and skip semantics are the
+    source functions' own and are untouched — each still returns
+    `(items, why)`, and an exception raised inside a source surfaces from
+    `.result()` in the calling thread exactly as it did inline.
+    """
+    jobs = {
+        "commits": lambda: examine_commits(root, anchors, limit),
+        "issues": lambda: examine_issues(root, terms, limit, with_thread),
+        "prose": lambda: examine_prose(root, terms, limit),
+    }
+    jobs = {k: v for k, v in jobs.items() if k in want}
+    if len(jobs) < 2:
+        return {k: fn() for k, fn in jobs.items()}
+    # Imported here, not at module load: a single-source examination (the
+    # re-grounding hop's common shape) should not pay for the pool.
+    from concurrent.futures import ThreadPoolExecutor
+    with ThreadPoolExecutor(max_workers=len(jobs)) as pool:
+        futures = {k: pool.submit(fn) for k, fn in jobs.items()}
+        return {k: f.result() for k, f in futures.items()}
+
+
+def main(argv=None):
     p = argparse.ArgumentParser(
         description="Ask the repository about ONE claim. Returns pinned "
                     "material; never a verdict.")
     p.add_argument("--root", default=".", help="host repository")
-    p.add_argument("--claim", required=True,
+    p.add_argument("--claim",
                    help="the concrete claim to be tested, in one sentence")
+    p.add_argument("--claim-id",
+                   help="the fan-out's pre-enumerated id for this claim; the "
+                        "record is named by it. Derived from the whole claim "
+                        "when omitted — never a truncated slug (#1248)")
+    p.add_argument("--claim-index",
+                   help="this claim's position in the fan-out enumeration "
+                        "(e.g. 3 or 1.2) — the claim order the derived pin "
+                        "ledger is built in")
+    p.add_argument("--defer-ledger", action="store_true",
+                   help="write only this examination's record and leave the "
+                        "pin ledger to the join (--derive-ledger). The "
+                        "fan-out's flag: concurrent examinations share no "
+                        "write at all")
+    p.add_argument("--derive-ledger", action="store_true",
+                   help="THE JOIN: derive $WS/examination-pins.txt from the "
+                        "workspace's examination records in claim order and "
+                        "exit. Requires --ws; --claim is not needed")
+    p.add_argument("--order",
+                   help="with --derive-ledger: comma-separated claim ids "
+                        "giving the claim order explicitly")
     p.add_argument("--scope",
                    help="JSON file carrying the brief's derived examine_scope "
                         "(#1097/#1185); a repository outside it is refused, "
@@ -431,9 +615,10 @@ def main():
                         "makes the scope refusal per-Strand, naming its "
                         "served attribution")
     p.add_argument("--ws",
-                   help="run workspace: persist the examination under "
-                        "$WS/examinations/ and append pins to "
-                        "$WS/examination-pins.txt at the read (AC1)")
+                   help="run workspace: persist this examination's own record "
+                        "under $WS/examinations/<claim-id>.json at the read "
+                        "(AC1). $WS/examination-pins.txt is DERIVED from the "
+                        "records, never appended to (#1248)")
     p.add_argument("--terms", default="",
                    help="comma-separated search terms; derived from the claim "
                         "when omitted")
@@ -447,7 +632,16 @@ def main():
     p.add_argument("--limit", type=int, default=15, help="per-source cap")
     p.add_argument("--no-thread", action="store_true",
                    help="skip issue comments (a marked partial)")
-    args = p.parse_args()
+    args = p.parse_args(argv)
+
+    if args.derive_ledger:
+        if not args.ws:
+            raise SystemExit("--derive-ledger requires --ws")
+        order = [o.strip() for o in (args.order or "").split(",") if o.strip()]
+        print(json.dumps(derive_ledger(args.ws, order), indent=2))
+        return 0
+    if not args.claim:
+        raise SystemExit("--claim is required (or --derive-ledger --ws <ws>)")
 
     root = os.path.abspath(args.root)
     if args.scope:
@@ -474,30 +668,28 @@ def main():
              or terms_from_claim(args.claim))
 
     anchors = parse_anchors(args.anchor)
+    # CONCURRENT, then joined in the fixed source order — the output contract
+    # is preserved byte-for-byte (#1248).
+    results = gather_sources(root, want, terms, anchors, args.limit,
+                             not args.no_thread)
     evidence, searched, skipped = [], [], []
-    if "commits" in want:
-        items, why = examine_commits(root, anchors, args.limit)
+    for source in SOURCE_ORDER:
+        if source not in results:
+            continue
+        items, why = results[source]
+        found = {"source": source, "found": len(items)}
+        if source == "issues":
+            found["thread_included"] = not args.no_thread
         (searched if why is None else skipped).append(
-            {"source": "commits", "reason": why} if why else
-            {"source": "commits", "found": len(items)})
-        evidence += items
-    if "issues" in want:
-        items, why = examine_issues(root, terms, args.limit, not args.no_thread)
-        (searched if why is None else skipped).append(
-            {"source": "issues", "reason": why} if why else
-            {"source": "issues", "found": len(items),
-             "thread_included": not args.no_thread})
-        evidence += items
-    if "prose" in want:
-        items, why = examine_prose(root, terms, args.limit)
-        (searched if why is None else skipped).append(
-            {"source": "prose", "reason": why} if why else
-            {"source": "prose", "found": len(items)})
+            {"source": source, "reason": why} if why else found)
         evidence += items
 
     episode_items = [e for e in evidence if e["time_axis"]]
     out = {
         "claim": args.claim,
+        # Identity, and the record's name: never a truncated slug (#1248).
+        "claim_id": claim_id(args.claim, args.claim_id),
+        "claim_index": args.claim_index,
         "terms": terms,
         "repo": os.path.basename(root),
         "head": head_sha(root),
@@ -522,7 +714,7 @@ def main():
         "evidence": evidence,
     }
     if args.ws:
-        out["recorded"] = _record(args.ws, out)
+        out["recorded"] = _record(args.ws, out, args.defer_ledger)
     print(json.dumps(out, indent=2))
     return 0
 
