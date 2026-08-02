@@ -73,6 +73,97 @@ def read_asks(ws):
     return rows
 
 
+def read_tool_calls(transcript_path, settle_marker=None):
+    """The `AskUserQuestion` tool-use events a transcript carries, plus whether
+    the transcript has CAUGHT UP (Story 20.151, #1221).
+
+    Returns `(gate_ids, settled)`. `settled` is the load-bearing half.
+
+    WHY SETTLEDNESS IS A RETURN VALUE AND NOT AN ASSUMPTION. The harness writes
+    the transcript asynchronously and its own docs say the file "may lag the
+    in-memory conversation". This audit's finding BLOCKS a turn, so a read that
+    raced the writer would block on evidence that exists and simply had not
+    landed — the most expensive failure this check can have. Owner decision
+    2026-08-02: assert only on settled turns, report the rest as
+    cannot-determine, never block on incomplete evidence.
+
+    `settle_marker` is the turn's final assistant text, supplied by the harness.
+    It is used as an OPAQUE TOKEN — "has the file caught up to this turn yet" —
+    and never classified, matched against patterns, or inspected for content.
+    That distinction is the whole reason this stays inside the contract: the
+    amendment forbids reading reply PROSE, and an identity test on a string the
+    harness handed us reads no prose. Nothing here branches on what it says.
+    """
+    if not transcript_path or not os.path.isfile(transcript_path):
+        return [], False
+    gates, saw_marker = [], settle_marker is None
+    try:
+        with open(transcript_path, encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    row = json.loads(line)
+                except ValueError:
+                    continue
+                blob = json.dumps(row)
+                if settle_marker and settle_marker in blob:
+                    saw_marker = True
+                for name, gate in _ask_tool_uses(row):
+                    if name == "AskUserQuestion":
+                        gates.append(gate)
+    except OSError:
+        return [], False
+    return gates, saw_marker
+
+
+def _ask_tool_uses(row):
+    """Yield `(tool_name, gate_id_or_None)` for every tool-use event in a
+    transcript row. Shape-tolerant on purpose: the transcript schema is the
+    harness's, not this repository's, so a structure change must degrade to
+    "found nothing" rather than raising inside a Stop hook."""
+    msg = row.get("message") if isinstance(row, dict) else None
+    content = (msg or {}).get("content") if isinstance(msg, dict) else None
+    if not isinstance(content, list):
+        return
+    for block in content:
+        if not isinstance(block, dict) or block.get("type") != "tool_use":
+            continue
+        inp = block.get("input") or {}
+        gate = inp.get("gate") if isinstance(inp, dict) else None
+        yield block.get("name"), gate
+
+
+def reached_from_state(ws):
+    """The gates a run reached, DERIVED FROM RUN STATE (Story 20.151, #1221).
+
+    The caller used to supply this, and the docstring above still records why
+    that was defensible: deriving `reached` from the PAYLOAD LOG would make the
+    audit vacuous, since a log missing a row is exactly the case under audit.
+    That argument is sound about the log and silent about run state, which is a
+    third source — and it is the one #1221 names: "the run workspace already
+    records `next_stage` ... so 'a gate was due here' is computable".
+
+    So the left-hand side now comes from the checkpoint, and the actor that
+    failed to declare a gate is no longer the actor reporting which gates it
+    reached.
+    """
+    path = os.path.join(ws, "checkpoint.json")
+    if not os.path.isfile(path):
+        return [], "no checkpoint — the run reached no declared stage"
+    try:
+        with open(path, encoding="utf-8") as f:
+            state = json.load(f)
+    except (OSError, ValueError) as e:
+        return [], f"checkpoint unreadable: {type(e).__name__}"
+    declared = _gates()
+    reached = [g for g in state.get("gates_reached") or [] if g in declared]
+    stage = state.get("next_stage")
+    return reached, None if reached else f"no gates recorded at next_stage={stage!r}"
+
+
+
 # THE BOUND, DECLARED ONCE (Story 20.136, #1176) and carried by every audit —
 # in the result, in the CLI output, and in --help. One string, so a consumer
 # quotes it rather than paraphrasing the limit into something weaker.
@@ -85,9 +176,12 @@ BOUND = (
 )
 
 
-def audit(ws, reached):
+def audit(ws, reached, transcript_path=None, settle_marker=None):
     """Assert `reached` ⊆ emitted, and that every emitted payload declares its
-    render form.
+    render form. With `transcript_path`, additionally assert that each emitted
+    gate has AskUserQuestion TOOL-CALL evidence (Story 20.151, #1221) — a gate
+    is `presented` when the transcript carries the call, never when a payload
+    file exists.
 
     Two findings, kept apart because they are different defects: a gate that
     never emitted (the thesis-gate shape) and a gate that emitted without a
@@ -106,7 +200,18 @@ def audit(ws, reached):
     render_missing = sorted({
         r["gate"] for r in rows
         if not all((it or {}).get("render") for it in (r.get("items") or [{}]))})
-    return {"ok": not missing and not render_missing,
+    tool_call_gaps, settled = [], None
+    if transcript_path is not None:
+        called, settled = read_tool_calls(transcript_path, settle_marker)
+        if settled:
+            called_set = {g for g in called if g}
+            # A gap is a gate that EMITTED a payload but has no tool-call
+            # evidence: the payload existed, so the pre-#1221 audit passed,
+            # and the question UI was never actually invoked.
+            tool_call_gaps = sorted(g for g in emitted
+                                    if g and g not in called_set)
+    return {"ok": (not missing and not render_missing
+                   and not tool_call_gaps),
             # The bound travels WITH the verdict, not beside it in a doc
             # somewhere: a caller that reads `ok` and nothing else is the
             # reader this clause exists for.
@@ -114,7 +219,13 @@ def audit(ws, reached):
             "reached": list(reached),
             "emitted": sorted(x for x in emitted if x),
             "missing": missing,
-            "render_missing": render_missing}
+            "render_missing": render_missing,
+            # None = not asked for; False = asked for but the transcript had
+            # not caught up, so NOTHING is asserted about tool calls. False is
+            # never a pass: it is cannot-determine, and the caller must not
+            # read `ok` as covering the tool-call half.
+            "tool_call_settled": settled,
+            "tool_call_gaps": tool_call_gaps}
 
 
 def pending_decisions(answered=()):
@@ -177,6 +288,18 @@ def main(argv=None):
     p.add_argument("--ws", help="the run workspace to audit")
     p.add_argument("--reached",
                    help="comma-separated gate ids the run reached")
+    p.add_argument("--transcript",
+                   help="a Claude Code transcript to take AskUserQuestion "
+                        "tool-call evidence from; a gate counts as PRESENTED "
+                        "only when the call is in the transcript, never when "
+                        "a payload file exists (Story 20.151, #1221)")
+    p.add_argument("--settle-marker",
+                   help="the turn's final assistant text, used ONLY as an "
+                        "opaque has-the-file-caught-up token; an unsettled "
+                        "transcript asserts nothing rather than blocking")
+    p.add_argument("--reached-from-state", action="store_true",
+                   help="derive the reached ids from the run checkpoint "
+                        "instead of --reached (Story 20.151, #1221)")
     p.add_argument("--audit", action="store_true",
                    help="audit --reached against the ask rows in --ws (the "
                         "default mode; named so citations can say --audit). "
@@ -196,15 +319,30 @@ def main(argv=None):
         answered = [g.strip() for g in args.answered.split(",") if g.strip()]
         print("\n".join(pending_decision_lines(answered)))
         return 0
-    if not args.ws or not args.reached:
-        p.error("--ws and --reached are required unless --list/--pending")
-    res = audit(args.ws, [g.strip() for g in args.reached.split(",") if g.strip()])
+    if not args.ws or not (args.reached or args.reached_from_state):
+        p.error("--ws and --reached (or --reached-from-state) are required "
+                "unless --list/--pending")
+    if args.reached_from_state:
+        reached, why = reached_from_state(args.ws)
+        if why:
+            print(f"cannot-determine: {why}")
+    else:
+        reached = [g.strip() for g in args.reached.split(",") if g.strip()]
+    res = audit(args.ws, reached, transcript_path=args.transcript,
+                settle_marker=args.settle_marker)
     print(json.dumps(res, indent=2))
     # PRINTED ON EVERY AUDIT, INCLUDING A CLEAN ONE — especially a clean one.
     # A limit disclosed only on failure is disclosed exactly where nobody is
     # about to over-read the result.
     print(BOUND)
     if res["missing"]:
+        if res.get("tool_call_gaps"):
+            print(f"error: emitted but never CALLED: {res['tool_call_gaps']} — "
+                  "a payload exists and the question UI was never invoked, so "
+                  "the ask reached the owner as prose", file=sys.stderr)
+        if res.get("tool_call_settled") is False:
+            print("cannot-determine: the transcript had not caught up to this "
+                  "turn; nothing is asserted about tool calls (not a pass)")
         print(f"error: reached but never emitted: {res['missing']} — a gate "
               f"surface that asked the owner something left no record of it",
               file=sys.stderr)
