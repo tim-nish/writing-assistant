@@ -385,6 +385,11 @@ def cmd_provenance(args):
                     f"skeleton (L{skeleton[pos]}) — re-anchor from "
                     "`provenance-segment`, never by hand (#755)")
 
+    run_record.note(outcome="fail" if problems else "pass",
+                    route="%d map entries parsed; anchors %s" % (
+                        len(entries),
+                        "validated" if draft_lines is not None else "unchecked (no --draft)"),
+                    detail="%d structural problem(s); %s" % (len(problems), json.dumps(tally)))
     if args.count:
         print(json.dumps(tally))
         return 0
@@ -992,6 +997,9 @@ def cmd_verify(args):
         "remaining": remaining,
         "worklist": worklist,
     }
+    run_record.note(outcome="pass" if remaining == 0 else "fail",
+                    route="[VERIFY] marker scan over the whole draft text",
+                    detail="%d unresolved; next_stage=%s" % (remaining, out["next_stage"]))
     print(json.dumps(out, indent=2))
     return 0
 
@@ -2380,6 +2388,9 @@ def cmd_interview(args):
         "questions": questions,
         "triage": triage,
     }
+    run_record.note(outcome="pass", route="three-outcome triage over harvest output",
+                    detail="asked %d + %d mandated; next_stage=%s"
+                           % (len(capped), len(mandated), out["next_stage"]))
     print(json.dumps(out, indent=2))
     return 0
 
@@ -2596,39 +2607,26 @@ def cmd_answer(args):
 
 
 def _run_events_path(ws):
-    return os.path.join(ws, "run-events.jsonl")
+    return run_record.run_events_path(ws)
 
 
 def cmd_run_event(args):
-    """Append one run-journal event (Story 19.8, #742): stage start/end,
-    retries, judge rounds, subagent spawns — one JSON line each, so post-hoc
-    cost attribution reads one file. Deterministic append; the timestamp is
-    the recording moment."""
-    import datetime
-    rec = {"ts": datetime.datetime.now(datetime.timezone.utc)
-           .isoformat(timespec="seconds"),
-           "stage": args.stage, "event": args.event}
+    """Append one run-journal event (Story 19.8, #742), NARROWED to the events
+    no block command can observe from inside itself — an agent-side retry, a
+    subagent spawn (SPEC-run-record, Story 20.181). A block's own start and end
+    are emitted by the block's own command at block close, and are no longer
+    anyone's to remember. Deterministic append through the one append site."""
+    rec = {"ts": run_record._now(), "stage": args.stage, "event": args.event}
     if args.note:
         rec["note"] = args.note
-    with open(_run_events_path(args.ws), "a", encoding="utf-8") as fh:
-        fh.write(json.dumps(rec) + "\n")
+    run_record.append(args.ws, rec)
     print(json.dumps({"stage": "run-event", "recorded": rec}))
     return 0
 
 
 def _read_run_events(ws):
-    path = _run_events_path(ws)
-    if not os.path.isfile(path):
-        return []
-    out = []
-    for ln in open(path, encoding="utf-8"):
-        ln = ln.strip()
-        if ln:
-            try:
-                out.append(json.loads(ln))
-            except json.JSONDecodeError:
-                continue
-    return out
+    """The journal's ONE reader, now literally one: same tolerance (20.181)."""
+    return run_record.read_records(ws)
 
 
 def _cost_proxies(ws):
@@ -2647,14 +2645,21 @@ def _cost_proxies(ws):
             pass
     elapsed_min = round((max(ts) - min(ts)).total_seconds() / 60) if len(ts) >= 2 else None
     retries = sum(1 for e in events if e.get("event") == "retry")
-    judge_rounds = sum(1 for e in events if e.get("event") == "judge-round")
+    # A gate close record IS a judge round, observed rather than remembered
+    # (20.181) — so the fallback stops being what a live run reports.
+    judge_rounds = sum(1 for e in events if e.get("event") == "judge-round"
+                       or (e.get("event") == "close"
+                           and e.get("block") == "quality-gate"))
     subagents = sum(1 for e in events if e.get("event") == "subagent")
+    jr_basis = "run-events.jsonl (judge-round events / quality-gate records)"
     if judge_rounds == 0:
         # Fallback basis: the judge artifact files the run wrote.
         judge_rounds = len([f for f in os.listdir(ws) if f.startswith(
             ("provenance-verdicts", "rubric-verdicts"))]) if os.path.isdir(ws) else 0
+        jr_basis = "verdict artifact files (no judging recorded in the journal)"
     return {"elapsed_minutes": elapsed_min, "stage_retries": retries,
             "judge_rounds": judge_rounds, "subagents": subagents,
+            "judge_rounds_basis": jr_basis,
             "events_recorded": len(events),
             "basis": "run-events.jsonl" + ("" if events else " (absent — proxies limited to judge artifacts)")}
 
@@ -3558,6 +3563,7 @@ def _write_checkpoint(ws, state):
     """The one checkpoint write path (shared by `checkpoint` and stage0's
     persist-by-construction, #830): pin carriage plus the atomic write.
     Returns the checkpoint path."""
+    run_record.before_checkpoint()   # CAP-4: the block's record lands FIRST
     path = _checkpoint_path(ws)
     # Skill-contract pin (#743): minted at the FIRST checkpoint write, carried
     # immutably by every later one — it records what the run STARTED under.
@@ -4827,6 +4833,8 @@ def cmd_stage0(args):
         # re-discovered at the post-review emission step every run. This does NOT
         # halt draft start (config_ok/next_stage above are untouched — 18.19).
         out["publish_blockers"] = _syndication_profile_blockers(warnings)
+    # The start block's record, late by construction (`emit_stage0` names why).
+    run_record.emit_stage0(out, run_state.get("framework"), root)
     print(json.dumps(out, indent=2))
     return 0
 
@@ -4860,6 +4868,8 @@ import draft_variants  # noqa: E402
 draft_variants.bind(globals())
 cmd_quality_gate = draft_variants.cmd_quality_gate
 cmd_variants = draft_variants.cmd_variants
+
+import run_record  # noqa: E402  (call sites only — see its module docstring)
 
 
 def main(argv=None):
@@ -5001,12 +5011,12 @@ def main(argv=None):
                     help="override the platform-profiles directory for the "
                          "resolvability warning (tests / non-default locations)")
     sp = sub.add_parser("run-event",
-                        help="append one run-journal event to <ws>/run-events.jsonl "
-                             "(#742): stage start/end, retry, judge-round, subagent")
+                        help="append one run-journal event no block command can "
+                             "observe from inside itself: an agent-side retry, a "
+                             "subagent spawn (SPEC-run-record)")
     sp.add_argument("--ws", required=True)
     sp.add_argument("--stage", required=True)
-    sp.add_argument("--event", required=True,
-                    choices=("start", "end", "retry", "judge-round", "subagent"))
+    sp.add_argument("--event", required=True, choices=("retry", "subagent"))
     sp.add_argument("--note")
 
     sp = sub.add_parser("cost-block",
@@ -5174,12 +5184,14 @@ def main(argv=None):
     sp.add_argument("--draft", required=True)
 
     sp = sub.add_parser("provenance")
+    sp.add_argument("--ws", help="run workspace ($WS): the fill block's record (CAP-1)")
     sp.add_argument("--map", default="-", help="the sidecar provenance map, or - for stdin")
     sp.add_argument("--count", action="store_true", help="print per-class tallies as JSON")
     sp.add_argument("--draft", help="the draft the map describes; enables anchor validation "
                                     "(every position must carry `[L<line>]` resolving to a "
                                     "real non-blank line — #304)")
     sp = sub.add_parser("quality-gate")
+    sp.add_argument("--ws", help="run workspace ($WS): the gate block's record (CAP-1)")
     sp.add_argument("--draft", default="-", help="the filled draft, or - for stdin")
     sp.add_argument("--map", help="the sidecar provenance map (for the stitched-fact-sheet check)")
     sp.add_argument("--judge", help="rubric judge verdicts for dims 1-2: `dimN: pass|fail [locations]` "
@@ -5226,6 +5238,7 @@ def main(argv=None):
     sp.add_argument("draft", nargs="?", default="-", help="draft file, or - for stdin")
     sp.add_argument("--count", action="store_true", help="print the count of well-formed markers")
     sp = sub.add_parser("verify")
+    sp.add_argument("--ws", help="run workspace ($WS): the verify block's record (CAP-1)")
     sp.add_argument("draft", nargs="?", default="-", help="filled draft, or - for stdin")
     sp = sub.add_parser("reroute")
     sp.add_argument("--rewrites", type=int, required=True,
@@ -5342,7 +5355,9 @@ def main(argv=None):
     global _TEST_DECLARED
     _TEST_DECLARED = (bool(getattr(args, "allow_external_draft", False))
                       or _env_test_declared())
-    return {
+    # Block commands run THROUGH the emitter: the record is a side effect of
+    # running, and there is no second invocation to skip (CAP-1).
+    return run_record.emit_block({
         "start": cmd_start, "interview": cmd_interview,
         "structures": cmd_structures,
         "structure-record": cmd_structure_record,
@@ -5375,7 +5390,7 @@ def main(argv=None):
         "variants": cmd_variants,
         "variant-staleness": cmd_variant_staleness,
         "site-record": cmd_site_record,
-    }[args.cmd](args)
+    }[args.cmd], args)
 
 
 if __name__ == "__main__":

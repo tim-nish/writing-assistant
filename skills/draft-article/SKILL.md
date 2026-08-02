@@ -135,9 +135,11 @@ nothing. Every owner-facing ask follows the shared
   `git status` in the host repo shows nothing but declared products.
 - **Budget triage is an orderly stop:** finish the unit in progress, persist
   at the boundary with `--stop-note`, exit clean (stages/complete.md).
-- **Run-level cost journal (#742):** at each stage boundary, retry, and judge
-  spawn, record the event —
-  `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py run-event --ws "$WS" --stage <s> --event start|end|retry|judge-round|subagent`
+- **Run-level cost journal (#742, narrowed by SPEC-run-record):** each block's
+  own command writes that block's open and close records as a **side effect of
+  running** — there is nothing to record and nothing to remember. `run-event`
+  is only for what no block command can observe from inside itself —
+  `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py run-event --ws "$WS" --stage <s> --event retry|subagent`
   — and at each stage boundary consult
   `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py budget-check --ws "$WS"`;
   `breached: true` presents the continue / orderly-stop choice (never a
@@ -149,9 +151,9 @@ nothing. Every owner-facing ask follows the shared
 | **start** (config gate, framework check, workspace autostart; optional `--depth`/`--element`/`--brief`; plan consultation, continuation, differential context; durability contract) | [`stages/stage0.md`](stages/stage0.md) | `draft-pipeline.py stage0 <framework> <sources…> --root <host-repo>` |
 | **probe** (configuration + permission check, no verdict — #1224; routes interview/fill; working-note slim profile) | [`stages/stage1.md`](stages/stage1.md) | `probe.py record --ws $WS --root <host-repo>` |
 | **gap interview** (policy seeds → classification → ≤5 questions + mandated tier → answers → journal → staging candidates → policy-block gate) | [`stages/stage2.md`](stages/stage2.md) | `draft-pipeline.py interview --framework <F> [--items …] <state>` |
-| **fill** (argument plan, structure proposal, per-section fill + sidecar provenance map, per-claim examine — [`stages/examine.md`](stages/examine.md), #1182 — visual set, isolated provenance judge; the concurrency of all four is [`stages/fan-out.md`](stages/fan-out.md), #1248) | [`stages/stage3.md`](stages/stage3.md) **and** [`style-contract.md`](style-contract.md) | `draft-pipeline.py provenance --map <map> --draft <draft>` |
-| **quality gate** (fill→verify; mechanical dims + isolated rubric judge; two-cycle bound; missing-input repair hop) | [`stages/gate.md`](stages/gate.md) | `draft-pipeline.py quality-gate --draft … --map … --judge …` |
-| **owner verification** (resolve every `[VERIFY]` to zero; bounded rewrites) | [`stages/stage4.md`](stages/stage4.md) | `draft-pipeline.py verify <draft>` → `verify-markers --count` = 0 |
+| **fill** (argument plan, structure proposal, per-section fill + sidecar provenance map, per-claim examine — [`stages/examine.md`](stages/examine.md), #1182 — visual set, isolated provenance judge; the concurrency of all four is [`stages/fan-out.md`](stages/fan-out.md), #1248) | [`stages/stage3.md`](stages/stage3.md) **and** [`style-contract.md`](style-contract.md) | `draft-pipeline.py provenance --ws $WS --map <map> --draft <draft>` |
+| **quality gate** (fill→verify; mechanical dims + isolated rubric judge; two-cycle bound; missing-input repair hop) | [`stages/gate.md`](stages/gate.md) | `draft-pipeline.py quality-gate --ws $WS --draft … --map … --judge …` |
+| **owner verification** (resolve every `[VERIFY]` to zero; bounded rewrites) | [`stages/stage4.md`](stages/stage4.md) | `draft-pipeline.py verify --ws $WS <draft>` → `verify-markers --count` = 0 |
 | **complete** (article plan emission + conformance, the dual-product `complete` gate, completion summary; variants are post-review — `variants.md`) | [`stages/complete.md`](stages/complete.md) | `draft-pipeline.py complete --draft … --slug … --root … --ws …` |
 
 **Routing notes (the dispatcher's whole job):**

@@ -179,7 +179,12 @@ a visual before the validator accepts it.
 
 Record the fan-out in the run journal so the completion summary's cost block has
 a basis (`draft-pipeline.py run-event --ws "$WS" --stage fill --event subagent
---note "<what was dispatched>"`).
+--note "<what was dispatched>"`). A **subagent spawn is one of the two events
+`run-event` still carries** (the other is an agent-side `retry`): it is agent-side
+by nature, so no block command can observe it from inside itself. The fill block's
+own open and close records are written by `provenance`, not here — and the legs
+dispatched above are named in that close record's `skipped` when they leave no
+artifact behind (SPEC-run-record CAP-1/CAP-3).
 
 **A timing claim names what it measured, and what it did not.** The fan-out
 touches **machine-paced units of the fill only**. Never report — or imply — an

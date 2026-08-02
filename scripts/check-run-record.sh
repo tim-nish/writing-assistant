@@ -3,7 +3,9 @@
 # tier: inner — pure stdlib Python over fixtures written into a private mktemp
 #   workspace; no network, no shared path, no repo mutation. Measured at
 #   adoption (2026-08-02) well under the runner's INNER_MS ceiling.
-# covers: scripts/run_record.py specs/spec-run-record/**
+# covers: scripts/run_record.py specs/spec-run-record/** scripts/draft-pipeline.py
+#   scripts/probe.py scripts/draft_variants.py skills/draft-article/SKILL.md
+#   skills/draft-article/stages/fan-out.md
 # removal-signal: the run record acquires a declared JSON schema enforced at
 #   the write site by every block command (so a malformed record cannot reach
 #   the file at all), or `run-events.jsonl` stops being the journal
@@ -276,6 +278,159 @@ if bad:
 print("ok:   a pre-contract journal reads unchanged through _read_run_events/_cost_proxies, "
       "and the validator calls those lines legacy rather than failing them (AC-4)")
 PY
+
+# --- EMISSION (Story 20.181, CAP-1/CAP-3/CAP-4) -------------------------------
+# The block sequence is driven with ZERO `run-event` calls, through the
+# dispatcher the skill invokes, and the journal is read back. Everything here is
+# behaviour: no grep for a call site would notice a wrapper that swallowed the
+# record, and a call site is not the property — "a block that ran has logged" is.
+python3 - "$WS" <<'PY' || fail=1
+import contextlib, importlib.util, io, json, os, sys
+sys.path.insert(0, "scripts")
+import run_record as R
+
+spec = importlib.util.spec_from_file_location("dp", "scripts/draft-pipeline.py")
+dp = importlib.util.module_from_spec(spec); spec.loader.exec_module(dp)
+
+ws = os.path.join(sys.argv[1], "emit")
+os.makedirs(ws, exist_ok=True)
+draft = os.path.join(ws, "draft.md")
+with open(draft, "w", encoding="utf-8") as fh:
+    fh.write("---\naudience: the maintainer\naudience_id: maintainer\n---\n\n"
+             "## A section\n\nOne short sentence about the thing.\n")
+mp = os.path.join(ws, "map.txt")
+with open(mp, "w", encoding="utf-8") as fh:
+    fh.write("P1.S1[L8]: narration\n")
+
+bad = []
+def need(cond, msg):
+    if not cond:
+        bad.append(msg)
+
+def drive(*argv):
+    """Run one block command exactly as the dispatcher does."""
+    out, err = io.StringIO(), io.StringIO()
+    with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+        try:
+            code = dp.main(list(argv))
+        except SystemExit as e:                 # argparse
+            code = e.code if isinstance(e.code, int) else 1
+    return code
+
+# --- CAP-1: one open and one close per block that ran, zero `run-event` calls -
+drive("provenance", "--ws", ws, "--map", mp, "--draft", draft)
+gate_code = drive("quality-gate", "--ws", ws, "--draft", draft, "--map", mp,
+                  "--profile", "slim")
+drive("verify", "--ws", ws, draft)
+
+records = R.read_records(ws)
+need(records, "the block sequence was driven and the journal is EMPTY — emission "
+              "is not a side effect of running (CAP-1)")
+need(not any(r.get("event") in ("start", "end", "judge-round") for r in records),
+     "a narrowed `run-event` event reached the journal without anyone calling it")
+states = {s["block"]: s for s in R.block_states(records)}
+for block in ("fill", "quality-gate", "verify"):
+    s = states.get(block)
+    need(s is not None and s["opens"] == 1 and s["closes"] == 1,
+         "block %r did not write exactly one open and one close: %r" % (block, s))
+need([n for n, _k, rs in R.validate_lines(
+        [json.dumps(r) for r in records]) if rs] == [],
+     "the emitted journal does not pass its own validator: %r"
+     % (R.validate_lines([json.dumps(r) for r in records]),))
+
+# every close carries the JUDGMENT, over the SAME hash the attestation uses
+H = R.draft_sha256(open(draft, encoding="utf-8").read())
+for block in ("fill", "quality-gate", "verify"):
+    close = states[block]["close"]
+    need(close["verdict"]["over"]["draft_sha256"] == H,
+         "block %r decided over a different hash than the draft's own (CAP-2)" % block)
+    need(close["verdict"]["detail"].strip() != "",
+         "block %r closed with an empty detail" % block)
+    need(close["route"], "block %r closed with an empty route" % block)
+
+# --- CAP-1: a NON-ZERO exit still records ------------------------------------
+broken = os.path.join(ws, "broken-map.txt")
+with open(broken, "w", encoding="utf-8") as fh:
+    fh.write("this is not a provenance entry\n")
+before = len(R.read_records(ws))
+code = drive("provenance", "--ws", ws, "--map", broken, "--draft", draft)
+after = R.read_records(ws)
+need(code != 0, "the failing fixture did not fail — the AC is about a non-zero exit")
+need(len(after) == before + 2,
+     "a block that EXITED NON-ZERO did not write its open and its close — the "
+     "failed block is the case the record exists for (CAP-1)")
+failed = [r for r in after if r.get("event") == "close" and r.get("block") == "fill"][-1]
+need(failed["exit"] == code and failed["verdict"]["outcome"] == "fail",
+     "the failing close does not carry its own exit and a failing outcome: %r" % (failed,))
+
+# --- CAP-3: the partial state is PRODUCED, not merely expressible ------------
+gate = states["quality-gate"]["close"]
+need(gate["status"] == "ran-partially",
+     "the slim-profile gate, which waives its dim1-2 judge, closed as %r — a "
+     "partial that reports clean is the collapse CAP-3 exists to prevent"
+     % (gate["status"],))
+need(any("dim1" in s["step"] for s in gate["skipped"]),
+     "the gate's `ran-partially` does not NAME the waived sub-obligation: %r"
+     % (gate["skipped"],))
+need("evidence" not in json.dumps(gate["skipped"]),
+     "the gate named the per-section evidence-type check — that repair is #1288's "
+     "and this story does not touch it")
+
+# --- CAP-4: the record is durable BEFORE the checkpoint ----------------------
+ows = os.path.join(sys.argv[1], "order")
+os.makedirs(ows, exist_ok=True)
+seen, real_append = {}, R.append
+def spy(w, rec):
+    seen[rec.get("event")] = os.path.isfile(os.path.join(w, "checkpoint.json"))
+    return real_append(w, rec)
+R.append = spy
+try:
+    R.open_block(ows, "fill", "provenance")
+    dp._write_checkpoint(ows, {"next_stage": "quality-gate"})
+finally:
+    R.append = real_append
+need(seen.get("close") is False,
+     "the block's close record was written when a checkpoint ALREADY existed — "
+     "the ordering CAP-4 states is reversed, and a kill between the two would "
+     "leave resumable state with no record behind it")
+need(os.path.isfile(os.path.join(ows, "checkpoint.json")),
+     "the checkpoint was not written at all — the fixture proves nothing")
+need([r for r in R.read_records(ows) if r.get("event") == "close"],
+     "no close record landed before the checkpoint write")
+
+# --- AC-6: the cost block's judge-round basis is no longer the fallback -------
+p = dp._cost_proxies(ws)
+need(p["judge_rounds"] >= 1,
+     "a gate that ran is not counted as a judge round: %r" % (p,))
+need("fallback" not in p["judge_rounds_basis"] and "verdict artifact" not in p["judge_rounds_basis"],
+     "the cost block still reports the verdict-FILE fallback as its basis after a "
+     "gate recorded its own round: %r" % (p["judge_rounds_basis"],))
+
+if bad:
+    for b in bad:
+        sys.stderr.write("FAIL: %s\n" % b)
+    sys.exit(1)
+print("ok:   the block sequence driven with ZERO run-event calls writes one open and "
+      "one close per block, and a non-zero exit still records (CAP-1)")
+print("ok:   a block whose sub-obligation was waived closes `ran-partially` and NAMES it (CAP-3)")
+print("ok:   the close record is durable BEFORE the checkpoint write (CAP-4)")
+print("ok:   a gate that ran is a counted judge round, so the verdict-file fallback is "
+      "no longer the reported basis (Story 20.181 AC-6)")
+PY
+
+# --- AC-4: `run-event` is narrowed, and the prose stopped asking --------------
+if grep -qE '"--event", required=True, choices=\("retry", "subagent"\)' scripts/draft-pipeline.py; then
+  ok "run-event accepts only the events no block command can observe from inside itself (AC-4)"
+else
+  err "run-event still accepts a block's own start/end (or the choices moved) — the block's start and end are the block command's to write (SPEC-run-record constraints)"
+fi
+if grep -qE 'run-event .*--event (start|end|judge-round)' skills/draft-article/SKILL.md skills/draft-article/stages/*.md; then
+  err "skill prose still asks an agent to record a block's own start/end with run-event — the surface that depends on remembering is the defect (AC-4)"
+else
+  ok "no skill prose asks an agent to record a block's own start or end (AC-4)"
+fi
+grep -q -- '--event subagent' skills/draft-article/stages/fan-out.md \
+  || err "the fan-out's `--event subagent` basis was neither preserved nor re-homed (AC-4)"
 
 # --- AC-6: the spec carrier this check answers to still exists ---------------
 for f in specs/spec-run-record/SPEC.md specs/spec-run-record/record-formats.md; do
