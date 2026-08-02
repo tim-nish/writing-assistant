@@ -1,5 +1,6 @@
 #!/usr/bin/env sh
 # parallel-safe
+# covers: scripts/draft_variants.py scripts/draft-pipeline.py skills/draft-article/stages/gate.md
 # check-evidence-types.sh — verify per-section minimum evidence-type
 # declarations and the fail-closed gate check (Story 13.90, #416). POSIX shell
 # + stdlib Python.
@@ -9,8 +10,10 @@
 # anchored pointers resolve to an allowed fact-sheet KIND; fails a hollow
 # section (wrong KINDs) with a missing-input finding whose `upstream` line
 # parses into `repair-hop`; fails CLOSED (exit 2) when declarations exist but
-# --map/--state are missing; and stays silent for a framework declaring
-# nothing.
+# --map/--state are missing; stays silent for a framework declaring nothing;
+# and — Story 20.173, #1288 — reports an unresolvable predicate as its own
+# named `cannot-determine` state with a reason, on both sides of the replay,
+# never as a missing-input finding and never as a publish blocker.
 
 set -eu
 
@@ -123,6 +126,46 @@ if g["dimensions"].get("dim1", {}).get("verdict") != "waived":
     bad.append("slim profile: dim1 not waived")
 if g["dimensions"].get("evidence", {}).get("verdict") != "fail":
     bad.append("slim profile bypassed the evidence check")
+
+# (f) THE THIRD OUTCOME (Story 20.173, #1288) — replayed on BOTH sides, and
+# asserted on the emitted report TEXT, never on key presence. (i) a state with
+# a resolvable carrier prints a pass or a finding; (ii) one whose carrier
+# resolves none of the section's anchored pointers prints the cannot-determine
+# line naming the section, the declared type, and WHY.
+nores = w("nores.json", json.dumps({"fact_sheet": [
+    {"claim": "elsewhere", "source": "other/z.py:1@ccccccc", "kind": "event"},
+]}))
+def report_text(out, errtxt):
+    g = json.loads(out)
+    return "\n".join(g.get("notices", [])
+                     + [g["dimensions"].get("evidence", {}).get("locations", "")]
+                     + [errtxt])
+
+rc, out, errtxt = gate(map=good_map, judge=judge, framework_file=fw, state=state)
+if "cannot-determine" in report_text(out, errtxt):
+    bad.append("a resolvable carrier reported cannot-determine (over-triggered)")
+
+rc, out, errtxt = gate(map=good_map, judge=judge, framework_file=fw, state=nores)
+text = report_text(out, errtxt)
+g = json.loads(out)
+if "evidence-type check: cannot-determine" not in text:
+    bad.append("an unresolvable carrier printed no cannot-determine line")
+if "evidence" not in text or "episode" not in text:
+    bad.append("cannot-determine line names neither the section nor the declared type")
+if text.count("cannot-determine") and "carrier absent" not in text:
+    bad.append("cannot-determine line carries no reason (a bare state repeats the defect)")
+# AC-3: never a missing-input finding, so the episode-candidates hop is
+# unreachable from it. AC-4: never a publish blocker on its own.
+if g.get("evidence_types", {}).get("missing_input"):
+    bad.append("cannot-determine leaked into missing_input[] (the #751 fabricated gap)")
+if "evidence" in g.get("failing_dimensions", []):
+    bad.append("cannot-determine blocked the gate as a failing dimension")
+if g["dimensions"].get("evidence", {}).get("verdict") != "cannot-determine":
+    bad.append("the evidence dimension did not carry the third verdict")
+# AC-2: dropping the flags no longer routes around the check in silence.
+rc, out, errtxt = gate(map=good_map, judge=judge)
+if "evidence-type check: cannot-determine" not in report_text(out, errtxt):
+    bad.append("gate run without --framework-file omitted the check silently (#1288)")
 
 for b in bad: print(f"  drift: {b}", file=sys.stderr)
 sys.exit(1 if bad else 0)
