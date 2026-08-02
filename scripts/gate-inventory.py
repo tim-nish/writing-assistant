@@ -34,15 +34,6 @@ that fires when a turn ends awaiting a reply.
 
 No spec, skill or check may cite this audit as evidence of gate coverage
 without that bound.
-
-HARNESS-LAYER ENFORCEMENT (Story 20.142, #1206). The above stated limit is now
-partially closable at the harness layer via Claude Code hooks, which run outside
-the model and can observe both the tool-call stream and the reply text. The
-extended audit (--tool-call-audit) checks interview-events.jsonl for
-AskUserQuestion tool-call evidence, not merely payload file presence. A gate is
-`presented` only when an AskUserQuestion tool-use event for its payload exists
-in the transcript. This closes the gap observed in run 20260802T090323-217675
-where payloads for q8 and depth were emitted but no selection event was recorded.
 """
 
 import argparse
@@ -74,127 +65,154 @@ def read_asks(ws):
             if not line:
                 continue
             try:
-                rows.append(json.loads(line))
-            except json.JSONDecodeError:
-                pass
+                row = json.loads(line)
+            except ValueError:
+                continue
+            if row.get("kind") == "ask":
+                rows.append(row)
     return rows
 
 
-def read_tool_call_events(ws):
-    """Read interview-events.jsonl and return gate ids that have AskUserQuestion
-    tool-call evidence. A gate is truly presented only when the tool-call exists
-    in the transcript, not merely when a payload file was written.
+# THE BOUND, DECLARED ONCE (Story 20.136, #1176) and carried by every audit —
+# in the result, in the CLI output, and in --help. One string, so a consumer
+# quotes it rather than paraphrasing the limit into something weaker.
+BOUND = (
+    "BOUND: this is coverage of DECLARED-ID EMISSION — reached ids against the "
+    "ask rows written for them, both keyed on draft_gates.GATES. It is NOT "
+    "coverage of an ask that was never declared: a surface composed outside the "
+    "registry is invisible here and this audit still reports ok. A clean audit "
+    "is not a clean class."
+)
 
-    This closes the gap documented in run 20260802T090323-217675: payloads for
-    q8 and depth were emitted but no AskUserQuestion tool call was recorded —
-    only t1/t2 had one. Payload file presence and tool-call evidence diverge
-    precisely in the failure mode this class tracks.
+
+def audit(ws, reached):
+    """Assert `reached` ⊆ emitted, and that every emitted payload declares its
+    render form.
+
+    Two findings, kept apart because they are different defects: a gate that
+    never emitted (the thesis-gate shape) and a gate that emitted without a
+    `render:` declaration (the intent-gate shape). Both were observed on the
+    same 2026-08-01 run, and collapsing them would lose which one to fix.
     """
-    path = os.path.join(ws, "interview-events.jsonl")
-    tool_call_gate_ids = set()
-    if not os.path.isfile(path):
-        return tool_call_gate_ids
-    with open(path, encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                event = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            # Accept any event shape that records an AskUserQuestion tool call
-            # with a gate_id or payload gate_id field.
-            event_type = event.get("type") or event.get("event_type") or ""
-            tool_name = event.get("tool") or event.get("tool_name") or event.get("tool_use", {}).get("name", "")
-            if "AskUserQuestion" in str(tool_name):
-                # Extract gate id from the event
-                gate_id = (
-                    event.get("gate_id")
-                    or event.get("id")
-                    or (event.get("input") or {}).get("gate_id")
-                    or (event.get("tool_use", {}).get("input") or {}).get("gate_id")
-                    or (event.get("payload") or {}).get("gate_id")
-                )
-                if gate_id:
-                    tool_call_gate_ids.add(gate_id)
-            # Also accept selection events as evidence (a selection implies the
-            # question was presented through the tool-call path)
-            if "selection" in str(event_type).lower() or "selected" in str(event_type).lower():
-                gate_id = event.get("gate_id") or event.get("id")
-                if gate_id:
-                    tool_call_gate_ids.add(gate_id)
-    return tool_call_gate_ids
+    declared = _gates()
+    unknown = [g for g in reached if g not in declared]
+    if unknown:
+        raise ValueError(
+            f"not declared in the gate registry: {unknown} — a gate the run "
+            f"claims to have reached must exist in `draft_gates.GATES`")
+    rows = read_asks(ws)
+    emitted = {r.get("gate") for r in rows}
+    missing = [g for g in reached if g not in emitted]
+    render_missing = sorted({
+        r["gate"] for r in rows
+        if not all((it or {}).get("render") for it in (r.get("items") or [{}]))})
+    return {"ok": not missing and not render_missing,
+            # The bound travels WITH the verdict, not beside it in a doc
+            # somewhere: a caller that reads `ok` and nothing else is the
+            # reader this clause exists for.
+            "bound": BOUND,
+            "reached": list(reached),
+            "emitted": sorted(x for x in emitted if x),
+            "missing": missing,
+            "render_missing": render_missing}
 
 
-def read_next_stage(ws):
-    """Read the current next_stage from the run workspace if available.
-    Used by the hook audit to determine which gate was due at turn end."""
-    path = os.path.join(ws, "next_stage")
-    if not os.path.isfile(path):
-        return None
-    with open(path, encoding="utf-8") as f:
-        return f.read().strip() or None
+def pending_decisions(answered=()):
+    """The owner decisions still to come, DERIVED from the registry
+    (Story 20.117, #1112).
 
+    AC3 forbids a hand-listed map — *"a hardcoded list is a conformance copy
+    with no precedence rule and drifts the first time a gate moves"* — so this
+    reads `draft_gates.GATES` and nothing else. Add a gate there and it appears
+    here; move it to another stage and this follows.
 
-def check_intent_gate_capacity(gates):
-    """Verify the intent gate is reachable by the question UI.
-
-    The #1102 capacity clause (host control = 2-4 options) made control: "block"
-    the only conforming form for a 5-label intent gate, locking the pipeline's
-    first and most central closed choice out of the question UI by spec (#1206).
-    A >4-option closed choice must degrade to a two-step selection (or
-    4 options + "more..."), never to prose block form.
-
-    Returns a list of violation strings (empty = no violations).
+    A gate with `owner_decision: None` carries no decision the owner must make
+    (the resume confirmation is asked only when a run predates the sitting), so
+    it is omitted rather than rendered as an empty row.
     """
-    violations = []
-    for gate_id, gate in gates.items():
-        options = gate.get("options") or gate.get("choices") or []
-        control = gate.get("control", "")
-        capacity = gate.get("capacity")
-        max_options = None
-        if capacity:
-            # Parse "2-4" style capacity bounds
-            if isinstance(capacity, str) and "-" in capacity:
-                try:
-                    parts = capacity.split("-")
-                    max_options = int(parts[-1])
-                except (ValueError, IndexError):
-                    pass
-            elif isinstance(capacity, int):
-                max_options = capacity
-        if max_options is not None and len(options) > max_options:
-            if str(control).lower() == "block":
-                violations.append(
-                    f"gate {gate_id!r}: {len(options)} options exceeds capacity "
-                    f"max {max_options}; control=block makes this gate unreachable "
-                    f"by the question UI — must degrade to two-step or 4+more form"
-                )
-    return violations
+    declared = _gates()
+    out = []
+    for gid, spec in declared.items():
+        if gid in answered or not spec.get("owner_decision"):
+            continue
+        out.append({"gate": gid, "stage": spec["stage"],
+                    "decision": spec["owner_decision"]})
+    # Stage order is the registry's insertion order, which is the order the
+    # pipeline reaches them; sorting alphabetically would tell the owner that
+    # sources comes before intent.
+    return out
 
 
-def audit(ws, reached, tool_call_audit=False, check_capacity=False):
-    """Return (missing, unknown, tool_call_gaps, capacity_violations).
+NEVER_ASKED = (
+    ("paragraph structure",
+     "frameworks bind section OBLIGATIONS, not literal headings — so this is "
+     "never asked, of anyone, at any stage"),
+)
 
-    missing: gate ids in `reached` with no payload row in presented-payloads.jsonl
-    unknown: gate ids in `reached` not in the declared registry
-    tool_call_gaps: gate ids in `reached` with payload rows but no AskUserQuestion
-                    tool-call evidence in interview-events.jsonl (only when
-                    tool_call_audit=True)
-    capacity_violations: gates whose option count exceeds UI capacity (only when
-                         check_capacity=True)
+
+def pending_decision_lines(answered=()):
+    """The map as the owner reads it, with the never-asked decision stated.
+
+    NON-MEMBER DISCLOSURE, applied to decisions rather than to content: the
+    absence of a structure ask at the brief must read as *later*, and the one
+    that is never asked must read as *never, and here is why*. An owner who
+    expected a gate and saw none could otherwise only conclude the pipeline
+    decided it silently, which is exactly what #1112 reports.
     """
-    gates = _gates()
-    asks = read_asks(ws)
-    emitted_ids = {row.get("gate_id") or row.get("id") for row in asks} - {None}
+    rows = pending_decisions(answered)
+    lines = ["Decisions still yours, and where each is asked:"]
+    lines += [f"  {r['decision']} — {r['stage']}" for r in rows]
+    for what, why in NEVER_ASKED:
+        lines.append(f"  {what} — never asked: {why}")
+    return lines
 
-    unknown = [r for r in reached if r not in gates]
-    missing = [r for r in reached if r in gates and r not in emitted_ids]
 
-    tool_call_gaps = []
-    if tool_call_audit:
-        tool_call_ids = read_tool_call_events(ws)
-        # A gap is a gate that emitted a payload but has no tool-call evidence:
-        # the payload existed (so the old check passed) but the question UI was
-        # never actually invoked
+def main(argv=None):
+    # RawDescriptionHelpFormatter, deliberately: the default formatter reflows
+    # the epilog into one block and the bound is the half a reader skims for.
+    p = argparse.ArgumentParser(
+        description="Audit a run's gates against the ask rows it wrote. " + BOUND,
+        epilog=BOUND,
+        formatter_class=argparse.RawDescriptionHelpFormatter)
+    p.add_argument("--ws", help="the run workspace to audit")
+    p.add_argument("--reached",
+                   help="comma-separated gate ids the run reached")
+    p.add_argument("--audit", action="store_true",
+                   help="audit --reached against the ask rows in --ws (the "
+                        "default mode; named so citations can say --audit). "
+                        + BOUND)
+    p.add_argument("--list", action="store_true",
+                   help="print the declared registry and exit")
+    p.add_argument("--pending", action="store_true",
+                   help="print the owner decisions still pending, derived from "
+                        "the registry (Story 20.117), and exit")
+    p.add_argument("--answered", default="",
+                   help="comma-separated gate ids already answered")
+    args = p.parse_args(argv)
+    if args.list:
+        print(json.dumps(_gates(), indent=2))
+        return 0
+    if args.pending:
+        answered = [g.strip() for g in args.answered.split(",") if g.strip()]
+        print("\n".join(pending_decision_lines(answered)))
+        return 0
+    if not args.ws or not args.reached:
+        p.error("--ws and --reached are required unless --list/--pending")
+    res = audit(args.ws, [g.strip() for g in args.reached.split(",") if g.strip()])
+    print(json.dumps(res, indent=2))
+    # PRINTED ON EVERY AUDIT, INCLUDING A CLEAN ONE — especially a clean one.
+    # A limit disclosed only on failure is disclosed exactly where nobody is
+    # about to over-read the result.
+    print(BOUND)
+    if res["missing"]:
+        print(f"error: reached but never emitted: {res['missing']} — a gate "
+              f"surface that asked the owner something left no record of it",
+              file=sys.stderr)
+    if res["render_missing"]:
+        print(f"error: emitted without a render: declaration: "
+              f"{res['render_missing']}", file=sys.stderr)
+    return 0 if res["ok"] else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())
