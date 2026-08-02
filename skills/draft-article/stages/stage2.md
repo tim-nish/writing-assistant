@@ -590,7 +590,7 @@ policy-seeded records `consulted: none (policy_source unset)`, or, when the
 probe degraded, `consulted: none (policy_source unavailable: <reason>)` via
 `--policy-note` — every interview run states its policy provenance, including
 the generic ones. Surface the line in the completion summary's informational
-notes when it names a pin.
+notes when it names a pin. **THE `none` REASON IS DERIVED FROM THE WORKSPACE, NEVER FROM A FLAG, AND THERE ARE THREE STATES, NOT TWO (amended 2026-08-02, #1289; contract: `specs/spec-run-record/SPEC.md` CAP-5 and `record-formats.md` §3).** `policy_source unset` asserts *no source was configured* and may be recorded ONLY when no policy-surface artifact exists in `$WS`; where a surface artifact IS present and the seed→question map is empty, the run read the source and authored no seeds from it — a third state, recorded as `consulted: none (policy surface read; no seeds authored)`, because that fact is editorial and the unset reason points a debugger at configuration. An explicit `--policy-note` degradation reason outranks both (it is evidence, not a flag). Run `20260802T185710-622820` recorded `policy_source unset` beside a 57,885-byte surface it had read; the wording here is illustrative, the discrimination is not.
 
 **On request — the policy-influence report.** When the owner asks what the
 policy changed in a run, produce the
