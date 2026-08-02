@@ -1,6 +1,8 @@
 #!/usr/bin/env sh
 # parallel-safe
 # covers: scripts/draft-pipeline.py
+# grep-binding: token — whole-skills-tree greps for subcommand invocation
+#   strings, set-wide by construction.
 # check-subcommand-carriers.sh — every shipped pipeline subcommand has a CARRIER:
 # at least one invocation site under skills/ (Story 13.41). Guards the
 # "mechanism built, orchestration missing" class: three Epic 16 subcommands

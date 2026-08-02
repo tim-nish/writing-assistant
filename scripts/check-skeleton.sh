@@ -1,6 +1,8 @@
 #!/usr/bin/env sh
 # parallel-safe
 # covers: .claude-plugin/** skills/draft-article/** skills/review-article/** specs/**
+# grep-binding: none — its greps filter a `git ls-files` path listing;
+#   no spec or skill prose is content-grepped.
 # covers-note (#1321): flag `dynamic-path:s` ANSWERED — `s` is a loop cursor over three
 #   literal spec names, so nothing is hidden. Two hand corrections: `specs/.*` was extracted
 #   from a REGEX in the BMAD-output guard and is not a path glob at all (it would match

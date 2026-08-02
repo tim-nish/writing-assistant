@@ -1,6 +1,8 @@
 #!/usr/bin/env sh
 # parallel-safe
 # covers: skills/** scripts/**
+# grep-binding: denial-tree — whole-tree denial greps over skills/ and
+#   scripts/, relocation-proof by construction.
 # covers-note (#1321): HAND-AUTHORED, and deliberately broad. The derivation proposed two
 #   SKILL.md files, both cited in this header's PROSE as examples of the collision that got
 #   `Seed` rejected — neither is opened. What this check actually reads is ROOTS =

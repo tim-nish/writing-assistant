@@ -2,6 +2,11 @@
 # parallel-safe
 # tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
 # covers: scripts/draft-pipeline.py scripts/fixtures/interview-items/** skills/draft-article/stages/stage2.md specs/spec-article-draft-pipeline/SPEC.md specs/spec-article-draft-pipeline/constraints.md specs/spec-policy-source-seam/SPEC.md specs/spec-policy-source-seam/seam-formats.md
+# grep-binding: file-set (precedent, #1322) — the pipeline-spec greps read
+#   SPEC.md + constraints.md as a set; the seam-spec greps match
+#   constraint-name phrases ('whole-surface authoring', 'staleness routing')
+#   in a two-file family and rebind to that set when the seam spec next
+#   relocates; the $SKILL greps are tokens or stage-owned wording.
 # check-stage2-policy-seam.sh — verify the Stage-2 policy-seam integration
 # (Story 14.4, SPEC-policy-source-seam FR45/FR47/FR48, CAP-2).
 # POSIX shell + stdlib Python only.

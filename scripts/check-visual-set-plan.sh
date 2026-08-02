@@ -4,7 +4,11 @@
 #   class. The breach PRE-DATES story 20.164 (measured on main at 2544ms
 #   against the 2000ms ceiling): the check shells out to the validator ~30
 #   times. Declared here rather than left failing every scoped inner run.
-# covers: scripts/validate-visual-set.py skills/draft-article/stages/stage3.md skills/draft-article/stages/fan-out.md skills/draft-article/stages/gate.md
+# covers: scripts/validate-visual-set.py skills/draft-article/**
+# grep-binding: file-set (#1325) — the join precondition is read across the
+#   skill's whole file set. The $FO/$sec greps assert fan-out.md's and
+#   stage3.md's own scheduling wording (which file states the concurrency IS
+#   the assertion), so they stay single-file and ride those files' relocation.
 # check-visual-set-plan.sh — verify the visual-set planning proposal (Story
 # 13.58, SPEC-article-visuals CAP-2a). POSIX shell + stdlib Python.
 #
@@ -167,9 +171,11 @@ grep -qi 'join at the quality gate\|They \*\*join at the quality gate' "$FO" \
 grep -qi 'owner-paced half of the visual set does not speed up\|owner decisions' "$FO" \
   && ok "fan-out excludes the visual set's owner-paced half from the win" \
   || err "fan-out.md claims the owner-paced visual steps speed up"
-grep -qi 'Join first, then' skills/draft-article/stages/gate.md \
-  && ok "gate.md carries the join precondition (join first, then gate)" \
-  || err "gate.md does not state that it is the join point"
+# The join precondition is contract wherever in the skill's file set it sits
+# (#1322/#1325), so the assertion reads the set rather than one file.
+grep -rqi 'Join first, then' skills/draft-article/ \
+  && ok "the skill carries the join precondition (join first, then gate)" \
+  || err "the skill does not state the join point"
 
 if [ "$fail" -eq 0 ]; then
   printf '\nAll visual-set-plan checks passed.\n'; exit 0

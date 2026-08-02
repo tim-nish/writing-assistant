@@ -5,6 +5,8 @@
 # tier: inner
 # parallel-safe
 # covers: scripts/owner_surface.py skills/completion-summary.md
+# grep-binding: token — the one skill grep matches the composer call
+#   fragment ('owner_surface as o'), code-shaped, not relocatable prose.
 # removal-signal: this check retires when the relay layer itself becomes
 #   constrainable — i.e. when the harness can guarantee that a composed block
 #   reaches the owner unmodified. At that point the composer is enforced at the

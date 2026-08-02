@@ -1,7 +1,11 @@
 #!/usr/bin/env sh
 # parallel-safe
 # tier: full — end-to-end probe invocations over a fixture host repo (#913)
-# covers: scripts/probe.py skills/draft-article/stages/stage1.md
+# covers: scripts/probe.py skills/draft-article/**
+# grep-binding: file-set (#1325) — the resume-contract sentence and the
+#   harvest-consume denial read the skill's whole file set (SKILL.md + stages/
+#   companions); 'next_stage: probe' is a state-field token, durable wherever
+#   it sits in that set.
 # removal-signal: stage 1 stops being probe (a later amendment replaces or
 #   folds it), at which point these assertions have no subject and retire with
 #   the stage.
@@ -118,10 +122,13 @@ assert json.load(open(sys.argv[1]))["next_stage"] == "fill"
 PY
 
 # --- checkpoint/resume contract is declared (AC4) ----------------------------
-grep -q "Checkpoint/resume contract" skills/draft-article/stages/stage1.md \
-  && ok "stage1.md declares probe's checkpoint/resume contract" \
+# The skill is SKILL.md plus its stages/ companions; the contract is declared
+# wherever in that set it sits (#1322/#1325), so the assertion reads the set
+# rather than one file.
+grep -rq "Checkpoint/resume contract" skills/draft-article/ \
+  && ok "the skill declares probe's checkpoint/resume contract" \
   || err "stage 1 declares no resume contract — an interruptible stage without one is a gap"
-grep -q "next_stage: probe" skills/draft-article/stages/stage1.md \
+grep -rq "next_stage: probe" skills/draft-article/ \
   && ok "...naming where an interrupted probe resumes" || err "...that names no resume point"
 
 # --- stage wiring: the mint points at probe, no consume step at stage 1 ------
@@ -132,8 +139,8 @@ dp = importlib.util.module_from_spec(spec); spec.loader.exec_module(dp)
 state, code = dp._run_state("F2", ["docs/"], None)
 assert state["next_stage"] == "probe", state
 PY
-grep -q "consume <harvest-doc>" skills/draft-article/stages/stage1.md skills/draft-article/SKILL.md \
-  && err "stage 1 still instructs consuming a harvest document" \
+grep -rq "consume <harvest-doc>" skills/draft-article/ \
+  && err "the skill still instructs consuming a harvest document" \
   || ok "no stage instructs consuming a harvest document (#1182)"
 
 [ "$fail" -eq 0 ] && printf '\nAll probe checks passed.\n' \

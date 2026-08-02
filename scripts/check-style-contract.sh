@@ -7,6 +7,8 @@
 # tier: inner — a handful of sub-100ms python invocations over temp fixtures,
 #   plus greps over tracked text; no seam, no pipeline run
 # covers: scripts/style-contract.py skills/draft-article/**
+# grep-binding: token — the skill grep matches the 'style-contract.md'
+#   filename token, not relocatable prose.
 # removal-signal: retire this when the style contract stops being an artifact
 #   this plugin reads — i.e. when either the contract is withdrawn, or its
 #   consumption moves behind a mechanism that carries these properties itself

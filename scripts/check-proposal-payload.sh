@@ -2,6 +2,10 @@
 # parallel-safe
 # tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
 # covers: scripts/validate-proposal-payload.py skills/owner-facing-proposal-contract.md
+# grep-binding: fragile-recorded (#1325) — 'plain text' and
+#   'presented-payloads.jsonl' are read from a single-file skill that is its
+#   own whole file set today; rebind to the set when that file splits under
+#   a ceiling.
 # check-proposal-payload.sh — verify payload integrity validation blocks a
 # damaged proposal prompt before presentation (Story 10.1, contract (e)).
 # POSIX shell + stdlib Python.

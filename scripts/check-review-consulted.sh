@@ -1,6 +1,8 @@
 #!/usr/bin/env sh
 # parallel-safe
 # covers: scripts/draft_review.py scripts/run_record.py skills/review-article/phases/passes.md
+# grep-binding: token — the skill grep matches the 'review-consulted --ws'
+#   command string, not relocatable prose.
 # check-review-consulted.sh — verify the review-side consulted line and the
 # policy pass's degradation wiring (Story 15.3, SPEC-policy-consistency-pass
 # CAP-4). POSIX shell + stdlib Python only.
