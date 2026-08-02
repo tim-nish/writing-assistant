@@ -16,10 +16,13 @@ re-implement them. Section order below is load-bearing.
 
 ## Visual slot (SPEC-article-visuals CAP-1)
 
-**F3 declares one comparison table — required** — the results table in the
-*What it caught* GATE is where the methodology's evidence lands (tables are
-preferred over diagrams for comparative content). It is **proposed, not
-auto-inserted** (Story 8.2). If the owner **declines** the visual proposal, the
+**F3's default visual slot is a comparison table — required where F3 is
+matched** — the results table in the *What it caught* GATE is where the
+methodology's evidence lands (tables are preferred over diagrams for
+comparative content). This is a **default offered to the structure proposer**,
+never the article's count: the accepted structure's own `visual_slots` is the
+declaration (#983), and it may take this default, take several, or take none.
+Where it is taken, it is **proposed, not auto-inserted** (Story 8.2). If the owner **declines** the visual proposal, the
 slot is **omitted entirely** — no `[Figure: …]` or placeholder residue is left in
 the draft.
 

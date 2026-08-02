@@ -1,10 +1,15 @@
 #!/usr/bin/env sh
 # parallel-safe
-# check-framework-visual-slots.sh — verify each framework declares its visual
-# slot(s) (Story 8.1, SPEC-article-visuals CAP-1): F1 one overview diagram; F2
-# optional before/after or timeline; F3 one comparison table (required); F4 one
-# landscape table or concept map — and that a declined slot is omitted entirely
-# with no `[Figure: …]` / placeholder residue. POSIX shell.
+# covers: skills/draft-article/frameworks/*.md
+# check-framework-visual-slots.sh — verify each framework offers its visual
+# slot(s) as DEFAULTS (Story 8.1, SPEC-article-visuals CAP-1 as amended
+# 2026-07-30, #983): F1 an overview diagram; F2 optional before/after or
+# timeline; F3 a comparison table (required where F3 is matched); F4 a
+# landscape table or concept map — that a declined slot is omitted entirely
+# with no `[Figure: …]` / placeholder residue, and that no framework file
+# states the ARTICLE's visual count. The declaration is the accepted
+# structure's `visual_slots`; these rows are only a source of defaults
+# (Story 20.168). POSIX shell.
 
 set -eu
 
@@ -29,6 +34,11 @@ hasc 'comparison table'                   "convention: F3 comparison table"
 hasc 'landscape table or concept map'     "convention: F4 landscape table or concept map"
 hasc 'declined slot is omitted entirely\|declined.*omitted' "convention: declined slot omitted entirely"
 hasc 'placeholder residue'                "convention: no placeholder residue"
+# #983 / Story 20.168: the table is a SOURCE OF DEFAULTS; the accepted
+# structure's `visual_slots` is the declaration.
+hasc 'accepted structure'                 "convention: the accepted structure declares the slots"
+hasc 'visual_slots'                       "convention: names the structure's visual_slots field"
+hasc 'source of defaults'                 "convention: the per-framework rows are defaults"
 
 # 1. Each framework declares its own slot + the no-residue rule.
 slot() {
@@ -43,6 +53,20 @@ slot F1 'overview diagram'                "one overview diagram"
 slot F2 'before/after or timeline'        "optional before/after or timeline"
 slot F3 'comparison table'                "one comparison table (required)"
 slot F4 'landscape table or concept map'  "one landscape table or concept map"
+
+# 1b. No framework file states the ARTICLE's visual count from framework
+# identity (Story 20.168 / #983) — "F1 declares one overview diagram" and
+# friends asserted a count the framework has no authority to impose.
+if grep -rnEi '\bF[1-5] declares (one|a|an|no) ' "$DIR" >/dev/null 2>&1; then
+  grep -rnEi '\bF[1-5] declares (one|a|an|no) ' "$DIR" >&2
+  err "a framework file states a framework-derived visual count"
+else
+  ok "no framework file derives a visual count from framework identity"
+fi
+for f in "$DIR"/F1-*.md "$DIR"/F2-*.md "$DIR"/F3-*.md "$DIR"/F4-*.md; do
+  grep -qi 'default' "$f" && ok "$(basename "$f") frames its slot as a default" \
+    || err "$(basename "$f") does not frame its visual slot as a default"
+done
 
 # 2. F3's comparison table is marked required.
 f3=$(ls "$DIR"/F3-*.md | head -1)

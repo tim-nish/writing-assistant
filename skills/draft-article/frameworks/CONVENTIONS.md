@@ -124,16 +124,24 @@ never a silent drop.
 
 ## Visual slots (SPEC-article-visuals CAP-1)
 
-Each framework declares its **expected visual(s)** as a slot, so a structurally
-important visual has a defined place:
+**The accepted structure proposal declares the article's visual slots** — its
+`visual_slots` field is the declaration, and its count and placement are what
+the fill reaches and what CAP-2a's cap (`declared slots + 2`) takes as its
+operand (amended 2026-07-30, #983). A structure may declare none, one, or
+several; `[]` is a valid declaration and is never padded up.
 
-| Framework | Visual slot |
+The per-framework rows below are a **source of defaults** a *framework-matched*
+structure proposal may draw from when it declares its own slots. They are
+**not** a declaration, and nothing derives a count from framework identity — a
+bespoke structure has no row here and declares its slots outright:
+
+| Framework | Default visual slot to draw from |
 |---|---|
-| F1 | one **overview diagram** |
+| F1 | an **overview diagram** |
 | F2 | **optional** before/after or timeline |
-| F3 | one **comparison table** (**required**) |
-| F4 | one **landscape table or concept map** |
-| F5 | **none** — the working-note profile never proposes a visual |
+| F3 | a **comparison table** (**required** where F3 is matched) |
+| F4 | a **landscape table or concept map** |
+| F5 | **none** — the working-note profile offers no default visual |
 
 A visual slot is **proposed, not auto-filled** (Story 8.2): the pipeline offers it
 under the owner-facing proposal contract, and the owner approves, modifies, or

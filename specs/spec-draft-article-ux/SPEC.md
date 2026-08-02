@@ -47,7 +47,9 @@ discretion leaking into the owner-facing surface.
   answers and needs nothing from the drafting context. No new tooling is
   built for the analysis itself — the capture is the deliverable; the
   analysis is a prompt over run state.
-- **CAP-3 — visual intent before visual source.** The declared visual slot
+- **CAP-3 — visual intent before visual source.** **Each** visual slot the
+  accepted structure declares (SPEC-article-visuals, amended 2026-07-30, #983
+  — the count is the structure's, never a framework's, and may be zero)
   is proposed in two steps under the proposal contract: (1) *intent* —
   "what should a visual in {section} communicate?" with draft-grounded
   options (e.g. pipeline flow / comparison / timeline / none needed), the

@@ -32,7 +32,10 @@ working note with a block missing is a different artifact, not a shorter note.
 
 ## Visual slot (SPEC-article-visuals CAP-1)
 
-**F5 declares no visual slot** — the lightweight profile never proposes one.
+**F5 offers no default visual slot** — the lightweight profile never proposes
+one. (Substance unchanged: an F5-matched structure draws no visual default
+from here. The declaration remains the accepted structure's own `visual_slots`,
+#983.)
 No `[Figure: …]` placeholder ever appears in a working note.
 
 ## Frontmatter

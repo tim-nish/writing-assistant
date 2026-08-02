@@ -29,9 +29,12 @@ the elements F2 selects over.
 
 ## Visual slot (SPEC-article-visuals CAP-1)
 
-**F2 declares one optional before/after or timeline visual** — showing the change
-over time that the lesson turns on. It is **optional** and **proposed, not
-auto-inserted** (Story 8.2). If the owner **declines** it, the slot is
+**F2's default visual slot is an optional before/after or timeline visual** —
+showing the change over time that the lesson turns on. This is a **default
+offered to the structure proposer**, never the article's count: the accepted
+structure's own `visual_slots` is the declaration (#983), and it may take this
+default, take several, or take none. Where it is taken, it is **optional** and
+**proposed, not auto-inserted** (Story 8.2). If the owner **declines** it, the slot is
 **omitted entirely** — no `[Figure: …]` or placeholder residue is left in the draft.
 
 ## Frontmatter

@@ -32,9 +32,13 @@ Scope angle is not the GATE and never substitutes for it.
 
 ## Visual slot (SPEC-article-visuals CAP-1)
 
-**F4 declares one landscape table or concept map** — the field map in *The map*
-section (a table when the landscape is comparative, a concept map when it is
-topological). It is **proposed, not auto-inserted** (Story 8.2). If the owner
+**F4's default visual slot is a landscape table or concept map** — the field
+map in *The map* section (a table when the landscape is comparative, a concept
+map when it is topological). This is a **default offered to the structure
+proposer**, never the article's count: the accepted structure's own
+`visual_slots` is the declaration (#983), and it may take this default, take
+several, or take none. Where it is taken, it is **proposed, not
+auto-inserted** (Story 8.2). If the owner
 **declines** it, the slot is **omitted entirely** — no `[Figure: …]` or
 placeholder residue is left in the draft.
 
