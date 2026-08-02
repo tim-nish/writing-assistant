@@ -536,8 +536,18 @@ def verify_cover(composed, brief, brief_path=None):
         return verify_theses(composed, selected)
     if kind == "partition":
         return verify_partition(composed, selected, brief_path)
+    if kind == "journey-incorporation":
+        # The incorporation count lives beside its composer (Story 20.166,
+        # #1045) and is imported at the routing rather than at module load,
+        # so the two siblings can share the refusal grammar declared here
+        # without a cycle.
+        from terrain_journey import verify_incorporation
+        return verify_incorporation(composed, selected)
     return {"kind": kind or None, "complete": False,
-            "refusals": ["the composed file names no `kind`: it is either "
-                         "`candidate-theses` or `partition`, and the two are "
-                         "counted differently — a thesis may omit a Strand it "
-                         "discloses, a partition may not."]}
+            "refusals": ["the composed file names no `kind`: it is "
+                         "`candidate-theses`, `partition`, or "
+                         "`journey-incorporation`, and the three are counted "
+                         "differently — a thesis may omit a Strand it "
+                         "discloses, a partition may not, and an "
+                         "incorporation cover runs over the members whose "
+                         "arcs are served."]}

@@ -205,6 +205,78 @@ while the rest go on, which would be the map choosing.
 To record the owner's chosen candidate, pass it back as `claim` in the answer:
 it supersedes the coverage statement and is pinned to this same member set.
 
+## Journey incorporation — after the thesis is adopted
+
+**Added 2026-08-02** (Story 20.166; #1045, the 2026-07-31 owner ruling and hub
+ratification). When the adopted brief's members carry served journey arcs, the
+command returns `journey_incorporation` — the register question: **how does
+that material enter this article?** It is the same mechanism as the candidate
+theses, one selection later: the block carries the composition **inputs**
+(`inputs.thesis` — the adopted reading — and `inputs.members`, each with its
+served arc quoted at the pin), the `requirements` your options must satisfy,
+and `composed: false`, which is literal.
+
+**Compose the options from THIS brief's state — the adopted thesis, the
+member set, each member's arc — at a professional article writer's
+calibration. A fixed menu of registers is exactly what must not ship:** two
+briefs with the same members and different theses may deserve entirely
+different registers, and an enumeration written in advance would decide the
+register where nothing about this article has been read. Relay
+`journey_incorporation.line` so the owner sees how much of their selection
+carries an arc; members without a served arc are already disclosed in
+`without_journey` with the reason.
+
+**The ratified requirements bind every option and you may not trade them
+against each other:**
+
+1. **Every option places every selected member's journey material or
+   discloses the omission by name**, with its reason. Completeness is a
+   **cover counted in placements**, and the count runs after composition.
+2. **Every placement cites the member's served arc rendering at this pin.**
+   The arc is quoted as served — never re-expressed, never synthesised from a
+   headline.
+3. **Every register offered keeps the arc shape** — before-position, what
+   broke, after-position — and **never collapses to rule-statement register**.
+   That is the hub's served-position constraint, applied with more force here:
+   an article is where a flattened arc would be read as a rule.
+4. **Options are enumerated, never ranked-and-trimmed, and free text wins** —
+   the owner's own incorporation direction becomes the recorded disclosure,
+   and every option is discarded when they write one.
+
+**PUT THE OPTIONS THROUGH THE CARRIER**, exactly as the thesis candidates go:
+
+```
+draft_gates.gate("journey-incorporation", where=…, why=…, choices=[…], ws=<run ws>)
+```
+
+The gate id is declared in `draft_gates.GATES`; presenting the options as a
+prose table is the defect the carrier exists to remove. Offer a
+recommendation beside the options per the standing rule — naming the axes it
+assessed on and what would overturn it — and nothing is trimmed or hidden for
+ranking lower.
+
+**Then run the count — not optional, and AFTER composition**, the same `cover`
+command over `{"kind": "journey-incorporation", "over": [...], "pin": ...,
+"options": [{"incorporation", "places", "omits": [{"index", "why"}],
+"grounds": [{"index", "cite"}]}]}` — the shape the block hands you in
+`journey_incorporation.answer`. Each ground cites the member's **arc** cite
+(`members[].journey.arc_cite`), not its index-line cite. A refusal returns the
+**whole** proposal to you, never one option while the rest go on.
+
+To record the owner's choice, pass it back as `journey_incorporation` in the
+answer **with `--incorporation <the composed options file>`** — the same
+#1079 rule as thesis adoption: the rejected options are the provenance of the
+choice.
+
+**A disclosure riding the brief, never a required slot.** A brief whose
+members carry no served arc simply does not raise this gate — the block is
+absent, nothing nags, and its absence is a fact about the brief. The adopted
+register crosses into drafting as a disclosure on the brief artifact, the way
+the members' gaps do: **direction at the brief; placement belongs to the
+outline; concrete design belongs to realization.** Nothing here reaches into
+the fill's own instructions, and the fill does not branch on this block
+existing.
+
 ## A large selection may be proposed as k article-scoped groups
 
 **Added 2026-07-31** (SPEC-terrain CAP-3, #988). Reviewing fifteen Strands as

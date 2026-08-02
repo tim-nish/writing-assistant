@@ -240,6 +240,15 @@ GATES = {
         "stage": TERRAIN,
         "owner_decision": "the thesis — which candidate the brief adopts",
     },
+    # AFTER THESIS ADOPTION, and only on a brief whose members carry served
+    # journey material (Story 20.166, #1045): the register rides the brief as
+    # a DISCLOSURE, so a brief without journey material never raises this
+    # gate and its absence from a run is a fact about the brief, not a gap.
+    "journey-incorporation": {
+        "stage": TERRAIN,
+        "owner_decision": "journey incorporation — how the selected members' "
+                          "journey material enters the article",
+    },
     "resume-confirmation": {
         "stage": START,
         "owner_decision": None,   # asked only when a run predates the sitting
@@ -322,6 +331,9 @@ GATES = {
 }
 
 # DECLARED BUT NOT YET CODE-COMPOSED (Story 20.118 step 3, #1114): `thesis`,
+# `journey-incorporation` (Story 20.166 — its options are composed by the
+# agent from the brief's own state, and presenting them calls the generic
+# `gate()` builder, exactly as the thesis candidates do),
 # `gap-interview`, `narrative-structure`, `visual-set`
 # (`policy-topics` JOINED this list at Story 20.127, #1144 and LEFT it at Story
 # 20.160, #1255 — the gate itself is RETIRED, so there is no longer a surface
