@@ -3,59 +3,65 @@
 
 ## Stage 1 — probe: can this repository ground the brief?
 
-Harvest is retired at this stage (amended 2026-08-02, #1182/#1097/#1185/#1209
-— the amendments companion is the authority). Harvest read at stage 1 while
-the article's structure is fixed at stage 3, so it gathered against an
-unstated query; stage 1 now asks the one question it can actually answer:
-whether this repository can ground anything for this brief at all. Probe
-returns a **feasibility verdict** plus a **handful of anchors** — resolvable
-pointers into the declared sources — and writes **no fact sheet**: no
-artifact of harvest's shape exists anywhere in the run workspace. Per-claim
-grounding is `examine` (stage 3+, story 20.147 — [`examine.md`](examine.md)),
-where a concrete claim exists to test.
+Stage 1 is a **configuration and permission check** (amended 2026-08-02,
+#1224 — the amendments companion is the authority). It asks one question:
+**can this run read what it was granted?** It does not enumerate files, hunt
+anchors, or judge feasibility.
 
-First read the declared surface, then judge, then record:
+**Why the feasibility verdict is gone.** Probe replaced harvest here as a
+model-judged read returning a `grounded`/`ungrounded` verdict, up to seven
+anchors, and a coverage ledger. Two of its own clauses could not both hold —
+"anchors, never an extraction pass" against a ledger accounting for **every**
+declared source — and the ledger won in practice: one 2026-08-02 run read 168
+files to certify an empty result from a source that contributed nothing.
+Underneath that was a deeper problem: the article's structure is fixed at
+stage 3, so a verdict here judges a thesis that does not yet exist.
+
+**Feasibility is discovered where it binds.** A claim that cannot be grounded
+is an ungrounded **claim**, found at [`examine`](examine.md) — a finding the
+pipeline acts on, where an ungrounded **run** was a verdict about nothing.
+Die-early folds into the first failed examine.
+
+**The declaration splits in two, and only one half lives here.** As a
+**permission boundary** — what may be read at all — `writing-sources.yaml` is
+untouched, and the invariants resting on it are unchanged: the stage-0
+selection is a **filter, never a scope widener**, and out-of-scope repos are
+never searched automatically. As a **coverage denominator** it is retired:
+certifying coverage of a declared universe makes cost scale with the
+declaration rather than with the claim.
+
+Run it, and record it:
 
 ```
-python3 ${CLAUDE_PLUGIN_ROOT}/scripts/probe.py surface --root <host-repo>
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/probe.py check --root <host-repo>
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/probe.py record --ws "$WS" --root <host-repo> [--framework <F>]
 ```
 
-`surface` prints the declared read surface **through the typed time-axis
-source model** (`resolve-writing-sources.py files` is the one enumeration; a
-second walk here would be a second boundary that drifts). The stage-0 sources
-are a **selection**, not a scope widener: whatever probe reads must intersect
-the declared boundary — a path can only narrow what is read, never add an
-undeclared repo, and `record` refuses an anchor outside the enumerated
-surface. The surface carries every declared entry with
-its derived `time_axis` and an `id` the coverage ledger must account for,
-plus the enumerated files. Read against the brief only what feasibility
-needs — anchors, never an extraction pass. Then record **your** judgment
-(the model judges; the tool validates and records, never decides):
+`record` takes **no result argument**: nothing at this stage is a judgment, so
+there is nothing for the model to supply. It reports:
 
-```
-python3 ${CLAUDE_PLUGIN_ROOT}/scripts/probe.py record --ws "$WS" --root <host-repo> [--framework <F>] <result.json|->
-```
+- **`declared`** — the granted sources, by name.
+- **`unreadable`** — any granted source the run cannot read, named with its
+  path. This is the **one** condition that stops the run here, and it is a
+  configuration error rather than a verdict about the article.
+- **`elapsed_s` / `budget_s` / `over_budget`** — the stage-1 **time budget**,
+  declared at `probe.py:TIME_BUDGET_S` and asserted by `check-probe.sh`.
+  #1224 observed that no performance budget existed anywhere and the only cost
+  language was relative ("a fraction of harvest's cost"), which bounds nothing
+  once harvest is gone.
 
-The result carries:
+**Relay one line, not this record.** The owner-surface budget applies
+(`turn_budget.py`, story 20.153): a clean check is a status line, and the
+record itself belongs in the workspace.
 
-- **`verdict`** — `grounded` or `ungrounded`, nothing third.
-- **`anchors`** — up to 7 resolvable pointers (`path:line[-line]` into an
-  enumerated source file, or a commit sha); `record` refuses any that do not
-  resolve. An anchor says where the evidence **sits**, never extracts it. A
-  `grounded` verdict carries at least one.
-- **`reasons`** — required on `ungrounded`; the run stops on them.
-- **`coverage`** — what was consulted (`consulted`) and what could not be
-  reached with **why** (`unreached`), accounting for **every** declared
-  source id; `record` refuses a ledger with a gap. An empty result from an
-  unreachable source is a different finding from an empty result from a read
-  source. A brief needing episode claims against a declaration with no
-  time-axis source is the standard ungrounded reason — stated from the typed
-  surface, never guessed.
-
-**A doomed article dies here.** An `ungrounded` verdict stops the run before
-any interview or structure work: the checkpoint routes `next_stage: done`,
-the verdict and its reasons are kept in `$WS/probe.json`, nothing is deleted.
-Relay the verdict and every reason to the owner verbatim.
+**What this trades away, stated so it can be checked.** The #1104 disclosure
+made a thin read *read as thin* by denominating it. Dropping the denominator
+risks reinstating that, and the bet is that per-claim scoring is the better
+instrument because each claim is individually gradeable. **Overturn
+condition:** a sitting where per-claim results are present and the owner still
+cannot tell a well-grounded article from a thin one — at which point the
+ledger returns, bounded to term-matched sources with the remainder
+counted-never-read.
 
 **Checkpoint/resume contract (the SPEC's per-stage obligation).** Probe is
 atomic at `record`: an interrupted probe leaves the run's checkpoint at

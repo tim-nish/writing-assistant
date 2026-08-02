@@ -82,9 +82,16 @@ ok "allowlist rejects F0/F6/slug/empty"
 # 6. Scope reconciliation is documented (selection intersects declared scope; no
 # widening). The text moved from the dispatcher SKILL.md to the stage-1
 # companion in the dispatcher split; the check follows the text (#835).
-STAGE1="skills/draft-article/stages/stage1.md"
-grep -q 'intersect' "$STAGE1" && ok "documents that sources intersect declared scope (no widening)" || err "scope-intersection not documented"
-grep -q 'resolve-writing-sources.py files' "$STAGE1" && ok "defers read scope to the declared files boundary" || err "does not defer to files boundary"
+# RE-POINTED FROM STAGE 1 TO EXAMINE (Story 20.154, #1224). These assert a
+# property of the step that READS, and probe stopped reading: it is a
+# configuration and permission check now, with no enumeration and no anchors.
+# Left on stage 1 the assertions would have forced the retired vocabulary back
+# into the file to keep a check green — the shape `check-readme.sh` was caught
+# in at story 20.150, where an assertion pinned documentation to a capability
+# that no longer existed. The invariant is unchanged; only its site moved.
+READS="skills/draft-article/stages/examine.md"
+grep -q 'intersect' "$READS" && ok "documents that reads intersect declared scope (no widening)" || err "scope-intersection not documented"
+grep -q 'resolve-writing-sources.py files' "$READS" && ok "defers read scope to the declared files boundary" || err "does not defer to files boundary"
 
 if [ "$fail" -eq 0 ]; then
   printf '\nAll draft-scaffold checks passed.\n'; exit 0

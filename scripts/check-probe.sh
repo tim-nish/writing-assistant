@@ -5,9 +5,22 @@
 # removal-signal: stage 1 stops being probe (a later amendment replaces or
 #   folds it), at which point these assertions have no subject and retire with
 #   the stage.
-# check-probe.sh — probe is the stage-1 feasibility check (Story 20.146,
-# #1210; umbrella #1182): a verdict plus a handful of anchors, NO fact sheet,
-# coverage over every declared source, and a doomed article dying early.
+# check-probe.sh — probe is the stage-1 CONFIGURATION AND PERMISSION CHECK
+# (Story 20.154, #1224; was a feasibility verdict + anchors + coverage ledger
+# at Story 20.146, #1210).
+#
+# WHAT CHANGED AND WHY THE OLD ASSERTIONS ARE GONE RATHER THAN RELAXED. The
+# 2026-08-02 amendment (#1224) retires the verdict, the anchors and the
+# coverage ledger together: `stage1.md` demanded "anchors, never an extraction
+# pass" AND a ledger accounting for every declared source, which cannot both
+# hold, and the second read 168 files to certify an empty result. Assertions
+# about a verdict that no longer exists have no subject — keeping them
+# weakened would be worse than deleting them, because a check nobody can fail
+# still reads as coverage.
+#
+# THE TIME BUDGET IS ASSERTED HERE, not hoped for: #1224 observed that no
+# performance budget existed anywhere and the only cost language was relative
+# ("a fraction of harvest's cost"), which bounds nothing once harvest is gone.
 
 set -eu
 
@@ -35,83 +48,74 @@ sha=$(git -C "$host" rev-parse --short HEAD)
 printf 'sources:\n  - path: docs\n' > "$host/writing-sources.yaml"
 WS="$work/ws"; mkdir -p "$WS"
 
-# --- the surface reads THROUGH the typed source model (AC3) ------------------
-python3 "$PR" surface --root "$host" > "$work/surface.json"
-python3 - "$work/surface.json" <<'PY' && ok "surface: typed entries with derived time_axis and coverage ids" || err "surface lacks the typed model's shape"
+# --- the permission check: three questions and no fourth (AC1, AC3) ---------
+python3 "$PR" check --root "$host" > "$work/check.json"
+python3 - "$work/check.json" <<'PY' && ok "check: the declaration resolves and every granted root is readable" || err "the permission check does not report the grant"
 import json, sys
 d = json.load(open(sys.argv[1]))
-e = d["entries"][0]
-assert e["type"] == "path" and e["time_axis"] is False and e["id"] == "path:docs", e
-assert any(f.endswith("docs/a.md") for f in d["files"]), d["files"]
+assert d["stage"] == "probe", d
+assert d["ok"] is True, d
+assert d["declared"], d
+assert d["unreadable"] == [], d
+# NO verdict, NO anchors, NO coverage ledger — the three the amendment retires.
+for gone in ("verdict", "anchors", "coverage", "reasons"):
+    assert gone not in d, f"{gone!r} survives in the probe result: {d}"
 PY
 
-# --- grounded: anchors resolve, coverage total, no fact sheet (AC1) ----------
-printf '{"verdict":"grounded","anchors":[{"pointer":"docs/a.md:2","for":"the claim"},{"pointer":"%s","for":"the change"}],"coverage":{"consulted":["path:docs"],"unreached":[]}}' "$sha" \
-  | python3 "$PR" record --ws "$WS" --root "$host" - > "$work/rec.json" \
-  && ok "record: a grounded result with resolvable anchors is accepted" \
-  || err "a valid grounded result was refused"
-jget 'd["next_stage"]' < "$work/rec.json" | grep -q interview \
-  && ok "record: grounded routes next_stage=interview" || err "grounded did not route to interview"
-[ -f "$WS/probe.json" ] && ok "record: probe.json persisted in the run workspace" || err "probe.json missing"
-[ ! -f "$WS/fact-sheet.md" ] && ok "no artifact of harvest's shape exists in the workspace (#1182)" \
-  || err "a fact sheet appeared — harvest's shape is retired"
-jget 'd["next_stage"]' < "$WS/checkpoint.json" | grep -q interview \
-  && ok "record: the checkpoint is routed in the same invocation" || err "checkpoint not routed"
-
-# slim profile routes to fill
-printf '{"verdict":"grounded","anchors":[{"pointer":"docs/a.md:1"}],"coverage":{"consulted":["path:docs"],"unreached":[]}}' \
-  | python3 "$PR" record --ws "$WS" --root "$host" --framework working-note - \
-  | jget 'd["next_stage"]' | grep -q fill \
-  && ok "record: the slim profile routes next_stage=fill" || err "slim routing broken"
-
-# --- refusals: the tool validates, it never judges ---------------------------
-printf '{"verdict":"maybe","anchors":[],"coverage":{"consulted":["path:docs"],"unreached":[]}}' \
-  | python3 "$PR" record --ws "$WS" --root "$host" - 2>"$work/e1" \
-  && err "a third verdict was accepted" || ok "refused: a verdict is grounded or ungrounded, nothing third"
-printf '{"verdict":"grounded","anchors":[{"pointer":"docs/a.md:99"}],"coverage":{"consulted":["path:docs"],"unreached":[]}}' \
-  | python3 "$PR" record --ws "$WS" --root "$host" - 2>"$work/e2" \
-  && err "an out-of-range anchor was accepted" || ok "refused: an anchor must resolve (line inside the file)"
-printf '{"verdict":"grounded","anchors":[{"pointer":"../outside.md:1"}],"coverage":{"consulted":["path:docs"],"unreached":[]}}' \
-  | python3 "$PR" record --ws "$WS" --root "$host" - 2>/dev/null \
-  && err "an outside-the-surface anchor was accepted" || ok "refused: an anchor points inside the declared surface only"
-printf '{"verdict":"grounded","anchors":[{"pointer":"docs/a.md:1"}],"coverage":{"consulted":[],"unreached":[]}}' \
-  | python3 "$PR" record --ws "$WS" --root "$host" - 2>"$work/e3" \
-  && err "a coverage gap was accepted" || ok "refused: coverage accounts for every declared source (AC3)"
-grep -q "path:docs" "$work/e3" && ok "...naming the unaccounted source" || err "the gap is not named"
-printf '{"verdict":"grounded","anchors":[],"coverage":{"consulted":["path:docs"],"unreached":[]}}' \
-  | python3 "$PR" record --ws "$WS" --root "$host" - 2>/dev/null \
-  && err "grounded-with-no-anchor was accepted" || ok "refused: a grounded verdict carries at least one anchor"
-python3 - <<PY | python3 "$PR" record --ws "$WS" --root "$host" - 2>/dev/null \
-  && err "more than a handful of anchors was accepted" || ok "refused: anchors are a handful (cap), never a sheet"
-import json
-print(json.dumps({"verdict": "grounded",
-                  "anchors": [{"pointer": "docs/a.md:1"}] * 8,
-                  "coverage": {"consulted": ["path:docs"], "unreached": []}}))
+# --- the time budget is a CONTRACT (AC2) ------------------------------------
+python3 - "$work/check.json" <<'PY' && ok "check: completes inside the declared stage-1 time budget" || err "the permission check exceeded its declared budget"
+import importlib.util, json, sys
+d = json.load(open(sys.argv[1]))
+spec = importlib.util.spec_from_file_location("probe", "scripts/probe.py")
+probe = importlib.util.module_from_spec(spec); spec.loader.exec_module(probe)
+assert d["budget_s"] == probe.TIME_BUDGET_S, (d, probe.TIME_BUDGET_S)
+assert d["elapsed_s"] <= probe.TIME_BUDGET_S, d
+assert d["over_budget"] is False, d
 PY
 
-# an unreached source needs its WHY
-printf '{"verdict":"grounded","anchors":[{"pointer":"docs/a.md:1"}],"coverage":{"consulted":[],"unreached":[{"source":"path:docs"}]}}' \
-  | python3 "$PR" record --ws "$WS" --root "$host" - 2>/dev/null \
-  && err "an unreached source without a why was accepted" \
-  || ok "refused: an unreachable source is a finding — it carries its why"
+# --- no enumeration: probe does not walk the declared files (AC3) -----------
+grep -q "enumerate_files" "$PR" \
+  && err "probe still enumerates declared files — that is the cost #1224 removes,
+      and examine is where reading now happens, per claim" \
+  || ok "probe enumerates no files: no surface pass, no anchor hunt"
+grep -q "def surface" "$PR" \
+  && err "probe still exposes a surface subcommand — the coverage denominator
+      is retired with the ledger that needed it" \
+  || ok "the surface subcommand is gone with the ledger it fed"
 
-# --- a doomed article dies early (AC2) ---------------------------------------
+# --- an unreadable grant is the ONE thing that stops the run (AC1) ----------
+mkdir -p "$host/secret"
+printf 'sources:\n  - path: docs\n  - path: secret\n' > "$host/writing-sources.yaml"
+chmod 000 "$host/secret" 2>/dev/null || true
+if [ -r "$host/secret" ]; then
+  ok "SKIPPED: unreadable-grant case (running as a user that bypasses mode bits)"
+else
+  python3 "$PR" record --ws "$WS" --root "$host" >/dev/null 2>&1 \
+    && err "a grant the run cannot read was accepted" \
+    || ok "refused: a granted source that cannot be read stops the run, named"
+fi
+chmod 755 "$host/secret" 2>/dev/null || true
+printf 'sources:\n  - path: docs\n' > "$host/writing-sources.yaml"
+
+# --- record routes onward, because there is no verdict left to stop on ------
+python3 "$PR" record --ws "$WS" --root "$host" > "$work/rec.json"
+python3 - "$work/rec.json" "$WS" <<'PY' && ok "record: routes to interview and writes no verdict to the checkpoint" || err "record did not route, or left a verdict behind"
+import json, sys, os
+d = json.load(open(sys.argv[1])); ws = sys.argv[2]
+assert d["next_stage"] == "interview", d
+cp = json.load(open(os.path.join(ws, "checkpoint.json")))
+assert cp["next_stage"] == "interview", cp
+# The key is REMOVED, not blanked: a key carrying "no verdict" reads as a
+# verdict to every consumer that tests for its presence.
+assert "probe_verdict" not in cp, cp
+PY
+
 WS2="$work/ws2"; mkdir -p "$WS2"
-printf '{"stage":"stage0","next_stage":"probe","run_state":{"framework":"F2"}}' > "$WS2/checkpoint.json"
-printf '{"verdict":"ungrounded","reasons":["the brief needs episode claims and no declared source carries a time axis"],"anchors":[],"coverage":{"consulted":["path:docs"],"unreached":[]}}' \
-  | python3 "$PR" record --ws "$WS2" --root "$host" - > "$work/dead.json" \
-  && ok "record: an ungrounded result is recordable" || err "ungrounded result refused"
-jget 'd["next_stage"]' < "$work/dead.json" | grep -q done \
-  && ok "ungrounded: the run stops (next_stage=done) before interview or structure work" \
-  || err "an ungrounded run kept going"
-jget 'd["stopped"]' < "$work/dead.json" | grep -q "before any interview" \
-  && ok "...stating the stop" || err "the stop is not stated"
-jget 'd["run_state"]["framework"]' < "$WS2/checkpoint.json" | grep -q F2 \
-  && ok "...with the prior checkpoint state preserved, nothing deleted" \
-  || err "the checkpoint lost its run_state"
-printf '{"verdict":"ungrounded","reasons":[],"anchors":[],"coverage":{"consulted":["path:docs"],"unreached":[]}}' \
-  | python3 "$PR" record --ws "$WS2" --root "$host" - 2>/dev/null \
-  && err "a bare ungrounded stop was accepted" || ok "refused: an ungrounded verdict carries its reasons"
+python3 "$PR" record --ws "$WS2" --root "$host" --framework working-note > "$work/rec2.json"
+python3 - "$work/rec2.json" <<'PY' && ok "record: the slim profile still routes past the interview" || err "the slim profile lost its routing"
+import json, sys
+assert json.load(open(sys.argv[1]))["next_stage"] == "fill"
+PY
 
 # --- checkpoint/resume contract is declared (AC4) ----------------------------
 grep -q "Checkpoint/resume contract" skills/draft-article/stages/stage1.md \
