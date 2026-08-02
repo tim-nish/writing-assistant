@@ -1,6 +1,6 @@
-# Step 1 — assemble the map
+# Assemble the map
 
-**Read this file on entry to Step 1 of [`../SKILL.md`](../SKILL.md)** — never up
+**Read this file on entry to the map assembly of [`../SKILL.md`](../SKILL.md)** — never up
 front, and never because the skill was merely invoked. It carries this step's
 operating detail verbatim; the dispatcher carries the sequence and the
 commands.

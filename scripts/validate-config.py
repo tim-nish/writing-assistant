@@ -400,7 +400,7 @@ def main(argv=None):
         return 0  # clean config: silent (but for any notices above), exit 0
 
     sys.stderr.write(
-        "Stage 0 — configuration validation failed. Fix these before the "
+        "Start — configuration validation failed. Fix these before the "
         "pipeline can run:\n\n")
     for fname, key, msg in findings:
         sys.stderr.write(f"  [{fname}] {key}: {msg}\n")

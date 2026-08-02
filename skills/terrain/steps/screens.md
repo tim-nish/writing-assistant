@@ -1,6 +1,6 @@
-# Step 2 — two screens
+# The two screens
 
-**Read this file on entry to Step 2 of [`../SKILL.md`](../SKILL.md)** — never up
+**Read this file on entry to the two screens of [`../SKILL.md`](../SKILL.md)** — never up
 front, and never because the skill was merely invoked. It carries this step's
 operating detail verbatim; the dispatcher carries the sequence and the
 commands.
@@ -38,7 +38,7 @@ carrying a banner, the options, and an explicit reply line. A block is a
 rendering of the payload, not a licence to narrate it. Every
 served tag listed deterministically with its Strand count — the count is a cue
 for choosing where to look, never a gate — plus the untagged-disclosure line
-when it applies (see Step 1). The payload is **plain text**: no `**bold**`, no
+when it applies (see the map assembly). The payload is **plain text**: no `**bold**`, no
 backticks, no headings, no Markdown links (contract (g)). A non-zero exit
 means the payload is not presentable — fix the named field and re-validate; a
 blocked payload is never shown.

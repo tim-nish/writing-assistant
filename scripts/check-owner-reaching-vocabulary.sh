@@ -95,8 +95,13 @@ TERMS = ("harvest", "fact sheet", "fact-sheet")
 # emitted surface and by the same three-valued rule. It is not a per-word
 # checker: one pattern over an already-enumerated field set, in a file that
 # already exists, is what the amendment's "detection rides the existing
-# owner-surface check" names.
-NUMBERED = re.compile(r"stage\s*[-_]?\s*\d", re.I)
+# owner-surface check" names. The class is NUMBERED PROCESS LABELS, not the
+# word "stage": the 2026-08-02 leak that survived the 20.158 sweep read
+# "Step 3 — compose the brief" (terrain's brief gate), in-class and unmatched
+# by a stage-only pattern. Widening the alternation is still one bound class;
+# adding a second TERMS-style list would be the denial-list growth SPEC.md:80
+# prohibits.
+NUMBERED = re.compile(r"\b(stage|step|phase)\s*[-_]?\s*\d", re.I)
 
 # The presented fields of a payload item, per `draft_gates.payload`. Named
 # rather than walked, so a new field is a deliberate addition here instead of
@@ -197,6 +202,30 @@ try:
     checked.append("owner_surface.BUCKETS")
 except Exception as e:
     undetermined.append(("owner_surface", f"{type(e).__name__}: {e}"))
+
+# --- terrain's register seam ---------------------------------------------
+# The 2026-08-02 leak: terrain's brief gate relayed "Step 3 — compose the
+# brief (terrain/step-3-compose-the-brief)" while this check watched only
+# draft_gates and owner_surface. `terrain_text` is terrain's DECLARED
+# owner-facing string seam (its own header says "Owner-facing strings, so
+# they live HERE"), and `topic-map-directions.py` composes the brief payload's
+# `step.line` from it verbatim — so it is owner-reaching by the same TYPE
+# argument as the two surfaces above, not by file-path heuristic.
+try:
+    tt = load("terrain_text", os.path.join("scripts", "terrain_text.py"))
+    for field, value in (("BRIEF_STEP_ID", tt.BRIEF_STEP_ID),
+                         ("BRIEF_STEP_NAME", tt.BRIEF_STEP_NAME),
+                         ("step.line", tt._brief_step_line())):
+        low = str(value).lower()
+        for t in TERMS:
+            if t in low:
+                hits.append(("terrain_text", field, t, str(value)))
+        m = NUMBERED.search(str(value))
+        if m:
+            numbered.append(("terrain_text", field, m.group(0), str(value)))
+    checked.append("terrain_text.BRIEF_STEP_*")
+except Exception as e:
+    undetermined.append(("terrain_text", f"{type(e).__name__}: {e}"))
 
 json.dump({"checked": sorted(set(checked)), "hits": hits,
            "numbered": numbered,

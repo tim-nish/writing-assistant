@@ -118,8 +118,8 @@ sed -i 's/^slug: retry-storms$/slug: marked/' "$work/drafts/marked.md"
 if $A plan --slug marked --target zenn $ARGS >/dev/null 2>"$work/e3"; then
   err "a [VERIFY]-carrying draft was adapted"
 else
-  grep -q 'unresolved \[VERIFY\] marker' "$work/e3" && grep -q 'Stage 4' "$work/e3" \
-    && ok "a marker-carrying draft is refused, naming Stage 4 as the remedy" \
+  grep -q 'unresolved \[VERIFY\] marker' "$work/e3" && grep -q 'complete verification' "$work/e3" \
+    && ok "a marker-carrying draft is refused, naming verification as the remedy" \
     || err "marker refusal wrong: $(cat "$work/e3")"
 fi
 

@@ -178,7 +178,7 @@ def resolve_source(args):
     if unresolved:
         raise Refusal(
             f"draft still has {len(unresolved)} unresolved [VERIFY] marker(s); "
-            "complete Stage 4 (and review) before adapting — adaptation derives from "
+            "complete verification (and review) before adapting — adaptation derives from "
             "a REVIEWED canonical, and an unverified claim must not be carried into a "
             "second language")
 

@@ -270,9 +270,9 @@ check("open the brief" in S and "show the terrain" in S
       and "show the topic map" in S and "what could I write about" in S,
       "AC2: the new trigger is listed WITH the three existing phrases, not "
       "instead of them")
-check("All three still start at **Step 0**" in S,
-      "AC2: ...and those three still start at Step 0, unchanged")
-check("enters at Step 3" in S,
+check("All three still start at **the workspace\nmint**" in S,
+      "AC2: ...and those three still start at the workspace mint, unchanged")
+check("enters at compose-the-brief" in S,
       "AC1: the trigger's entry point is stated on the skill's own surface")
 brief_trigger = B.split("The named trigger", 1)[-1]
 check("walks no screens and loads no corpus" in (brief_trigger + S),
@@ -285,7 +285,7 @@ check("named, never guessed between" in brief_trigger,
       "AC3: ...and an ambiguous workspace is stated, never silently picked")
 check("says so plainly" in brief_trigger
       and "composes nothing" in brief_trigger,
-      "AC3: with no brief it says so plainly rather than starting Step 0")
+      "AC3: with no brief it says so plainly rather than starting the workspace mint")
 check("Opening and inspecting" in brief_trigger
       and "still hits the existing refusal" in brief_trigger,
       "AC4: opening across workspaces succeeds while the EDIT refusal stands")
