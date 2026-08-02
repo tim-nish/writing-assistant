@@ -46,93 +46,89 @@ dogfooding surprise this closes).
 per question or one for the batch is deliberately left to you — the interview's
 content is variable in a way the other gates' is not — but a question reaching
 the owner with no ask row is the defect #1114 names, whichever shape you pick.
-**So is the topic selection below** — `gate("policy-topics", …)`, 20.127/#1144.
+**THE TOPIC ASK IS RETIRED (Story 20.160, #1255; SPEC-policy-topic-at-draft
+amended 2026-08-02, #1246 — OWNER RULING).** *"Which policy topics seed this
+article?"* is asked of **nobody** — not the owner at a gate, not the machine on
+their behalf off-screen. `gate("policy-topics", …)` is gone from
+`draft_gates.GATES`, `list-topics` is not run here, and no `--topics` selection
+is composed on this path. CAP-2's two-step is **replaced, not half-removed**:
+removing the ask while keeping the pre-pick would only move the same decision
+off-screen. The evidence is that the ask carried no owner-only information —
+on run `20260802T142948-588398` the recommendation engine derived the answer it
+was asking for, in the same breath as the ask.
 
-Before selecting questions, probe the host repo's optional `policy_source`
-(SPEC-policy-source-seam) — the owner's policy repo, read-only and bounded
-**in code** to GLOSSARY.md, LESSONS.md, and ≤2 `topics/*.md`. Which two topic
-files is a **per-article decision made now, not a per-repo config**
-(SPEC-policy-topic-at-draft CAP-2, Story 13.35), in two steps:
+**Seeding derives from the adopted thesis and its member Strands.** Every run
+carries a brief (SPEC-article-draft-pipeline, amended 2026-08-01, #1147), so
+the material is already fixed before the interview opens. Compose the candidate
+tension questions from **that** material and nothing else:
 
-1. **List** the available topics — names only, no content read:
+- the **adopted thesis** — the one claim the article exists to make; and
+- its **member Strands** — the brief record's `journey_arcs` in run state, one
+  entry per member, each carrying its `arc` quoted at its `arc_cite` under the
+  recorded pin, with `served: false` and a `not_served_reason` where no arc
+  exists.
 
-   ```
-   python3 ${CLAUDE_PLUGIN_ROOT}/scripts/read-policy-source.py --root "$HOST" list-topics
-   ```
+**Do NOT rebuild the `Strand → lesson → served topic` join in any form.** #1168
+measured it false against a real five-member brief: every member's served
+`topic` was the synthetic bucket `hub-lessons`, and the intersection with the
+nine served topic files was **empty**. A step that resolves members to topic
+files is that join under another name, whatever it is called.
 
-   If this exits **13** (`gateway cannot enumerate topics` — a named
-   tool-surface gap, Story 13.72), ask the owner for the topic names under
-   the proposal contract instead; the ≤2 cap is unchanged.
+**The read is bounded by the CLAIM, not by a file set.** Where a candidate
+tension needs a recorded position to *be* a tension at all, ask the served
+surface as a **query** — claim in, matched lines out — once per claim, no topic
+files chosen in advance by anyone:
 
-2. **Propose ≤2 topics for THIS article** under the proposal contract. The
-   **default recommendation** is drawn as follows, the owner approves or
-   overrides either way:
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/read-policy-source.py --root "$HOST" \
+  query --claim "<the claim this tension turns on>" >> "$WS/policy-surface.txt"
+```
 
-   - **Mapped default (#525, SPEC-policy-topic-at-draft CAP-5).** When this
-     draft is built from a backlog item that carries a `track:` frontmatter
-     value, and the host repo's `policy_source` block declares a
-     `track_topics` mapping whose keys include that track, the mapped topic(s)
-     are the **default recommendation**. Read the mapping from the resolver's
-     JSON — it exposes a `track_topics` field when present:
+The output grammar is the `read` grammar (`pin:`, `=== FILE @ sha`, `N: text`),
+so the downstream steps are untouched and several queries **append** into one
+surface file — the prefilter and the classifier both tolerate the repeated
+`pin:`/section headers. Write nothing to that file that the gateway did not
+serve. This is the same direction ratified the same day for repository reading
+(`specs/spec-writing-assistant/amendments.md`, #1182): *read a corpus to test a
+stated claim, never to gather against an unstated one*. The **permission**
+boundary is untouched — the gateway's grant table still decides what may be
+served at all; what is gone is the ≤2-file **cost** bound over a pre-declared
+universe.
 
-     ```
-     python3 ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-writing-sources.py --root "$HOST" policy-source
-     ```
+**COLD (brief-less) runs read nothing policy-side, and the ask does not return
+there either.** No brief means no thesis, therefore no claim, therefore nothing
+to bound a policy read with: skip this whole step until a thesis exists. Do not
+substitute a topic ask, a whole-surface `read`, or a glossary sweep for the
+missing claim.
 
-     Look up the backlog item's `track:` value in that object; its value (a
-     topic name or list) is the recommended `--topics` selection. The mapping
-     only widens **which** topics the recommendation names — it **never**
-     applies silently (the owner still approves/overrides under the proposal
-     contract), never widens the **≤2 cap**, and never touches the
-     code-enforced whitelist. A mapped topic that names no hub topic file was
-     already caught at stage 0 (topic-existence lint), so the recommendation
-     is trustworthy by the time it is presented here.
-
-   - **Intent-driven default (unchanged, today's behavior).** When there is
-     **no mapping**, **no track** on the draft, or the track has **no mapping
-     entry**, draft the recommendation from the chosen article intent and the
-     host repo (e.g. an evaluation-methodology article from a benchmark repo →
-     the benchmark-engineering topic) exactly as before — zero behavior change.
-
-   Declining is valid in either case: the read proceeds with GLOSSARY +
-   LESSONS only — still policy-seeded, recorded as track-less. Then read with
-   the approved selection:
-
-   ```
-   python3 ${CLAUDE_PLUGIN_ROOT}/scripts/read-policy-source.py --root "$HOST" read --topics <a.md> [<b.md>] > "$WS/policy-surface.txt"
-   ```
-
-   **Then pre-filter the surface before it enters model context (Story 19.7,
-   #741):**
-
-   ```
-   python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py policy-prefilter \
-     --surface "$WS/policy-surface.txt" [--items "$WS/policy-items.json"]
-   ```
-
-   Author tension items and run `classify-policy` against the emitted
-   `policy-surface.filtered.txt` — a deterministic allowlist reduction
-   (subject patterns, config keys, seed pointers, headings; fail-open to
-   inclusion) that is behavior-preserving for classification by test. The
-   full surface stays on disk beside it for audit, and the command's
-   `disclosure` line (full → filtered size) is **relayed once** as an
-   informational note.
-
-   (No approved topics → plain `read`: GLOSSARY + LESSONS only. The per-repo
-   `track`/`topics` config keys were **removed** — Story 13.36,
-   SPEC-policy-topic-at-draft CAP-3; a leftover key is a named stage-0
-   configuration error, never silently applied. The ≤2 cap and the
-   code-enforced whitelist are unchanged; `--topics` builds the whitelist,
-   unlike `--only`, which filters within it.)
-
-When `policy_source` is unset this whole step is skipped silently — zero new
+**When `policy_source` is unset** this whole step is skipped silently — zero new
 interaction in generic mode (seam CAP-6).
 
-Branch on its exit code — **the policy source is an enhancer, never a
+**Then pre-filter the surface before it enters model context (Story 19.7,
+#741):**
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py policy-prefilter \
+  --surface "$WS/policy-surface.txt" [--items "$WS/policy-items.json"]
+```
+
+Author tension items and run `classify-policy` against the emitted
+`policy-surface.filtered.txt` — a deterministic allowlist reduction (subject
+patterns, config keys, seed pointers, headings; fail-open to inclusion) that is
+behavior-preserving for classification by test. The full surface stays on disk
+beside it for audit, and the command's `disclosure` line (full → filtered size)
+is **relayed once** as an informational note.
+
+Branch on the query's exit code — **the policy source is an enhancer, never a
 dependency; no exit code here may abort the run**:
 
 - **0** — the output leads with the run's pin (`pin: <policy-source>@<commit>`)
-  and each file's content line-numbered. Author **tension items** from it:
+  and the matched lines line-numbered under their served files. A **served
+  miss** — `miss: query <claim>` under the pin — is an ANSWER, not a failure:
+  the surface holds no line bearing on that claim, so raise the tension without
+  a policy seed or drop it, and surface the miss with the question
+  (consult-first convention; it is also a distill-bug signal). Author **tension
+  items** from a hit:
   questions whose `gap_type` is `contradiction`, `ambiguity`,
   `missing-rationale`, or `reversal-candidate`, each carrying its seed
   `{quote, pointer: file:line@commit}` quoted **verbatim** from the surface at
@@ -183,9 +179,12 @@ dependency; no exit code here may abort the run**:
   **relay that one line once** and continue with the generic interview. Do
   not retry, do not warn again — one line, then generic mode. Keep the
   reason: the journal's `consulted:` line records it (`--policy-note`).
-- **13** (named gateway tool-surface gap — Story 13.72) — treat exactly like
-  11: the reader printed one `policy tool-surface gap: <reason>` line;
-  relay it once, continue generic, record it via `--policy-note`.
+- **13** (named gateway tool-surface gap — Story 13.72; on this path, a gateway
+  that does not register `policy_lookup`) — treat exactly like 11: the reader
+  printed one `policy tool-surface gap: <reason>` line; relay it once, continue
+  generic, record it via `--policy-note`. **Never substitute a whole-surface
+  `read` for an unavailable query** — that reinstates the pre-declared universe
+  this step retired.
 - **4** (malformed block) — a stage-0 configuration error slipped through;
   halt and report it like any CAP-5 finding (this cannot happen after a clean
   `stage0`).

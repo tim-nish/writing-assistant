@@ -173,7 +173,7 @@ _state(next_stage="probe")
 need(gi.reached_from_state(wsj) == (["probe-entry"], None),
      "a run entering `probe` does not resolve the probe-entry gate as due — "
      "that is the join #1221 asked for and #1245 found dead")
-for stage, want in (("interview", ["policy-topics", "gap-interview"]),
+for stage, want in (("interview", ["gap-interview"]),
                     ("fill", ["narrative-structure", "visual-set"])):
     _state(next_stage=stage)
     need(gi.reached_from_state(wsj)[0] == want,

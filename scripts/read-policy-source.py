@@ -52,6 +52,17 @@ Subcommands (each takes --root, the HOST repo root; default: git top-level):
                    `gloss_index` degrades to a NAMED exit-13 tool-surface gap
                    (the same shape as the pre-#41 surface_names gap) — the
                    caller discloses the reason and never invents a rendering.
+  query --claim TEXT
+                   CLAIM-BOUNDED read (Story 20.160, #1255): one claim in, the
+                   gateway's `policy_lookup` matched lines out, in the same
+                   output grammar as `read`. Nothing selects topic files in
+                   advance — the bound is the claim, not a pre-picked file set
+                   — so the ≤2 cap and the read whitelist are not consulted on
+                   this path; the gateway's grant table remains the permission
+                   boundary. This is the seeding transport for stage 2's
+                   tension questions. A gateway not registering `policy_lookup`
+                   is the named exit-13 gap; a served miss prints as
+                   `miss: query <claim>` under the pin (exit 0).
   read [--only NAME ...] [--topics NAME.md ...]
                    Print the pin (`pin: <pin>`), then each served file as a
                    `=== FILE @ <sha>` section with `N: text` lines, numbers and
@@ -134,6 +145,11 @@ GAP_GLOSS = (
     "gateway does not register gloss_index (the two-tier plain-register Gloss "
     "surface, tsurezure-gateway#64) — the deployed gateway predates it or its "
     "operator config declares no gloss surface; serving it is a hub-side act, "
+    "never a consumer-side workaround")
+GAP_QUERY = (
+    "gateway does not register policy_lookup (the claim-bounded query tool the "
+    "seeding read is asked through) — the deployed gateway predates it or its "
+    "operator config grants no queryable surface; serving it is a hub-side act, "
     "never a consumer-side workaround")
 GAP_ELEMENTS = (
     "gateway does not register element_survey (the structured element-manifest "
@@ -499,6 +515,47 @@ def cmd_elements(args):
     return 0
 
 
+def cmd_query(args):
+    """Claim-bounded read: one CLAIM in, the served MATCHED lines out, via the
+    gateway's `policy_lookup` tool (Story 20.160, #1255;
+    SPEC-policy-topic-at-draft amended 2026-08-02, #1246).
+
+    This is the seeding transport for draft-article stage 2. The bound is the
+    CLAIM, not a pre-picked file set: nothing selects topic files in advance,
+    so `--topics`, the ≤2 cap and the whitelist are not consulted here at all.
+    The PERMISSION boundary is untouched — the gateway's own grant table
+    decides what may be served, exactly as it does for `read` — and the output
+    grammar is the same `pin:` + `=== FILE @ sha` + `N: text`, so a caller
+    already handling a surface file handles this one unchanged.
+
+    A gateway that does not register `policy_lookup` is a NAMED exit-13
+    tool-surface gap; a served miss (no matched line) is a served answer under
+    the pin, distinguishable from unavailability, and the caller surfaces it
+    with the question per the consult-first convention.
+    """
+    root = RWS.host_root(args.root)
+    _block, err = resolve_policy_source(root)
+    if err:
+        return _unavailable(err)
+    claim = (getattr(args, "claim", "") or "").strip()
+    if not claim:
+        sys.stderr.write("refused: query takes a non-empty --claim (the "
+                         "question the read is bounded by)\n")
+        return REFUSED
+    try:
+        if "policy_lookup" not in gateway_tool_names():
+            return _tool_gap(GAP_QUERY)
+        (payload,) = call_gateway([("policy_lookup", {"question": claim})])
+    except GatewayError as e:
+        return _unavailable((UNAVAIL_GATEWAY, f"gateway unreachable ({e})"))
+    print(f"pin: {payload['pin']}")
+    if payload.get("miss"):
+        print(f"miss: query {claim}")
+        return 0
+    _emit_sections(payload)
+    return 0
+
+
 def compose_glossary(names):
     """Compose the whole GLOSSARY.md section from per-entry `glossary_entry`
     calls (Story 18.16): `surface_names(kind=glossary)` gives the entry
@@ -607,6 +664,11 @@ def main(argv=None):
                          "(lesson | journey | decision); omit for all")
     ep.add_argument("--tag", metavar="TAG",
                     help="filter records to those carrying this tag; omit for all")
+    qp = sub.add_parser("query", parents=[root_parent])
+    qp.add_argument("--claim", metavar="TEXT", required=True,
+                    help="the claim/question the read is bounded by (Story "
+                         "20.160): served matched lines out, no topic files "
+                         "selected in advance")
     sp = sub.add_parser("read", parents=[root_parent])
     sp.add_argument("--only", nargs="+",
                     help="restrict to these whitelist entries; anything else is refused (exit 5)")
@@ -620,7 +682,8 @@ def main(argv=None):
         args.root = None
     return {"whitelist": cmd_whitelist, "pin": cmd_pin,
             "list-topics": cmd_list_topics, "gloss": cmd_gloss,
-            "elements": cmd_elements, "read": cmd_read}[args.cmd](args)
+            "elements": cmd_elements, "query": cmd_query,
+            "read": cmd_read}[args.cmd](args)
 
 
 if __name__ == "__main__":

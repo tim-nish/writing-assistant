@@ -285,34 +285,28 @@ GATES = {
     # named the transition into stage 1; stage 1 has been `probe` since Story
     # 20.146 (#1210), and the id reached the owner as a `gate:` field, so the
     # stale name was owner-facing rather than internal.
-    # BEFORE `gap-interview`, and the order is the pipeline's: the policy-topic
-    # selection runs *before* questions are selected, because it fixes which
-    # recorded positions may raise a tension at all
-    # (`skills/draft-article/stages/stage2.md` — "Before selecting questions").
+    # `policy-topics` WAS HERE (interview, before `gap-interview`) and is
+    # RETIRED (Story 20.160, #1255; SPEC-policy-topic-at-draft amended
+    # 2026-08-02, #1246 — OWNER RULING). It declared `owner_decision: "which
+    # ≤2 policy topics this article's tension questions may be seeded from"`.
     #
-    # IT WAS OUTSIDE THE REGISTRY ENTIRELY (Story 20.127, #1144). CAP-2's
-    # two-step selection has asked the owner to pick ≤2 topic files since #230,
-    # and declared nothing here — so it sat outside the payload audit and the
-    # pending-decision map, which is what "a run's gates are auditable"
-    # (#1132) forbids. An owner screen with no declared id leaves no event, so
-    # nothing could assert it emitted; that is the #1114 defect, reached by a
-    # surface old enough that no story had looked at it.
+    # THE ASK CARRIED NO OWNER-ONLY INFORMATION, measured on run
+    # `20260802T142948-588398`: brief-carrying, an adopted thesis over three
+    # Strands, and the recommendation engine derived the answer it was asking
+    # for — the only two topics holding the selected Strands' material — in the
+    # same breath as the ask. A question whose answer the asker computes is not
+    # a gate.
     #
-    # THE COLD-RUN BRANCH IS THE ONLY BRANCH — the second one was RETRACTED
-    # (2026-08-01, #1168), not left pending. The #1144 amendment had ratified a
-    # DERIVED disclosure for a brief-carrying run, carrying `owner_decision:
-    # None` on the `resume-confirmation` shape. Its `Strand → lesson → served
-    # topic` derivation needs a join the hub does not serve — screen 1's axis
-    # is tags precisely because no served Lesson→Topic join exists — so the
-    # premise was measured false and the derivation half was withdrawn; see
-    # `specs/spec-policy-topic-at-draft/amendments.md`. Declaring a second id
-    # here would put a gate in the inventory that no code path can reach.
-    # The registry states what a run can actually present.
-    "policy-topics": {
-        "stage": INTERVIEW,
-        "owner_decision": "which ≤2 policy topics this article's tension "
-                          "questions may be seeded from",
-    },
+    # THE ENTRY IS DELETED RATHER THAN GIVEN `owner_decision: None`, because
+    # CAP-2's two-step is REPLACED and not half-removed: keeping a disclosure
+    # here would keep the pre-pick and move the same decision off-screen.
+    # Seeding now derives from the adopted thesis and its member Strands, and a
+    # tension question needing served policy asks the surface as a QUERY —
+    # claim in, matched lines out (`read-policy-source.py query`), no topic
+    # files chosen in advance by anyone. Nothing rebuilds the `Strand → lesson
+    # → served topic` join #1168 measured false. A cold run has no thesis,
+    # therefore no claim, therefore reads nothing policy-side at all — so there
+    # is no branch left for a registry entry to declare.
     "gap-interview": {
         "stage": INTERVIEW,
         "owner_decision": "the gap interview — what only you can answer",
@@ -328,10 +322,10 @@ GATES = {
 }
 
 # DECLARED BUT NOT YET CODE-COMPOSED (Story 20.118 step 3, #1114): `thesis`,
-# `policy-topics`, `gap-interview`, `narrative-structure`, `visual-set`
-# (`policy-topics` JOINED this list at Story 20.127, #1144 — it is declared so
-# the audit can report it as reached-but-never-emitted, which is the honest
-# state of a surface that has reached owners since #230 with no ask row at all)
+# `gap-interview`, `narrative-structure`, `visual-set`
+# (`policy-topics` JOINED this list at Story 20.127, #1144 and LEFT it at Story
+# 20.160, #1255 — the gate itself is RETIRED, so there is no longer a surface
+# for the audit to report as reached-but-never-emitted)
 # (`harvest-completion` LEFT this list at Story 20.129, #1143 when it gained a
 # builder, and the gate itself is RETIRED at Story 20.148, #1223 — the stage
 # it gated no longer exists)
