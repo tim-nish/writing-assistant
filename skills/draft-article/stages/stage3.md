@@ -193,11 +193,12 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/render-frontmatter.py --language <en|ja>
 **Fill `audience` and `audience_id` here (Stories 13.41 and 13.71 — this is
 where both fields are born).** The skeleton carries pipeline-internal
 `audience: {audience}` and `audience_id: {audience_id}` slots. Replace
-`audience` with the **one named reader** — from the interview's audience answer
-(q5) when one was given, from the backlog item's declared audience when
-drafting from the backlog, or from the owner's draft-start declaration
-otherwise. Replace `audience_id` with the **stable compatibility identifier**
-the owner selected with that same audience answer, **chosen from the installed
+`audience` with the **one named reader** — from the backlog item's declared
+audience, or the owner's draft-start declaration. **No interview producer
+exists today (#1283):** `q5` went with the framework generator (#1147), so
+**ask the owner**; composing the field here is the untraceable path the
+provenance rules refuse. Replace `audience_id` with the **stable compatibility
+identifier** the owner declared with that reader, **chosen from the installed
 platform profiles' audience vocabulary** (list the profiles' `audience` values
 and have the owner pick the matching id at the audience declaration — e.g.
 `en-practitioner`); it never replaces the free-text named reader and is
