@@ -173,7 +173,7 @@ def confirmation(run_id, ws, state, why):
     stage = state.get("next_stage")
     out = dg.payload(
         gate="resume-confirmation",
-        where=f"Stage 0: run {run_id} is in progress and stops at {stage}.",
+        where=f"Run {run_id} is already in progress and stopped part-way.",
         why=f"It {why}, so adopting it silently would resume another "
             f"sitting's work.",
         choices=[
@@ -184,6 +184,16 @@ def confirmation(run_id, ws, state, why):
              "effect": "mint a new run; that one is left untouched and stays "
                        "resumable"},
         ],
+        # A GROUNDED RECOMMENDATION, not a default (Story 20.152, #1222).
+        # This gate fires only ACROSS a sitting gap — #1082 bounded automatic
+        # resume to the same sitting precisely because "across a gap it becomes
+        # stale-state adoption". So the served reasoning that licenses
+        # resume-by-default inside a sitting is the same reasoning that
+        # recommends AGAINST it here, and the age this payload already carries
+        # is the evidence. Nothing is pre-selected and the other option is a
+        # full citizen; what would overturn it is the owner knowing the older
+        # run's work is still wanted, which the machine cannot see.
+        recommended=1,
     )
     out.update({
         "resumed": False,
