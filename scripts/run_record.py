@@ -761,6 +761,25 @@ def _cmd_validate(path):
     return 1
 
 
+def cmd_run_event(args):
+    """Append one run-journal event (Story 19.8, #742), NARROWED to the events
+    no block command can observe from inside itself — an agent-side retry, a
+    subagent spawn (SPEC-run-record, Story 20.181). A block's own start and end
+    are emitted by the block's own command at block close, and are no longer
+    anyone's to remember. Deterministic append through the one append site.
+
+    Lives here rather than in `draft-pipeline.py` because it is journal code and
+    this is the journal's module — the sanctioned remedy for that file's ratchet
+    is moving code into the module it already has, never raising the ratchet.
+    """
+    rec = {"ts": _now(), "stage": args.stage, "event": args.event}
+    if args.note:
+        rec["note"] = args.note
+    append(args.ws, rec)
+    print(json.dumps({"stage": "run-event", "recorded": rec}))
+    return 0
+
+
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
     if len(argv) == 2 and argv[0] == "validate":
