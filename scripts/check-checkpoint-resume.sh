@@ -1,14 +1,19 @@
 #!/usr/bin/env sh
-# serial-reason: it MUTATES A TRACKED FILE in the shared working tree —
+# serial-reason: it USED TO MUTATE A TRACKED FILE in the shared working tree —
 #   `printf '\n' >> skills/draft-article/stages/stage4.md`, then `git checkout
 #   -q --` to restore it (the #743 skill-contract-mismatch case needs a real
-#   mid-run edit). Re-verified 2026-07-31 (#999): the window is invisible after
-#   the fact but real to a concurrent reader, and the suite has many — every
-#   check that greps the draft-article stages, and check-skill-budget, which
-#   COUNTS LINES against a ratchet a one-line append could flip. Making this
-#   one safe means removing the tracked-file edit, not declaring it.
-# NOT parallel-safe (#957/#964) — deliberately carries no `# parallel-safe`
-# header, so run-checks.sh -P leaves it in the serial remainder.
+#   mid-run edit). That is REMOVED (#1273): the case now runs against a copied
+#   plugin root, so nothing tracked is written and nothing has to be restored.
+#   The old note called the window "invisible after the fact but real to a
+#   concurrent reader" and prescribed its own fix — "making this one safe means
+#   removing the tracked-file edit, not declaring it" — which is what happened,
+#   after the restore destroyed a concurrent session's uncommitted work twice on
+#   2026-08-02.
+# STILL NOT parallel-safe (#957/#964), and the reason is now a DIFFERENT one:
+#   the case exports XDG_STATE_HOME/XDG_CONFIG_HOME and drives autostart against
+#   process-global state further down. Deliberately carries no `# parallel-safe`
+#   header, so run-checks.sh -P leaves it in the serial remainder. Re-derive that
+#   before ever declaring it — an inherited exemption signals nothing.
 # tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
 # check-checkpoint-resume.sh — verify per-stage checkpoint + resume (Story 13.5).
 # POSIX shell + stdlib Python. A run that stops after stage N resumes from N+1
@@ -307,16 +312,52 @@ PYEOF
 python3 "$DP" resume --ws "$wpin" 2>/dev/null | grep -q skill_contract_mismatch \
   && err "#743: mismatch reported on an unchanged tree" \
   || ok "#743: unchanged tree resumes silently (disclosure only on mismatch)"
-touched="skills/draft-article/stages/stage4.md"
-printf '\n' >> "$touched"
-python3 "$DP" resume --ws "$wpin" 2>/dev/null | grep -q skill_contract_mismatch \
+
+# THE MID-RUN EDIT HAPPENS IN A COPIED PLUGIN ROOT, NEVER THE SHARED TREE (#1273).
+# This case needs a real edit to the skill surface, and it used to make one in
+# place — `printf '\n' >> skills/draft-article/stages/stage4.md`, then
+# `git checkout -q --` to restore. That restore is unconditional: it overwrites
+# the working-tree copy from the index and cannot tell this check's own
+# one-byte append from a concurrent editor's unrelated work. It destroyed such
+# work twice on 2026-08-02, and the loss is INVISIBLE — the file simply drops
+# out of `git status`, with no conflict, no stash, no reflog entry and nothing
+# in this check's output.
+#
+# `_skill_contract_pin()` walks `<plugin_root>/skills/draft-article`, where
+# plugin_root derives from `realpath(__file__)`. So a COPIED plugin root moves
+# the whole case off the shared tree: the pin computes over the copy, the edit
+# lands on the copy, and there is nothing to restore. Copied rather than
+# symlinked deliberately — `realpath` would resolve a symlinked script straight
+# back to the real repository and re-create the very coupling this removes.
+# Snapshot BEFORE, compare AFTER — the assertion is that THIS CASE changed
+# nothing, not that the tree was clean to begin with. A bare `git diff --quiet`
+# here would fail on a developer's unrelated uncommitted edits, which is its own
+# obstruction and the same class of harm as the destroy this replaces.
+skill_state_before=$(git status --porcelain -- skills/draft-article | sort)
+pinroot=$(mktemp -d)
+mkdir -p "$pinroot/scripts"
+cp "$root"/scripts/*.py "$pinroot/scripts/"
+cp -R "$root/skills" "$pinroot/skills"
+DP_ISO="$pinroot/scripts/draft-pipeline.py"
+wpin2=$(mktemp -d)
+printf '{"next_stage":"interview","stage":"consume"}' > "$wpin2/s.json"
+python3 "$DP_ISO" checkpoint --ws "$wpin2" "$wpin2/s.json" >/dev/null 2>&1
+printf '\n' >> "$pinroot/skills/draft-article/stages/stage4.md"
+python3 "$DP_ISO" resume --ws "$wpin2" 2>/dev/null | grep -q skill_contract_mismatch \
   && ok "#743: mid-run skill edit is disclosed on resume" \
   || err "#743: skill edit NOT disclosed on resume"
-python3 "$DP" stop-disclosure --ws "$wpin" --repo /x 2>/dev/null \
+python3 "$DP_ISO" stop-disclosure --ws "$wpin2" --repo /x 2>/dev/null \
   | grep -q "skill contract changed mid-run" \
   && ok "#743: stop-side line carries the mismatch note with both pins" \
   || err "#743: stop-side line missing the mismatch note"
-git checkout -q -- "$touched"
+
+# The shared tree is untouched by the case above — asserted rather than assumed,
+# since a silent regression here is exactly what made #1273 invisible.
+skill_state_after=$(git status --porcelain -- skills/draft-article | sort)
+[ "$skill_state_before" = "$skill_state_after" ] \
+  && ok "#1273: the mid-run-edit case leaves the shared tree exactly as it found it" \
+  || err "#1273: the mid-run-edit case CHANGED skills/draft-article in the shared tree"
+rm -rf "$pinroot" "$wpin2"
 rm -rf "$wpin"
 
 # --- autostart disclosure + --fresh (Story 19.10, #746) ------------------------
