@@ -45,6 +45,21 @@ a draft-hash mismatch is an ATTESTATION FAILURE (exit 3), reported before any
 grading result — absence of verdicts is never PASS, and "never judged" is
 mechanically distinguishable from "judged clean".
 
+SHARDED judging (Story 20.163, #1248 clause (3)): the judge may be fanned out
+across isolated subagents, and each shard returns its OWN attested file.
+`--judge-findings` (alias `--verdicts`) is therefore REPEATABLE — every shard
+file opens with its own attestation binding the SAME `draft-sha256` and carries
+its own `graded:` line, coverage is checked over the UNION of those lines, and
+ANY hash disagreement fails the whole gate. A stale shard is "not judged",
+never dropped.
+
+CONCATENATION IS REFUSED. Two attestation headers inside ONE file used to parse
+without complaint, last-wins — so a concatenation whose final shard was fresh
+silently accepted a stale earlier shard, which is exactly the fail-open the
+attestation exists to close. A file carrying more than one attestation header
+is now an ATTESTATION FAILURE; shards arrive as separate `--verdicts` files.
+A single file with exactly one attestation header behaves exactly as before.
+
 Exit 0 with no findings = the map passes. Any finding = a gate failure, printed
 as `POS: reason`, and a non-zero exit — the Stage 3→4 gate (Story 11.4) blocks
 on it. Exit 2 = malformed map; exit 3 = attestation failure.
@@ -210,8 +225,18 @@ def draft_sha256(draft_text):
     return hashlib.sha256(draft_text.encode("utf-8")).hexdigest()
 
 
+class ConcatenatedVerdicts(ValueError):
+    """More than one attestation header inside ONE verdicts file (Story 20.163).
+
+    Raised rather than resolved: any resolution rule is a fail-open. Last-wins
+    (what shipped) accepts a stale earlier shard behind a fresh final one;
+    first-wins accepts a fresh later shard behind a stale header. Shards are
+    separate files, each attested on its own, or they are not judged.
+    """
+
+
 def parse_attestation(text):
-    """Split the verdicts file into (draft_hash, graded_set, carried_set,
+    """Split ONE verdicts file into (draft_hash, graded_set, carried_set,
     verdict_lines).
 
     Returns (None, set(), set(), lines) when no attestation header is present —
@@ -219,6 +244,10 @@ def parse_attestation(text):
     can echo the narration and derived listings' headers separately. `carried:`
     lines (#738 delta re-grade) name positions whose verdicts carry forward
     from the attested prior cycle — echoed from the hand-off like `graded:`.
+
+    Raises ConcatenatedVerdicts when the text carries a SECOND attestation
+    header (Story 20.163): sharded verdicts are separate `--verdicts` files,
+    never a concatenation.
     """
     draft_hash, graded, carried, verdicts = None, set(), set(), []
     for raw in text.splitlines():
@@ -227,6 +256,12 @@ def parse_attestation(text):
             continue
         m = ATTEST_LINE.match(ln)
         if m:
+            if draft_hash is not None:
+                raise ConcatenatedVerdicts(
+                    "verdicts file carries more than one `attestation:` header — "
+                    "concatenated shards are REFUSED, not merged: whichever header "
+                    "won, a stale shard would ride in on a fresh one's hash. Pass "
+                    "each shard as its own --verdicts file")
             draft_hash = m.group("hash").lower()
             continue
         m = GRADED_LINE.match(ln)
@@ -272,11 +307,56 @@ def check_attestation(draft_hash, graded, entries, draft_text, carried=frozenset
     return errors
 
 
+def parse_shards(paths):
+    """Parse N attested verdicts files into one union (Story 20.163, #1248).
+
+    Returns (draft_hash, graded, carried, verdict_lines, errors). `draft_hash`
+    is the single hash every shard agreed on, or None when they did not agree —
+    in which case `errors` names the disagreement and the caller fails the WHOLE
+    gate. Nothing is dropped and nothing is preferred: a stale shard is "not
+    judged", so its presence poisons the run rather than being silently ignored.
+
+    With a single path this is exactly the shipped single-file behaviour: the
+    union of one set is that set, and a missing header still yields
+    `draft_hash is None` for `check_attestation` to report.
+    """
+    graded, carried, verdicts, errors = set(), set(), [], []
+    by_hash = {}
+    sharded = len(paths) > 1
+    for path in paths:
+        try:
+            h, g, c, v = parse_attestation(_read(path))
+        except ConcatenatedVerdicts as e:
+            errors.append(f"{path}: {e}")
+            continue
+        graded |= g
+        carried |= c
+        verdicts += v
+        if h is not None:
+            by_hash.setdefault(h, []).append(path)
+        elif sharded:
+            errors.append(f"{path}: shard carries no `attestation: draft-sha256=<hex>` "
+                          "header — every shard attests on its own, and an unattested "
+                          "shard is not judged")
+    if len(by_hash) > 1:
+        named = "; ".join(f"{h}: {', '.join(ps)}" for h, ps in sorted(by_hash.items()))
+        errors.append("shard attestations disagree on the draft they bind — the "
+                      f"whole gate fails, no shard is dropped ({named})")
+        return None, graded, carried, verdicts, errors
+    draft_hash = next(iter(by_hash)) if by_hash else None
+    return draft_hash, graded, carried, verdicts, errors
+
+
 def delta_basis(prior_worklist_text, prior_verdicts_text):
     """The #738 delta re-grade basis: which sentence TEXTS passed the attested
     prior cycle. Returns (passing_texts, prior_hash) or (None, reason) when the
     basis does not resolve — the caller then falls back to a full re-grade with
     a disclosed reason, never silently.
+
+    `prior_verdicts_text` is one file's text, or a LIST of shard texts when the
+    prior cycle was judged sharded (Story 20.163): the shards' `graded:` sets
+    and failure verdicts are unioned exactly as the consumption side unions
+    them, and every shard must attest to the same draft as the prior worklist.
     """
     prior_hash = None
     texts = {}
@@ -294,12 +374,23 @@ def delta_basis(prior_worklist_text, prior_verdicts_text):
             texts[m.group("pos")] = text.strip()
     if prior_hash is None:
         return None, "prior worklist carries no attestation header"
-    v_hash, graded, _carried, verdict_lines = parse_attestation(prior_verdicts_text)
-    if v_hash is None:
-        return None, "prior verdicts carry no attestation header"
-    if v_hash != prior_hash:
-        return None, ("prior verdicts attestation does not match the prior "
-                      "worklist (different draft version)")
+    shard_texts = ([prior_verdicts_text] if isinstance(prior_verdicts_text, str)
+                   else list(prior_verdicts_text))
+    graded, verdict_lines = set(), []
+    for shard_text in shard_texts:
+        try:
+            v_hash, g, _carried, v = parse_attestation(shard_text)
+        except ConcatenatedVerdicts as e:
+            # A concatenated prior-verdicts file is refused here too: the delta
+            # basis is only as trustworthy as the attestation it rests on.
+            return None, str(e)
+        if v_hash is None:
+            return None, "prior verdicts carry no attestation header"
+        if v_hash != prior_hash:
+            return None, ("prior verdicts attestation does not match the prior "
+                          "worklist (different draft version)")
+        graded |= g
+        verdict_lines += v
     failing = set()
     for ln in verdict_lines:
         m = JUDGE_ECHO.match(ln)
@@ -355,7 +446,13 @@ def main(argv=None):
     )
     p.add_argument("--map", default="-", help="the sidecar provenance map, or - for stdin")
     p.add_argument("--fact-sheet", help="file of valid fact-sheet pointer ids (one per line)")
-    p.add_argument("--judge-findings", help="independent judge's verdicts: `POS: reason` per line")
+    p.add_argument("--judge-findings", "--verdicts", dest="judge_findings",
+                   action="append", metavar="FILE",
+                   help="independent judge's verdicts: `POS: reason` per line. REPEATABLE "
+                        "(Story 20.163): a sharded judge returns one attested file per "
+                        "shard, each binding the same draft-sha256; coverage is checked "
+                        "over the union and any hash disagreement fails the whole gate. "
+                        "Concatenating shards into one file is refused")
     p.add_argument("--list-narration", action="store_true", help="list narration positions for the judge")
     p.add_argument("--list-derived", action="store_true", help="list derived positions + pointers for the judge")
     p.add_argument("--list-sourced", action="store_true",
@@ -369,10 +466,12 @@ def main(argv=None):
                         "(#738 delta re-grade): sentences unchanged since it, whose "
                         "positions the prior judge graded clean, are CARRIED instead of "
                         "re-graded; requires --prior-verdicts and --draft")
-    p.add_argument("--prior-verdicts", dest="prior_verdicts",
+    p.add_argument("--prior-verdicts", dest="prior_verdicts", action="append", metavar="FILE",
                    help="the judge verdicts returned for --prior-worklist; its attestation "
                         "must match the prior worklist's, else the emission falls back to a "
-                        "full re-grade with a disclosed reason")
+                        "full re-grade with a disclosed reason. REPEATABLE when the prior "
+                        "cycle was judged sharded — the shards' graded sets and verdicts are "
+                        "unioned, and every shard must attest to the same draft")
     args = p.parse_args(argv)
 
     try:
@@ -403,7 +502,7 @@ def main(argv=None):
         carried = []
         if args.prior_worklist and args.prior_verdicts and args.draft:
             passing, basis = delta_basis(_read(args.prior_worklist),
-                                         _read(args.prior_verdicts))
+                                         [_read(pv) for pv in args.prior_verdicts])
             if passing is None:
                 sys.stderr.write(f"delta re-grade unavailable — full re-grade: {basis}\n")
             else:
@@ -445,8 +544,13 @@ def main(argv=None):
     verdict_lines = None
     if args.judge_findings:
         draft_text = _read(args.draft) if args.draft else None
-        att_hash, graded, carried, verdict_lines = parse_attestation(_read(args.judge_findings))
-        att_errors = check_attestation(att_hash, graded, entries, draft_text, carried)
+        # N shards, one attestation each, checked over the union (Story 20.163).
+        # Shard-level failures (a concatenation, a disagreeing hash, an
+        # unattested shard) are reported INSTEAD of the coverage/hash checks —
+        # once the shard set is untrustworthy, its union means nothing.
+        att_hash, graded, carried, verdict_lines, att_errors = parse_shards(args.judge_findings)
+        if not att_errors:
+            att_errors = check_attestation(att_hash, graded, entries, draft_text, carried)
         if att_errors:
             sys.stderr.write("verify-provenance: ATTESTATION FAILURE (not judged)\n")
             for e in att_errors:
