@@ -58,6 +58,24 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py quality-gate \
   absence after the shared two-cycle bound surfaces as a publish blocker
   naming the section and the missing type. The gate **fails closed** (exit
   2) if the framework declares types but `--map`/`--state` are missing.
+- **The carrier is the examination pin ledger, and the unrunnable case is a
+  NAMED STATE — never a dropped flag (#1288, SPEC-article-draft-pipeline
+  amended 2026-08-02):** the fact sheet `--state` used to carry no longer
+  exists (producer retired with harvest, #1182/#1224), so the KIND source is
+  `$WS/examination-pins.txt` — the run's declared pointer set, derived from
+  the examination records — read beside the provenance map's per-section
+  sourced/derived distribution. It is the same file stage 3 already hands
+  `verify-provenance` as `--fact-sheet`. **Never respond to the refusal by
+  re-running the gate without `--framework-file`/`--state`**: that omits the
+  check in silence and is the exact vacuous pass the three-valued rule exists
+  to prevent. Where a declared type has no resolvable predicate over what the
+  run carries, the gate's output carries
+  `evidence-type check: cannot-determine — <reason>` naming the section and
+  the type. **`episode` resolves through the time-axis predicate
+  `verify-provenance` already enforces; `example` and `measurement` have no
+  established predicate over the pin ledger and are an open question** — they
+  report cannot-determine, and are never converted into a missing-input
+  finding on a guessed mapping.
 - **Dimension 4 (readability mechanics) is checked mechanically** here (zero
   tokens): sentence/paragraph-length distributions, heading density, and — from
   the provenance map — the **stitched-fact-sheet** signature (wall-to-wall
@@ -158,6 +176,12 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py episode-candidates \
   --state "$WS/checkpoint.json" --section "<failing section>"
 ```
 
+- **This hop is reachable only from a REAL missing-input finding (#1288).**
+  `episode-candidates` reads the same retired fact sheet as the check above,
+  so where the gate reported `cannot-determine` rather than a missing-input
+  finding, **do not take this hop** — a cannot-determine is not an evidence
+  gap, and building episodes to close one manufactures the absence the state
+  exists to avoid asserting. Route it as the named state and stop.
 - The command reads **only the fact sheet** (never a source — probe's
   scope boundary holds on the hop) and groups event-kind facts by source
   file, with same-source result/number/quote facts as support. Each
