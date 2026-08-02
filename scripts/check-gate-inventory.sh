@@ -31,7 +31,7 @@ ok()  { printf 'ok:   %s\n' "$1"; }
 err() { printf 'FAIL: %s\n' "$1" >&2; fail=1; }
 
 report=$(python3 - <<'PY'
-import contextlib, importlib.util, io, json, os, sys, tempfile
+import contextlib, glob, importlib.util, io, json, os, re, sys, tempfile
 sys.path.insert(0, "scripts")
 
 
@@ -141,10 +141,89 @@ need(all(r["gate"] != "resume-confirmation" for r in pend),
      "decision the owner must make, so an empty row would be noise")
 lines = gi.pending_decision_lines()
 joined = "\n".join(lines)
-for want in ("stage 3", "stage 2", "terrain screen 1"):
-    need(want in joined, "the map omits %r — #1112's ask names the stage-3 "
+# The map names the PROCESS each decision is asked in (Story 20.157, #1247).
+# #1112's ask is that the late gates be named explicitly; the owner ruling of
+# 2026-08-02 is that naming them by NUMBER is what stopped the owner being able
+# to tell brief creation from draft creation. Both hold at once only if the
+# process names are what the map renders.
+for want in ("fill", "interview", "terrain"):
+    need(want in joined, "the map omits %r — #1112's ask names the late "
                          "gates explicitly, and a map missing exactly the "
                          "decisions the owner went looking for is the defect" % want)
+need(not re.search(r"stage\s*\d", joined, re.I),
+     "the pending-decision map renders a NUMBERED stage label — prohibited by "
+     "the owner ruling of 2026-08-02 (#1247), and this map is composed "
+     "straight from the registry, so a number here means the registry has one")
+
+# --- DUE-NESS IS THE REGISTRY <-> next_stage JOIN (Story 20.157, #1245) ----
+# `gates_reached` was the old left-hand side and its only writer in this
+# repository was a check fixture, so `--reached-from-state` returned [] on
+# every real run: an audit with nothing to audit cannot fail. The join is now
+# an EQUALITY between the registry's process name and the checkpoint's
+# `next_stage`, so the fixture-shaped input is not merely unnecessary but
+# unread.
+wsj = tempfile.mkdtemp()
+cpj = os.path.join(wsj, "checkpoint.json")
+
+def _state(**kw):
+    with open(cpj, "w", encoding="utf-8") as f:
+        json.dump(kw, f)
+
+_state(next_stage="probe")
+need(gi.reached_from_state(wsj) == (["probe-entry"], None),
+     "a run entering `probe` does not resolve the probe-entry gate as due — "
+     "that is the join #1221 asked for and #1245 found dead")
+for stage, want in (("interview", ["policy-topics", "gap-interview"]),
+                    ("fill", ["narrative-structure", "visual-set"])):
+    _state(next_stage=stage)
+    need(gi.reached_from_state(wsj)[0] == want,
+         "the gates due at %r are %s, not %s" %
+         (stage, want, gi.reached_from_state(wsj)[0]))
+_state(next_stage="verify")
+r_v, why_v = gi.reached_from_state(wsj)
+need(r_v == [] and why_v,
+     "a stage no gate belongs to reports nothing and says so — a silent empty "
+     "list is the fail-toward-silence shape the amendment names")
+_state(next_stage="probe", gates_reached=["intent"])
+need(gi.reached_from_state(wsj)[0] == ["probe-entry"],
+     "a checkpoint carrying `gates_reached` still influences the verdict — it "
+     "is dropped, not merely unwritten")
+gi_src = open("scripts/gate-inventory.py", encoding="utf-8").read()
+fn_code = gi_src.split("def reached_from_state", 1)[1].split('"""')[2]
+need("gates_reached" not in fn_code,
+     "reached_from_state still READS gates_reached (#1245: its only writer in "
+     "this repository is a check fixture)")
+need("_gates()" in fn_code and "next_stage" in fn_code,
+     "due-ness is not derived from the registry joined on next_stage")
+
+# --- ONE VOCABULARY, DECLARED ONCE (Story 20.157 AC-1/AC-2/AC-4) ----------
+declared_stages = {v["stage"] for v in dg.GATES.values()}
+need(declared_stages <= set(dg.PROCESSES),
+     "a gate names a process outside the declared vocabulary: %s" %
+     sorted(declared_stages - set(dg.PROCESSES)))
+need(not [n for n in declared_stages if re.search(r"stage\s*\d", n, re.I)],
+     "a registry stage value still carries a stage NUMBER")
+dg_src = open("scripts/draft_gates.py", encoding="utf-8").read()
+gates_block = dg_src.split("GATES = {", 1)[1].split("\n}\n", 1)[0]
+need(not re.search(r'"stage":\s*"', gates_block),
+     "a GATES entry restates its stage as a literal string — the vocabulary is "
+     "declared once and referenced, or it drifts on one side (AC-4)")
+# NO TRANSLATION TABLE: every run-process name in the registry is a string the
+# pipeline itself writes to `next_stage`. Derived from the writers, so a rename
+# on their side fails here rather than silently un-joining the hook.
+written = set()
+for f in sorted(glob.glob("scripts/*.py")):
+    if os.path.basename(f) in ("gate-inventory.py", "draft_gates.py"):
+        continue
+    for line in open(f, encoding="utf-8"):
+        if "next_stage" in line:
+            written |= set(re.findall(r'"([a-z][a-z0-9-]*)"', line))
+written.discard("next_stage")
+run_processes = set(dg.PROCESSES) - set(dg.PRE_RUN_PROCESSES)
+need(run_processes <= written,
+     "a registry process name is written to `next_stage` by nothing: %s — the "
+     "join is equality, so an unwritten name is a gate that can never be due" %
+     sorted(run_processes - written))
 need("never asked" in joined and "OBLIGATIONS" in joined,
      "paragraph structure is not stated as NEVER asked, with its reason — "
      "non-member disclosure applied to decisions: an absent item must read as "

@@ -61,24 +61,43 @@ else
   err "the 2026-08-02 defect shape passed validation"
 fi
 
-# --- 2. stage names are DERIVED, never listed ----------------------------
+# --- 2. the denied form is the NUMBER, and the registry carries none ------
+# Obligation 5 used to deny whatever strings `draft_gates.GATES` happened to
+# carry, which was right while the registry said "stage 2". Since the owner
+# ruling of 2026-08-02 (#1247) the registry names PROCESSES, so that
+# derivation would now deny a gate the right to say which process it belongs
+# to — the thing the ruling REQUIRES an ask to say, and the probe-entry gate's
+# own shipped label ("run probe now") would have become a defect. Asserted
+# both ways: the numbered family is denied by SHAPE wherever it appears, and
+# no declared process name is a numbered form — the registry-side carrier for
+# "the prohibited form has no source to leak from".
 if run <<'PY'
 import importlib.util, sys
 s = importlib.util.spec_from_file_location("v", "scripts/validate-proposal-payload.py")
 v = importlib.util.module_from_spec(s); s.loader.exec_module(v)
 d = importlib.util.spec_from_file_location("dg", "scripts/draft_gates.py")
 dg = importlib.util.module_from_spec(d); d.loader.exec_module(dg)
-derived = v._stage_names()
-declared = {str(x.get("stage") or "").strip().lower() for x in dg.GATES.values()}
-# Every declared stage string is reachable from the derived set: a literal list
-# here would drift the first time a stage is renamed, which is what happened to
-# `harvest-entry`.
-sys.exit(0 if declared - {""} <= derived else 1)
+declared = {str(x.get("stage") or "").strip().lower()
+            for x in dg.GATES.values()} - {""}
+bad = sorted(n for n in declared if v.numbered_stage_forms(n))
+if bad:
+    print("  registry stage values carrying a stage NUMBER: %s" % bad)
+    sys.exit(1)
+# Matched by shape, not by an enumeration, so a spelling nobody listed fails too.
+for form in ("Stage 3", "stage 3", "stage3", "STAGE 0", "stage  5"):
+    if not v.numbered_stage_forms("next is %s now" % form):
+        print("  the numbered form %r is not denied" % form)
+        sys.exit(1)
+# And a process name is NOT denied — the inversion this check exists to catch.
+if any(v.numbered_stage_forms(n) for n in declared):
+    sys.exit(1)
+sys.exit(0)
 PY
 then
-  ok "stage names derive from the gate registry — no literal list to drift"
+  ok "the denied family is the NUMBERED form, matched by shape; no registry
+      stage value carries a number, so the prohibited form has no source"
 else
-  err "the stage-name set is not derived from draft_gates.GATES"
+  err "either a numbered form is not denied, or the registry still carries one"
 fi
 
 # --- 3. a declared absence is accepted, an undeclared one is not ---------

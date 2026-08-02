@@ -179,28 +179,73 @@ def render_form(choices, recommended=None, banner=None, reply_line=None):
 #
 # `owner_decision` is what 20.117 renders: the decision the owner still owes at
 # that gate, or None where the gate asks nothing the owner must carry forward.
+#
+# --------------------------------------------------------------------------
+# THE ONE STAGE VOCABULARY (Story 20.157, #1245/#1247), DECLARED HERE AND
+# NOWHERE ELSE.
+#
+# Owner ruling, 2026-08-02: *"I prohibit the expression 'Stage N.' It becomes
+# impossible to tell whether the system is performing Brief creation or Draft
+# creation. By attaching a number, the system abandons its responsibility to
+# explain which process the Human Gate belongs to."* Until this story the
+# registry said `"stage 2"`, `"stage 3"`, `"stage 0"` and `"after stage 0,
+# before probe"` while `checkpoint.json:next_stage` said `interview`, `fill`,
+# `probe` — the same stages under two vocabularies. Two consequences, one
+# cause: the due-ness join could not match without a translation table, and
+# the prohibited numbered form had a source to leak from.
+#
+# So a `stage` value is the NAME OF THE PROCESS the gate belongs to, and for
+# every gate inside a run it is the exact string the run's own checkpoint
+# carries in `next_stage` (`draft-pipeline.py` writes `probe`, `interview`,
+# `fill`, `verify`, `variants`; `draft_variants.py` writes `review`;
+# `draft_review.py` writes `done`). `gate-inventory.reached_from_state` joins
+# the two by EQUALITY — no mapping anywhere in the path, which is the property
+# a translation table would quietly destroy the first time a stage is renamed
+# on one side only.
+#
+# TWO PROCESSES RUN BEFORE ANY CHECKPOINT EXISTS, and they are declared apart
+# rather than folded into a run stage. `TERRAIN` is brief creation — it ends
+# by handing a brief to a run that does not exist yet — and `START` is the run
+# mint (`draft-pipeline.py start`/`stage0`), which fixes the article type and
+# WRITES the first checkpoint. Gates on these two never match a `next_stage`
+# and are therefore never reported due by the join; that is correct rather
+# than a gap, because there is no run state to be due against. The distinction
+# the ruling asks for — brief creation versus draft creation — is exactly the
+# `terrain` / everything-else split, which a number could not express.
+TERRAIN = "terrain"          # brief creation, before any run exists
+START = "start"              # the run mint: article type, sources, workspace
+PROBE = "probe"              # feasibility read (checkpoint: next_stage=probe)
+INTERVIEW = "interview"      # the gap interview (next_stage=interview)
+FILL = "fill"                # the framework fill (next_stage=fill)
+
+# The closed set, for a consumer asserting over the vocabulary rather than
+# restating it. PRE_RUN names the members that by construction have no
+# `next_stage` counterpart; the rest MUST equal one.
+PRE_RUN_PROCESSES = (TERRAIN, START)
+PROCESSES = (TERRAIN, START, PROBE, INTERVIEW, FILL)
+
 GATES = {
     # IN PIPELINE ORDER, and the order is load-bearing: story 20.117 renders
     # this as "where each decision is asked", so a registry sorted any other
     # way would tell the owner that sources comes before the terrain screens.
     "terrain-axis": {
-        "stage": "terrain screen 1",
+        "stage": TERRAIN,
         "owner_decision": "where to look first — one axis member",
     },
     "terrain-member": {
-        "stage": "terrain screen 2",
+        "stage": TERRAIN,
         "owner_decision": "which Strands the brief is composed from",
     },
     "thesis": {
-        "stage": "terrain step 3",
+        "stage": TERRAIN,
         "owner_decision": "the thesis — which candidate the brief adopts",
     },
     "resume-confirmation": {
-        "stage": "stage 0",
+        "stage": START,
         "owner_decision": None,   # asked only when a run predates the sitting
     },
     "intent": {
-        "stage": "stage 0",
+        "stage": START,
         "owner_decision": "intent — which article type the draft is filled from",
     },
     # `sources` WAS HERE (stage 0) and is retired (Story 20.147, #1209): the
@@ -224,7 +269,7 @@ GATES = {
     # composition step, so `gate-inventory.py` and the checks that iterate this
     # dict now say what they do not cover, rather than reading as clean.
     "probe-entry": {
-        "stage": "after stage 0, before probe",
+        "stage": PROBE,
         "owner_decision": "run probe now, or stop with the brief kept",
     },
     # `harvest-completion` WAS HERE and is RETIRED (Story 20.148, #1223).
@@ -264,20 +309,20 @@ GATES = {
     # here would put a gate in the inventory that no code path can reach.
     # The registry states what a run can actually present.
     "policy-topics": {
-        "stage": "stage 2",
+        "stage": INTERVIEW,
         "owner_decision": "which ≤2 policy topics this article's tension "
                           "questions may be seeded from",
     },
     "gap-interview": {
-        "stage": "stage 2",
+        "stage": INTERVIEW,
         "owner_decision": "the gap interview — what only you can answer",
     },
     "narrative-structure": {
-        "stage": "stage 3",
+        "stage": FILL,
         "owner_decision": "narrative structure — which arc the article takes",
     },
     "visual-set": {
-        "stage": "stage 3",
+        "stage": FILL,
         "owner_decision": "the visual set — which figures the article carries",
     },
 }
