@@ -35,7 +35,17 @@ whole claim; it is never a truncated slug, which used to let two long claims
 sharing a prefix overwrite each other. Pass `--defer-ledger` when running
 examinations concurrently and derive once at the join
 (`examine.py --ws "$WS" --derive-ledger [--order <claim-ids>]`); a single
-examination derives it itself and needs neither flag. A sourced
+examination derives it itself and needs neither flag.
+
+**Concurrent examinations are scheduled by the fill, not by this step** — the
+enumeration, the dispatch, and the join are [`fan-out.md`](fan-out.md)'s (story
+20.164, #1248). What binds HERE is unchanged by any of it: **one examination
+answers one stated claim**, the claim exists before the read, and a claim that
+emerges mid-fill gets its own ordinary examination at that moment. Enumeration
+widened to claims that might be needed is a stockpile — harvest under a new
+name — and is refused.
+
+A sourced
 claim in the provenance map cites the `cite` form verbatim (a bare sha for a
 commit, `path:line@sha` for prose at HEAD, the URL for an issue); `derived`
 inherits ≥2 of them. Never cite a pin no recorded examination produced.

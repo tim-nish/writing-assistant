@@ -1,5 +1,10 @@
 #!/usr/bin/env sh
 # parallel-safe
+# tier: full — measured over the inner ceiling (#913); end-to-end/scenario
+#   class. The breach PRE-DATES story 20.164 (measured on main at 2544ms
+#   against the 2000ms ceiling): the check shells out to the validator ~30
+#   times. Declared here rather than left failing every scoped inner run.
+# covers: scripts/validate-visual-set.py skills/draft-article/stages/stage3.md skills/draft-article/stages/fan-out.md skills/draft-article/stages/gate.md
 # check-visual-set-plan.sh — verify the visual-set planning proposal (Story
 # 13.58, SPEC-article-visuals CAP-2a). POSIX shell + stdlib Python.
 #
@@ -145,6 +150,26 @@ printf '%s' "$ZERO" | python3 "$V" --plan-record "$RECNONE" >/dev/null 2>&1 \
 printf '%s' "$ZERO" | python3 "$V" >/dev/null 2>&1 \
   && err "no operand at all was ACCEPTED — a guessed cap is the #983 defect" \
   || ok "no --slot-count and no --plan-record refuses rather than defaulting"
+
+# --- the visual-set track runs BESIDE the judging (Story 20.164, #1248) ------
+# Independence is the claim, and it is directional: the plan depends on the
+# draft and the argument plan, the judging on neither. Both are LLM steps, so
+# the concurrency binds as prose; what a check can hold is that the claim is
+# stated where the track is described, that the join is named, and that the
+# OWNER-paced half is not swept into the win.
+FO="skills/draft-article/stages/fan-out.md"
+printf '%s' "$sec" | grep -qi 'beside the provenance judging\|runs beside the judging' \
+  && ok "the visual-set section states it runs beside the judging" \
+  || err "stage3.md's visual-set section does not state the concurrency (#1248)"
+grep -qi 'join at the quality gate\|They \*\*join at the quality gate' "$FO" \
+  && ok "fan-out names the quality gate as the join" \
+  || err "fan-out.md does not name the join point"
+grep -qi 'owner-paced half of the visual set does not speed up\|owner decisions' "$FO" \
+  && ok "fan-out excludes the visual set's owner-paced half from the win" \
+  || err "fan-out.md claims the owner-paced visual steps speed up"
+grep -qi 'Join first, then' skills/draft-article/stages/gate.md \
+  && ok "gate.md carries the join precondition (join first, then gate)" \
+  || err "gate.md does not state that it is the join point"
 
 if [ "$fail" -eq 0 ]; then
   printf '\nAll visual-set-plan checks passed.\n'; exit 0

@@ -11,6 +11,16 @@ review finding: **Stage 3 does not complete until the gate passes**, so the
 owner's ~4-minute budget never lands on a draft that reads like a stitched fact
 sheet.
 
+**This gate is also the JOIN for the fill's concurrent tracks (story 20.164,
+#1248).** The provenance judging and the visual-set work run beside each other
+([`fan-out.md`](fan-out.md) §5) — the gate is where both are already required,
+and the requirement is unchanged rather than new: the draft it reads carries the
+approved visuals, and `verify-provenance` must have PASSED over the same draft
+version. So a gate run started before either track landed is not an early
+result, it is a run against the wrong artifact — the visuals are missing from
+the draft, or the judge's `draft-sha256` no longer matches. **Join first, then
+gate**; the gate itself neither dispatches nor waits.
+
 **Strengthened for the argument plan (#440/#434).** The gate is now a real
 second-net *before* review, not after: the **narrative-arc dimension fails**
 stitched-fact-sheet and **per-lesson-skeleton** drafts (a framework skeleton

@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 # parallel-safe
 # tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
-# covers: scripts/verify-provenance.py
+# covers: scripts/verify-provenance.py skills/draft-article/stages/stage3.md skills/draft-article/stages/fan-out.md
 # check-verify-provenance.sh — verify the independent verify-provenance check
 # (Story 11.2). POSIX shell + stdlib Python.
 #
@@ -417,6 +417,30 @@ printf '%s' "$out" | grep -q 'asserts a checkable proposition' \
   && ! printf '%s' "$out" | grep -q 'ANCHOR MISMATCH' \
   && ok "a correctly-echoed shard verdict is graded normally (20.163)" \
   || err "shard echo check mishandled a correct verdict: $out"
+
+# --- the SHARDED judge is WIRED, not merely supported (Story 20.164) ---------
+# 20.163 made the tool accept repeated attested files; nothing told a
+# judge-fanning agent to produce them. The dispatch is an LLM step with no code
+# carrier, so the emission contract binds as prompt text or not at all.
+FO="skills/draft-article/stages/fan-out.md"
+grep -qi 'one attested file' "$FO" \
+  && ok "fan-out instructs ONE ATTESTED FILE PER SHARD (20.163's emission contract)" \
+  || err "fan-out.md does not tell a sharded judge to return one attested file per shard"
+grep -q 'attestation: draft-sha256=' "$FO" && grep -q 'graded:' "$FO" \
+  && ok "fan-out restates the per-shard attestation grammar verbatim" \
+  || err "fan-out.md omits the attestation grammar the shards must echo"
+grep -qi 'never .*concatenat\|concatenat.*refused\|Never `cat`' "$FO" \
+  && ok "fan-out refuses concatenating shards into one file" \
+  || err "fan-out.md does not refuse shard concatenation"
+grep -qi 'union' "$FO" && grep -qi 'partition' "$FO" \
+  && ok "fan-out states coverage over the union, so shards must partition the worklist" \
+  || err "fan-out.md does not state the union/partition coverage rule"
+grep -qi 'isolated' "$FO" && grep -qi 'never the drafting rationale\|never the drafting' "$FO" \
+  && ok "each shard is as isolated from the drafting context as the single judge (NFR13)" \
+  || err "fan-out.md does not carry the per-shard isolation rule"
+grep -q 'ONE ATTESTED FILE OF ITS OWN' "$SKILL" \
+  && ok "stage3.md's judge section points at the per-shard form (single-file stays valid)" \
+  || err "stage3.md still documents only the single-file attestation grammar"
 
 if [ "$fail" -eq 0 ]; then
   printf '\nAll verify-provenance checks passed.\n'; exit 0
