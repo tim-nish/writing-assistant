@@ -310,6 +310,114 @@ grep -q 'sourced episode' "$SKILL" && grep -qi 'time axis' "$SKILL" \
   && ok "SKILL documents the episode claim type and the time-axis rule" \
   || err "SKILL does not document the episode claim type"
 
+# --- Story 20.163 (#1248 clause 3): SHARDED provenance attestation ----------
+# The judge fans out across isolated subagents; each shard returns its OWN
+# attested file. `--verdicts` is repeatable, coverage is checked over the union,
+# any hash disagreement fails the whole gate, and a CONCATENATION is refused —
+# the shipped parser set draft_hash last-wins, so a concatenation whose final
+# shard was fresh silently accepted a stale earlier one.
+cat > "$work/sh-draft.md" <<'MD'
+Structured discovery halved our token bill.
+Under a binary rule connective tissue is neither sourced nor marked.
+The bench recorded a two-fold drop.
+MD
+cat > "$work/sh-map.txt" <<'MAP'
+P1.S1[L1]: narration
+P1.S2[L2]: narration
+P1.S3[L3]: narration
+MAP
+SH=$(python3 -c "import hashlib;print(hashlib.sha256(open('$work/sh-draft.md',encoding='utf-8').read().encode()).hexdigest())")
+STALE="1111111111111111111111111111111111111111111111111111111111111111"
+printf 'attestation: draft-sha256=%s\ngraded: P1.S1\n' "$SH"       > "$work/sh-a.txt"
+printf 'attestation: draft-sha256=%s\ngraded: P1.S2,P1.S3\n' "$SH" > "$work/sh-b.txt"
+
+# AC-1/AC-4 — N shards agreeing, union covering the worklist: PASS.
+out=$(python3 "$VP" --map "$work/sh-map.txt" --draft "$work/sh-draft.md" \
+      --judge-findings "$work/sh-a.txt" --judge-findings "$work/sh-b.txt" 2>&1) && rc=0 || rc=$?
+[ "$rc" -eq 0 ] && ok "N agreeing shards whose union covers the worklist pass (20.163)" \
+  || err "sharded verdicts rejected (rc=$rc): $out"
+# The repeatable flag is also spelled --verdicts, per the amendment's wording.
+python3 "$VP" --map "$work/sh-map.txt" --draft "$work/sh-draft.md" \
+  --verdicts "$work/sh-a.txt" --verdicts "$work/sh-b.txt" >/dev/null 2>&1 \
+  && ok "--verdicts is the repeatable alias of --judge-findings (20.163)" \
+  || err "--verdicts alias not accepted"
+# Verdicts from EVERY shard are consumed, not just the first file's.
+{ printf 'attestation: draft-sha256=%s\ngraded: P1.S2,P1.S3\n' "$SH"
+  printf 'P1.S3: asserts a checkable proposition\n'; } > "$work/sh-b-fail.txt"
+out=$(python3 "$VP" --map "$work/sh-map.txt" --draft "$work/sh-draft.md" \
+      --judge-findings "$work/sh-a.txt" --judge-findings "$work/sh-b-fail.txt" 2>&1) && rc=0 || rc=$?
+[ "$rc" -eq 1 ] && printf '%s' "$out" | grep -q 'P1.S3' \
+  && ok "a failure verdict in a later shard is a gate failure (20.163)" \
+  || err "later shard's verdict was dropped (rc=$rc): $out"
+
+# AC-2 — any hash disagreement fails the WHOLE gate; no shard is dropped.
+printf 'attestation: draft-sha256=%s\ngraded: P1.S2,P1.S3\n' "$STALE" > "$work/sh-stale.txt"
+out=$(python3 "$VP" --map "$work/sh-map.txt" --draft "$work/sh-draft.md" \
+      --judge-findings "$work/sh-a.txt" --judge-findings "$work/sh-stale.txt" 2>&1) && rc=0 || rc=$?
+[ "$rc" -eq 3 ] && printf '%s' "$out" | grep -q 'disagree' \
+  && ok "one shard binding a different draft fails the whole gate (20.163)" \
+  || err "shard hash disagreement not caught (rc=$rc): $out"
+# A shard with no attestation of its own is not judged.
+printf 'graded: P1.S2,P1.S3\n' > "$work/sh-bare.txt"
+out=$(python3 "$VP" --map "$work/sh-map.txt" --draft "$work/sh-draft.md" \
+      --judge-findings "$work/sh-a.txt" --judge-findings "$work/sh-bare.txt" 2>&1) && rc=0 || rc=$?
+[ "$rc" -eq 3 ] && printf '%s' "$out" | grep -q 'not judged' \
+  && ok "an unattested shard fails closed (20.163)" \
+  || err "unattested shard accepted (rc=$rc): $out"
+
+# AC-3 — CONCATENATION IS REFUSED. This fixture is the live fail-open: shard A
+# is stale, shard B is fresh and last, and last-wins would have accepted both.
+{ printf 'attestation: draft-sha256=%s\ngraded: P1.S1\n' "$STALE"
+  cat "$work/sh-b.txt"; } > "$work/sh-cat.txt"
+out=$(python3 "$VP" --map "$work/sh-map.txt" --draft "$work/sh-draft.md" \
+      --judge-findings "$work/sh-cat.txt" 2>&1) && rc=0 || rc=$?
+[ "$rc" -eq 3 ] && printf '%s' "$out" | grep -qi 'more than one .*attestation' \
+  && ok "a concatenated multi-attestation file is REFUSED, never merged (20.163)" \
+  || err "concatenated shards were parsed (rc=$rc): $out"
+# ... and the refusal does not depend on the stale header coming first.
+{ cat "$work/sh-a.txt"; cat "$work/sh-b.txt"; } > "$work/sh-cat2.txt"
+out=$(python3 "$VP" --map "$work/sh-map.txt" --draft "$work/sh-draft.md" \
+      --judge-findings "$work/sh-cat2.txt" 2>&1) && rc=0 || rc=$?
+[ "$rc" -eq 3 ] && ok "concatenation is refused even when every shard agrees (20.163)" \
+  || err "an agreeing concatenation was accepted (rc=$rc): $out"
+
+# AC-4 — the union still fails closed when it does not cover the worklist.
+printf 'attestation: draft-sha256=%s\ngraded: P1.S2\n' "$SH" > "$work/sh-short.txt"
+out=$(python3 "$VP" --map "$work/sh-map.txt" --draft "$work/sh-draft.md" \
+      --judge-findings "$work/sh-a.txt" --judge-findings "$work/sh-short.txt" 2>&1) && rc=0 || rc=$?
+[ "$rc" -eq 3 ] && printf '%s' "$out" | grep -q 'ungraded position(s): P1.S3' \
+  && ok "a union short of the worklist fails closed naming the gap (20.163)" \
+  || err "short union not rejected (rc=$rc): $out"
+
+# Backward compatibility — ONE file with ONE attestation behaves as it always
+# did (every shipped caller passes that shape).
+printf 'attestation: draft-sha256=%s\ngraded: P1.S1,P1.S2,P1.S3\n' "$SH" > "$work/sh-single.txt"
+python3 "$VP" --map "$work/sh-map.txt" --draft "$work/sh-draft.md" \
+  --judge-findings "$work/sh-single.txt" >/dev/null 2>&1 \
+  && ok "a single single-attestation verdicts file is unchanged (20.163 back-compat)" \
+  || err "single-file verdicts regressed"
+
+# AC-5 — the per-position machinery is untouched by sharding: an echo mismatch
+# is still caught when the verdict arrives in a shard.
+S1=$(python3 "$VP" --map "$work/sh-map.txt" --draft "$work/sh-draft.md" \
+     --list-narration | awk -F': ' '/^P1.S1 /{sub(/^[^:]*: /,""); print; exit}')
+{ printf 'attestation: draft-sha256=%s\ngraded: P1.S1\n' "$SH"
+  printf 'P1.S1 ~ "a sentence that is not there": asserts a checkable proposition\n'; } \
+  > "$work/sh-a-mis.txt"
+python3 "$VP" --map "$work/sh-map.txt" --draft "$work/sh-draft.md" \
+  --judge-findings "$work/sh-a-mis.txt" --judge-findings "$work/sh-b.txt" 2>&1 \
+  | grep -q 'ANCHOR MISMATCH' \
+  && ok "ANCHOR MISMATCH still fires on a verdict arriving in a shard (20.163)" \
+  || err "anchor-mismatch machinery broke under sharding"
+{ printf 'attestation: draft-sha256=%s\ngraded: P1.S1\n' "$SH"
+  printf 'P1.S1 ~ "%s": asserts a checkable proposition\n' "$S1"; } > "$work/sh-a-echo.txt"
+out=$(python3 "$VP" --map "$work/sh-map.txt" --draft "$work/sh-draft.md" \
+      --judge-findings "$work/sh-a-echo.txt" --judge-findings "$work/sh-b.txt" 2>&1 || true)
+printf '%s' "$out" | grep -q 'asserts a checkable proposition' \
+  && ! printf '%s' "$out" | grep -q 'ANCHOR MISMATCH' \
+  && ok "a correctly-echoed shard verdict is graded normally (20.163)" \
+  || err "shard echo check mishandled a correct verdict: $out"
+
 if [ "$fail" -eq 0 ]; then
   printf '\nAll verify-provenance checks passed.\n'; exit 0
 else
