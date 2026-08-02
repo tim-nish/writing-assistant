@@ -11,7 +11,7 @@ the implementation and specs; the normative contracts are
 
 The pipeline harvests **facts** from the sources; the owner supplies **judgment**
 and **requirements**. The single designed place for that owner input is the
-**Stage-2 gap interview**. Post-hoc hand-editing of the finished draft outside
+**gap interview**. Post-hoc hand-editing of the finished draft outside
 the pipeline is **not** the intended workflow — it produces prose with no
 provenance and no quality re-check. During dogfooding an owner assumed manual
 insertion was the path precisely because the channel was not surfaced; it now
@@ -23,7 +23,7 @@ is (the interview says so when it opens).
 |---|---|---|
 | Opinion, thesis, arc, stakes, a belief or reversal | an `open` (owner-only) item | an **owner-attributed prose span** — a paragraph classified `sourced` with a paragraph-granularity question-id pointer (Story 17.1) |
 | A checkable requirement or fact the owner knows | an `open` or NEEDS-OWNER item | a **sourced / derived** claim carrying its interview pointer |
-| A free-form constraint, emphasis, or correction | a **first-class** interview item (not only a source-gap answer) | applied at Stage 3 per its kind (span or claim) |
+| A free-form constraint, emphasis, or correction | a **first-class** interview item (not only a source-gap answer) | applied at the fill per its kind (span or claim) |
 
 Owner judgment is never source-checkable and must not be — the falsifiability
 contract holds; an attributed prose span asserts the owner's view, attributed to
@@ -47,7 +47,7 @@ completion-summary contract:
 
 ## See also
 
-- [`pipeline-vocabulary.md`](pipeline-vocabulary.md) — Stage 3 and the
+- [`pipeline-vocabulary.md`](pipeline-vocabulary.md) — the fill and the
   provenance classes owner input is classified into.
-- [`docs/interview-architecture.md`](interview-architecture.md) — the Stage-2
+- [`docs/interview-architecture.md`](interview-architecture.md) — the gap
   interview decision.

@@ -2,9 +2,9 @@
      SKILL.md dispatcher; carries the stage's full operating detail,
      moved verbatim from the pre-split SKILL.md. -->
 
-## Stage 0 — start the run (one call)
+## Start — mint the run (one call)
 
-**Stage 0 is a single invocation (Story 13.13)** — configuration validation
+**The run mint is a single invocation (Story 13.13)** — configuration validation
 (CAP-5), the framework check, and workspace **autostart** (Story 13.12) fold into
 one command so the run spends one turn here, not three:
 
@@ -56,7 +56,7 @@ config or framework:
     Relay the error, then **offer to scaffold** a starter `writing-sources.yaml`
     at that resolved machine-global path as an explicit, owner-confirmed step;
     on consent create it from the example and show the owner the **path and
-    contents** before re-running Stage 0; without consent, stop.
+    contents** before re-running the mint; without consent, stop.
     Never scaffold silently, and never create the file inside the host repo.
 - **Article-type check** against the **closed set** of intent labels and their
   `F1`–`F5` aliases (`resolve_framework`) — an invalid name exits non-zero and
@@ -89,7 +89,7 @@ config or framework:
 
 On success `stage0` prints one JSON: `{"config_ok": true, "run_state": {…framework,
 framework_file, sources…}, "resumed": …, "ws": …, "next_stage": …}`. Carry
-`run_state` into the next stage unchanged and write every intermediate under `ws`.
+`run_state` into the next process unchanged and write every intermediate under `ws`.
 (The underlying `validate-config`, `start`, and `autostart` commands still exist
 for standalone use; `stage0` composes them.)
 
@@ -100,13 +100,13 @@ is resolver-internal; always ask the resolver, never spell it out. The probe
 record (`probe.json`, #1182), interview answers, the provenance map, quality-gate
 output, and any scratch all live under `$WS/`; there is no state-vs-cache split.
 The **only** files this pipeline writes into the host repo are the declared
-products at `output.drafts` (the `complete` gate). Pass `$WS` to Stage 1 so probe writes
+products at `output.drafts` (the `complete` gate). Pass `$WS` to probe so it writes
 there rather than minting its own workspace.
 
 **Artifact-write precondition (Story 13.78).** The harness Write tool refuses
 to overwrite a file that has not been Read in the current session (`File has
 not been read yet`). Two situations make a pipeline target already-exist:
-**re-writes** (the Stage 3 revision loop, a regenerated provenance map, a
+**re-writes** (the fill's revision loop, a regenerated provenance map, a
 visual *modify*, re-entry after a policy block) and **resumed runs**, where
 every artifact persisted by a prior invocation exists but nothing in this
 session has Read it. So before every Write to a `$WS` path (or any path this
@@ -267,13 +267,13 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py entry --element "<name>"
 ```
 
 The owner can say **"write the article about *this* element"** by passing
-`--element <name>` to stage 0 (recorded as `state.element`, projected from
+`--element <name>` to the run mint (recorded as `state.element`, projected from
 `state.entry`). When set:
 
 - the name **resolves to an element id** (18.8) and **selection is pinned** to
   it — no other elements are selected, and the disclosure above states the pin
   as the selecting rule;
-- **examine grounds claims for that element alone** (stage 3+,
+- **examine grounds claims for that element alone** (during the fill,
   [`examine.md`](examine.md)), and the **interview covers that element's gaps**;
 - the pin **scopes** the run — it does **not widen the declared-source
   boundary**. Examine still reads only the writing-sources-declared files (the
@@ -292,7 +292,7 @@ past the writing-sources-declared files.
 Article depth is **owner intent, never a tool default**. If the owner's
 invocation names a depth or scope — a level (`deep-dive` | `standard` | `note`)
 or a one-line scope statement ("just the retry bug, deeply") — pass it to
-stage 0 so the run records it:
+the run mint so the run records it:
 
 ```
 python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py stage0 <framework> <sources...> --depth "<level or scope>" --root <host-repo>
@@ -300,7 +300,7 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py stage0 <framework> <sour
 
 The run-state then carries `depth: {"level": …}` or `depth: {"scope": …}`. If
 the owner gave **no** directive, do not invent one — the offer is presented
-**exactly once as a Stage-2 interview item** under the proposal contract, and
+**exactly once as a gap-interview item** under the proposal contract, and
 the answer is recorded; absent an answer, the run proceeds exactly as before.
 
 **The offer is generated mechanically, not left to this prompt (Story 18.42,
@@ -329,7 +329,7 @@ Exit 1 means neither — **disclose the applied default in the completion
 summary's informational notes** rather than shipping a silent default.
 
 **Reading-time bands as the depth-choice unit (CAP-8 clause, Story 18.27,
-#506).** The stage-0 / stage-2 depth question **may** present **suggested
+#506).** The run-mint / gap-interview depth question **may** present **suggested
 reading-time bands** derived from the selected elements — `~3 min note / ~7 min
 standard / ~15 min deep-dive` — **plus a custom value** the owner can type when
 no band fits. Get the bands (scaled by the selected-element count) from:
@@ -350,7 +350,7 @@ the owner decides), never an automatic cut. With **no directive** at all, the
 run is **byte-for-byte the behavior before CAP-8** — the bands are an optional
 way to *ask*, never a new gate.
 
-**At Stage 3, fill consumes the directive** (`state.depth`): it governs **how
+**At the fill, generation consumes the directive** (`state.depth`): it governs **how
 much each slot elaborates and how many story elements the draft carries** — not
 a word count or reading-time target. A **deep-dive** keeps material a
 framework's split hint (e.g. F2's ">3 lessons") would otherwise cut in **one**
@@ -364,7 +364,7 @@ reading-time estimate stays informational — it drives no split.
 
 Beyond the one-element `--element` pin and the one-line `--depth` scope, the
 owner may hand the run a **free-form coverage brief** — "what this article
-should cover", in their own words. Pass it to stage 0 as **text or a file
+should cover", in their own words. Pass it to the run mint as **text or a file
 path**:
 
 ```
@@ -385,7 +385,7 @@ existing boundaries**:
   or an interview question ("the brief asks for X but no evidence cluster
   covers it — is it out of scope, or a gap to fill?").
 - **Argument plan** — the brief **supplies the owner's thesis candidate** (the
-  thesis the owner already holds), fed into the Stage-3 argument-plan sub-step.
+  thesis the owner already holds), fed into the fill's argument-plan sub-step.
   The disclosure trail is **unchanged**: the thesis is still owner-attributed,
   and every checkable claim stays sourced/derived.
 - **Directed grounding** — examine **emphasis follows the brief WITHIN the
@@ -408,7 +408,7 @@ optional owner input, never a required gate.
 
 ### Plan consultation at draft start (SPEC-article-plan CAP-3, Story 13.57)
 
-After Stage 0, before the interview, **consult existing article plans** in the
+After the run mint, before the interview, **consult existing article plans** in the
 articles repository — serial engineering-lessons articles should build on prior
 decisions instead of repeating them. The read is **read-only through the repo's
 schema** — nothing under the articles repository is created or modified by
@@ -468,7 +468,7 @@ draft article <type> from <sources> continuing <prior-slug>
    read-only through the repo schema. The prior draft's
    **body never enters the harvest evidence stream** (Story 13.56's fences hold
    exactly as for plan consultation); it is *framing context*, not a source.
-2. **Constrain the lede at Stage 3** to **build on** the prior article rather
+2. **Constrain the lede at the fill** to **build on** the prior article rather
    than restate it: the opening assumes the prior claim/summary as given and
    advances from it, instead of re-explaining shared context. This is a directed
    emphasis on the drafting agent, not new evidence and not a new provenance
@@ -492,7 +492,7 @@ surrounding **tissue** — the same introductions, shared setup, and warnings a
 prior article on the **same project** already carries. This is **automatic**,
 like continuation mode, not gated on an explicit `continuing <slug>`: whenever
 prior published/drafted articles **share the project** (`related.projects`), the
-argument plan receives a **prior-coverage digest**. Compute it after Stage 0,
+argument plan receives a **prior-coverage digest**. Compute it after the run mint,
 alongside plan consultation, over the **existing carriers** — `plans/*.md` and
 the prior canonicals — **never** the policy hub, and with **no schema change**
 (the project a plan belongs to is the repo component of its recorded `pin`):
@@ -508,7 +508,7 @@ named prior article. **The prior body never enters the harvest evidence stream**
 (Story 13.56's fences hold exactly as for plan consultation): the digest is
 **framing context**, not a source, and no checkable claim is ever sourced to it.
 
-At Stage 3, the argument plan treats repeated context as **compress-and-link**,
+At the fill, the argument plan treats repeated context as **compress-and-link**,
 not re-explanation: where this article would re-introduce shared setup a prior
 article already established, write a **one-sentence recap plus a pointer** to
 that article (`related.articles`) instead of re-explaining it. A **warning
@@ -534,7 +534,7 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py checkpoint --ws "$WS" <s
 
 The write is atomic and idempotent — checkpointing the same stage twice is a
 no-op, and because the checkpoint records `next_stage`, resuming
-**never re-runs a completed stage**. Stage 0's `autostart` (above) already picks
+**never re-runs a completed stage**. The mint's `autostart` (above) already picks
 the right workspace and `next_stage` automatically; `resume --ws "$WS"` inspects a
 specific workspace's checkpoint directly when you need it:
 
@@ -559,13 +559,13 @@ artifacts are durably written** — the recording IS the boundary, so a
 half-written unit is never marked done. On resume, `autostart`/`resume` return
 the `progress` object with the rest of the state: **skip the units it lists**
 and continue from the first unrecorded one. A stage's normal completion
-checkpoint overwrites the file, clearing its sub-stage progress. Stage 1 is
+checkpoint overwrites the file, clearing its sub-stage progress. Probe is
 atomic at `probe.py record` (#1182) and records no sub-stage progress; the
 long later stages do.
 
-**Stage 2 (the gap interview) records per answered question (Story 18.38,
+**The gap interview records per answered question (Story 18.38,
 #533).** The interview presents a deterministic ordered set (`interview`'s
-`presentation_order`). Stage 1 (probe) is non-interactive — the
+`presentation_order`). Probe is non-interactive — the
 only ≤5-question elicitation loop is *this* stage — so it is the interruptible
 question loop the #533 ESC-then-resume burned. After each question is answered
 (recorded via `answer`/`journal`), mark it done:
@@ -712,14 +712,14 @@ staleness is stated.
 Checkpoint state lives under `$WS` with the other intermediates
 (`docs/storage-architecture.md` D2), never in the host tree.
 
-**Resumed-run audience recheck (Story 13.41 — stage 0's half of the presence
+**Resumed-run audience recheck (Story 13.41 — the run mint's half of the presence
 rule).** When `stage0`/`autostart` resumes a run (`"resumed": true`) whose
 `next_stage` is `verify` (or `variants`, from a checkpoint written before Story
 13.69 made variant emission post-review) — i.e. a filled draft already exists among
 the intermediates — confirm that draft carries a **resolved `audience`** before
 continuing (a run checkpointed before the audience precondition existed may lack
 it). If it is missing or still `{audience}` (or `audience_id` is missing or
-still `{audience_id}` — Story 13.71), fill both per the Stage-3 rule and
+still `{audience_id}` — Story 13.71), fill both per the fill's rule and
 re-run the quality gate; the variant stage's hard stop remains the mechanical
 backstop either way.
 

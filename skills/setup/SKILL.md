@@ -35,7 +35,7 @@ destination, and the writers already resolve it).
 
 This is a **once-per-repo bootstrap**: after a clean finish, `draft-article`
 runs with no manual file edit. It is never a recurring step, and
-`draft-article` never runs it implicitly — Stage 0 keeps its own fail-closed
+`draft-article` never runs it implicitly — the run mint keeps its own fail-closed
 behavior.
 
 ## Stage A — resolve and inspect
@@ -86,10 +86,10 @@ from nothing (evidence-gate-must-be-agent-fed).
    location; the tsurezure-gateway MCP registration is the integration, and
    the gateway's own operator config owns the hub path). Which policy topics
    an article reads stays a **per-article decision made at draft time**
-   (draft-article Stage 2 — SPEC-policy-topic-at-draft), so setup asks no
+   (draft-article's gap interview — SPEC-policy-topic-at-draft), so setup asks no
    `track`/`topics` question and writes neither key. State the
    consequence of declining in one line: *"without
-   it, the Stage-2 interview runs generic — no policy-seeded tension
+   it, the gap interview runs generic — no policy-seeded tension
    questions, `consulted: none`."* Declining is a valid, recorded choice —
    the run-time degrade stays silent by design (SPEC-policy-source-seam
    CAP-6); this offer is the setup-time surfacing of that decision, not a

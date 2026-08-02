@@ -85,7 +85,7 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/write-article-plan.py write \
 
 ### Policy-conformance gate (SPEC-article-plan CAP-4, Story 13.76)
 
-When the run consulted the policy seam (Stage 2 wrote `$WS/policy-surface.txt`),
+When the run consulted the policy seam (the gap interview wrote `$WS/policy-surface.txt`),
 run the conformance gate on the assembled plan **before** handing it to
 `write` — a policy-seeded plan without conformance data is refused by the
 writer:
@@ -103,9 +103,9 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/write-article-plan.py conformance \
   the plan's frontmatter through the writer's fail-closed validation. The
   recorded status **rides the plan**.
 - At plan emission a `conflict` or `stale` status is **recorded, not blocking**
-  — the stage-progression block fired earlier, at the Stage 2→3 boundary
+  — the stage-progression block fired earlier, at the interview→fill boundary
   (`policy-block-check`, Story 13.77), and the recorded status is what that
-  gate **re-validates on the next resumed run** before Stage 3+ continues.
+  gate **re-validates on the next resumed run** before the fill continues.
   Relay the status (and the findings' positions/pointers) in the completion
   summary's informational bucket.
 - Pass `--staging` when the run emitted staging candidates: a plan decision
@@ -178,7 +178,7 @@ the `complete` subcommand's JSON (the dual-product completion gate, Story
 summarize: surface the gate's hard error instead.
 
 Any unresolved `[VERIFY]` marker or unrendered figure is a **publish blocker**,
-listed under that bucket and nowhere else. A run stopped by the Stage 2→3
+listed under that bucket and nowhere else. A run stopped by the interview→fill
 policy-block gate (Story 13.77) lists its block there too: the bucket carries
 the `publish_blocker` payload — the conflicting **positions with pointers**, or
 the moved pin/configVersion — plus the **resume path** (the block checkpoint;
@@ -244,23 +244,23 @@ pipeline order. This is the authoritative flag list — consult it instead of
 `variant-staleness`, `site-record`) are post-review, not part of this flow —
 their reference lives in [`variants.md`](../variants.md).
 
-| Subcommand | Stage | Purpose | Args / flags |
+| Subcommand | Process | Purpose | Args / flags |
 |---|---|---|---|
-| `stage0` | 0 | Config validation (CAP-5) + framework check + workspace autostart in one call (Story 13.13) | `<framework> <sources…>` `--root` |
-| `start` | 0 | Framework check + run-state only, no workspace (granular alternative to `stage0`) | `<framework> <sources…>` `--root` |
-| `autostart` | 0 | Resume the newest in-progress run, else mint a fresh workspace (Story 13.12) | `--root` |
+| `stage0` | start | Config validation (CAP-5) + framework check + workspace autostart in one call (Story 13.13) | `<framework> <sources…>` `--root` |
+| `start` | start | Framework check + run-state only, no workspace (granular alternative to `stage0`) | `<framework> <sources…>` `--root` |
+| `autostart` | start | Resume the newest in-progress run, else mint a fresh workspace (Story 13.12) | `--root` |
 | `checkpoint` | durability | Persist a completed stage's state to `<ws>/checkpoint.json` (Story 13.5) | `--ws` (req) `<state\|->` |
 | `resume` | durability | Report where to resume a run from its workspace checkpoint | `--ws` (req) |
 | `progress` | durability | Record sub-stage progress (completed units inside a long stage) into the checkpoint (Story 13.83); with `--stop-note`, records an orderly budget stop (Story 13.85) | `--ws` (req) `--stage` (req) `--done` (req, 1+) `--stop-note` |
-| `interview` | 2 | Build the bounded gap-interview question set for the framework | `--framework` (req) `<state\|->` |
-| `answer` | 2 | Record one owner answer (single form), or validate a batch | `--id` `--disposition` `--text` `--pointer` (repeatable) `--batch` `--candidates` `--selection` |
-| `journal` | 2 | Write the interview journal (triage record, Story 10.4) | `--interview` (req) `--answers` `--seed-extra` `--policy-note` `--events` |
-| `policy-block-check` | 2→3 | Stage-progression precondition (Story 13.77): blocks Stage 3 fill on an unresolved config↔policy conflict or a `conflict`/`stale` plan, emitting the publish-blocker payload + block checkpoint; `conformant`/`open` and generic mode proceed | `--classification` `--answers` `--plan` `--surface` `--config-json` `--root` `--config-version` `--staging` |
-| `provenance` | 3 | Parse + structurally validate the sidecar provenance map | `--map` `--count` `--draft` |
-| `quality-gate` | 3→4 | The mandatory quality gate; non-zero exit blocks Stage 4 (Story 11.4) | `--draft` `--map` `--judge` `--framework-file` `--state` `--profile` |
-| `verify-markers` | 3/4 | Validate `[VERIFY: reason]` markers; `--count` prints the count (drive to 0) | `<draft\|->` `--count` |
-| `verify` | 4 | Build the owner verification worklist, one entry per marker | `<draft\|->` |
-| `reroute` | 4 | Reroute an over-budget section into a new bounded interview question (Story 4.5) | `--rewrites` (req) `--section` |
+| `interview` | interview | Build the bounded gap-interview question set for the framework | `--framework` (req) `<state\|->` |
+| `answer` | interview | Record one owner answer (single form), or validate a batch | `--id` `--disposition` `--text` `--pointer` (repeatable) `--batch` `--candidates` `--selection` |
+| `journal` | interview | Write the interview journal (triage record, Story 10.4) | `--interview` (req) `--answers` `--seed-extra` `--policy-note` `--events` |
+| `policy-block-check` | interview→fill | Stage-progression precondition (Story 13.77): blocks the fill on an unresolved config↔policy conflict or a `conflict`/`stale` plan, emitting the publish-blocker payload + block checkpoint; `conformant`/`open` and generic mode proceed | `--classification` `--answers` `--plan` `--surface` `--config-json` `--root` `--config-version` `--staging` |
+| `provenance` | fill | Parse + structurally validate the sidecar provenance map | `--map` `--count` `--draft` |
+| `quality-gate` | fill→verify | The mandatory quality gate; non-zero exit blocks verification (Story 11.4) | `--draft` `--map` `--judge` `--framework-file` `--state` `--profile` |
+| `verify-markers` | fill/verify | Validate `[VERIFY: reason]` markers; `--count` prints the count (drive to 0) | `<draft\|->` `--count` |
+| `verify` | verify | Build the owner verification worklist, one entry per marker | `<draft\|->` |
+| `reroute` | verify | Reroute an over-budget section into a new bounded interview question (Story 4.5) | `--rewrites` (req) `--section` |
 | `complete` | completion | The dual-product completion gate (Story 13.68): persist the canonical to `<output.drafts>/<slug>.md`, verify `plans/<slug>.md`, then (and only then) write the `next_stage: done` checkpoint; the only sanctioned way to finish a run | `--draft` (req) `--slug` (req) `--root` `--ws` |
 
 ---

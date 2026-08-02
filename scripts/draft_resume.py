@@ -12,7 +12,7 @@ resumption is automatic and not opt-in, so a turn-ceiling casualty is
 recoverable rather than a total loss, and a large draft completing across
 several invocations is the normal model. That purpose is retained whole. What
 failed is the reach of the phrase "an in-progress run": the run adopted in the
-reported incident had been halted FOURTEEN DAYS, and stage 0 attached to it
+reported incident had been halted FOURTEEN DAYS, and the run mint attached to it
 with no announcement and no confirmation. Across a gap that is stale-state
 adoption — the class *proposals carry the state they were computed against*
 exists to prevent, arriving in its worst form, because a resumed workspace
@@ -108,7 +108,10 @@ def candidate_state(run_dir, checkpoint_file):
     if not os.path.isfile(cp):
         if not os.path.isfile(os.path.join(run_dir, "presented-payloads.jsonl")):
             return None
-        return {"next_stage": "stage0", "checkpoint_absent": True}
+        # The process name, never a number (#1247): this value is the one the
+        # caller reports and can reach an owner turn, so it is the same
+        # vocabulary `draft_gates.START` declares and `next_stage` carries.
+        return {"next_stage": "start", "checkpoint_absent": True}
     try:
         with open(cp, encoding="utf-8") as f:
             return json.load(f)
@@ -214,8 +217,8 @@ def confirmation(run_id, ws, state, why):
     #
     # RECORDING IS NOT ADOPTING, and the distinction is the whole gate: an ask
     # row says a question was posed ABOUT that run. Nothing reads it back as
-    # progress, and no checkpoint is written — stage 0 returns immediately on
-    # this shape precisely so the run is not attached to.
+    # progress, and no checkpoint is written — the run mint returns immediately
+    # on this shape precisely so the run is not attached to.
     _emit_ask(ws, out)
     return out
 
@@ -274,5 +277,5 @@ def disclosure_line(run_id, ws, state):
     if srcs:
         bits.append(f"sources {', '.join(map(str, srcs))[:60]}")
     subject = "; ".join(bits) or "subject unrecorded in checkpoint"
-    return (f"resuming run {run_id}{age} — {subject}; stage {state.get('next_stage')}. "
+    return (f"resuming run {run_id}{age} — {subject}; next: {state.get('next_stage')}. "
             f"Not your topic? re-run with --fresh (this run stays untouched).")

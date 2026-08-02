@@ -49,7 +49,7 @@ picks only one platform leaves no file for the others, anywhere).
   `output.drafts`); anything else is a hard error naming the expected
   persisted path and the `complete` remedy (`--allow-external-draft` is a
   test-only escape for check harnesses, never a production path).
-- **Precondition:** the draft carries **zero `[VERIFY]` markers** — Stage 4 must
+- **Precondition:** the draft carries **zero `[VERIFY]` markers** — verification must
   be complete. Any unresolved marker aborts the invocation. The draft must also
   declare a resolved `audience` (the named reader) and `audience_id` (the
   compatibility identifier, Story 13.71) — an unfilled one is a hard stop.

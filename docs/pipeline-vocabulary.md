@@ -15,34 +15,34 @@ and its companion
 `draft article <type> from <sources>` runs a fixed sequence:
 
 ```
-stage 0        probe          gap interview     framework fill    verify        complete
-(invocation) → (verdict +    → (owner answers) → (Stage 3 draft, → (provenance) → (canonical + plan)
+start          probe          gap interview     framework fill    verify        complete
+(invocation) → (verdict +    → (owner answers) → (the fill drafts,→ (provenance) → (canonical + plan)
                 anchors)                          examine per claim)
 ```
 
-- **Stage 0 — invocation.** Validates configuration and classifies the source
+- **Start — invocation.** Validates configuration and classifies the source
   tokens (path / glob / commit-range); emits the run-state probe consumes.
-- **Stage 1 — probe.** Checks whether the declared sources can ground this
+- **Probe.** Checks whether the declared sources can ground this
   brief at all — a verdict plus a handful of anchors saying where evidence
   sits. **No fact sheet is built**: there is no pre-extraction pass anywhere in
   the pipeline (retired 2026-08-02, #1182/#1220).
-- **Stage 2 — gap interview.** At most five questions covering only what the
-  sources cannot answer; answers return as owner input for Stage 3.
-- **Stage 3 — fill.** Populates the framework's slots from the interview
+- **Gap interview.** At most five questions covering only what the
+  sources cannot answer; answers return as owner input for the fill.
+- **Fill.** Populates the framework's slots from the interview
   answers and from **examine**, which grounds each claim at the read that
   produced it, classifying every sentence in a provenance map. The pin is born
   with the claim rather than two stages before it.
-- **Verify.** An independent `verify-provenance` check and the Stage 3→4
-  quality gate.
+- **Verify.** An independent `verify-provenance` check and the
+  fill→verify quality gate.
 - **Complete.** Durably writes the two declared products: the canonical draft
   at `output.drafts` and the article plan at `plans/<slug>.md`.
 
-## Stage 3 — the fill stage
+## The fill
 
-Stage 3 is where source facts and owner judgment become prose. Its contract is
+The fill is where source facts and owner judgment become prose. Its contract is
 CAP-3 of the pipeline spec.
 
-**Stage 3 opens with an argument-plan sub-step (#440/#434).** Before filling any
+**The fill opens with an argument-plan sub-step (#440/#434).** Before filling any
 slot, it composes an explicit **argument plan** — thesis, arc, per-section
 content intents — from the examined claims (including the narrative kinds) and the
 interview, then fills **from that plan**, so the article is an argument rather
@@ -50,10 +50,10 @@ than a framework skeleton stitched from fact-sheet prose. A framework governs
 each section's **content obligations, not a literal heading skeleton** — a
 multi-lesson article is one arc, not the skeleton repeated per lesson. The plan
 is a run-workspace intermediate, owner-visible; at completion the plan-record
-`plans/<slug>.md` projects the thesis/arc from it. The Stage 3→4 quality gate
+`plans/<slug>.md` projects the thesis/arc from it. The fill→verify quality gate
 fails stitched-fact-sheet and per-lesson-skeleton drafts **before** review.
 
-- **Inputs:** the interview answers (Stage 2) and, per claim, what `examine` grounds during fill.
+- **Inputs:** the gap interview's answers and, per claim, what `examine` grounds during fill.
 - **Outputs:** a slot-filled draft with schema-conformant frontmatter, plus a
   **sidecar provenance map** classifying every body sentence.
 - **Restrictions — the three provenance classes** (every claim-classed
@@ -122,7 +122,7 @@ class — `P4.S6[L35]: sourced episode <- a1b2c3d`:
 
 **Enforcement is at the ship gate, deny-never-warn.** `verify-provenance`
 refuses a claim typed `episode` whose every pin resolves to a `time_axis:
-false` source, naming the claim and the source that failed it; the Stage 3→4
+false` source, naming the claim and the source that failed it; the fill→verify
 gate blocks on it like any other finding. This is a **predicate on the shipped
 mechanism**, not a second one — examine is unchanged and stays per-claim.
 
@@ -162,7 +162,7 @@ its output auditable.
   — the canonical pipeline contract (CAP-1…CAP-7).
 - [`specs/spec-article-draft-pipeline/pipeline-stages.md`](../specs/spec-article-draft-pipeline/pipeline-stages.md)
   — the stage table, fact-sheet entry format, provenance map, and quality gate.
-- [`docs/interview-architecture.md`](interview-architecture.md) — the Stage-2
+- [`docs/interview-architecture.md`](interview-architecture.md) — the gap
   interview decision.
 - [`docs/harness-architecture.md`](harness-architecture.md) — the
   article-quality harness (provenance classes and the quality gate).

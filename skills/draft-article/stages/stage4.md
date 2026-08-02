@@ -2,7 +2,7 @@
      SKILL.md dispatcher; carries the stage's full operating detail,
      moved verbatim from the pre-split SKILL.md. -->
 
-## Stage 4 — owner verification pass
+## Verification — owner verification pass
 
 A bounded pass where the owner resolves the draft's `[VERIFY]` markers within a
 **≤4 minute** owner-attention budget. Exit criterion: **zero `[VERIFY]` markers remain**.
@@ -13,7 +13,7 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py verify <draft>
 ```
 
 This lists every well-formed marker with its **line and reason** (a malformed
-marker blocks the pass — Stage 3 must have produced canonical `[VERIFY: <reason>]`
+marker blocks the pass — the fill must have produced canonical `[VERIFY: <reason>]`
 forms). Present each marker to the owner under the
 [owner-facing proposal contract](../../owner-facing-proposal-contract.md): **where**
 the claim sits in the article (its section, with the surrounding sentence as a
@@ -28,7 +28,7 @@ exactly one of:
    it; drop the marker;
 3. **remove the claim from the article** — it cannot be supported; delete it.
 
-The pass is done when the Stage-3 gate reports zero:
+The pass is done when the marker count reports zero:
 
 ```
 python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py verify-markers --count <draft>   # -> 0
@@ -45,17 +45,17 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py reroute --section <id> -
 With `n` = rewrites already applied to that section, this returns `decision:
 edit` while a rewrite remains, or `decision: reroute` (with `next_stage:
 interview` and a bounded question) once the budget is spent. Ask the rerouted
-question, capture the bullet answer verbatim as in Stage 2, and apply it — the
+question, capture the bullet answer verbatim as in the gap interview, and apply it — the
 draft never drifts into unbounded editing.
 
-Stage 4 exit: zero unmarked invented claims, zero `[VERIFY]` markers — the draft
+Verification exit: zero unmarked invented claims, zero `[VERIFY]` markers — the draft
 is ready for the article plan and the `complete` gate. Variant emission is
 **not** part of this flow (see the pointer section below).
 
 
 ---
 
-**Stage 4 exit → completion.** Read [`complete.md`](complete.md) and run:
+**Verification exit → completion.** Read [`complete.md`](complete.md) and run:
 
 ```
 python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py complete --draft … --slug … --root … --ws …

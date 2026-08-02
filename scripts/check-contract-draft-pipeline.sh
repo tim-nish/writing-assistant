@@ -27,30 +27,30 @@ ok()  { printf 'ok:   %s\n' "$1"; }
 
 # Section extractors (from a heading to the next '## ').
 sec() { awk -v h="$1" '$0 ~ h {f=1} f && $0 ~ /^## / && $0 !~ h {exit} f {print}' "$SKILL"; }
-s2=$(sec '^## Stage 2')
-s4=$(sec '^## Stage 4')
+s2=$(sec '^## Gap interview')
+s4=$(sec '^## Verification')
 
 # Whitespace-collapsed match: a contract phrase that wraps across source lines
 # ("repository\nknowledge alone") must still anchor — line-based grep rotted
 # red the moment prose re-wrapped (#190).
 hasin() { printf '%s\n' "$1" | tr '\n' ' ' | tr -s ' ' | grep -qi -- "$2" && ok "$3" || err "$3 — missing"; }
 
-# Stage 2 — gap interview under the contract.
-hasin "$s2" 'owner-facing-proposal-contract'        "stage 2 references the shared contract"
-hasin "$s2" 'outline'                               "stage 2 shows where the section sits (outline context)"
-hasin "$s2" 'preview of the current section'        "stage 2 shows a preview of the current section"
-hasin "$s2" 'concrete effect'                       "stage 2 choices state their concrete effect"
+# The gap interview under the contract.
+hasin "$s2" 'owner-facing-proposal-contract'        "gap interview references the shared contract"
+hasin "$s2" 'outline'                               "gap interview shows where the section sits (outline context)"
+hasin "$s2" 'preview of the current section'        "gap interview shows a preview of the current section"
+hasin "$s2" 'concrete effect'                       "gap interview choices state their concrete effect"
 # Anchor on the CURRENT disposition labels (Story 10.3 replaced the old
 # drop-the-section examples); both alternatives are live label text (#190).
-hasin "$s2" 'adopt this answer as written\|discard this and use my own' "stage 2 choices are effect-labelled (not shorthand)"
-hasin "$s2" 'repository knowledge alone'            "stage 2 answerable from repository knowledge alone"
+hasin "$s2" 'adopt this answer as written\|discard this and use my own' "gap interview choices are effect-labelled (not shorthand)"
+hasin "$s2" 'repository knowledge alone'            "gap interview answerable from repository knowledge alone"
 
-# Stage 4 — verification items under the contract, effect-named choices.
-hasin "$s4" 'owner-facing-proposal-contract'        "stage 4 references the shared contract"
-hasin "$s4" 'concrete effect on the article'        "stage 4 choices state their concrete effect"
-hasin "$s4" 'keep the claim, marked as an unmeasured estimate' "stage 4 'keep as unmeasured estimate' choice is effect-named"
-hasin "$s4" 'remove the claim from the article'     "stage 4 'remove the claim' choice is effect-named"
-hasin "$s4" 'repository knowledge alone'            "stage 4 answerable from repository knowledge alone"
+# Verification items under the contract, effect-named choices.
+hasin "$s4" 'owner-facing-proposal-contract'        "verification references the shared contract"
+hasin "$s4" 'concrete effect on the article'        "verification choices state their concrete effect"
+hasin "$s4" 'keep the claim, marked as an unmeasured estimate' "verification 'keep as unmeasured estimate' choice is effect-named"
+hasin "$s4" 'remove the claim from the article'     "verification 'remove the claim' choice is effect-named"
+hasin "$s4" 'repository knowledge alone'            "verification answerable from repository knowledge alone"
 
 if [ "$fail" -eq 0 ]; then
   printf '\nAll contract-in-draft-pipeline checks passed.\n'; exit 0

@@ -10,7 +10,7 @@ Partition everything the run surfaced into exactly three labelled buckets:
 
 1. **Informational notes** — things worth knowing that need no action (counts,
    what was examined, and — for an article body — the reading-time estimate).
-   For a run that reached Stage 5, this bucket also records the **emission
+   For a run that emitted variants, this bucket also records the **emission
    choice and its outcome** (the platforms offered vs. the owner's `chosen`
    subset, and where each variant file landed — FR57) and, when one fired, the
    **lede re-targeting touchpoint** (which variant carried a `lede_proposals`
@@ -26,7 +26,7 @@ Partition everything the run surfaced into exactly three labelled buckets:
    owner's explicit publish decision through the standalone variants flow
    (`variants --slug <slug>`), never something a review run performs; or a
    **declared syndication variant with no resolvable platform profile** — a
-   `publish_blockers` entry from Stage 0 (`stage0`,
+   `publish_blockers` entry from the run mint (`stage0`,
    `declared-variant-no-resolvable-profile`, #530): `syndication.policy` declares
    a variant (e.g. `devto`) whose `platform-profiles/<platform>.yaml` does not
    resolve (only a `*.example.yaml` exists), so variant emission **will** fail.
@@ -92,7 +92,7 @@ The non-member fallback is **present it as a selection**,
 never *fall through to prose*.
 
 Why that is stated first rather than left implied: this section listed four run
-kinds and a terrain sitting ending at a **staged stage-0 run** was none of them,
+kinds and a terrain sitting ending at a **staged, unstarted run** was none of them,
 so the mandate had no case to bind and the ask reached the owner as chat prose
 — *"Say the word and I'll run harvest"* — answered in free text, with no ask
 row anywhere. For an enumeration of admissible kinds the load-bearing half is
@@ -105,7 +105,7 @@ The cases below are **worked examples beneath that rule**:
 - **review run** → "apply the accepted findings, then re-run review" or "the
   draft is publishable".
 - **partially-completed run** → the resume command above is the next step.
-- **a terrain sitting that ends at a staged stage-0 run** — the case none of the
+- **a terrain sitting that ends at a staged, unstarted run** — the case none of the
   three above matched — → "run probe now / stop with the brief kept", through
   its declared builder:
 

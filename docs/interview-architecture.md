@@ -1,4 +1,4 @@
-# Stage-2 interview — architecture decision
+# The gap interview — architecture decision
 
 **Status:** accepted (owner, 2026-07-11; skip semantics revised on review) · **Date:** 2026-07-11
 **Drives:** amendments to SPEC-article-draft-pipeline (CAP-2,
@@ -10,13 +10,20 @@ worked); 2026-07-10 "cross-cutting (interview & review UX)" and
 "draft-article run (gap interview)" entries
 
 > **Dated note added 2026-08-02 (Story 20.150, #1223).** This record describes
-> the **pre-reorder** pipeline, in which stage 1 was `harvest` and built a fact
-> sheet. That stage is retired: stage 1 is now `probe` (a feasibility verdict
+> the **pre-reorder** pipeline, in which `harvest` ran before the interview and
+> built a fact sheet. It is retired: the feasibility read is `probe` (a verdict
 > plus anchors) and grounding happens per claim at `examine` during fill
 > (#1182, #1220/#1223). The record is left **unrewritten on purpose** — it is a
 > dated decision with an accepted status, and editing it to match the present
 > would destroy the thing it exists to preserve. Read every "harvest" below as
 > naming the stage that then occupied slot 1.
+
+> **Dated note added 2026-08-02 (Story 20.158, #1247).** The owner ruling of
+> 2026-08-02 prohibits numbered process labels on every owner-facing surface.
+> This record is a **dated decision, left unrewritten on purpose** — the same
+> reason its harvest vocabulary stands. Its numbered forms name the processes
+> this pipeline now calls `start`, `probe`, the gap interview, the fill,
+> verification and `complete`; nothing composed for the owner may use them.
 
 
 This document closes the last of the four 2026-07-11 finding clusters at the

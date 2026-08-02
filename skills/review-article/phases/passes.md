@@ -120,7 +120,7 @@ each, in this order:
      journal predates the field or records no anchor, the claim anchor is
      **absent** — handled below, not substituted.
    - **Audience — the draft's own `audience:` frontmatter.** It is born at
-     stage 3 and is a stage 3→4 quality-gate precondition (Stories 13.41 and
+     the fill and is a fill→verify quality-gate precondition (Stories 13.41 and
      13.71), so every framework-complete draft carries it; packaging strips
      it, but review reads the canonical, which still has it. When it is
      missing the draft did not clear its own gate — report that as the
@@ -222,7 +222,7 @@ consult its config `frontmatter.schema` — that list, not this default, is
 authoritative.
 
 **Configuration backstop (CAP-5, Story 7.4).** The lint pass also re-runs the
-stage-0 configuration validation as a zero-token backstop:
+run-mint configuration validation as a zero-token backstop:
 
 ```
 python3 ${CLAUDE_PLUGIN_ROOT}/scripts/validate-config.py
@@ -371,7 +371,7 @@ review:
 - **13** (named gateway tool-surface gap — Story 13.72) — same as 11: the
   reader printed one `policy tool-surface gap: <reason>` line; relay it once,
   skip the pass, continue. Keep the reason for the `consulted:` line.
-- **4** (malformed block) — a stage-0 configuration error slipped through;
+- **4** (malformed block) — a configuration error slipped through;
   halt and report it like any CAP-5 finding.
 
 **The review run artifact ends with the `consulted:` line (Story 15.3)** —

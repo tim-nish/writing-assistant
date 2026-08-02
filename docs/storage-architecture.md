@@ -7,8 +7,8 @@
 target repository" (both friction findings)
 
 > **Dated note added 2026-08-02 (Story 20.150, #1223).** This record describes
-> the **pre-reorder** pipeline, in which stage 1 was `harvest` and built a fact
-> sheet. That stage is retired: stage 1 is now `probe` (a feasibility verdict
+> the **pre-reorder** pipeline, in which `harvest` ran before the interview and
+> built a fact sheet. It is retired: the feasibility read is `probe` (a verdict
 > plus anchors) and grounding happens per claim at `examine` during fill
 > (#1182, #1220/#1223). The record is left **unrewritten on purpose** — it is a
 > dated decision with an accepted status, and editing it to match the present

@@ -2,7 +2,7 @@
 
 <!-- rubric-version: 1 -->
 
-The fixed quality standard a draft must meet at the Stage 3→4 gate
+The fixed quality standard a draft must meet at the fill→verify gate
 (SPEC-article-draft-pipeline CAP-7; `docs/harness-architecture.md` D4).
 "Readable" is **this rubric**, not whatever an agent happens to produce.
 
@@ -42,7 +42,7 @@ The article advances **one claim**, and every section advances it.
   (`$WS/argument-plan.md`: thesis, arc, section intents), the draft must
   **advance that thesis** — a section that does not serve the planned thesis, or
   that fills its slot with a single under-evidenced sentence, **fails**. This
-  makes skeleton drafts fail the Stage 3→4 gate **before** review; review is a
+  makes skeleton drafts fail the fill→verify gate **before** review; review is a
   second net.
 
 ## Dimension 2 — Paragraph flow

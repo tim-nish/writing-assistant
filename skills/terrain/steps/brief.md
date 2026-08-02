@@ -374,7 +374,7 @@ definition in the same act, and "framework" was never owed one here.
 **Then hand off, with `--brief` wired from the artifact — never retyped.** The
 brief string comes from the artifact this step already wrote; the owner does not
 copy it, and neither do you. Capture the answered gate's payload per the gate's
-own contract, then run the **existing** stage-0 `--brief` path, unchanged since
+own contract, then run the **existing** run-mint `--brief` path, unchanged since
 Story 18.24 (#505):
 
 ```
@@ -385,7 +385,7 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py stage0 <the intent the o
 
 **`--brief` takes the artifact ITSELF, and that is the whole arc carrier**
 (Story 20.91, #1044). `--brief` has accepted a FILE since Story 18.24 (#505),
-and stage 0 reads a JSON **brief record** — the brief string, plus the selected
+and the run mint reads a JSON **brief record** — the brief string, plus the selected
 members and their journey arcs — by its shape alone. So the string it uses is
 the one this step composed, unchanged, and the **arcs travel with it**: the
 selected Strands' served arcs cross as declared source material at the recorded
@@ -394,8 +394,7 @@ second argument and no second hand-off. Nothing on the owner's surface changes,
 and the extraction one-liner is gone because the pipeline reads the file.
 
 **The sitting does not end on that command. It ends on a GATE (Story 20.136,
-#1176).** Staging the run is not the same as running probe (stage 1 since
-#1182), and the ask that
+#1176).** Staging the run is not the same as running probe, and the ask that
 decides which happens is an owner decision like every other one here:
 
 ```
@@ -417,7 +416,7 @@ its thesis or its gaps back at them. A restatement is free composition, which
 is the surface nothing downstream can police; a pointer leaves nothing to
 compose.
 
-The coupling direction is unchanged by this: stage 0 recognises a **format**,
+The coupling direction is unchanged by this: the run mint recognises a **format**,
 never a producer. It does not detect, name, import or resolve terrain, and it
 cannot tell this record from one the owner wrote by hand.
 
@@ -429,7 +428,7 @@ owner typed unaided. There is no new entry pipeline.
 **The uniformity is of BEHAVIOUR, and that scope is the point.** Downstream
 behaviour is identical — the run is byte-identical whichever way the brief
 arrived, and **nothing in drafting branches on which producer ran**. The
-coupling runs one way only: terrain → the gate → stage 0. Drafting neither
+coupling runs one way only: terrain → the gate → the run mint. Drafting neither
 imports, resolves, nor detects terrain state, and inverting that direction
 would breach the entry-agnosticism this clause protects.
 

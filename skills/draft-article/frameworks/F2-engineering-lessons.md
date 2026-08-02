@@ -55,7 +55,7 @@ context to make the lesson intelligible — this is not the project intro.)}
      → one synthesis), and a section's structure varies with its content — a
      lesson may fold or reorder these obligations rather than emit five identical
      headings. A slot met with a single under-evidenced sentence fails the
-     Stage 3→4 gate.
+     fill→verify gate.
      >3 lessons is a DECLINABLE SUGGESTION to split, not a rule (CAP-8, #432):
      depth is owner intent — surface "~N lessons; one deep-dive or split?" as an
      owner choice, and honor a depth/scope directive (deep-dive keeps them in one

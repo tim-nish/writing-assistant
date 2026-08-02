@@ -1,9 +1,9 @@
 <!-- stages/examine.md — draft-article stage companion (Story 20.147, #1182/#1097/#1185/#1209).
-     Loaded from stage 3 whenever a claim needs repository grounding; carries
+     Loaded from the fill whenever a claim needs repository grounding; carries
      the examine step's full operating detail. Not a pipeline stage of its own:
-     examine is a per-claim sub-step of the fill (stage 3+). -->
+     examine is a per-claim sub-step of the fill. -->
 
-## Examine — per-claim repository grounding (stage 3+)
+## Examine — per-claim repository grounding (during the fill)
 
 Harvest is retired (amended 2026-08-02, #1182 — the amendments companion is
 the authority) and **no fact sheet exists anywhere in the pipeline**. The
@@ -60,7 +60,7 @@ commits source is skipped and says so — take an address from
 `anchors_offered` and ask again rather than letting history be searched by
 claim keywords.
 
-**Anchor-finding lives HERE, per claim** (moved from stage 1 by story 20.155,
+**Anchor-finding lives HERE, per claim** (moved from probe by story 20.155,
 #1224). Probe emits no anchors: it is a configuration and permission check and
 has no claim to find them for. `anchors_offered` derives addresses from the
 first hop's own hits — a searchable source is where an address comes from, and
@@ -95,7 +95,7 @@ With no brief-carried scope (a cold run), `--scope` is omitted and the
 declared-source boundary of `writing-sources.yaml` is the fence, as always.
 
 **The read scope INTERSECTS the declared boundary and never widens it**
-(moved here from stage 1 by story 20.154, #1224 — probe no longer reads, so
+(moved here from probe by story 20.154, #1224 — probe no longer reads, so
 the invariant now binds where reading happens). Whatever a claim is examined
 against must intersect the declaration: a brief-carried region can only
 NARROW what is read, never add an undeclared repository, and the enumeration
