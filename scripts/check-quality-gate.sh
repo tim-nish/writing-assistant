@@ -360,20 +360,24 @@ grep -q 'verdict record is partial' "$work/e_rvc" \
   && err "a complete verdict record wrongly tripped the partial-record block" \
   || ok "a complete four-dimension record clears the completion verdict gate"
 
-# --- #751 substrate assertion (Story 19.14): an emptied state refuses, never
-# a false evidence gap. The terminal done checkpoint drops fact_sheet; passing
-# it must exit 2 with the named substrate error and NO evidence verdict.
+# --- #751 substrate assertion (Story 19.14), RE-ANCHORED (Story 20.174,
+# #1288): the carrier is the examination pin ledger, so a run that passes only
+# the terminal done checkpoint has supplied no carrier at all. It must exit 2
+# with the named error and NO evidence verdict — never a false evidence gap.
+# The re-pointed error also NAMES --pin-ledger, so an agent re-invoking is not
+# routed back into the same refusal (which is the #1288 defect's own shape).
 printf '{"stage":"done","next_stage":"done","reviewed":true}' > "$work/done-cp.json"
 rc=0
 python3 "$DP" quality-gate --draft "$work/good.md" --map "$work/good-map.txt" \
   --judge "$work/judge-pass.txt" \
   --framework-file "skills/draft-article/frameworks/F1-project-introduction.md" \
   --state "$work/done-cp.json" > "$work/sub.out" 2> "$work/sub.err" || rc=$?
-if [ "$rc" -eq 2 ] && grep -q "carries no fact sheet" "$work/sub.err" \
+if [ "$rc" -eq 2 ] && grep -q -- "--pin-ledger" "$work/sub.err" \
+   && grep -q "examination-pins.txt" "$work/sub.err" \
    && ! grep -q "found_kinds" "$work/sub.out"; then
-  ok "#751: emptied state -> named substrate error (exit 2), never found_kinds: []"
+  ok "#751/#1288: no carrier -> named error (exit 2) naming --pin-ledger, never a gap"
 else
-  err "#751: emptied state not refused as a substrate error (rc=$rc)"
+  err "#751/#1288: missing carrier not refused with the re-anchored error (rc=$rc)"
 fi
 
 # --- #750 (Story 19.12): a renamed GATE heading is section-not-found, with a
@@ -390,11 +394,11 @@ audience_id: x
 - proof lives here
 RN
 printf 'P1.S1[L9]: sourced <- x.md:1@8f3c2d1000000000000000000000000000000000\n' > "$work/rn-map.txt"
-printf '{"fact_sheet":[{"claim":"c","source":"x.md:1@8f3c2d1000000000000000000000000000000000","kind":"number"}]}' > "$work/rn-state.json"
+printf 'x.md:1@8f3c2d1000000000000000000000000000000000\n' > "$work/rn-pins.txt"
 python3 "$DP" quality-gate --draft "$work/renamed.md" --map "$work/rn-map.txt" \
   --judge "$work/judge-pass.txt" \
   --framework-file "skills/draft-article/frameworks/F1-project-introduction.md" \
-  --state "$work/rn-state.json" > "$work/rn.out" 2>/dev/null || true
+  --pin-ledger "$work/rn-pins.txt" > "$work/rn.out" 2>/dev/null || true
 python3 - "$work/rn.out" <<'PYEOF' \
   && ok "#750: renamed heading -> section-not-found with a heading-fix remedy" \
   || err "#750: renamed heading misreported (the found-nothing incident shape)"

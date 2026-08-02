@@ -27,6 +27,7 @@ rule as `draft_review.py`, applied for an additional reason.
 
 import argparse
 import hashlib
+import importlib.util
 import json
 import os
 import re
@@ -72,6 +73,54 @@ def _evidence_cannot_determine_line(entry):
            else "declared type not determined")
     return (f"evidence-type check: cannot-determine — {sec}, {dec}: "
             f"{entry['reason']}")
+
+
+# The evidence types this check has a SHIPPED predicate for, post-harvest
+# (Story 20.174, #1288; SPEC-article-draft-pipeline per-section-minimum-
+# evidence-type clause (a), amended 2026-08-02).
+#
+# `episode` maps onto the time-axis admissibility predicate `verify-provenance`
+# already enforces per claim (`scripts/verify-provenance.py:405-435`), whose
+# pointer-form→source-type table is owned by `resolve-writing-sources.py`.
+# `none` never reaches here (`parse_evidence_declarations` drops it).
+#
+# `example` and `measurement` are DELIBERATELY ABSENT and must stay absent
+# until the record gains a kind field. A pin-ledger line is a BARE POINTER with
+# no kind (`scripts/examine.py:629-632` writes `evidence[].cite` and nothing
+# else), while `EVIDENCE_KINDS` resolves those two out of `quote`/`result`/
+# `number`; the examination record's own vocabulary is `source_type`
+# (`commit|issue|prose`) plus `time_axis`, an ORTHOGONAL axis rather than a
+# renaming of the four KINDs. Inventing a substitute predicate would put a
+# fabricated judgment under a publish blocker — a worse failure than the silent
+# skip #1288 exists to fix — so they resolve to 20.173's cannot-determine
+# state, which is the correct output here and not a stopgap.
+EVIDENCE_TYPE_PREDICATES = {"episode"}
+
+
+def _load_rws():
+    """The declared-source TYPE authority (`resolve-writing-sources.py`) — the
+    same module `verify-provenance` loads for the same reason: ONE copy of the
+    pointer-form→source-type→time-axis table in the repository. Loaded lazily,
+    so a gate run over a framework declaring no evidence types pays nothing."""
+    here = os.path.dirname(os.path.realpath(__file__))
+    spec = importlib.util.spec_from_file_location(
+        "rws", os.path.join(here, "resolve-writing-sources.py"))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def _read_pin_ledger(path):
+    """The run's declared pointer set, read from `$WS/examination-pins.txt` —
+    the SAME file stage 3 hands `verify-provenance` as `--fact-sheet`
+    (`skills/draft-article/stages/stage3.md`; the flag name predates #1182 and
+    was retained on purpose). Same one-pointer-per-line, `#`-comment grammar
+    `verify-provenance._load_set` reads, because it is the same file. This
+    creates NO store and appends nothing: the ledger stays DERIVED from the
+    examination records in claim order (`scripts/examine.py:607-635`)."""
+    with open(path, encoding="utf-8") as fh:
+        return {ln.strip() for ln in fh
+                if ln.strip() and not ln.strip().startswith("#")}
 
 
 def cmd_quality_gate(args):
@@ -280,7 +329,7 @@ def cmd_quality_gate(args):
                        "the framework's per-section [EVIDENCE: …] declarations "
                        "— no declared minimum evidence type was resolved for "
                        "any section, and the check did not run. Re-invoke with "
-                       "--framework-file and --state (the documented gate "
+                       "--framework-file and --pin-ledger (the documented gate "
                        "invocation, skills/draft-article/stages/gate.md)"),
         })
     if getattr(args, "framework_file", None):
@@ -293,35 +342,44 @@ def cmd_quality_gate(args):
             sys.stderr.write(f"error: cannot read --framework-file: {e}\n")
             return 2
         if decls:
-            if not args.map or not getattr(args, "state", None):
+            # THE RE-ANCHOR (Story 20.174, #1288). The carrier is the
+            # examination pin ledger read beside the provenance map — NOT
+            # `state["fact_sheet"]`, whose producer was retired with harvest
+            # (#1182/#1224), which is what converted a fail-closed check into a
+            # silent skip. `--state` is still accepted (the CLI surface is the
+            # invariant) and is no longer consulted by THIS check.
+            if not args.map or not getattr(args, "pin_ledger", None):
                 sys.stderr.write(
                     "error: the framework declares per-section minimum evidence "
                     "types, so the gate needs --map (anchored provenance map) "
-                    "and --state (consume/checkpoint state carrying the fact "
-                    "sheet) — the check fails closed rather than silently "
-                    "skipping (SPEC-article-draft-pipeline, evidence-type "
-                    "constraint)\n")
+                    "and --pin-ledger (the run's examination pin ledger, "
+                    "$WS/examination-pins.txt — the same file stage 3 hands "
+                    "verify-provenance as --fact-sheet) — the check fails "
+                    "closed rather than silently skipping. NOTE: --state no "
+                    "longer carries this check's evidence; passing it instead "
+                    "of --pin-ledger will not satisfy this refusal "
+                    "(SPEC-article-draft-pipeline, evidence-type constraint as "
+                    "amended 2026-08-02, #1288)\n")
                 return 2
-            state = _host._load_json_state(args.state, "--state")
-            # Substrate assertion (Story 19.14, #751): a state with no fact
-            # sheet cannot resolve any KIND, and "computed over nothing" must
-            # never present as "computed and found nothing" — the terminal
-            # `done` checkpoint drops `fact_sheet`, so the documented re-entry
-            # invocation used to false-fail here as `found_kinds: []`,
-            # indistinguishable from a real evidence gap. Same fail-closed
-            # posture as the missing --map/--state branch above.
-            if not state.get("fact_sheet"):
+            # An UNREADABLE ledger is an invocation defect (a wrong path), so it
+            # refuses like a missing flag. An EMPTY one is a corpus precondition
+            # and falls through to cannot-determine below — the Story 19.14
+            # (#751) distinction, re-pointed: "computed over nothing" must stay
+            # mechanically distinguishable from "computed and found nothing",
+            # and post-#1288 the honest name for the first is the third state,
+            # not a refusal that an agent then routes around by dropping flags.
+            try:
+                ledger = _read_pin_ledger(args.pin_ledger)
+            except OSError as e:
                 sys.stderr.write(
-                    "error: --state carries no fact sheet (empty or absent "
-                    "`fact_sheet` key) — the evidence-type check cannot resolve "
-                    "KINDs over nothing, and refuses rather than reporting a "
-                    "false evidence gap. Pass a pre-completion state (the "
-                    "consume output, or a checkpoint written before the "
-                    "terminal `done`); the run's fact sheet itself is unchanged "
-                    "at $WS/fact-sheet.md (Story 19.14, #751)\n")
+                    f"error: cannot read --pin-ledger: {e} — the evidence-type "
+                    "check refuses rather than reporting a false evidence gap. "
+                    "Pass the run's derived ledger ($WS/examination-pins.txt); "
+                    "derive it with `examine.py derive-ledger` if the run's "
+                    "examinations have not been joined yet (Story 20.174, "
+                    "#1288)\n")
                 return 2
-            kinds_by_source = {e.get("source"): e.get("kind")
-                               for e in state.get("fact_sheet", [])}
+            rws = _load_rws()
             lines = draft.splitlines()
             heads = [(i + 1, ln) for i, ln in enumerate(lines) if ln.startswith("##")]
             sections = []
@@ -331,70 +389,112 @@ def cmd_quality_gate(args):
             evidence_checked = True
             for slot, types in decls:
                 sec = next((s for s in sections if s[0] == slot), None)
-                # KIND unmappable (Story 20.173): a declared type with no entry
-                # in the KIND mapping has no predicate to evaluate. Reporting
-                # the section as unsatisfied would assert an absence the check
-                # never established.
-                unmapped = sorted(t for t in types if t not in _host.EVIDENCE_KINDS)
-                if unmapped:
-                    evidence_cannot_determine.append({
-                        "section": slot,
-                        "section_present": bool(sec),
-                        "declared": sorted(types),
-                        "reason": ("declared evidence type(s) "
-                                   + ", ".join(unmapped)
-                                   + " have no KIND mapping, so there is no "
-                                     "predicate to evaluate for them — this "
-                                     "section's evidence was established "
-                                     "neither present nor absent"),
-                    })
-                    continue
-                allowed = set().union(*(_host.EVIDENCE_KINDS[t] for t in types))
-                found = set()
-                unresolved = []
+                decidable = sorted(set(types) & EVIDENCE_TYPE_PREDICATES)
+                undecidable = sorted(set(types) - EVIDENCE_TYPE_PREDICATES)
+                # The section's EVIDENCE-BEARING positions, from the map's
+                # per-section sourced/derived distribution (AC-1). `narration`
+                # and `verify` are excluded on the shipped predicate's own
+                # polarity: `_episode_findings` refuses an episode claim typed
+                # either, because neither carries a pin.
+                dist = {c: 0 for c in ("sourced", "derived", "narration", "verify")}
+                carried, absent, time_axis = [], [], []
                 if sec:
                     for _pos, _cls, ptrs, anchor in prov_entries:
-                        if anchor and sec[1] <= anchor <= sec[2]:
-                            for ptr in ptrs:
-                                k = kinds_by_source.get(ptr)
-                                if k:
-                                    found.add(k)
-                                else:
-                                    unresolved.append(ptr)
-                if not (found & allowed) and sec and unresolved:
-                    # Carrier absent FOR THIS SECTION (Story 20.173): the
-                    # section anchors pointers the carrier does not resolve to
-                    # any KIND, so "no allowed KIND found" cannot be told apart
-                    # from "the carrier does not carry these pointers" — the
-                    # #751 false-gap shape at per-section granularity. The
-                    # producer of the KIND carrier was retired with harvest
-                    # (#1182/#1224), which is why this is the ordinary case now
-                    # rather than a corner.
-                    evidence_cannot_determine.append({
-                        "section": slot,
-                        "section_present": True,
-                        "declared": sorted(types),
-                        "allowed_kinds": sorted(allowed),
-                        "found_kinds": sorted(found),
-                        "unresolved_pointers": sorted(set(unresolved)),
-                        "reason": ("carrier absent — "
-                                   + str(len(set(unresolved)))
-                                   + " anchored pointer(s) in this section "
-                                     "resolve to no KIND in the supplied "
-                                     "--state carrier (its producer was "
-                                     "retired with harvest, #1182/#1224), so "
-                                     "the declared type was neither found nor "
-                                     "established missing"),
-                    })
+                        if not (anchor and sec[1] <= anchor <= sec[2]):
+                            continue
+                        dist[_cls] = dist.get(_cls, 0) + 1
+                        if _cls not in ("sourced", "derived"):
+                            continue
+                        for ptr in ptrs:
+                            if ptr in ledger:
+                                carried.append(ptr)
+                                if rws.pointer_time_axis(ptr):
+                                    time_axis.append(ptr)
+                            else:
+                                absent.append(ptr)
+                common = {"section": slot, "section_present": bool(sec),
+                          "declared": sorted(types), "class_distribution": dist,
+                          "carrier": "examination-pins"}
+                # (1) NO SHIPPED PREDICATE for any declared type (AC-4). A
+                # pin-ledger line is a bare pointer; `example` and `measurement`
+                # are resolved out of quote/result/number, which nothing
+                # post-harvest records. Reporting the section unsatisfied would
+                # assert an absence the check never established, and inventing a
+                # substitute would put a fabricated judgment under a publish
+                # blocker.
+                # `sec and` guards it so that a section the join never LOCATED
+                # still reports #750's section-not-found: a renamed heading is a
+                # draft-shape defect knowable without any evidence predicate,
+                # and reporting it as cannot-determine would hide a repair the
+                # check CAN name.
+                if sec and not decidable:
+                    evidence_cannot_determine.append(dict(
+                        common,
+                        reason=("declared evidence type(s) " + ", ".join(undecidable)
+                                + " have no established predicate over the "
+                                  "examination pin ledger — a ledger line is a "
+                                  "bare pointer with no kind field, and the "
+                                  "examination record's `source_type`/`time_axis` "
+                                  "vocabulary is orthogonal to the quote/result/"
+                                  "number KINDs these types resolve out of. This "
+                                  "section's evidence was established neither "
+                                  "present nor absent; the mapping is an open "
+                                  "question (#1288), never guessed here"),
+                    ))
                     continue
-                if not (found & allowed):
+                if sec and time_axis:
+                    # (2) SATISFIED. `episode` passes iff at least one anchored
+                    # pointer resolves to a TIME-AXIS source — the same
+                    # predicate `verify-provenance` enforces per claim (#1184
+                    # clause (iii)), REUSED from the same table, never
+                    # re-implemented. The declaration is a disjunction, so one
+                    # decidable type satisfying it settles the section.
+                    pass
+                elif sec and absent:
+                    # (3) Carrier absent FOR THIS SECTION (Story 20.173, shape
+                    # preserved): the section anchors pointers the ledger does
+                    # not carry — an interview answer id, or a pin from a run
+                    # whose examinations were never joined — so "no time-axis
+                    # source found" cannot be told apart from "the carrier does
+                    # not carry these pointers". The #751 false-gap shape at
+                    # per-section granularity.
+                    evidence_cannot_determine.append(dict(
+                        common,
+                        unresolved_pointers=sorted(set(absent)),
+                        reason=("carrier absent — " + str(len(set(absent)))
+                                + " anchored pointer(s) in this section are not "
+                                  "in the supplied --pin-ledger "
+                                  "($WS/examination-pins.txt), so the declared "
+                                  "type was neither found nor established "
+                                  "missing"),
+                    ))
+                    continue
+                elif sec and undecidable:
+                    # (4) The decidable half is REFUTED but the declaration is a
+                    # disjunction whose remaining members have no predicate — so
+                    # the section as a whole is undecided, not failing.
+                    evidence_cannot_determine.append(dict(
+                        common,
+                        decided=decidable, undecided=undecidable,
+                        reason=("no anchored pointer resolves to a time-axis "
+                                "source, so `" + "|".join(decidable) + "` is "
+                                "refuted — but the declaration also offers "
+                                + ", ".join(undecidable) + ", which has no "
+                                "established predicate over the pin ledger. The "
+                                "disjunction is undecided, and reporting a "
+                                "missing-input finding here would rest on a "
+                                "guessed mapping (#1288)"),
+                    ))
+                    continue
+                if not (sec and time_axis):
                     tlist = "|".join(sorted(types))
                     evidence_missing.append({
                         "section": slot,
                         "section_present": bool(sec),
                         "declared": sorted(types),
-                        "allowed_kinds": sorted(allowed),
-                        "found_kinds": sorted(found),
+                        "class_distribution": dist,
+                        "carrier": "examination-pins",
+                        "carried_pointers": sorted(set(carried)),
                         # #750: a section the join never FOUND is a different
                         # defect class than a found-but-hollow one — the first
                         # is a draft-shape defect (renamed heading), repaired
@@ -434,8 +534,9 @@ def cmd_quality_gate(args):
                     (f"{m['section']}: section not found (expected slot key "
                      f"'{m['section']}'; heading mismatch — see upstream)")
                     if m["classification"] == "section-not-found" else
-                    f"{m['section']}: declared {'|'.join(m['declared'])}, found "
-                    f"{','.join(m['found_kinds']) or 'nothing'}"
+                    f"{m['section']}: declared {'|'.join(m['declared'])}, no "
+                    f"anchored pointer resolves to a time-axis source "
+                    f"({len(m['carried_pointers'])} pointer(s) in the ledger)"
                     for m in evidence_missing))
             elif evidence_cannot_determine:
                 results["evidence"] = ("cannot-determine", "; ".join(

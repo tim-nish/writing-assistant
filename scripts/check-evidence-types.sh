@@ -14,6 +14,13 @@
 # and — Story 20.173, #1288 — reports an unresolvable predicate as its own
 # named `cannot-determine` state with a reason, on both sides of the replay,
 # never as a missing-input finding and never as a publish blocker.
+#
+# Story 20.174 (#1288) RE-ANCHORS the carrier on the examination pin ledger
+# read beside the provenance map, so this check replays against a real
+# workspace shape: `episode` resolves through the shipped time-axis predicate,
+# and `example`/`measurement` — which a bare pin carries no field for — must
+# stay UNMAPPED and report cannot-determine rather than acquire a guessed
+# predicate under a publish blocker.
 
 set -eu
 
@@ -53,23 +60,30 @@ def w(name, text):
     open(p, "w").write(text)
     return p
 
-fw = w("fw.md", "# T\n\n## GATE {Evidence}   (~100 words) [SKIP: blocker] [EVIDENCE: episode|example|measurement]\n\n## {Limits}\n")
+fw = w("fw.md", "# T\n\n## GATE {Evidence}   (~100 words) [SKIP: blocker] [EVIDENCE: episode]\n\n## {Limits}\n")
+fw_mixed = w("fw_mixed.md", "# T\n\n## GATE {Evidence}   [EVIDENCE: episode|example|measurement]\n\n## {Limits}\n")
+fw_ex = w("fw_ex.md", "# T\n\n## GATE {Evidence}   [EVIDENCE: example]\n\n## {Limits}\n")
 fw_none = w("fw_none.md", "# T\n\n## {Context}\n\n## GATE {Pointer block}\n")
-state = w("state.json", json.dumps({"fact_sheet": [
-    {"claim": "c1", "source": "src/a.py:10@aaaaaaa", "kind": "event"},
-    {"claim": "c2", "source": "src/b.py:20@bbbbbbb", "kind": "decision"},
-]}))
+# THE CARRIER (Story 20.174): the run's derived pin ledger — bare pointers, one
+# per line, exactly the file stage 3 hands verify-provenance as --fact-sheet.
+# A commit sha carries a time axis; a `path:line@sha` prose pin does not.
+state = w("pins.txt", "a1b2c3d\nsrc/b.py:20@bbbbbbb\n")
 draft = ("---\naudience: r\naudience_id: r-id\n---\n"
          "## Evidence\n\nBody sentence one.\n\n## Limits\n\nTail.\n")
-good_map = w("good.map", "P1.S1[L7]: sourced <- src/a.py:10@aaaaaaa\n")   # event -> allowed
-holl_map = w("holl.map", "P1.S1[L7]: sourced <- src/b.py:20@bbbbbbb\n")   # decision -> not allowed
+good_map = w("good.map", "P1.S1[L7]: sourced <- a1b2c3d\n")               # commit -> time axis
+holl_map = w("holl.map", "P1.S1[L7]: sourced <- src/b.py:20@bbbbbbb\n")   # prose -> no time axis
 
 def gate(**kw):
     class A:
         draft = "-"; map = None; judge = None; audience_known = None
         cycle = 1; prior_locations = None; profile = "full"
-        framework_file = None; state = None
+        framework_file = None; state = None; pin_ledger = None
     a = A()
+    # `state=` names the CARRIER in this fixture: since 20.174 it is the pin
+    # ledger, passed as --pin-ledger. One name kept so every case below reads
+    # as "the carrier for this run".
+    if "state" in kw:
+        kw["pin_ledger"] = kw.pop("state")
     for k, v in kw.items(): setattr(a, k, v)
     out, errbuf = io.StringIO(), io.StringIO()
     sys.stdin = io.StringIO(draft)
@@ -108,10 +122,14 @@ else:
     if rc2 != 0 or hop.get("action") not in ("elicit", "re-harvest"):
         bad.append(f"missing-input upstream line did not parse in repair-hop (action={hop.get('action')!r})")
 
-# (c) fail closed: declarations exist, --state missing -> exit 2.
+# (c) fail closed: declarations exist, the carrier flag is missing -> exit 2,
+# and the error NAMES the re-anchored flag (an agent re-invoking with --state
+# would otherwise loop on the same refusal).
 rc, out, errtxt = gate(map=good_map, judge=judge, framework_file=fw, state=None)
 if rc != 2 or "fails closed" not in errtxt:
-    bad.append("missing --state did not fail closed with the named error")
+    bad.append("missing --pin-ledger did not fail closed with the named error")
+if "--pin-ledger" not in errtxt or "examination-pins.txt" not in errtxt:
+    bad.append("fail-closed error does not name the re-anchored carrier (#1288)")
 
 # (d) undeclared framework: no evidence key, no failure.
 rc, out, _ = gate(map=good_map, judge=judge, framework_file=fw_none, state=state)
@@ -132,9 +150,7 @@ if g["dimensions"].get("evidence", {}).get("verdict") != "fail":
 # a resolvable carrier prints a pass or a finding; (ii) one whose carrier
 # resolves none of the section's anchored pointers prints the cannot-determine
 # line naming the section, the declared type, and WHY.
-nores = w("nores.json", json.dumps({"fact_sheet": [
-    {"claim": "elsewhere", "source": "other/z.py:1@ccccccc", "kind": "event"},
-]}))
+nores = w("nores.txt", "other/z.py:1@ccccccc\n")
 def report_text(out, errtxt):
     g = json.loads(out)
     return "\n".join(g.get("notices", [])
@@ -166,6 +182,86 @@ if g["dimensions"].get("evidence", {}).get("verdict") != "cannot-determine":
 rc, out, errtxt = gate(map=good_map, judge=judge)
 if "evidence-type check: cannot-determine" not in report_text(out, errtxt):
     bad.append("gate run without --framework-file omitted the check silently (#1288)")
+
+# (g) THE RE-ANCHOR REPLAY (Story 20.174, #1288) — the three outcomes AC-6
+# names, all asserted on emitted output, against a real workspace shape: a pin
+# ledger of bare pointers plus an anchored provenance map.
+#
+# (i) `episode` grounded in a COMMIT pointer passes — through the SAME
+# time-axis predicate verify-provenance enforces per claim (#1184 (iii)).
+rc, out, errtxt = gate(map=good_map, judge=judge, framework_file=fw, state=state)
+g = json.loads(out)
+if g["dimensions"].get("evidence", {}).get("verdict") != "pass":
+    bad.append("episode grounded in a commit pointer did not pass the time-axis predicate")
+
+# (ii) the SAME section grounded only in a `path:line@sha` prose pointer is a
+# missing-input finding NAMING the section and the type — never a pass, and
+# never cannot-determine (the predicate resolved; it was refuted). examine
+# declares that negative at the source: a prose item is "state claims only —
+# not an episode source".
+rc, out, errtxt = gate(map=holl_map, judge=judge, framework_file=fw, state=state)
+g = json.loads(out)
+mi = g.get("evidence_types", {}).get("missing_input", [])
+loc = g["dimensions"].get("evidence", {}).get("locations", "")
+if g["dimensions"].get("evidence", {}).get("verdict") != "fail" or not mi:
+    bad.append("prose-only episode section did not produce a missing-input finding")
+elif mi[0]["section"] != "evidence" or "episode" not in "|".join(mi[0]["declared"]):
+    bad.append("missing-input finding names neither the section nor the type")
+if "evidence" not in loc or "episode" not in loc:
+    bad.append("the emitted fail locations name neither the section nor the type")
+if "cannot-determine" in report_text(out, errtxt):
+    bad.append("a REFUTED episode predicate reported cannot-determine (over-triggered)")
+
+# (iii) an `example`-declaring section is cannot-determine — ALWAYS, including
+# over a carrier that resolves every one of its pointers. A pin ledger line is
+# a bare pointer with no kind field, so quote/result/number are not recoverable
+# from it; a guessed predicate under a publish blocker is the worse failure.
+for fwx, label in ((fw_ex, "example-only"), (fw_mixed, "episode|example|measurement")):
+    rc, out, errtxt = gate(map=good_map if fwx is fw_ex else holl_map,
+                           judge=judge, framework_file=fwx, state=state)
+    g = json.loads(out)
+    text = report_text(out, errtxt)
+    if "evidence-type check: cannot-determine" not in text:
+        bad.append(f"{label}: no cannot-determine line for an unmapped type")
+    if "example" not in text:
+        bad.append(f"{label}: cannot-determine line does not name the unmapped type")
+    if g.get("evidence_types", {}).get("missing_input"):
+        bad.append(f"{label}: an unmapped type produced a missing-input finding "
+                   "(a guessed mapping under a publish blocker)")
+    if "evidence" in g.get("failing_dimensions", []):
+        bad.append(f"{label}: an unmapped type blocked the gate")
+
+# (iv) `example`/`measurement` have NO entry in the predicate table — asserted
+# on the table itself, so a future edit that quietly adds one is caught here
+# and not only in the replay above.
+PY_TABLE = getattr(dp, "draft_variants", None)
+if PY_TABLE is None or not hasattr(PY_TABLE, "EVIDENCE_TYPE_PREDICATES"):
+    bad.append("EVIDENCE_TYPE_PREDICATES is not reachable from the host module")
+elif PY_TABLE.EVIDENCE_TYPE_PREDICATES != {"episode"}:
+    bad.append("the predicate table drifted: only `episode` has a shipped "
+               f"predicate post-harvest, got {PY_TABLE.EVIDENCE_TYPE_PREDICATES!r}")
+
+# (v) an EMPTY but readable ledger is a corpus precondition (cannot-determine),
+# while an UNREADABLE one is an invocation defect (exit 2). The #751 line
+# between "computed over nothing" and "computed and found nothing", re-pointed.
+empty = w("empty.txt", "")
+rc, out, errtxt = gate(map=good_map, judge=judge, framework_file=fw, state=empty)
+if rc == 2 or "cannot-determine" not in report_text(out, errtxt):
+    bad.append("an empty pin ledger refused instead of reporting cannot-determine")
+rc, out, errtxt = gate(map=good_map, judge=judge, framework_file=fw,
+                       state=os.path.join(tmp, "does-not-exist.txt"))
+if rc != 2 or "cannot read --pin-ledger" not in errtxt:
+    bad.append("an unreadable pin ledger did not refuse as an invocation defect")
+
+# (vi) NO NEW STORE (AC-2): the check only READS its carrier — no second
+# ledger, no index, no kind-sidecar, and no append to the derived ledger.
+files_before = sorted(os.listdir(tmp))
+pins_before = open(state).read()
+gate(map=good_map, judge=judge, framework_file=fw_mixed, state=state)
+if sorted(os.listdir(tmp)) != files_before:
+    bad.append("the evidence-type check wrote a file — it creates no store (AC-2)")
+if open(state).read() != pins_before:
+    bad.append("the evidence-type check mutated the pin ledger — it stays DERIVED (AC-2)")
 
 for b in bad: print(f"  drift: {b}", file=sys.stderr)
 sys.exit(1 if bad else 0)
