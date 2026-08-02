@@ -74,6 +74,23 @@ Where/Why/Effect, a journal entry per disposition — `detector-formats.md` §3)
     upstream hub is untouched.
   - **fix here** — the divergence is a consumer defect: route to this repo's
     tracker as an ordinary issue; no upstream proposal.
+
+  **Either tracker-issue emission is composed through the mint guard** (Story
+  20.167, #1260): write the draft body and the run output's `denominator`
+  block to files, then
+
+  ```
+  python3 ${CLAUDE_PLUGIN_ROOT}/scripts/mint_guard.py compose \
+    --record "$WS/denominator.json" --body-file "$WS/issue-body.md" \
+    [--run-record "$WS/mint-record.json"]
+  ```
+
+  and file **its stdout** as the issue body — it carries a `## Denominator`
+  section stating what the pass examined, from the run's own mechanical
+  fields, never prose. On a refusal (empty enumeration — exit 4, reason on
+  stderr) **no issue is opened**: the finding is cannot-determine, recorded
+  to the run record and relayed to the owner as such, never converted into
+  an absence-shaped issue (#1171–#1175 are the shape this forbids).
   - **dismiss** — not a divergence; a one-line reason, remembered.
 
 Nothing is emitted without the owner's choice, and **no path touches the
