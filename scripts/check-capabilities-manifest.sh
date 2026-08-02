@@ -1,6 +1,12 @@
 #!/usr/bin/env sh
 # parallel-safe
 # tier: full — binds the manifest to the pre-PR gate run that executes the
+# covers: CAPABILITIES.md scripts/check-*.sh
+# covers-note (#1321): flag `sparse:1-paths/199-lines` ANSWERED BY WIDENING. The one derived
+#   glob is right — a manifest row naming a check that was renamed or deleted is exactly the
+#   rot this exists to catch, so every check file is covered. What the derivation could not
+#   see is the subject itself: MANIFEST=CAPABILITIES.md sits at the repo ROOT, outside the
+#   trees the extractor scans. Added by hand.
 #   suite-resident evidence (#949); measured ~1s after the re-execution class
 #   was removed (was 81.7s — evidence re-run per row)
 # check-capabilities-manifest.sh — every CAPABILITIES.md row's evidence EXISTS

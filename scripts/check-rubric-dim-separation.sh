@@ -1,5 +1,6 @@
 #!/usr/bin/env sh
 # parallel-safe
+# covers: scripts/draft-pipeline.py skills/draft-article/quality-rubric.md skills/draft-article/stages/gate.md
 # check-rubric-dim-separation.sh — verify the dim4-vs-dim1/2 dimension
 # separation (Story 13.66, #349). POSIX shell + stdlib Python.
 #

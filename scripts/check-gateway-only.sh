@@ -1,5 +1,13 @@
 #!/usr/bin/env sh
 # parallel-safe
+# covers: scripts/** skills/**
+# covers-note (#1321): flag `dynamic-path:canary` ANSWERED — the canary dirs are mktemp hub
+#   fixtures, no coverage. The derived set is REPLACED, not trimmed: it proposed
+#   scripts/fixtures/**, which this check explicitly EXCLUDES (SKIP_DIRS), and three named
+#   scripts. What it actually asserts is a repo-wide invariant — the static scan walks
+#   "$root/scripts" and "$root/skills" whole, looking for any direct recall-surface read —
+#   so a new file ANYWHERE in either tree is exactly what must trigger it. Broad by
+#   necessity, and cheap: an inner-tier static text walk.
 # check-gateway-only.sh — gateway-only regression suite (Story 13.74,
 # SPEC-policy-source-seam CAP-2 success clause as amended 2026-07-18, #366).
 # POSIX shell + stdlib Python only.

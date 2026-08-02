@@ -1,6 +1,7 @@
 #!/usr/bin/env sh
 # parallel-safe
 # tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
+# covers: config/platform-profiles/devto.example.yaml config/platform-profiles/zenn.example.yaml scripts/adapt-canonical.py scripts/draft-pipeline.py scripts/validate-proposal-payload.py skills/adapt-canonical/SKILL.md
 # check-derived-canonical.sh — verify the DERIVED CANONICAL is first-class and
 # records its ancestry (Story 18.57, #586; SPEC-canonical-adaptation CAP-2 +
 # CAP-4). POSIX sh + stdlib Python; every fixture write lands under mktemp -d.

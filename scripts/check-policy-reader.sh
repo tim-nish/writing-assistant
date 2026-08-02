@@ -1,6 +1,10 @@
 #!/usr/bin/env sh
 # parallel-safe
 # tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
+# covers: scripts/fixtures/policy-gateway-stub.py scripts/read-policy-source.py
+# covers-note (#1321): flag `sparse:2-paths/372-lines` RECORDED AS UNDERSTOOD-AND-NARROW —
+#   the seam reader and the stub it is exercised against are the entire subject, and no
+#   `dynamic-path` flag accompanies the ratio.
 # check-policy-reader.sh — verify the gateway-backed policy reader (Story
 # 13.72, SPEC-policy-source-seam CAP-2 as amended 2026-07-18: served
 # transport, same CLI contract). POSIX shell + stdlib Python only.

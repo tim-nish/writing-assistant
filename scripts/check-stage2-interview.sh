@@ -1,6 +1,11 @@
 #!/usr/bin/env sh
 # parallel-safe
 # tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
+# covers: config/platform-profiles/devto.example.yaml config/platform-profiles/zenn.example.yaml scripts/draft-pipeline.py scripts/fixtures/interview-items/valid.json skills/draft-article/SKILL.md skills/draft-article/stages/complete.md skills/draft-article/stages/gate.md skills/draft-article/stages/stage0.md skills/draft-article/stages/stage1.md skills/draft-article/stages/stage2.md skills/draft-article/stages/stage3.md skills/draft-article/stages/stage4.md
+# covers-note (#1321): flag `dynamic-path:PROFD` ANSWERED as understood-and-narrow — PROFD
+#   is "${TMPDIR}/da-profiles.$$", a per-run scratch profile directory. Nothing tracked is
+#   reached through it, and the derived set (the pipeline, the whole draft-article stage
+#   set this check cats, the shipped profiles and the interview fixture) is complete.
 # check-stage2-interview.sh — verify the bounded gap interview (Story 4.3).
 # POSIX shell + stdlib Python.
 

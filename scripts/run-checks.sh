@@ -6,7 +6,8 @@
 #
 # Two tiers:
 #   inner  — the per-edit tier. Runs every check NOT carrying a `# tier: full`
-#            header. An inner check exceeding INNER_MS FAILS the run with the
+#            header, PLUS any full-tier check PROMOTED by a coverage hit (see
+#            below). An inner check exceeding INNER_MS FAILS the run with the
 #            fix named — a slow check silently absorbed by each sitting is the
 #            defect class this runner exists to make visible (the 2026-07-29
 #            investigation measured a 34.3s check inside the edit loop, paid
@@ -77,7 +78,21 @@
 # authoritative-and-wrong, and nothing becomes unreachable — the full tier is
 # still the single pre-PR gate and still runs everything. The incompleteness is
 # REPORTED on every run (the `coverage-map:` line) so it is observable rather
-# than silent. A `# covers:` line with no globs after it is an ERROR naming the
+# than silent.
+#
+# COVERAGE IS ALSO THE PROMOTION SIGNAL (#1321). A `# tier: full` check whose
+# declared globs match a changed path RUNS in the inner tier for that
+# invocation — it is not skipped. Without this, a declaration on a full-tier
+# check bought visibility (it appears in `--list`) and not earlier discovery,
+# and three of the first four ratified declarations sit on full-tier checks, so
+# populating the rest would have bought a longer list. Promotion is narrow by
+# construction: a full-tier check runs early only when a path IT DECLARES
+# changed, never on every edit, and its `# covers:` line is the one place a
+# human already ratified that scope. The runtime bargain is stated at `report`
+# below (per-check ceiling exempt-and-disclosed) and at the family total
+# (binding) — read both together; they are one decision.
+#
+# A `# covers:` line with no globs after it is an ERROR naming the
 # file: an empty declaration is the one shape that reads as a claim and makes
 # none. Globs are matched with `case`, so `*` crosses `/` — `skills/**` and
 # `skills/*` both mean everything under `skills/`.
@@ -92,8 +107,9 @@
 #                  serially exactly as it always has.
 #   --changed PATHS  space- or comma-separated changed paths (repeatable). Adds
 #                  every check whose `# covers:` globs match one of them to the
-#                  GLOB selection. Omit it and selection is EXACTLY the
-#                  name-prefix family it has always been.
+#                  GLOB selection, and PROMOTES a matched `# tier: full` check
+#                  into an inner run (#1321). Omit it and selection is EXACTLY
+#                  the name-prefix family it has always been.
 #   --list         print the selected checks and the coverage-map line, run
 #                  nothing, exit 0. The selector is inspectable on its own.
 #   GLOB           optional filter, e.g. 'scripts/check-terrain*' — the
@@ -230,17 +246,47 @@ for f in $GLOB; do
   [ -f "$f" ] || continue
   case "$f" in *run-checks.sh) continue ;; esac
   FILES="$FILES $f"
+  PREFIX_FILES="$PREFIX_FILES $f"
 done
+#
+# COVERED is the coverage-matched set, and it is computed for EVERY check, not
+# only the ones the GLOB missed: it is also the PROMOTION signal (#1321), and a
+# check can be both prefix-selected and coverage-matched.
+COVERED=''
+PROMOTED=''
 UNION_ADDED=0
+PROMOTED_N=0
 if [ -n "$CHANGED" ]; then
   for f in scripts/check-*; do
     [ -f "$f" ] || continue
     case "$f" in *run-checks.sh) continue ;; esac
+    covers_match "$f" || continue
+    COVERED="$COVERED $f"
     case " $FILES " in *" $f "*) continue ;; esac
-    if covers_match "$f"; then
-      FILES="$FILES $f"
-      UNION_ADDED=$((UNION_ADDED + 1))
-    fi
+    FILES="$FILES $f"
+    UNION_ADDED=$((UNION_ADDED + 1))
+  done
+  # PROMOTION IS BOUNDED BY THE GLOB; SELECTION IS NOT (#1321, owner decision
+  # 2026-08-02). The asymmetry is deliberate and is not promotion half-wired:
+  #
+  #   SELECTION (an inner check the GLOB missed) stays UNBOUNDED, because #998's
+  #   gap was a check asserting a repo-wide property ABOUT what you edited never
+  #   being selected. That gap stays fully closed.
+  #
+  #   PROMOTION runs a check its author deliberately tiered OUT of the edit
+  #   loop, so the operator's own scope bounds it. Measured before this bound:
+  #   an inner run over scripts/draft-pipeline.py promoted 32 full-tier checks
+  #   for 177s, breaching INNER_TOTAL_MS — and the runner's own documented
+  #   per-edit remedy (scope with a GLOB) could not reach it, because this set
+  #   ignored the GLOB. The ceiling fired with remedies that did not apply.
+  #
+  # An unscoped inner run still promotes everything, which is correct: it is
+  # already documented as failing its ceiling by design.
+  for f in $COVERED; do
+    grep -m1 -E '^# tier: full' "$f" >/dev/null 2>&1 || continue
+    case " $PREFIX_FILES " in
+      *" $f "*) PROMOTED="$PROMOTED $f"; PROMOTED_N=$((PROMOTED_N + 1)) ;;
+    esac
   done
 fi
 
@@ -249,23 +295,44 @@ coverage_line="run-checks: coverage-map: ${declared_n} check(s) declare '# cover
 if [ "$LIST" -eq 1 ]; then
   for f in $FILES; do echo "$f"; done
   echo "$coverage_line"
-  echo "run-checks: selected=$(set -- $FILES; echo $#) union-added=${UNION_ADDED}"
+  echo "run-checks: selected=$(set -- $FILES; echo $#) union-added=${UNION_ADDED} promoted=${PROMOTED_N}"
   exit 0
 fi
 
 fails=0; ran=0; skipped=0; total_ms=0
 
-# report FILE MS RC — the single place a check's outcome becomes a line. Both
-# the serial path and the parallel wave call it from the PARENT shell, so the
-# counters it maintains are the run's counters and no two lines interleave.
+# report FILE MS RC [PROMOTED] — the single place a check's outcome becomes a
+# line. Both the serial path and the parallel wave call it from the PARENT
+# shell, so the counters it maintains are the run's counters and no two lines
+# interleave. PROMOTED is `yes` only for a coverage-promoted full-tier check on
+# an inner run (#1321); the parallel wave is full-tier-only and omits it.
+#
+# THE PROMOTED CHECK IS EXEMPT FROM INNER_MS, AND THE BREACH IS STILL REPORTED.
+# The per-check ceiling's stated job (header, above) is to police the tier
+# DEFAULT: headerless checks are inner, so the ceiling is what stops a new slow
+# check HIDING in the inner tier, and its failure message names the two exits —
+# "declare '# tier: full' or make the assertion fixture-based". A promoted
+# check has already taken the first exit; it is declared, not hiding, and the
+# ceiling's own remedy is already spent. Failing it would leave only
+# fixture-ising, charged as the price of ADDING A `# covers:` LINE — so the
+# cheapest way to keep an edit loop green would be to declare no coverage,
+# which is the silence this population exists to end. The cost is not waved
+# through: it is disclosed per check as PROMOTED-SLOW, and it still counts into
+# the family total below, which is the aggregate ceiling that DOES fail and
+# whose named remedy — narrow a too-broad glob — is the right answer to
+# promotion that costs too much. Raising a ceiling is not one of the exits.
 report() {
   status=ok
   if [ "$3" -eq 124 ]; then status="TIMEOUT(${FULL_TIMEOUT_S}s)"; fails=$((fails+1))
   elif [ "$3" -ne 0 ]; then status="FAIL(rc=$3)"; fails=$((fails+1))
   fi
   if [ "$TIER" = "inner" ] && [ "$2" -gt "$INNER_MS" ]; then
-    status="$status TIER-VIOLATION: ${2}ms > ${INNER_MS}ms — declare '# tier: full' or make the assertion fixture-based"
-    fails=$((fails+1))
+    if [ "${4:-no}" = "yes" ]; then
+      status="$status PROMOTED-SLOW: ${2}ms > ${INNER_MS}ms — reported, not failing; the check already declares '# tier: full' and ran only because a path it covers changed (#1321)"
+    else
+      status="$status TIER-VIOLATION: ${2}ms > ${INNER_MS}ms — declare '# tier: full' or make the assertion fixture-based"
+      fails=$((fails+1))
+    fi
   fi
   printf '%6sms  %-8s %s\n' "$2" "$status" "$1"
   ran=$((ran+1))
@@ -336,14 +403,25 @@ if [ "$PARALLEL" -gt 0 ]; then
 else
   for f in $FILES; do
     declared=$(grep -m1 -E '^# tier: full' "$f" >/dev/null 2>&1 && echo full || echo inner)
+    promoted=no
+    # PROMOTION (#1321). An inner run skips `# tier: full` checks — except one
+    # whose OWN `# covers:` declaration matched a changed path. Coverage is the
+    # promotion signal: without this, a declaration on a full-tier check buys
+    # visibility in --list and nothing else, and three of the first four
+    # ratified declarations are on full-tier checks. Promotion is targeted by
+    # construction — a full-tier check runs early only when a path it DECLARES
+    # changed, never on every edit.
     if [ "$TIER" = "inner" ] && [ "$declared" = "full" ]; then
-      skipped=$((skipped+1)); continue
+      case " $PROMOTED " in
+        *" $f "*) promoted=yes ;;
+        *) skipped=$((skipped+1)); continue ;;
+      esac
     fi
     t0=$(date +%s%N)
     timeout "$FULL_TIMEOUT_S" sh "$f" >/dev/null 2>&1
     rc=$?
     t1=$(date +%s%N)
-    report "$f" "$(( (t1 - t0) / 1000000 ))" "$rc"
+    report "$f" "$(( (t1 - t0) / 1000000 ))" "$rc" "$promoted"
   done
 fi
 
@@ -353,7 +431,10 @@ fi
 # bounded by nothing but the declared globs, so the ceiling is what keeps a
 # too-broad glob visible. A union that routinely breaches it means the globs
 # are too broad — that is a finding, never a reason to raise the ceiling.
-if [ "$TIER" = "inner" ] && { [ "$SCOPED" = "no" ] || [ "$UNION_ADDED" -gt 0 ]; } && [ "$total_ms" -gt "$INNER_TOTAL_MS" ]; then
+# A PROMOTED run binds for the same reason and more strongly (#1321): a
+# promoted check is exempt from the per-check ceiling, so this total is the
+# ONLY ceiling standing between coverage promotion and a slow edit loop.
+if [ "$TIER" = "inner" ] && { [ "$SCOPED" = "no" ] || [ "$UNION_ADDED" -gt 0 ] || [ "$PROMOTED_N" -gt 0 ]; } && [ "$total_ms" -gt "$INNER_TOTAL_MS" ]; then
   echo "run-checks: FAMILY-VIOLATION: inner run ${total_ms}ms > ${INNER_TOTAL_MS}ms (#944)" >&2
   echo "  — scope the per-edit run to the blast-radius family (e.g. run-checks.sh 'scripts/check-terrain*')," >&2
   echo "    narrow a too-broad '# covers:' glob (#998) — never raise the ceiling," >&2
@@ -365,6 +446,7 @@ par_note=''
 [ "$PARALLEL" -gt 0 ] && par_note=" parallel=$PARALLEL"
 union_note=''
 [ "$UNION_ADDED" -gt 0 ] && union_note=" union-added=$UNION_ADDED"
+[ "$TIER" = "inner" ] && [ "$PROMOTED_N" -gt 0 ] && union_note="$union_note promoted=$PROMOTED_N"
 echo "run-checks: tier=$TIER ran=$ran skipped=$skipped fails=$fails total=${total_ms}ms$par_note$union_note"
 echo "$coverage_line"
 

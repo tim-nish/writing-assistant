@@ -1,6 +1,7 @@
 #!/usr/bin/env sh
 # parallel-safe
 # tier: inner — consultant-contract assertions against a derived fixture map;
+# covers: scripts/fixtures/terrain/screen-map.json scripts/topic-map-directions.py skills/terrain/SKILL.md skills/terrain/steps/brief.md skills/terrain/steps/gap.md skills/terrain/steps/map.md skills/terrain/steps/screens.md
 #   no seam, no corpus, no assembly. Measured 2026-07-30 at adoption: ~0.8s
 #   (ceiling 2s).
 # removal-signal: the terrain checks are retired or re-shaped under the #910

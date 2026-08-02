@@ -1,5 +1,6 @@
 #!/usr/bin/env sh
 # parallel-safe
+# covers: skills/review-article/SKILL.md skills/review-article/phases/arbitration.md skills/review-article/phases/entry.md skills/review-article/phases/passes.md skills/review-article/phases/reentry.md
 # check-review-arbitration.sh — verify owner arbitration & the second-cycle gate
 # (Story 5.6): a single top-down accept/reject round, no auto-applied edits, no
 # re-litigation of rejected findings, exactly one additional full cycle only when

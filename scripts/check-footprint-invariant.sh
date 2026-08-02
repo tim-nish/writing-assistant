@@ -13,6 +13,14 @@
 # alone and diffing the real state root, the real config home, $HOME, and this
 # repo's git status/index: no shared write.
 # tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
+# covers: config/platform-profiles/devto.example.yaml docs/storage-architecture.md scripts/*.py skills/draft-article/SKILL.md skills/review-article/SKILL.md skills/terrain/SKILL.md specs/spec-writing-assistant/plugin-layout.md
+# covers-note (#1321): flag `dynamic-path:WS,outside` ANSWERED as understood-and-narrow —
+#   both name scratch trees ($HOME/.writing-assistant-check-NNN, a per-run workspace), and a
+#   scratch path carries no coverage. scripts/*.py is KEPT and is the point of the
+#   declaration: the scan at the write-path section greps EVERY python file for a
+#   hard-coded repos/ root, which is precisely the repo-wide assertion a name-prefix
+#   selection can never reach. Two sibling check names were REMOVED — they appear in this
+#   header's prose as isolation notes, not as anything this file runs.
 # check-footprint-invariant.sh — verify the host-repo footprint invariant is
 # enforced end-to-end (Story 9.3). POSIX shell + stdlib Python only.
 #

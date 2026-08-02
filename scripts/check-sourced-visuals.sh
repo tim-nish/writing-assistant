@@ -1,5 +1,6 @@
 #!/usr/bin/env sh
 # parallel-safe
+# covers: skills/draft-article/stages/stage3.md
 # check-sourced-visuals.sh — verify every element of a proposed visual is sourced
 # like a prose claim (Story 8.3, SPEC-article-visuals CAP-3): each element is
 # source-pointed like a fact-sheet entry or the proposal carries `[VERIFY]`; an

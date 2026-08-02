@@ -1,5 +1,6 @@
 #!/usr/bin/env sh
 # parallel-safe
+# covers: skills/draft-article/quality-rubric.md skills/review-article/SKILL.md skills/review-article/phases/arbitration.md skills/review-article/phases/entry.md skills/review-article/phases/passes.md skills/review-article/phases/reentry.md skills/review-article/review-prompts.md
 # check-rubric-mapped-gate.sh — verify rubric-mapped findings gate "publishable"
 # (Story 12.2). POSIX shell.
 #

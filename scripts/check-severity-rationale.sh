@@ -1,5 +1,6 @@
 #!/usr/bin/env sh
 # parallel-safe
+# covers: skills/review-article/SKILL.md skills/review-article/phases/arbitration.md skills/review-article/phases/entry.md skills/review-article/phases/passes.md skills/review-article/phases/reentry.md skills/review-article/review-prompts.md
 # check-severity-rationale.sh — verify criterion-anchored severity with a
 # rationale field (Story 12.1). POSIX shell.
 #

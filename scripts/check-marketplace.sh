@@ -1,5 +1,10 @@
 #!/usr/bin/env sh
 # parallel-safe
+# covers: .claude-plugin/marketplace.json .claude-plugin/plugin.json
+# covers-note (#1321): HAND-AUTHORED — the tool derived nothing, correctly. Both subjects
+#   live under .claude-plugin/, and the extractor's root list carries `.claude/`, which does
+#   not match it. The two files are named literally at MKT= and PLUGIN=, so there is no
+#   ambiguity to resolve, only a prefix the extractor was never told about.
 # check-marketplace.sh — verify the repo-as-marketplace manifest (Story 6.2):
 # .claude-plugin/marketplace.json is valid JSON with name/owner/plugins, the
 # single self-referential plugin entry points at this repo (source "./"), and it

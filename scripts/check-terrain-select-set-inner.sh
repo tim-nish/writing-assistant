@@ -1,6 +1,10 @@
 #!/usr/bin/env sh
 # parallel-safe
 # tier: inner — set-selection assertions against a derived over-budget fixture
+# covers: scripts/fixtures/terrain/screen-map.json scripts/topic-map-directions.py
+# covers-note (#1321): flag `sparse:2-paths/443-lines` RECORDED AS UNDERSTOOD-AND-NARROW —
+#   one module driven against one committed fixture map, argued at length. No
+#   `dynamic-path` flag accompanies the ratio, so nothing is assembled out of view.
 #   map; no seam, no corpus, no assembly. A THIRD sibling beside
 #   check-terrain-select-brief-inner.sh and check-terrain-select-index-inner.sh
 #   for the reason #948 split those two: each subject holds its own check with

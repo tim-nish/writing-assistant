@@ -1,5 +1,6 @@
 #!/usr/bin/env sh
 # parallel-safe
+# covers: skills/draft-article/frameworks/F1-project-introduction.md
 # check-framework-f1.sh — verify the F1 project-introduction framework (Story
 # 2.2). POSIX shell only.
 #

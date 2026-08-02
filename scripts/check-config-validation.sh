@@ -1,6 +1,7 @@
 #!/usr/bin/env sh
 # parallel-safe
 # tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
+# covers: config/platform-profiles/devto.example.yaml config/user-config.example.yaml scripts/resolve-paths.py scripts/resolve-writing-sources.py scripts/validate-config.py skills/draft-article/SKILL.md skills/draft-article/stages/complete.md skills/draft-article/stages/gate.md skills/draft-article/stages/stage0.md skills/draft-article/stages/stage1.md skills/draft-article/stages/stage2.md skills/draft-article/stages/stage3.md skills/draft-article/stages/stage4.md skills/review-article/SKILL.md skills/review-article/phases/arbitration.md skills/review-article/phases/entry.md skills/review-article/phases/passes.md skills/review-article/phases/reentry.md
 # check-config-validation.sh — verify Stage-0 configuration validation (Story 7.4,
 # CAP-5): before any generation or review, a config carrying an example
 # placeholder, a malformed URL (double-slash canonical_url), or a missing required

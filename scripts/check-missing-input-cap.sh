@@ -1,5 +1,6 @@
 #!/usr/bin/env sh
 # parallel-safe
+# covers: scripts/draft-pipeline.py skills/draft-article/stages/gate.md
 # check-missing-input-cap.sh — verify the missing-input repair-hop cycle cap
 # and publish-blocker (Story 13.64, SPEC-article-draft-pipeline). POSIX shell.
 #

@@ -1,5 +1,12 @@
 #!/usr/bin/env sh
 # parallel-safe
+# covers: scripts/dev-link.sh
+# covers-note (#1321): flag `dynamic-path:CLAUDE_SKILL_DIR,host` ANSWERED — both are fixture,
+#   not repo: `host="$work/host"` is a mktemp tree and ${CLAUDE_SKILL_DIR} is the token this
+#   check asserts a SKILL body uses, never a path it reads. skills/draft-article/** is
+#   REMOVED for the same reason: every occurrence is under "$fx/", the synthetic plugin this
+#   check builds. What it really asserts over is the dev-link harness alone. Understood, and
+#   narrow on purpose.
 # check-dev-harness.sh — verify the local-skill development harness (Story 1.5).
 # POSIX shell only.
 #

@@ -1,5 +1,6 @@
 #!/usr/bin/env sh
 # parallel-safe
+# covers: scripts/draft-pipeline.py skills/draft-article/stages/stage4.md
 # check-stage4-verify.sh — verify Stage 4 owner verification pass (Story 4.5):
 # the `[VERIFY]` worklist + zero-marker exit, and the >1-rewrite reroute rule.
 # POSIX shell + stdlib Python.

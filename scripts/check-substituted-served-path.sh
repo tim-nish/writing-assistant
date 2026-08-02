@@ -1,5 +1,6 @@
 #!/bin/sh
 # parallel-safe
+# covers: scripts/terrain_map.py scripts/terrain_members.py scripts/terrain_text.py scripts/topic-map-directions.py
 # A served path that differs from the requested one is ANNOUNCED, never
 # re-cited (SPEC-terrain CAP-4, amended 2026-07-29; Story 20.29, #873).
 #

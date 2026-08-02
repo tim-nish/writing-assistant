@@ -1,6 +1,10 @@
 #!/usr/bin/env sh
 # parallel-safe
 # tier: inner — View-content and owner-language assertions against the
+# covers: scripts/fixtures/terrain/screen-map.json scripts/terrain_directions.py scripts/topic-map-directions.py
+# covers-note (#1321): flag `sparse:3-paths/396-lines` RECORDED AS UNDERSTOOD-AND-NARROW —
+#   the View's two modules and the fixture map they run against, no `dynamic-path` flag
+#   beside it.
 #   committed fixture map; no seam, no corpus, no assembly. Measured
 #   2026-07-30 after the #950 interpreter batching: ~1.0s (was ~1.7s — the
 #   check ran at ~85% of INNER_MS, the flap zone #948 named). Assertion

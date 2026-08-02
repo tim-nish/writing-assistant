@@ -1,5 +1,6 @@
 #!/usr/bin/env sh
 # parallel-safe
+# covers: config/platform-profiles/devto.example.yaml scripts/render-frontmatter.py scripts/render-pointer-block.py skills/draft-article/frameworks/CONVENTIONS.md
 # check-frameworks.sh — verify the shared framework conventions, config-bound
 # frontmatter, and shared pointer block (Story 2.1). POSIX shell + stdlib Python.
 #

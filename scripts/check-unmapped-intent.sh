@@ -1,5 +1,6 @@
 #!/usr/bin/env sh
 # parallel-safe
+# covers: scripts/draft-pipeline.py skills/draft-article/stages/stage0.md
 # check-unmapped-intent.sh — graceful handling when an article intent maps to
 # no framework (Story 13.81). POSIX shell + stdlib Python.
 #

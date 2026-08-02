@@ -1,5 +1,6 @@
 #!/usr/bin/env sh
 # parallel-safe
+# covers: scripts/check-staging-candidates.sh scripts/draft-pipeline.py skills/review-article/SKILL.md skills/review-article/phases/arbitration.md skills/review-article/phases/entry.md skills/review-article/phases/passes.md skills/review-article/phases/reentry.md
 # check-policy-arbitration.sh — verify policy-finding arbitration routing
 # (Story 15.2, SPEC-policy-consistency-pass CAP-3). POSIX shell + stdlib Python.
 #

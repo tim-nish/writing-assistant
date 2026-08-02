@@ -1,5 +1,6 @@
 #!/usr/bin/env sh
 # parallel-safe
+# covers: config/platform-profiles/devto.example.yaml config/platform-profiles/zenn.example.yaml scripts/draft-pipeline.py scripts/lint-platform-variant scripts/resolve-paths.py
 # check-platform-lint.sh — verify the profile-parameterized platform lint
 # (Story 16.6, SPEC-platform-variants CAP-5): a mechanical, zero-LLM lint of an
 # emitted variant against its platform profile, reporting each defect file/line;

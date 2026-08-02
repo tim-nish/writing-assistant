@@ -1,5 +1,6 @@
 #!/usr/bin/env sh
 # parallel-safe
+# covers: skills/review-article/SKILL.md skills/review-article/phases/arbitration.md skills/review-article/phases/entry.md skills/review-article/phases/passes.md skills/review-article/phases/reentry.md skills/review-article/review-prompts.md
 # check-review-policy-pass.sh — verify the policy-consistency review pass
 # (Story 15.1, SPEC-policy-consistency-pass CAP-1/CAP-2/CAP-5).
 # POSIX shell + stdlib Python only.

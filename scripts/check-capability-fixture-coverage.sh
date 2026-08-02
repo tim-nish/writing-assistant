@@ -1,6 +1,7 @@
 #!/usr/bin/env sh
 # parallel-safe
 # tier: full — assembles a real map through the seam (gateway stub + fixture
+# covers: scripts/fixtures/policy-gateway-stub.py scripts/fixtures/terrain/screen-map-served.json scripts/resolve-paths.py scripts/terrain_map.py
 #   repos), so it is corpus/seam-dependent by construction. Measured 2026-07-30
 #   at adoption: ~1.5s, over the INNER_MS ceiling and correctly declared rather
 #   than absorbed (#913).

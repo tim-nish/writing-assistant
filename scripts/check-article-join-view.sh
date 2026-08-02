@@ -1,5 +1,6 @@
 #!/usr/bin/env sh
 # serial-reason: a known mtime race — recorded as an intermittent in the full
+# covers: docs/dogfood-findings.md docs/evidence-gloss-consumption-join.md scripts/inspect-article-join.py
 #   tier, and its fixture files are written inside one second so an
 #   ordering-by-mtime assertion can read them as simultaneous. Re-verified
 #   2026-07-31 (#999) and DELIBERATELY LEFT SERIAL: declaring a member with a

@@ -1,5 +1,6 @@
 #!/usr/bin/env sh
 # parallel-safe
+# covers: scripts/draft-pipeline.py skills/review-article/SKILL.md skills/review-article/phases/arbitration.md skills/review-article/phases/entry.md skills/review-article/phases/passes.md skills/review-article/phases/reentry.md
 # check-review-diff.sh — verify review's owner-facing before/after comparison and
 # the pre-review checkpoint proposal (Story 18.25, #495; SPEC-article-review
 # CAP-6). Alt A: the review presents the before/after diff + applied change list

@@ -1,5 +1,6 @@
 #!/usr/bin/env sh
 # parallel-safe
+# covers: scripts/draft-pipeline.py skills/draft-article/stages/gate.md
 # check-repair-hop.sh — verify the bounded missing-input repair hop (Story
 # 13.63, SPEC-article-draft-pipeline missing-input repair route). POSIX shell.
 #

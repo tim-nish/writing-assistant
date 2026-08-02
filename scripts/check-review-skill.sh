@@ -1,5 +1,6 @@
 #!/usr/bin/env sh
 # parallel-safe
+# covers: scripts/lint-article skills/review-article/SKILL.md skills/review-article/phases/arbitration.md skills/review-article/phases/entry.md skills/review-article/phases/passes.md skills/review-article/phases/reentry.md
 # check-review-skill.sh — verify the review-article skill scaffold (Story 5.2):
 # the fixed pass order (lint → structure → prose → policy consistency → cold read), once-per-version
 # execution, the strict findings contract, the lint (pass-1) wiring, and model

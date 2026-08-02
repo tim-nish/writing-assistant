@@ -1,6 +1,7 @@
 #!/usr/bin/env sh
 # parallel-safe
 # tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
+# covers: config/platform-profiles/devto.example.yaml config/platform-profiles/newsletter-email.example.yaml config/platform-profiles/web-archive.example.yaml config/platform-profiles/zenn.example.yaml scripts/draft-pipeline.py scripts/resolve-paths.py skills/draft-article/stages/complete.md skills/draft-article/variants.md
 # check-stage5-variants.sh — verify variant emission as a PROFILE-DRIVEN
 # projection (Story 16.3, SPEC-platform-variants CAP-4) and, since Story 13.69,
 # as a STANDALONE POST-REVIEW invocation over the PERSISTED canonical

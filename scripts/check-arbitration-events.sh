@@ -1,5 +1,6 @@
 #!/usr/bin/env sh
 # parallel-safe
+# covers: scripts/emit-arbitration-events.py skills/review-article/SKILL.md skills/review-article/phases/arbitration.md skills/review-article/phases/entry.md skills/review-article/phases/passes.md skills/review-article/phases/reentry.md
 # check-arbitration-events.sh — verify review-arbitration event emission
 # (SPEC-article-review CAP-5, Story 13.42): one raw event per finding
 # disposition (N in -> N out, five fields, reason required on reject, nothing

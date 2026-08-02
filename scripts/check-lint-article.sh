@@ -1,6 +1,11 @@
 #!/usr/bin/env sh
 # parallel-safe
 # tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
+# covers: config/language-conventions.yaml scripts/lint-article scripts/resolve-user-config.py
+# covers-note (#1321): flag `sparse:3-paths/444-lines` RECORDED AS UNDERSTOOD-AND-NARROW.
+#   The three are the linter, the conventions it reads, and the config resolver that feeds
+#   it — the whole subject. No `dynamic-path` flag accompanies the ratio, so the length is
+#   case count, not hidden reach.
 # check-lint-article.sh — verify the zero-token lint script (Story 5.1):
 # schema/title/pointer/heading-density/dead-link/[VERIFY] checks against the
 # config `article` schema, a clean draft passing, and a seeded-defect draft

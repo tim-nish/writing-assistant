@@ -1,5 +1,6 @@
 #!/usr/bin/env sh
 # parallel-safe
+# covers: skills/review-article/SKILL.md skills/review-article/phases/arbitration.md skills/review-article/phases/entry.md skills/review-article/phases/passes.md skills/review-article/phases/reentry.md
 # check-contract-review-arbitration.sh — verify review arbitration presents each
 # finding under the owner-facing proposal contract (Story 7.3): location, why it
 # is raised, and accept/reject choices stating their concrete effect on the

@@ -1,6 +1,7 @@
 #!/usr/bin/env sh
 # parallel-safe
 # tier: inner — indexed-selection assertions against a derived over-budget
+# covers: scripts/fixtures/terrain/screen-map.json scripts/topic-map-directions.py
 #   fixture map; no seam, no corpus, no assembly. Split from
 #   check-terrain-select-inner.sh (#948) — see its sibling
 #   check-terrain-select-brief-inner.sh for the split's rationale. Assertion

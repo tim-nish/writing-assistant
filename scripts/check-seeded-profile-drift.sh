@@ -1,5 +1,11 @@
 #!/usr/bin/env bash
 # parallel-safe
+# covers: config/platform-profiles/** scripts/resolve-platform-profiles.py
+# covers-note (#1321): flag `dynamic-path:edir` ANSWERED as understood-and-narrow — `edir`
+#   is "$work/examples", the scratch copy of the shipped profiles this check seeds and then
+#   diffs. The tracked originals it copies FROM are config/platform-profiles/**, which is
+#   declared, so the broad glob here is the deliberate one: any shipped profile drifting
+#   from what the resolver seeds is exactly this check's subject.
 # Story 18.117 (#722, #719) — a seeded platform profile is a conformance copy
 # of the shipped example, so it carries a mechanical mismatch check.
 #

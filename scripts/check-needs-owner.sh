@@ -1,6 +1,7 @@
 #!/usr/bin/env sh
 # parallel-safe
 # tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
+# covers: scripts/fixtures/needs-owner/inline-subordinate-premise.md scripts/fixtures/needs-owner/tanuki-run-confabulated-premise.md scripts/gate_premise.py scripts/validate-fact-sheet.py scripts/validate-needs-owner.py
 # check-needs-owner.sh — verify the NEEDS-OWNER list, its schema, and the strict
 # partition from the fact sheet (Story 3.3). POSIX shell + stdlib Python.
 

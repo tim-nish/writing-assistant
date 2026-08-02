@@ -1,5 +1,6 @@
 #!/usr/bin/env sh
 # parallel-safe
+# covers: scripts/write-article-plan.py skills/completion-summary.md skills/draft-article/SKILL.md skills/draft-article/frameworks/F2-engineering-lessons.md skills/draft-article/stages/complete.md skills/draft-article/stages/gate.md skills/draft-article/stages/stage0.md skills/draft-article/stages/stage1.md skills/draft-article/stages/stage2.md skills/draft-article/stages/stage3.md skills/draft-article/stages/stage4.md
 # check-story-element-selection.sh — verify CAP-9 story-element selection: the
 # element model (evidence cluster + stable id) and the #428 disclosure-only rule
 # (Story 18.8, SPEC-article-draft-pipeline CAP-9 added 2026-07-20, umbrella #428).

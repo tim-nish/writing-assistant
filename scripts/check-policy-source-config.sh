@@ -1,6 +1,7 @@
 #!/usr/bin/env sh
 # parallel-safe
 # tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
+# covers: config/writing-sources.example.yaml scripts/resolve-writing-sources.py scripts/validate-config.py
 # check-policy-source-config.sh — verify the `policy_source` config block
 # (Story 14.1, SPEC-policy-source-seam CAP-1 as amended 2026-07-18, #366:
 # presence toggle, no filesystem path — Story 13.73). POSIX shell + stdlib

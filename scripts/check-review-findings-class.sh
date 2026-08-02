@@ -1,5 +1,6 @@
 #!/usr/bin/env sh
 # parallel-safe
+# covers: scripts/validate-review-findings.py skills/review-article/review-prompts.md
 # check-review-findings-class.sh — verify the review finding-class contract
 # (Story 13.62, SPEC-article-review). POSIX shell + stdlib Python.
 #

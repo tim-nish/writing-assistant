@@ -1,6 +1,12 @@
 #!/usr/bin/env sh
 # parallel-safe
 # tier: inner — screen-composition assertions against the committed fixture
+# covers: scripts/fixtures/terrain/screen-map.json scripts/terrain_directions.py scripts/terrain_text.py scripts/topic-map-directions.py scripts/validate-proposal-payload.py
+# covers-note (#1321): terrain_directions.py is KEPT although its literal appears only in a
+#   comment — the assertion at the bottom reads it for real, assembled as
+#   os.path.dirname(dpath) + "terrain_directions.py", which no static extractor can see.
+#   scripts/terrain_map.py is REMOVED: it is cited in prose as where a pairing used to live,
+#   and this check never opens it.
 #   map (scripts/fixtures/terrain/screen-map.json); no seam, no corpus, no
 #   assembly. Measured 2026-07-30 after the #950 interpreter batching: ~1.1s
 #   (was ~1.5s — 78% of INNER_MS, adjacent to the flap zone #948 named).

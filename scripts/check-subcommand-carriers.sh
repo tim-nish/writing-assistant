@@ -1,5 +1,6 @@
 #!/usr/bin/env sh
 # parallel-safe
+# covers: scripts/draft-pipeline.py
 # check-subcommand-carriers.sh — every shipped pipeline subcommand has a CARRIER:
 # at least one invocation site under skills/ (Story 13.41). Guards the
 # "mechanism built, orchestration missing" class: three Epic 16 subcommands

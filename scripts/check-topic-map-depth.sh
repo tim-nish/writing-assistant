@@ -1,5 +1,6 @@
 #!/usr/bin/env sh
 # parallel-safe
+# covers: scripts/terrain_brief.py scripts/terrain_directions.py scripts/terrain_map.py scripts/terrain_members.py scripts/terrain_screens.py scripts/terrain_select.py scripts/terrain_text.py scripts/terrain_theses.py scripts/topic-map-directions.py
 # check-topic-map-depth.sh — the depth ESTIMATOR IS GONE (Story 20.7, #809).
 #
 # This suite used to exercise the estimator end to end: clustering, the

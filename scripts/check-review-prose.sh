@@ -1,5 +1,6 @@
 #!/usr/bin/env sh
 # parallel-safe
+# covers: skills/review-article/SKILL.md skills/review-article/phases/arbitration.md skills/review-article/phases/entry.md skills/review-article/phases/passes.md skills/review-article/phases/reentry.md
 # check-review-prose.sh — verify the prose pass rubric (Story 5.4): the six-point
 # rubric (unwarranted hedging, unexplained jargon, overlong sentences, agent-less
 # decision statements, buried load-bearing sentences, non-native phrasing without

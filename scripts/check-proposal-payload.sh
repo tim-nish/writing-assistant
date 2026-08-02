@@ -1,6 +1,7 @@
 #!/usr/bin/env sh
 # parallel-safe
 # tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
+# covers: scripts/validate-proposal-payload.py skills/owner-facing-proposal-contract.md
 # check-proposal-payload.sh — verify payload integrity validation blocks a
 # damaged proposal prompt before presentation (Story 10.1, contract (e)).
 # POSIX shell + stdlib Python.

@@ -1,5 +1,11 @@
 #!/usr/bin/env sh
 # parallel-safe
+# covers: .claude-plugin/plugin.json skills/draft-article/SKILL.md skills/draft-article/stages/** skills/review-article/SKILL.md
+# covers-note (#1321): flag `dynamic-path:s` ANSWERED BY WIDENING. `s` is a loop cursor over
+#   the literal skill names draft-article and review-article, so it hides nothing — but the
+#   paths it builds (skills/$s/SKILL.md) leave no literal token, and neither does
+#   MANIFEST=".claude-plugin/plugin.json". All three are what this check actually opens;
+#   added by hand.
 # check-plugin-manifest.sh — verify the plugin manifest (Story 6.1):
 # .claude-plugin/plugin.json is valid JSON declaring name/version/description/
 # author, names the three exposed skills, and the packaging is additive — the

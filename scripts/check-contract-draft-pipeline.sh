@@ -1,5 +1,6 @@
 #!/usr/bin/env sh
 # parallel-safe
+# covers: skills/draft-article/SKILL.md skills/draft-article/stages/complete.md skills/draft-article/stages/gate.md skills/draft-article/stages/stage0.md skills/draft-article/stages/stage1.md skills/draft-article/stages/stage2.md skills/draft-article/stages/stage3.md skills/draft-article/stages/stage4.md
 # check-contract-draft-pipeline.sh — verify the draft pipeline applies the
 # owner-facing proposal contract (Story 7.2) at its two owner decision points:
 # the Stage 2 gap interview and the Stage 4 verification pass. Each must show

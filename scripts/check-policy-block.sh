@@ -1,6 +1,7 @@
 #!/usr/bin/env sh
 # parallel-safe
 # tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
+# covers: scripts/draft-pipeline.py scripts/fixtures/policy-classification/** skills/draft-article/stages/stage2.md
 # check-policy-block.sh — verify the Stage 2→3 policy-block gate (Story 13.77,
 # SPEC-article-draft-pipeline 2026-07-18 amendment, umbrella #365).
 # POSIX shell + stdlib Python only.

@@ -1,5 +1,6 @@
 #!/usr/bin/env sh
 # parallel-safe
+# covers: skills/fork-gate-consult-first/SKILL.md specs/spec-policy-fork-consultation/SPEC.md
 # check-gate-comparison.sh — the ranked-recommendation obligation has a carrier
 # at every layer that can carry it (Story 20.12, #808).
 #

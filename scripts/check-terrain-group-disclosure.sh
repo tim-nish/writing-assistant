@@ -19,10 +19,15 @@
 # guard on that: the disclosure is rendering, and grouping stays navigation.
 #
 # tier: inner
+# covers: scripts/terrain_members.py scripts/topic-map-directions.py
 # removal-signal: the `in common:` line stops being composed per group — if a
 # later decision moves commonality out of the per-group rendering, or adopts
 # subdivision on the degeneracy signal (the watch trigger #980 recorded), this
 # check is asserting a shape that no longer exists and retires with it.
+# covers-note (#1321): flag `sparse:2-paths/322-lines` RECORDED AS UNDERSTOOD-AND-NARROW —
+#   long file, two subjects, and no `dynamic-path` flag alongside, so nothing is assembled
+#   at runtime that the extractor could have missed. (Placed BELOW removal-signal on
+#   purpose: check-check-declarations.sh reads only the first 25 lines.)
 
 set -u
 D="scripts/topic-map-directions.py"

@@ -1,5 +1,6 @@
 #!/usr/bin/env sh
 # parallel-safe
+# covers: scripts/resolve-writing-sources.py scripts/write-article-plan.py skills/draft-article/stages/stage0.md
 # check-differential-context.sh — verify the differential-context prior-coverage
 # digest (Story 18.23, #504): when prior published/drafted articles share the
 # project (related.projects), the argument plan receives a prior-coverage digest

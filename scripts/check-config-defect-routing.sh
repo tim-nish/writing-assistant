@@ -1,5 +1,6 @@
 #!/usr/bin/env sh
 # parallel-safe
+# covers: skills/review-article/SKILL.md skills/review-article/phases/arbitration.md skills/review-article/phases/entry.md skills/review-article/phases/passes.md skills/review-article/phases/reentry.md
 # check-config-defect-routing.sh — verify review routes configuration defects to
 # the publish-blocker bucket, never into the capped article-quality findings, and
 # never reports a draft "publishable" while a configuration blocker is open

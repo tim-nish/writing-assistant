@@ -1,6 +1,7 @@
 #!/usr/bin/env sh
 # parallel-safe
 # tier: inner — source/skill-text assertions plus the self-contained screen-1
+# covers: scripts/fixtures/terrain/screen-map.json scripts/resolve-paths.py scripts/terrain_brief.py scripts/terrain_directions.py scripts/terrain_map.py scripts/terrain_members.py scripts/terrain_screens.py scripts/terrain_seam.py scripts/terrain_select.py scripts/terrain_text.py scripts/topic-map-directions.py scripts/validate-proposal-payload.py skills/terrain/SKILL.md skills/terrain/steps/brief.md skills/terrain/steps/gap.md skills/terrain/steps/map.md skills/terrain/steps/screens.md
 #   axes fixture; no seam, no corpus, no map assembly. Measured 2026-07-30 at
 #   adoption: ~1.3s (the runner discloses the live number every run).
 # removal-signal: the terrain checks are retired or re-shaped under the #910

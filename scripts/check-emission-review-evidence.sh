@@ -1,6 +1,7 @@
 #!/usr/bin/env sh
 # parallel-safe
 # tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
+# covers: config/platform-profiles/devto.example.yaml config/platform-profiles/zenn.example.yaml scripts/draft-pipeline.py scripts/resolve-paths.py
 # check-emission-review-evidence.sh — verify emission ASSERTS the "reviewed"
 # half of its own "persisted, reviewed canonical" promise, as a DISCLOSURE
 # (Story 18.114, #716; SPEC-platform-variants "Emission asserts the
