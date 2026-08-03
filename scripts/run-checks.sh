@@ -481,13 +481,36 @@ if [ "$LIST" -eq 1 ]; then
   exit 0
 fi
 
+# --- fixture isolation (#1366, story 20.200) ---------------------------------
+# EVERY CHECK RUNS AGAINST A SANDBOXED STATE ROOT, BOTH TIERS, NO OPT-OUT.
+# storage-architecture.md D1 bounds where the plugin writes FOR A RUN and said
+# nothing about the suite that exercises the machinery minting run state — so
+# the suite minted real state: 853 tmp-derived directories, eight more per full
+# run, and on 2026-08-03 a full tier wrote foreign block records into a live
+# draft run. The second face has the same cause as the first: the active-run
+# pointer `run_record.workspace_of` falls back to LIVES IN THE STATE ROOT, so a
+# fixture and a live run shared one pointer. A sandboxed root gives fixtures
+# their own, which makes the cross-run attribution unreachable rather than
+# merely refused. A check that genuinely needs the real root is a defect.
+#
+# THE RUNNER IS NOT A CHECK. The sandbox is exported PER SPAWN, never into this
+# shell — `check_ledger_path` resolves through the real root at exit, and a
+# global export would delete the #1354 ledger at teardown with silence as the
+# failure mode (the report would simply find fewer invocations than happened).
+# Do not "simplify" this into one export at the top; the per-spawn form is what
+# makes the runner/check split structural rather than statement-order-dependent.
+CHECK_SANDBOX=$(mktemp -d 2>/dev/null) || CHECK_SANDBOX=''
+[ -n "$CHECK_SANDBOX" ] && trap 'rm -rf "$CHECK_SANDBOX"' EXIT INT TERM
+
 fails=0; ran=0; skipped=0; total_ms=0; fam_ms=0; union_ms=0
 
 # Per-check rows for the ledger (#1354). Tab-separated and assembled into one
 # JSON line at exit — the rows are collected in the PARENT shell by report(),
 # exactly like the counters above, so a -P wave cannot interleave them.
 LEDGER_ROWS=$(mktemp) || LEDGER_ROWS=''
-[ -n "$LEDGER_ROWS" ] && trap 'rm -f "$LEDGER_ROWS"' EXIT INT TERM
+# ONE trap for both temporaries — a second `trap ... EXIT` REPLACES the first in
+# POSIX sh, so registering them separately would silently leak the sandbox.
+trap 'rm -f "$LEDGER_ROWS"; rm -rf "$CHECK_SANDBOX"' EXIT INT TERM
 
 # report FILE MS RC [PROMOTED] — the single place a check's outcome becomes a
 # line. Both the serial path and the parallel wave call it from the PARENT
@@ -578,7 +601,7 @@ if [ "$PARALLEL" -gt 0 ]; then
       read -r _tok <&9
       (
         c0=$(date +%s%N)
-        timeout "$FULL_TIMEOUT_S" sh "$f" >/dev/null 2>&1
+        XDG_STATE_HOME="$CHECK_SANDBOX" timeout "$FULL_TIMEOUT_S" sh "$f" >/dev/null 2>&1
         crc=$?
         c1=$(date +%s%N)
         printf '%s %s\n' "$(( (c1 - c0) / 1000000 ))" "$crc" > "$tmpd/r.$n"
@@ -601,7 +624,7 @@ if [ "$PARALLEL" -gt 0 ]; then
 
   for f in $rest; do
     t0=$(date +%s%N)
-    timeout "$FULL_TIMEOUT_S" sh "$f" >/dev/null 2>&1
+    XDG_STATE_HOME="$CHECK_SANDBOX" timeout "$FULL_TIMEOUT_S" sh "$f" >/dev/null 2>&1
     rc=$?
     t1=$(date +%s%N)
     report "$f" "$(( (t1 - t0) / 1000000 ))" "$rc"
@@ -624,7 +647,7 @@ else
       esac
     fi
     t0=$(date +%s%N)
-    timeout "$FULL_TIMEOUT_S" sh "$f" >/dev/null 2>&1
+    XDG_STATE_HOME="$CHECK_SANDBOX" timeout "$FULL_TIMEOUT_S" sh "$f" >/dev/null 2>&1
     rc=$?
     t1=$(date +%s%N)
     report "$f" "$(( (t1 - t0) / 1000000 ))" "$rc" "$promoted"
