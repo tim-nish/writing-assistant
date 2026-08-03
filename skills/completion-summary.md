@@ -184,6 +184,24 @@ continuing the workflow, and never phrased as one ("review the file at <path>,
 then …" is the defect; "here's the path for reference — continue or stop?" is
 the contract).
 
+## Suppressed provenance disagreements (informational — Story 20.203, #1375)
+
+A run whose `verify-provenance` exited **4** —
+`PASS-WITH-SUPPRESSIONS (0 findings, N suppressed disagreement(s))` — carries
+**N** in the informational bucket, naming it as suppressed rather than clean.
+
+A suppressed disagreement is not "no finding": it is a finding the first-wins
+carry chose not to act on, because the ledger already held a verdict for that
+exact text. Reporting the run as a plain PASS is the boolean swallowing the
+grade — the defect this exists to prevent printed `PASS (no findings)` four
+lines below thirteen `LEDGER DISAGREEMENT` lines, and only an agent reading the
+raw output caught it.
+
+**Exit 4 is not a failure and must not be reported as one.** It is a pass whose
+grade rests on carried verdicts rather than on this round's, and the number is
+what lets a reader decide whether that matters. Exit 0 carries nothing here —
+a clean run says nothing about suppressions, exactly as before.
+
 ## Reading-time estimate (article body only)
 
 A run that **produces or reviews an article body** includes a reading-time

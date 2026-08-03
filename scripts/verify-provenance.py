@@ -780,6 +780,10 @@ def main(argv=None):
 
     valid = _load_set(args.fact_sheet)
     findings = []
+    # Story 20.203: suppressed disagreements are a FIRST-CLASS result, not
+    # a stderr aside. Initialised here so the terminal line can report them
+    # whether or not a judge round ran at all.
+    suppressed = 0
 
     # --- mechanical layer ---
     for pos, cls, ptrs, anchor, ctype in entries:
@@ -906,6 +910,7 @@ def main(argv=None):
                     "verdict for it — the CARRIED verdict stands, and an unedited "
                     "failing position is still failing")
             findings.append((pos, f"CARRIED FAIL (run ledger, unchanged text): {prior[1]}"))
+        suppressed = len(disagreements)
         for d in disagreements:
             sys.stderr.write(f"LEDGER DISAGREEMENT — {d}\n")
         if ledger_path is not None and args.draft:
@@ -923,10 +928,21 @@ def main(argv=None):
                 sys.stderr.write(f"ledger: {len(rows)} verdict(s) recorded for the run "
                                  f"({ledger_path})\n")
 
+    # THE SUMMARY MAY NOT CONTRADICT ITS OWN OUTPUT (Story 20.203, #1375).
+    # `PASS (no findings)` printed four lines under thirteen LEDGER DISAGREEMENT
+    # lines is the boolean swallowing the grade: a suppressed disagreement is
+    # not "no finding", it is a finding the carry rule chose not to act on. So
+    # a suppression-laden run gets a DISTINCT state token AND a distinct exit,
+    # never the same pair a clean run gets.
     if not findings:
+        if suppressed:
+            print(f"verify-provenance: PASS-WITH-SUPPRESSIONS "
+                  f"(0 findings, {suppressed} suppressed disagreement(s))")
+            return 4
         print("verify-provenance: PASS (no findings)")
         return 0
-    sys.stderr.write("verify-provenance: FAIL\n")
+    sys.stderr.write(f"verify-provenance: FAIL (0 suppressed)\n" if not suppressed
+                     else f"verify-provenance: FAIL ({suppressed} suppressed disagreement(s))\n")
     for pos, reason in findings:
         sys.stderr.write(f"  {pos}: {reason}\n")
     return 1
