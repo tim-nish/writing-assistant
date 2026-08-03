@@ -127,6 +127,18 @@ nothing. Every owner-facing ask follows the shared
   (`stop-disclosure --ws "$WS" --repo <host-repo>`). On any resumed run, emit
   `resume-disclosure` **before spending**. Elective pauses only at sanctioned
   points, rendered as a gate (stages/stage0.md §Durability).
+- **Block mode (opt-in dev mode, #1332/#1360):** a run normally proceeds
+  **continuously**, and that default is unchanged. When the owner asks for it —
+  "run in block mode", "stop at each block", "one block at a time" — enable it
+  **after the mint**, `python3 scripts/run_block.py enable "$WS"` (before the
+  mint, `WA_BLOCK_MODE=1` in the environment does the same). The run then stops
+  at every block boundary and the next block is **not entered until the owner
+  says so**; each stop names what it stopped at, how to inspect it, how to
+  re-run that block alone, and how to continue. Blocks are
+  `start probe interview fill quality-gate verify complete`. Without one of
+  those two acts the mode is **off** — there is no way to reach it from this
+  file's normal flow, which is the point of an opt-in dev mode. Contract:
+  `specs/spec-run-record/SPEC.md`.
 - **Host-repo footprint:** every intermediate lives in the run workspace `$WS`
   — minted by `stage0` (resolver-backed: `resolve-paths.py new-run` is the
   standalone form) **outside the host repo**, never a path you compose — and

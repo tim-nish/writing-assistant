@@ -246,6 +246,16 @@ def stop_notice(ws, snap):
             "not_entered": ("block mode is on: %r is NOT entered until you "
                             "say so" % (nxt,)) if nxt else
                            "this was the run's terminal block",
+            # The stop names all three acts available here, not only the one
+            # this module owns (#1360). A notice that names `rerun` alone
+            # reads as if re-running were the only move, and the two the owner
+            # most often wants — look at what the block produced, and go on —
+            # were left to be inferred from the mode's own documentation,
+            # which is exactly what #1360 found nobody reads.
+            "inspect": ws,
+            "continue": ("re-invoke the skill; autostart resumes this run at "
+                         "%r" % (nxt,)) if nxt else
+                        "nothing to continue — the run reached its last block",
             "rerun": "python3 scripts/run_block.py rerun %s %s"
                      % (ws, snap.get("block"))}
 
@@ -253,13 +263,18 @@ def stop_notice(ws, snap):
 def _format_notice(notice):
     dur = notice.get("duration_s")
     return ("block mode: STOPPED at block %r after %s — %s, verdict %s (%s). "
-            "%s. Re-run this block alone with: %s\n"
+            "%s.\n"
+            "  inspect:  %s\n"
+            "  re-run:   %s\n"
+            "  continue: %s\n"
             % (notice["stopped_at"],
                "%.1fs" % dur if isinstance(dur, (int, float)) else "unknown",
                notice.get("status"),
                (notice.get("verdict") or {}).get("outcome"),
                (notice.get("verdict") or {}).get("detail"),
-               notice.get("not_entered"), notice.get("rerun")))
+               notice.get("not_entered"),
+               notice.get("inspect"), notice.get("rerun"),
+               notice.get("continue")))
 
 
 def after_close(ws, close_rec):
