@@ -236,3 +236,39 @@ and no already-relocated text moves — the rule is prospective.
 > rules 2 and 4 will read a bounded recent window rather than history, which
 > would return this record to the ordinary state-growth class D2 already defers.
 > Delivery: story 20.199.
+
+> **Amended 2026-08-03 (implementation, #1355/#1356/#1361) — the promotion
+> ceiling clause of the amendment above is WITHDRAWN the same day it was
+> written; the #1321 exemption stands, and the withdrawal is recorded rather
+> than edited away.** The amendment above closed the exemption on the reasoning
+> that #1321 gave a coverage-promoted check the *execution cost* of an inner
+> member while #1326 left it the *reporting semantics* of a full one, and that
+> the pairing was an oversight. It is not an oversight. `run-checks.sh` carries
+> #1321's own reasoning at the site, and it was **not read before the clause was
+> written**: the per-check ceiling's stated job is to stop a check **hiding** in
+> the inner tier, a promoted check is declared rather than hiding, and its named
+> remedy — declare `# tier: full` — is already spent. Failing it would leave
+> only fixture-ising, **charged as the price of adding a `# covers:` line**, so
+> the cheapest way to keep an edit loop green becomes declaring no coverage.
+> That escape is sharper now than when #1321 was written, not weaker: `# covers:`
+> stands at **174 of 174**, an undeclared check is selected by name-prefix only,
+> and stripping the line is a one-line change that is invisible in review as a
+> deletion. The clause would therefore have put pressure on precisely the
+> declaration #998 exists to collect, at the moment that collection is complete.
+> **The pressure the clause wanted already exists at the right altitude:** a
+> promoted check's cost still counts into `INNER_TOTAL_MS`, which **does** fail,
+> and whose named remedy — narrow a too-broad glob — is the correct answer to
+> promotion that costs too much. The aggregate ceiling was the instrument all
+> along; the per-check one had nothing left to add. **Everything else in the
+> amendment above stands unchanged** — the five governance rules, the decline of
+> the `tier:` polarity inversion and its measured basis, the baseline ratchet,
+> and the orphan sweep. Only the promotion clause is withdrawn. **Consequence
+> for delivery: story 20.196 has no implementation left.** Its remaining
+> criterion — that the rules are declared in the runner's header — was satisfied
+> by the amendment's own commit, because under declare-once-in-the-enforcement
+> the rules text *is* the contract. It is therefore a spec-only outcome and is
+> not carried as a story. **What would overturn this withdrawal:** a measured
+> case of a promoted check materially slowing an edit loop while
+> `INNER_TOTAL_MS` stays green — which would show the aggregate is not catching
+> it and the per-check ceiling has a job again. Delivery: stories 20.197, 20.198
+> (unchanged) and 20.199 (unchanged).

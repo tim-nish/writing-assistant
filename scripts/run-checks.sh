@@ -198,6 +198,16 @@
 # They are ratified now and unenforceable until it lands; the interval is stated
 # rather than left to be discovered. Rules 1, 3 and 5 bind immediately.
 #
+# THE #1321 PROMOTION EXEMPTION STANDS. The #1355/#1356 amendment briefly closed
+# it and the clause was WITHDRAWN the same day (#1361): the per-check ceiling
+# exists to stop a check HIDING in the inner tier, a promoted check is declared
+# rather than hiding, and failing it would charge fixture-ising as the price of
+# adding a `# covers:` line — making "declare no coverage" the cheapest way to
+# keep an edit loop green, against a map that is currently complete at 174/174.
+# The pressure lives at the aggregate instead: a promoted check's cost counts
+# into INNER_TOTAL_MS, which DOES fail, and whose remedy is narrowing the glob.
+# See the report() comment below, which is the reasoning's home and is unchanged.
+#
 # WHAT IS NOT LICENSED, because it was proposed and DECLINED at the #1356 gate:
 # inverting the `tier:` default polarity. Measured at triage — 174 checks, 55
 # full, 36 explicit inner, 83 headerless; a scoped inner run selects 5 checks
