@@ -299,9 +299,20 @@ Three properties bind:
   restores the resume pointer captured at N's own close — which enters N,
   because CAP-4 puts the close record *before* the block's checkpoint write —
   so the existing resume runs exactly N and nothing before it.
-- **What comes after N is invalidated, never silently retained.** Everything
-  the workspace gained or changed after N's boundary is moved aside under
-  `block-mode/invalidated/<ts>/` and named with the block that produced it. A
-  downstream artifact standing on a superseded upstream is the failure the mode
-  exists to prevent, so it is not left where a reader would trust it — and it
-  is set aside rather than deleted.
+- **What is not in N's UPSTREAM BASIS is invalidated, never silently
+  retained.** Everything the workspace holds that is absent from — or changed
+  against — **the boundary before N**, the same manifest the drift check above
+  is stated over, is moved aside under `block-mode/invalidated/<ts>/` and named
+  with the block that produced it. A downstream artifact standing on a
+  superseded upstream is the failure the mode exists to prevent, so it is not
+  left where a reader would trust it — and it is set aside rather than deleted.
+  **The basis is the boundary before N, never N's own** (#1388, 2026-08-03):
+  boundaries are snapshotted at a block's **close**, so N's own boundary
+  manifest contains N's outputs by construction, and a predicate stated over it
+  preserves exactly the artifacts a re-run of N supersedes. This clause
+  previously read "everything the workspace gained or changed after N's
+  boundary" — an **ordering** predicate — while the drift clause above already
+  read "the boundary before N". One contract, two bases, and the implementation
+  mirrored the split exactly: `upstream_boundary()` for drift,
+  `boundary_of()` for invalidation. The correction makes both clauses name the
+  same basis.
