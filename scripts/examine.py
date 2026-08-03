@@ -791,6 +791,132 @@ def derive_ledger(ws, order=None):
     return {"pin_ledger": ledger, "records": len(recs), "pins": len(lines)}
 
 
+def _arc_cites(brief_path):
+    """Arc cites from a brief record, in member order. ([] when absent.)"""
+    if not brief_path or not os.path.exists(brief_path):
+        return []
+    try:
+        with open(brief_path, encoding="utf-8") as fh:
+            rec = json.load(fh)
+    except (OSError, ValueError):
+        return []
+    out = []
+    for m in rec.get("members", []):
+        j = (m or {}).get("journey") or {}
+        cite, arc = j.get("arc_cite"), j.get("arc")
+        if cite:
+            out.append((cite, m.get("index"), m.get("slug"), arc,
+                        j.get("served"), j.get("not_served_reason")))
+    return out
+
+
+def _answer_ids(answers_path):
+    """(id, text) for every recorded interview answer. ([] when absent.)"""
+    if not answers_path or not os.path.exists(answers_path):
+        return []
+    try:
+        with open(answers_path, encoding="utf-8") as fh:
+            recs = json.load(fh)
+    except (OSError, ValueError):
+        return []
+    return [(r.get("id"), r.get("answer") or r.get("text") or "")
+            for r in recs if r.get("id")]
+
+
+def derive_declared(ws, brief=None, answers=None, order=None):
+    """THE ONE PRODUCER of the run's declared pointer set, and of the judge's
+    cited material derived from it (Story 20.204, #1376).
+
+    WHY THIS EXISTS AT ALL. `stages/stage3.md` requires handing the isolated
+    judge the sentences plus "the fact-sheet entries they cite" — and NOTHING
+    emitted those entries. A grep for `cited-material` across scripts/, skills/
+    and specs/ returned nothing: the artifact the judge contract depends on was
+    composed freehand by the drafting agent every run, which is how a run's
+    declared journey arcs were dropped from it in silence and detected only
+    because the judge itself remarked on the absence. The reader was specified;
+    the producing site did not exist.
+
+    The declared set is the UNION of three classes that are already declared
+    elsewhere and were never joined:
+      - examination pins  — derived from the examination records
+      - brief-record arc cites — declared source material carried BESIDE the
+        host-repo sources; an arc is not an examination, so it can never appear
+        in the pin ledger by construction
+      - interview answer ids — owner judgment, cited by id
+
+    ORDER IS DETERMINISTIC and by class, so two runs over the same state produce
+    a byte-identical file.
+
+    RECONCILIATION IS THE POINT. Every declared pointer either lands in the
+    cited material with its content, or is named in an absence list WITH ITS
+    REASON. A silent skip becomes structurally impossible rather than
+    prohibited, and the absence list travels to the judge so that "ungraded" and
+    "graded-clean" cannot blur.
+    """
+    pins = derive_ledger(ws, order)
+    ledger = os.path.join(ws, "examination-pins.txt")
+    with open(ledger, encoding="utf-8") as fh:
+        pin_lines = [ln.strip() for ln in fh if ln.strip()]
+
+    arcs = _arc_cites(brief)
+    answers_l = _answer_ids(answers)
+
+    declared = list(pin_lines)
+    declared += [c for c, *_ in arcs if c not in declared]
+    declared += [i for i, _t in answers_l if i not in declared]
+    _atomic_write(os.path.join(ws, "declared-pointers.txt"),
+                  "".join(d + "\n" for d in declared))
+
+    # --- the cited material, derived FROM the declared set -------------------
+    by_commit = {}
+    for _cid, data in read_records(ws):
+        for e in data.get("evidence", []):
+            if e.get("cite"):
+                by_commit.setdefault(e["cite"], e)
+    arc_by_cite = {c: (idx, slug, arc, served, why)
+                   for c, idx, slug, arc, served, why in arcs}
+    ans_by_id = dict(answers_l)
+
+    blocks, absent = [], []
+    for d in declared:
+        if d in arc_by_cite:
+            idx, slug, arc, served, why = arc_by_cite[d]
+            if arc:
+                blocks.append(f"[{d}] JOURNEY ARC — declared source material carried "
+                              f"beside the host-repo sources ({idx or '?'}"
+                              f"{', ' + slug if slug else ''}):\n{arc}")
+            else:
+                absent.append((d, "arc declared but not served"
+                                  + (f": {why}" if why else "")))
+        elif d in ans_by_id:
+            blocks.append(f"[{d}] INTERVIEW ANSWER (owner judgment) — {ans_by_id[d]}")
+        elif d in by_commit:
+            e = by_commit[d]
+            head = f"[{d}] {str(e.get('source_type','source')).upper()}"
+            when = e.get("when")
+            if when:
+                head += f" ({when}, time_axis={str(bool(e.get('time_axis'))).lower()})"
+            body = e.get("title") or e.get("text") or ""
+            blocks.append(f"{head} — {body}".rstrip())
+        else:
+            absent.append((d, "declared but no record in this workspace resolves it"))
+
+    out = "\n\n".join(blocks) + "\n"
+    if absent:
+        out += ("\n=== DECLARED BUT NOT RESOLVED ===\n"
+                "Every entry below was declared and could not be rendered. A position "
+                "citing one of these is UNGRADED, never graded-clean.\n"
+                + "".join(f"  {c} — {why}\n" for c, why in absent))
+    _atomic_write(os.path.join(ws, "cited-material.txt"), out)
+
+    return {"declared_pointers": os.path.join(ws, "declared-pointers.txt"),
+            "cited_material": os.path.join(ws, "cited-material.txt"),
+            "examination_pins": pins["pins"], "arc_cites": len(arcs),
+            "answer_ids": len(answers_l), "declared": len(declared),
+            "rendered": len(blocks), "unresolved": len(absent),
+            "reconciled": len(blocks) + len(absent) == len(declared)}
+
+
 def derive_ledger_stable(ws, order=None, tries=6):
     """Derive, then confirm the record set did not move under the derivation.
 
@@ -885,6 +1011,12 @@ def main(argv=None):
                    help="THE JOIN: derive $WS/examination-pins.txt from the "
                         "workspace's examination records in claim order and "
                         "exit. Requires --ws; --claim is not needed")
+    p.add_argument("--derive-declared", action="store_true",
+                   help="THE ONE PRODUCER (#1376): emit $WS/declared-pointers.txt "
+                        "(examination pins + brief arc cites + interview answer ids) "
+                        "and $WS/cited-material.txt derived from it, reconciled")
+    p.add_argument("--brief", help="brief record, for its members' arc cites")
+    p.add_argument("--answers", help="recorded interview answers, for their ids")
     p.add_argument("--order",
                    help="with --derive-ledger: comma-separated claim ids "
                         "giving the claim order explicitly")
@@ -916,6 +1048,13 @@ def main(argv=None):
                    help="skip issue comments (a marked partial)")
     args = p.parse_args(argv)
 
+    if args.derive_declared:
+        if not args.ws:
+            raise SystemExit("--derive-declared requires --ws")
+        order = [o.strip() for o in (args.order or "").split(",") if o.strip()]
+        print(json.dumps(derive_declared(args.ws, args.brief, args.answers, order),
+                         indent=2))
+        return 0
     if args.derive_ledger:
         if not args.ws:
             raise SystemExit("--derive-ledger requires --ws")
