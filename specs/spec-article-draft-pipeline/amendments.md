@@ -87,3 +87,60 @@ appends to it.
 > **#1289 is absorbed as an INSTANCE, not a second patch.** The interview block's `consulted:` line recorded `none (policy_source unset)` beside a 57,885-byte policy surface the run had read — a *derived* absence reported as a *configured* one, pointing the next debugger at a config key when the fact was editorial. The general rule is `SPEC-run-record` CAP-5 (a reason is computed from what the workspace holds, never read off a flag); the instance is a **third** `consulted:` state distinguishing "no source configured" from "source read, zero seeds survived" (`skills/draft-article/stages/stage2.md` amended the same day; composition site `scripts/draft-pipeline.py:2842-2848`).
 >
 > **Stated residue, so its absence is not read as an oversight:** the five registry gates composed from skill prose with no code emitter (`scripts/draft_gates.py:333-337`) still leave no mechanical `presented-payloads.jsonl` row, which is what `gate-inventory.py`'s `reached but never emitted` (`:364-366`) and the journal's `payload_capture_warning` (`scripts/draft-pipeline.py:2859`) report. The correct move is to **shrink that surface by giving them emitters** — the direction the gate-carrier work (#1245) started — never to police prompts. It is named, scoped follow-on work and **not a precondition** for anything above. Delivery: stories 20.180 (record format + validator + check), 20.181 (per-block emission at block close), 20.182 (the `consulted:` third state, derived).
+
+> **Amended 2026-08-03 (triage, #1335) — the persisted product paths take a
+> FIXED FIRST POSITION in the completion summary, and the review/stop gate
+> carries the draft path in its payload.** This narrows the 2026-07-15
+> interaction contract added to CAP-6 (#226), which reads: *"local artifact
+> paths may be displayed informationally but are never a required navigation
+> step or decision gate"* (`amendments-2026-07-10--2026-08-01.md:24@21ddd82`). That
+> clause was written against a stage that ended by sending the owner to read a
+> fact sheet at a path instead of presenting a choice, and it remains correct
+> for that case. It is **not** correct for the run's terminal handover: at
+> completion the product path is not reference information, it is the one thing
+> the completion exists to hand over.
+>
+> **The observed failure (#1335).** Run `20260803T105759-992700` completed with
+> both products persisted and zero blockers, and the owner reported: *"No file
+> path was shown, so I cannot see the generated artifact."* The paths **were**
+> emitted — as line 2 of an informational bucket inside 17 owner-facing lines,
+> which the run's own stop hook flagged in the same breath as 8.5x over its
+> 2-line budget. The contract worked as written and the handover failed.
+>
+> **What binds.** (a) The completion summary's **first line, before any
+> bucket**, names both persisted product paths, rendered mechanically from
+> `complete`'s JSON rather than composed — a path a run types is a path a run
+> can mistype. (b) The **review/stop gate payload carries the draft path** in
+> its `where` field, so the handover rides a payload the carrier can observe
+> rather than prose it cannot. (c) CAP-6's clause is narrowed to what it was
+> written for: a path may not be a **decision gate** or a required navigation
+> step *in place of a choice*; naming the product the run just wrote is
+> neither.
+>
+> **Why position rather than presence.** Whether a person notices a signal is
+> a property of its fixed position and shape, not of its presence in a long
+> reply — which is why the remedy is a position rule and not another sentence
+> in the bucket. The declined alternative, pinning the paths to position 1
+> *within* the informational bucket, keeps CAP-6 untouched and still fails the
+> case it was reported from: the bucket itself moves down the reply as notes
+> accumulate, and the run with the most notes is the run most in need of
+> inspection.
+>
+> **What would overturn this amendment:** the first line proving to crowd out a
+> publish blocker — a blocker is the one thing that outranks the handover, and
+> if the two compete for line 1 the ordering rule needs a tie-break rather than
+> a second fixed position.
+>
+> Delivery: story 20.194.
+
+> **Amended 2026-08-03 (triage, #1338, coupled with `../spec-terrain/amendments.md`
+> of the same date) — the Brief binding is carried where a checkpoint write
+> cannot omit it, and `autostart` reports three states, not two.** The
+> same-brief-only resumption contract (#1207) is unchanged in intent and
+> unreachable in fact when the discriminator can be dropped by a writer that
+> simply had no `run_state` to pass. The terrain-side amendment carries the
+> Brief's home and ID; what binds **here** is the pipeline half: `checkpoint`
+> refuses a write that would leave the binding absent while one exists, and
+> `autostart` distinguishes *no binding recorded* from *a different Brief*
+> rather than collapsing the first into the second and taking the expensive
+> branch. Delivery: story 20.193.

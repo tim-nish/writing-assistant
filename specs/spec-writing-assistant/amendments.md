@@ -68,3 +68,50 @@ and no already-relocated text moves — the rule is prospective.
 > **(7) The check idiom: a content assertion binds to an anchor token or to a spec's file SET.** This generalizes the repair `scripts/check-stage2-policy-seam.sh` already carries, where a `grep` that had matched one file now passes `SPEC.md` and `constraints.md` together, so the assertion survives the relocation that split them. A check asserting that a contract exists should grep for a `CAP-n` token, a constraint's declared name, or an `#issue` anchor — the forms with a measured survival rate of 100% — and where prose must be matched, it is matched across the spec's whole file set rather than one member. Migration is **opportunistic and rides the coverage-declaration work already in flight**, not a sweep of its own: the 22 are converted as their specs are touched.
 >
 > **What would overturn this amendment:** a demonstration that anchors rot here too — a `CAP-n` renumbering, or an issue-number reuse — which would mean the durable form is only durable because it has not yet been stressed, and the answer becomes an indexed reference rather than a grammar; or a ruling that a citation inside an append-only amendment block cannot be governed at all, which would put a third of the population permanently outside the convention and make the rule's scope claim false. **Success signal, unchanged from the issue:** the next forced relocation completes without producing a repair issue. Delivery: story 20.184 (the guard), story 20.185 (the check-idiom migration).
+
+> **Amended 2026-08-03 (triage, #1339) — a reader-facing citation in an
+> emitted product is CONSTRUCTED repo-qualified, and a bare sha is
+> unconstructible rather than detectable.** The shipped canonical
+> `articles/drafts/where-a-safeguard-binds.md` cites `commit 556ab1b` in its
+> Pointers section while the GitHub references beside it carry full URLs. For
+> the article's declared audience — an external reader with no portfolio
+> context — a bare sha resolves to nothing: no repository is named, and the
+> article mentions several.
+>
+> **The asymmetry this closes.** `scripts/check-citation-form.sh` governs this
+> repository's **own** body text (`path:line@sha` pins); the **product's**
+> reader-facing citation form had no carrier at all. So the internal citation
+> discipline was enforced and the published one was not, which is backwards:
+> the external reader is the party with no other way to resolve a reference.
+>
+> **What binds.** The emitter renders a product's commit citation from the
+> examination record, which already carries `pin: <repo>@<sha>` at the read
+> that produced it — so the repository qualifier is **in hand at the point of
+> writing** and nothing is inferred, looked up, or re-derived. A bare,
+> repo-unqualified sha therefore cannot be composed. A refusal at the `complete`
+> write layer is the **backstop**, not the mechanism: it exists so a
+> hand-authored product cannot re-open the hole, and it is expected never to
+> fire on pipeline output.
+>
+> **The remedy shape is the standing one** — *owner decision record —
+> 2026-07-28 (constrain generation, not post-hoc detection)* — and this is the
+> constrain side of it: detection after composition would make the run loop to
+> repair what it could not have written wrong. The declined alternative (a
+> check on the persisted product, symmetric with the frontmatter bounds
+> already enforced there) is exactly that loop.
+>
+> **Scope, stated so it is not read wider:** this governs **commit** references
+> in emitted products. Issue and URL references already resolve and are
+> untouched; `path:line@sha` pins in this repository's own text stay with
+> `check-citation-form.sh`. The publication boundary is unaffected — a
+> repo-qualified sha of a **public** repository is what the reader needs, and
+> the boundary's prohibition on the policy hub's name and shas is unchanged
+> and unweakened.
+>
+> **What would overturn this amendment:** drafts proving to need short internal
+> references during review, with only the published variant resolving them.
+> That is a product-boundary claim (the canonical is what the site publishes,
+> so it does not hold today) and it would arrive as a variant-side amendment,
+> not as a relaxation here.
+>
+> Delivery: story 20.195.
