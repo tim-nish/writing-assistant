@@ -323,6 +323,59 @@ def check_attestation(draft_hash, graded, entries, draft_text, carried=frozenset
     return errors
 
 
+def round_acceptance_errors(verdict_lines, entries):
+    """Is this ROUND trustworthy at all? Evaluated BEFORE any ledger write.
+
+    Story 20.202 (#1374/#1375). The rejection predicate already existed one
+    entry point over: `check_attestation` refuses a round whose ATTESTATION
+    grades a position not in the map. The same defect in the VERDICT BODY was a
+    per-finding discard, so a round whose header was well-formed and whose body
+    was not still recorded a full set of implicit passes — 88 of them on run
+    20260803T142748-813020, which then suppressed 13 real violations on
+    byte-identical text through the first-wins carry.
+
+    A rejected round's SILENCES are as untrusted as its findings. A judge that
+    wrote a placeholder for every position id demonstrably did not deliver
+    per-position grades, so keeping its implicit passes discards the signal and
+    keeps the noise, pre-loaded into the mechanism that makes it permanent.
+
+    STATED LIMIT, so the gap is not read as covered: the story's predicate also
+    names "verdict tokens from the closed set". THIS GRAMMAR HAS NO VERDICT
+    TOKEN — every line is a finding (`POS: reason`, or `POS ~ "quote": reason`),
+    and a pass is the ABSENCE of a line. That clause is therefore vacuous here
+    and is deliberately not implemented as an invented token set; the story
+    records it as an open question against the parser.
+    """
+    known = {pos for pos, _c, _p, _a, _t in entries}
+    unknown, repeated, seen = [], [], set()
+    for ln in verdict_lines:
+        m = JUDGE_ECHO.match(ln)
+        pos = (m.group("pos") if m else ln.partition(":")[0]).strip()
+        if pos not in known:
+            if pos not in unknown:
+                unknown.append(pos)
+        elif pos in seen:
+            if pos not in repeated:
+                repeated.append(pos)
+        seen.add(pos)
+    # One line per DISTINCT defect, with its count: the observed round repeated
+    # a single bad id thirteen times, and thirteen identical lines report the
+    # round's size rather than its defect.
+    errors = []
+    if unknown:
+        errors.append(f"{len(unknown)} verdict position(s) not in the map "
+                      f"({', '.join(repr(p) for p in unknown[:5])}"
+                      f"{', …' if len(unknown) > 5 else ''}) — the ROUND is rejected, not "
+                      "the lines: a judge that cannot name a position did not grade the "
+                      "ones it stayed silent about, so its passes are not evidence either")
+    if repeated:
+        errors.append(f"{len(repeated)} position(s) carry more than one verdict "
+                      f"({', '.join(repr(p) for p in repeated[:5])}"
+                      f"{', …' if len(repeated) > 5 else ''}) — one verdict per position, "
+                      "or the round's per-position grading is not a function")
+    return errors
+
+
 def parse_shards(paths):
     """Parse N attested verdicts files into one union (Story 20.163, #1248).
 
@@ -488,8 +541,23 @@ def read_ledger(path):
     return held, None
 
 
-def append_ledger(path, rows):
-    """Append (pos, texthash, outcome, draft_hash, reason) rows. Best-effort:
+def round_id(att_hash, verdict_lines):
+    """A stable id for THIS round's verdict set (Story 20.202).
+
+    Rows carry it so a round's rows can be struck mechanically rather than by
+    hand-editing a TSV, and so a later carry can refuse rows whose round was
+    rejected. Derived from the attested draft hash plus the round's own sorted
+    verdict lines: same round, same id, no clock and no counter to persist.
+    """
+    h = hashlib.sha256()
+    h.update((att_hash or "").encode("utf-8"))
+    for ln in sorted(verdict_lines or []):
+        h.update(b"\n"); h.update(ln.strip().encode("utf-8"))
+    return h.hexdigest()[:12]
+
+
+def append_ledger(path, rows, rid=""):
+    """Append (pos, texthash, outcome, draft_hash, reason) rows, tagged `rid`. Best-effort:
     an unwritable ledger degrades the NEXT round to a disclosed full grade, and
     must never fail a gate the judge already decided."""
     if not rows:
@@ -501,10 +569,10 @@ def append_ledger(path, rows):
                 fh.write("# provenance verdict ledger (Story 20.170, #1287) — "
                          "run-scoped, append-only, first-wins.\n"
                          "# position\tsha256(segmented sentence)\tpass|fail\t"
-                         "draft-sha256\treason\n")
+                         "draft-sha256\treason\tround\n")
             for pos, th, outcome, dh, reason in rows:
                 clean = " ".join((reason or "").split())
-                fh.write(f"{pos}\t{th}\t{outcome}\t{dh}\t{clean}\n")
+                fh.write(f"{pos}\t{th}\t{outcome}\t{dh}\t{clean}\t{rid}\n")
     except OSError as e:
         return f"verdict ledger {path} could not be written: {e}"
     return None
@@ -700,6 +768,16 @@ def main(argv=None):
                 sys.stderr.write(f"  {e}\n")
             return 3
 
+        # ROUND ACCEPTANCE (Story 20.202) — atomic, and BEFORE any ledger read
+        # or write. A rejected round contributes nothing: no rows, no carry
+        # entries, no findings. It is re-run, not partially believed.
+        round_errors = round_acceptance_errors(verdict_lines, entries)
+        if round_errors:
+            sys.stderr.write("verify-provenance: ROUND REJECTED (not judged)\n")
+            for e in round_errors:
+                sys.stderr.write(f"  rejected: {e}\n")
+            return 3
+
     valid = _load_set(args.fact_sheet)
     findings = []
 
@@ -837,7 +915,8 @@ def main(argv=None):
                      round_fail.get(pos, ""))
                     for pos in sorted(graded)
                     if pos in keys and pos not in discarded and keys[pos] not in held]
-            err = append_ledger(ledger_path, rows)
+            err = append_ledger(ledger_path, rows,
+                                round_id(att_hash, verdict_lines))
             if err:
                 sys.stderr.write(f"ledger not recorded — next round re-grades: {err}\n")
             elif rows:
