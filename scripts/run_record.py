@@ -551,7 +551,27 @@ def close_block(exit_code=0):
     dur = duration_between(opened, rec["ts"]) if opened else None
     if dur is not None:
         rec["duration_s"] = dur
-    return append(p["ws"], rec)
+    reason = append(p["ws"], rec)
+    _block_mode(p["ws"], rec)   # opt-in stop at this boundary; off = no-op
+    return reason
+
+
+def _block_mode(ws, rec):
+    """The development block mode's boundary hook (story 20.190, #1332).
+
+    A NO-OP unless the developer enabled the mode for this workspace, which is
+    what keeps the production run byte-identical: the mode writes nothing to
+    this journal in either state — it READS this record for the block, its
+    duration and its verdict, and everything it stores rides the WORKSPACE,
+    exactly where the amendment's carrier split already puts artifacts. That
+    is why it adds no record class, which the amendment names as the test of
+    whether the split was right.
+    """
+    try:
+        import run_block
+        return run_block.after_close(ws, rec)
+    except Exception:                                      # pragma: no cover
+        return None                     # a control surface never fails a run
 
 
 _RUN_LOOP = []

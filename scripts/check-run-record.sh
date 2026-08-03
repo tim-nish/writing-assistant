@@ -3,7 +3,8 @@
 # tier: inner — pure stdlib Python over fixtures written into a private mktemp
 #   workspace; no network, no shared path, no repo mutation. Measured at
 #   adoption (2026-08-02) well under the runner's INNER_MS ceiling.
-# covers: scripts/run_record.py scripts/run_loop.py specs/spec-run-record/**
+# covers: scripts/run_record.py scripts/run_loop.py scripts/run_block.py
+#   specs/spec-run-record/**
 #   scripts/draft-pipeline.py
 #   scripts/probe.py scripts/draft_variants.py skills/draft-article/SKILL.md
 #   skills/draft-article/stages/fan-out.md skills/draft-article/stages/stage3.md
@@ -706,6 +707,254 @@ print("ok:   the two-cycle bound and the delta re-grade behave exactly as before
       "(20.189 AC-4)")
 print("ok:   every record-formats.md §5 rejection class fails with a reason of its "
       "own, and a report disagreeing with its stream is caught at stream level")
+PY
+
+# --- DEVELOPMENT BLOCK MODE (Story 20.190, #1332) ----------------------------
+# The amendment's own test of the carrier split: a block mode that needed a new
+# record class would be evidence the split was wrong. So the assertions below
+# are as much about what the journal does NOT gain as about what the mode does
+# — the off path is compared record-for-record against a run with the hook
+# neutralised, and the ON path is compared against the OFF path.
+python3 - "$WS" <<'PY' || fail=1
+import contextlib, io, json, os, sys
+sys.path.insert(0, "scripts")
+import run_record as R
+import run_block as B
+
+os.environ.pop(B.ENV, None)     # the per-process switch must not leak in here
+bad = []
+def need(cond, msg):
+    if not cond:
+        bad.append(msg)
+
+SEQ = (("probe", "probe.json"), ("interview", "interview.json"),
+       ("fill", "draft.md"), ("quality-gate", "gate-verdicts.txt"))
+
+def drive(ws, block, artifact=None):
+    """One block, in CAP-4's order: the close record lands, THEN the block's
+    own checkpoint write. The mode's re-entry depends on that order, so the
+    fixture must reproduce it rather than assume it."""
+    R.open_block(ws, block, "cmd-" + block)
+    if artifact:
+        with open(os.path.join(ws, artifact), "w", encoding="utf-8") as fh:
+            fh.write(block + " output\n")
+    R.note(outcome="pass", detail="did " + block, route=block,
+           draft_sha256=(R.draft_sha256("a draft")
+                         if block in R.DRAFT_DECIDING_BLOCKS else None))
+    err = io.StringIO()
+    with contextlib.redirect_stderr(err):     # the mode's own notice, captured
+        R.close_block(0)
+    with open(os.path.join(ws, "checkpoint.json"), "w", encoding="utf-8") as fh:
+        json.dump({"next_stage": B.next_block(block) or "done"}, fh)
+    return err.getvalue()
+
+def mint(name, seq=SEQ):
+    ws = os.path.join(sys.argv[1], "blockmode-" + name)
+    os.makedirs(ws, exist_ok=True)
+    with open(os.path.join(ws, "checkpoint.json"), "w", encoding="utf-8") as fh:
+        json.dump({"next_stage": "probe"}, fh)
+    return ws
+
+def tree(ws):
+    out = []
+    for base, _dirs, files in os.walk(ws):
+        for fn in files:
+            out.append(os.path.relpath(os.path.join(base, fn), ws))
+    return sorted(out)
+
+def normalised(ws):
+    """Records with the two timing fields dropped — everything a run's journal
+    says, minus what differs between any two executions of the same run."""
+    out = []
+    for rec in R.read_records(ws):
+        out.append({k: v for k, v in rec.items()
+                    if k not in ("ts", "duration_s")})
+    return out
+
+# --- AC-1: OFF is byte-identical to a run with no block mode at all -----------
+# `control` runs with the hook itself replaced, i.e. exactly the code path that
+# existed before this story. `off` runs the real hook with the mode not
+# enabled. A difference in either the journal or the workspace is the mode
+# having changed production behaviour.
+control = mint("control")
+real_hook = R._block_mode
+R._block_mode = lambda ws, rec: None
+try:
+    for block, artifact in SEQ:
+        drive(control, block, artifact)
+finally:
+    R._block_mode = real_hook
+off = mint("off")
+off_said = [drive(off, block, artifact) for block, artifact in SEQ]
+need(off_said == ["", "", "", ""],
+     "an OFF run said something about block mode: %r (AC-1)" % (off_said,))
+
+need(normalised(off) == normalised(control),
+     "with the mode OFF the journal differs from a run with the hook removed "
+     "entirely — the mode is opt-in and production behaviour is unchanged "
+     "(AC-1):\n  off=%r\n  control=%r" % (normalised(off), normalised(control)))
+need(tree(off) == tree(control),
+     "with the mode OFF the run workspace differs from a run with the hook "
+     "removed: %r vs %r (AC-1)" % (tree(off), tree(control)))
+need(not os.path.exists(B.mode_dir(off)),
+     "an OFF run minted the mode's own directory — the gate is checked before "
+     "anything is created, which is what makes AC-1 assertable from the "
+     "workspace rather than from a code path")
+need(B.after_close(off, R.read_records(off)[-1]) is None,
+     "the hook did work with the mode off — it must return before touching "
+     "anything (AC-1)")
+need(B.enabled(off) is False and B.rerun(off, "fill")["ok"] is False,
+     "a re-entry worked without the mode having been asked for — opt-in means "
+     "the control surface is absent until enabled (AC-1)")
+need("opt-in" in " ".join(B.rerun(off, "fill")["reasons"]),
+     "the off-path refusal does not say why it refused")
+# and the per-process switch is a switch, not a default
+os.environ[B.ENV] = "1"
+need(B.enabled(mint("envprobe")) is True, "the %s switch does not turn the "
+     "mode on" % B.ENV)
+os.environ.pop(B.ENV)
+
+# --- AC-2: the mode stops at the boundary and reports block/duration/verdict --
+on = mint("on")
+B.enable(on)
+said = {block: drive(on, block, artifact) for block, artifact in SEQ}
+need("STOPPED at block 'fill'" in said["fill"]
+     and "verdict pass" in said["fill"]
+     and "'quality-gate' is NOT entered" in said["fill"],
+     "the boundary stop was not reported where the developer is looking — the "
+     "block, its verdict and the block being withheld reach the command's own "
+     "stderr (AC-2): %r" % (said["fill"],))
+
+closes = {r["block"]: r for r in R.read_records(on)
+          if R.classify(r) == R.EVENT_CLOSE}
+for snap in B.boundaries(on):
+    close = closes[snap["block"]]
+    notice = B.stop_notice(on, snap)
+    need(notice["stopped_at"] == close["block"],
+         "the stop notice names a different block than the close record: %r"
+         % (notice,))
+    need(notice["duration_s"] == close.get("duration_s")
+         and isinstance(close.get("duration_s"), (int, float)),
+         "the stop notice's duration is not the close record's own — the "
+         "record carries the time and the mode READS it, it does not "
+         "recompute one (AC-2): %r vs %r" % (notice, close.get("duration_s")))
+    need(notice["verdict"]["outcome"] == close["verdict"]["outcome"]
+         and notice["verdict"]["detail"] == close["verdict"]["detail"],
+         "the stop notice does not report the block's verdict: %r" % (notice,))
+stop = json.load(open(os.path.join(B.mode_dir(on), B.STOP_FILE),
+                     encoding="utf-8"))
+need(stop["stopped_at"] == "quality-gate" and stop["next_block"] == "verify",
+     "the last boundary's stop record does not say where the run stopped and "
+     "which block is NOT entered: %r" % (stop,))
+need("NOT entered" in stop["not_entered"] and stop["rerun"],
+     "the stop record does not state that the next block is withheld, or "
+     "offers no way back in: %r" % (stop,))
+
+# --- AC-5: being ON adds NO record and NO field ------------------------------
+need(normalised(on) == normalised(off),
+     "turning the mode ON changed the journal — the mode introduces no record "
+     "class and no record field; everything it stores rides the workspace "
+     "(AC-5, amendments.md 2026-08-03):\n  on=%r\n  off=%r"
+     % (normalised(on), normalised(off)))
+need(all(R.classify(r) in (R.EVENT_OPEN, R.EVENT_CLOSE, R.EVENT_UNIT)
+         for r in R.read_records(on)),
+     "a record written under the mode does not classify as one of the three "
+     "kinds record-formats.md declares (AC-5)")
+rows = R.validate_lines([json.dumps(r) for r in R.read_records(on)])
+need([n for n, _k, rs in rows if rs] == [],
+     "a journal written under the mode fails the record validator: %r" % (rows,))
+
+# --- AC-3: a re-run of block N consumes blocks 1..N-1 unchanged --------------
+before_up = {rel: B._sha256(os.path.join(on, rel))
+             for rel in ("probe.json", "interview.json")}
+before_recs = len(R.read_records(on))
+report = B.rerun(on, "fill")
+need(report["ok"] and report["applied"],
+     "re-running a completed block was refused: %r" % (report["reasons"],))
+need(report["upstream"]["through_block"] == "interview"
+     and report["upstream"].get("unchanged") is True,
+     "the re-run does not name the preserved upstream it consumed: %r"
+     % (report["upstream"],))
+need(all(B._sha256(os.path.join(on, rel)) == sha
+         for rel, sha in before_up.items()),
+     "a re-run of the fill CHANGED an upstream artifact — blocks 1..N-1 are "
+     "consumed unchanged (AC-3)")
+need(len(R.read_records(on)) == before_recs,
+     "the re-entry itself wrote to the journal — it re-runs nothing, so it "
+     "records nothing (AC-3/AC-5)")
+need(report.get("reran_upstream") is False,
+     "the re-entry does not state that it ran nothing upstream: %r" % (report,))
+ck = json.load(open(os.path.join(on, "checkpoint.json"), encoding="utf-8"))
+need(ck["next_stage"] == "fill",
+     "the resume pointer was not restored to the state block `fill` was "
+     "entered from — the re-run would enter some other block (AC-3): %r"
+     % (ck,))
+per_block = {}
+for r in R.read_records(on):
+    per_block[r.get("block")] = per_block.get(r.get("block"), 0) + 1
+drive(on, "fill", "draft.md")     # the developer's actual single-block re-run
+after = {}
+for r in R.read_records(on):
+    after[r.get("block")] = after.get(r.get("block"), 0) + 1
+need(after["fill"] == per_block["fill"] + 2,
+     "the single-block re-run did not record its own open and close: %r" % (after,))
+need(all(after[b] == per_block[b] for b in ("probe", "interview")),
+     "an upstream block ran again during a single-block re-run of the fill — "
+     "nothing upstream re-runs (AC-3): %r vs %r" % (after, per_block))
+need(B.upstream_drift(on, "fill") == [],
+     "after the re-run the preserved upstream no longer verifies: %r"
+     % (B.upstream_drift(on, "fill"),))
+
+# a re-run against a CHANGED upstream refuses, naming the file
+with open(os.path.join(on, "probe.json"), "a", encoding="utf-8") as fh:
+    fh.write("edited upstream\n")
+refused = B.rerun(on, "fill")
+need(not refused["ok"] and any("probe.json" in r for r in refused["reasons"]),
+     "a re-run against a CHANGED upstream was allowed, or refused without "
+     "naming what changed: %r" % (refused,))
+
+# --- AC-4: what comes after N is invalidated, never silently retained --------
+need(not os.path.exists(os.path.join(on, "gate-verdicts.txt")),
+     "the quality gate's artifact survived a re-run of the fill in place — a "
+     "downstream artifact built on a superseded upstream is the failure this "
+     "mode must not manufacture (AC-4)")
+item = [i for i in report["invalidated"] if i["path"] == "gate-verdicts.txt"]
+need(item and item[0]["produced_by"] == "quality-gate",
+     "the invalidation report does not name the downstream artifact and the "
+     "block that produced it: %r" % (report["invalidated"],))
+need(item and os.path.isfile(os.path.join(on, item[0]["moved_to"])),
+     "the invalidated artifact was destroyed rather than set aside — "
+     "invalidated is a state, not a shredder: %r" % (item,))
+need(os.path.isfile(os.path.join(on, "draft.md")),
+     "the re-run invalidated the block's OWN output — only what comes AFTER "
+     "block N is superseded (AC-4)")
+need(all("interview.json" != i["path"] for i in report["invalidated"]),
+     "an UPSTREAM artifact was invalidated: %r" % (report["invalidated"],))
+
+# --- the module is stdlib-only, like its siblings ----------------------------
+import re as _re
+src = open("scripts/run_block.py", encoding="utf-8").read()
+extra = [ln for ln in src.splitlines()
+         if _re.match(r"^(import|from) ", ln)
+         and not _re.match(r"^(import|from) (datetime|hashlib|json|os|re|shutil"
+                           r"|sys|run_record)\b", ln)]
+need(not extra, "scripts/run_block.py imports outside the standard library: %r"
+     % (extra,))
+
+if bad:
+    for b in bad:
+        sys.stderr.write("FAIL: %s\n" % b)
+    sys.exit(1)
+print("ok:   with block mode OFF the journal and the workspace are identical to "
+      "a run with the hook removed entirely (20.190 AC-1)")
+print("ok:   a closed block reports its block, its own recorded duration and its "
+      "verdict, and names the block it is withholding (20.190 AC-2)")
+print("ok:   re-running one block consumes blocks 1..N-1 unchanged, re-runs "
+      "nothing upstream, and refuses when the upstream has changed (20.190 AC-3)")
+print("ok:   a re-run invalidates what was built after block N, naming it and "
+      "the block that produced it, and preserving it (20.190 AC-4)")
+print("ok:   the mode adds no record class and no record field — the ON journal "
+      "equals the OFF journal (20.190 AC-5)")
 PY
 
 # --- AC-4: the OLD readers are unchanged over a pre-contract journal ----------

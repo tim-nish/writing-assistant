@@ -267,3 +267,41 @@ ledger carry are what make a loop converge; none of them is a history mechanism
 and none is touched. This adds history to a loop that already terminates —
 never a third cycle. The revision cycle still overwrites the working artifact;
 what changes is that the superseded version stays addressable.
+
+## 6. The development block mode adds NO record
+
+Stated here, in the record formats, precisely because the contract is about
+what this file does *not* gain. The opt-in development block mode
+(`scripts/run_block.py`, amendments.md 2026-08-03, "The block mode adds no
+record class") stops a run at a block boundary and re-runs one block against
+preserved upstream state. It introduces **no `event` value, no record field,
+and no line in `run-events.jsonl` at all** — a mode that needed one would be
+evidence the amendment's carrier split was wrong, and that is the test the
+amendment itself names.
+
+It **reads** the close record of §2 for the three facts it reports — the block,
+its `duration_s`, its `verdict` — and it **writes** to the run workspace, under
+`<ws>/block-mode/`, the same carrier clause (c) already gives per-iteration
+artifacts: a boundary snapshot per closed block (the workspace manifest, and
+the resume pointer as it stood at that close), the last stop notice, and
+anything a re-run invalidated. Deleting that directory leaves an ordinary
+continuous run behind.
+
+Three properties bind:
+
+- **Off is off.** The mode is enabled per workspace (`block-mode/state.json`)
+  or per process (`WA_BLOCK_MODE=1`), never by default, and an unenabled run's
+  journal and workspace are identical to a run with the hook absent.
+- **A re-run of block N consumes blocks 1..N-1 unchanged.** The upstream is the
+  manifest snapshotted at the boundary before N; a re-run whose upstream has
+  changed is **refused**, naming the changed file, because that is an ordinary
+  re-run of the changed block and not a single-block re-entry. Re-entry
+  restores the resume pointer captured at N's own close — which enters N,
+  because CAP-4 puts the close record *before* the block's checkpoint write —
+  so the existing resume runs exactly N and nothing before it.
+- **What comes after N is invalidated, never silently retained.** Everything
+  the workspace gained or changed after N's boundary is moved aside under
+  `block-mode/invalidated/<ts>/` and named with the block that produced it. A
+  downstream artifact standing on a superseded upstream is the failure the mode
+  exists to prevent, so it is not left where a reader would trust it — and it
+  is set aside rather than deleted.
