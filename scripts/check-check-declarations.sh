@@ -1,6 +1,10 @@
 #!/usr/bin/env sh
 # parallel-safe
 # tier: inner — a header scan over scripts/check-*.sh, no execution
+# ends: unclassified checks entering the family — a member with no declared
+#   tier, removal signal, parallel-safety decision, defect class or measured
+#   runtime, and an exemption list quietly widened to admit one
+# measured: 680ms
 # covers: scripts/check-*
 # removal-signal: the #910 retrospective classification pass runs (its reopen
 #   trigger is recorded in specs/spec-writing-assistant/SPEC.md — a climbing
@@ -22,6 +26,28 @@
 #
 #   # tier: inner|full — <why this tier>
 #   # removal-signal: <a condition someone could OBSERVE firing>
+#
+# TWO MORE ARE REQUIRED OF CHECKS NEWER THAN 2026-08-03 (Story 20.197, #1355):
+#
+#   # ends: <the defect class this check ends>
+#   # measured: <N>ms
+#
+# These are rule 1 of the checker governance rules declared in run-checks.sh's
+# header. A proposal is accepted only when it states what class it ends — a
+# generation-side constraint that makes the class unproducible being the
+# preferred answer, and "no checker" a valid outcome — and what it measured.
+# "The effect may be small but having one is better than none" is formally
+# inadmissible: it prices the benefit and not the cost, and cost multiplies by
+# loop position. ADMISSION_BASELINE exempts the 41 checks that predate the
+# clauses, for the same declined-retrospective-sweep reason BASELINE exists.
+#
+# BOTH EXEMPTION LISTS RATCHET: they may only shrink, compared against this
+# file's own previous committed revision. An addition is the gate widening to
+# admit the file it was meant to bind — the one edit that cannot be caught by
+# reading the file it exempts. And a BASELINE member EDITED on this branch or
+# in the working tree leaves the exemption: the declined sweep means nobody
+# re-tiers 134 files at once, not that a file stays unclassified while being
+# actively changed.
 #
 # The removal signal follows the ratified shape: concrete, observable
 # conditions recorded at adoption — a bare expiry date alone does not satisfy
@@ -201,6 +227,94 @@ check-write-before-read.sh
 check-writing-sources.sh
 "
 
+# The check suite at the ADMISSION-GATE adoption (2026-08-03, Story 20.197,
+# #1355/#1356) — the 41 checks that already existed when the admission clauses
+# landed. They are exempt from `# ends:` and `# measured:` for the same reason
+# BASELINE is exempt from `# tier:` and `# removal-signal:`: the retrospective
+# sweep was declined, and a gate that failed 41 files on the day it shipped
+# would be a sweep wearing a gate's clothes. Anything NEWER declares all four.
+# Do NOT add new checks here.
+ADMISSION_BASELINE="
+check-ask-decidability.sh
+check-brief-content-contract.sh
+check-brief-pointer-unresolved.sh
+check-capability-fixture-coverage.sh
+check-check-declarations.sh
+check-citation-form.sh
+check-composed-owner-surfaces.sh
+check-dead-inputs.sh
+check-examine.sh
+check-gate-inventory.sh
+check-gate-payload-carrier.sh
+check-journey-writer-absent.sh
+check-kind-lockstep.sh
+check-owner-path-rendering.sh
+check-owner-reaching-vocabulary.sh
+check-probe.sh
+check-product-citation.sh
+check-resolved-default-inner.sh
+check-review-style-conformance.sh
+check-run-record.sh
+check-stage0-brief-entry.sh
+check-stage0-brief-selection.sh
+check-stage0-resume-confirmation.sh
+check-stop-gate-carrier.sh
+check-strand-cover-inner.sh
+check-style-contract.sh
+check-terrain-brief-home-inner.sh
+check-terrain-brief-iteration-inner.sh
+check-terrain-code-inner.sh
+check-terrain-compose-inner.sh
+check-terrain-consultant-inner.sh
+check-terrain-group-disclosure.sh
+check-terrain-relay-fidelity.sh
+check-terrain-report-inner.sh
+check-terrain-select-brief-inner.sh
+check-terrain-select-index-inner.sh
+check-terrain-select-set-inner.sh
+check-terrain-split.sh
+check-terrain-theses-inner.sh
+check-terrain-view-inner.sh
+check-turn-budget.sh
+"
+
+# --- the baseline RATCHET (Story 20.197, #1356) ------------------------------
+# Both exemption lists may only SHRINK. An addition to either is the gate being
+# widened to admit the file it was meant to bind, which is the one edit that
+# cannot be caught by reading the file it exempts. Compared against this file's
+# own previous committed revision, so the assertion needs no external state.
+prev=$(git show HEAD:scripts/check-check-declarations.sh 2>/dev/null || true)
+if [ -n "$prev" ]; then
+  for list in BASELINE ADMISSION_BASELINE; do
+    prev_n=$(printf '%s\n' "$prev" | awk -v L="$list=\"" '
+      index($0,L)==1 {inl=1; next} inl && /^"$/ {inl=0} inl && NF {c++} END {print c+0}')
+    case "$list" in
+      BASELINE) cur_n=$(printf '%s\n' "$BASELINE" | grep -c . || true) ;;
+      *)        cur_n=$(printf '%s\n' "$ADMISSION_BASELINE" | grep -c . || true) ;;
+    esac
+    if [ "$prev_n" -gt 0 ] && [ "$cur_n" -gt "$prev_n" ]; then
+      err "$list grew from $prev_n to $cur_n entries — an exemption list may only shrink. A new check declares its headers; it is never added here (Story 20.197, #1356)"
+    fi
+  done
+fi
+
+# --- classify-when-touched (Story 20.197, #1356) -----------------------------
+# A baseline member edited on this branch or in the working tree leaves the
+# exemption: the declined retrospective sweep means nobody re-tiers 134 files at
+# once, and it does NOT mean a file stays unclassified while being edited.
+# Both diffs are name-only and cost single-digit ms.
+touched=$( { git diff --name-only HEAD 2>/dev/null;
+             b=$(git merge-base HEAD origin/main 2>/dev/null) \
+               && git diff --name-only "$b" HEAD 2>/dev/null; } | sort -u)
+for f in $touched; do
+  case "$f" in scripts/check-*.sh) ;; *) continue ;; esac
+  [ -e "$f" ] || continue
+  base=${f#scripts/}
+  printf '%s\n' "$BASELINE" | grep -qx "$base" || continue
+  head -25 "$f" | grep -Eq '^# tier: (inner|full)' \
+    || err "$f is a baseline check being EDITED with no '# tier: inner|full' header — a touched file leaves the exemption: declare its tier and delete its line from BASELINE (Story 20.197, #1356)"
+done
+
 new=0
 for f in scripts/check-*.sh; do
   [ -e "$f" ] || continue
@@ -219,6 +333,31 @@ for f in scripts/check-*.sh; do
     words=$(printf '%s\n' "$residue" | wc -w | tr -d ' ')
     [ "$words" -ge 3 ] \
       || err "$f declares a removal signal that is a bare date ('$sig') — name a condition someone could observe (Story 20.48 AC5)"
+  fi
+
+  # --- the admission clauses (Story 20.197, #1355) --------------------------
+  # Rule 1 of the checker governance rules in run-checks.sh's header: a
+  # proposal is accepted only when it states the DEFECT CLASS IT ENDS and its
+  # MEASURED runtime. A declared tier with no measured number is the "better
+  # than none" admission the rule names inadmissible — it prices the benefit
+  # and not the cost, and cost multiplies by loop position.
+  printf '%s\n' "$ADMISSION_BASELINE" | grep -qx "$base" && continue
+
+  ends=$(head -25 "$f" | sed -n 's/^# ends:[[:space:]]*//p' | head -1)
+  if [ -z "$ends" ]; then
+    err "$f declares no '# ends:' header — name the defect class this check ends. A generation-side constraint that makes the class unproducible is the preferred answer, and 'no checker' is a valid outcome (Story 20.197, #1355 rule 1)"
+  else
+    ewords=$(printf '%s' "$ends" | sed -E 's/[^A-Za-z]+/ /g' | wc -w | tr -d ' ')
+    [ "$ewords" -ge 3 ] \
+      || err "$f declares a defect class with no substance ('$ends') — name what becomes unproducible or undetectable without it (Story 20.197, #1355 rule 1)"
+  fi
+
+  meas=$(head -25 "$f" | sed -n 's/^# measured:[[:space:]]*//p' | head -1)
+  if [ -z "$meas" ]; then
+    err "$f declares no '# measured:' header — record the runtime you measured, as '# measured: <N>ms'. A declared tier with no number prices the benefit and not the cost (Story 20.197, #1355 rule 1)"
+  else
+    printf '%s\n' "$meas" | grep -qE '^[0-9]+ *ms' \
+      || err "$f declares '# measured: $meas', which names no milliseconds — write '# measured: <N>ms' so the number is comparable against INNER_MS (Story 20.197, #1355 rule 1)"
   fi
 done
 
