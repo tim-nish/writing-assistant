@@ -136,6 +136,70 @@ def _journey_arcs(record, source=None):
     }
 
 
+# --- THE HOME, ENUMERATED FOR THE STAGE-0 SELECTION GATE --------------------
+# (story 20.192, #1343; SPEC-terrain amendments, the 2026-08-03 block, clause
+# (b): "`stage0` gains an enumerated selection gate over the Briefs that home
+# makes enumerable".)
+#
+# THE ENUMERATION IS NOT COMPOSED HERE, and that is the whole of what this
+# function is careful about. The paths come from the resolver's `list-briefs`
+# — the directory IS the enumeration (story 20.191 AC4) — and the content of
+# each option comes from the record read through the SANCTIONED READER. No
+# path is walked by hand, no basename is parsed for meaning beyond the id the
+# writer put there, and no index file is read or written: an index over a
+# directory is the derived second ledger the amendment declined by name.
+#
+# A RECORD THAT WILL NOT READ IS SKIPPED, not fatal. The gate's job is to
+# offer what is offerable; a corrupt or hand-edited file in the home must not
+# take down every stage-0 invocation in the repository. It stays on disk, and
+# the free-form override still reaches it by path.
+NO_BRIEFS_NOTE = ("no Briefs are in this repository's Brief home ({home}), so "
+                  "there is nothing to choose between and the run proceeds "
+                  "cold — an empty enumeration is a fact about this repo, not "
+                  "a blocker")
+
+
+def _sibling(name):
+    """Import a scripts/ sibling by file name, hyphens and all."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(
+        name.replace("-", "_").replace(".py", ""),
+        os.path.join(os.path.dirname(os.path.realpath(__file__)), name))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def home_briefs(root, rp=None):
+    """Every readable Brief in the home, as gate-ready option material.
+
+    Each entry carries the Brief's stable `id` (its address — what the owner
+    can type back), its `path`, the DERIVED `label` the artifact module
+    composes from the record's own content, its lifecycle `state` and its
+    member count. Nothing is stored and nothing is cached: the listing is read
+    fresh, so a Brief added or removed by hand is reflected with nothing to
+    repair.
+    """
+    rp = rp or _sibling("resolve-paths.py")
+    tb = _sibling("terrain_brief.py")
+    found = []
+    for path in rp.list_home_briefs(root):
+        try:
+            rec = tb.read_brief_artifact(path)
+        except (OSError, ValueError):
+            continue
+        ids = list(rec.get("indexes") or ([rec["index"]] if rec.get("index")
+                                          else []))
+        found.append({
+            "id": os.path.splitext(os.path.basename(path))[0],
+            "path": path,
+            "label": tb._brief_label(rec),
+            "state": (rec.get("lifecycle") or {}).get("state") or "composed",
+            "members": len(ids),
+        })
+    return found
+
+
 def brief_pin(state):
     """The recorded brief's IDENTITY (amended 2026-08-02, #1207): a content
     pin over the exact recorded text. Same-brief on a brief-carrying stage-0

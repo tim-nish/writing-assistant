@@ -259,6 +259,28 @@ GATES = {
         "stage": START,
         "owner_decision": "intent — which article type the draft is filled from",
     },
+    # THE BRIEF SELECTION (story 20.192, #1343; SPEC-terrain amendments, the
+    # 2026-08-03 block, clause (b)). Until the Brief had a durable home there
+    # was nothing to enumerate, so the only routes into a brief-carrying run
+    # were the same-sitting handoff, "open the brief" — which defaults to the
+    # most recent workspace — and a hand-typed state-dir path. Multiple
+    # accepted Briefs are the DESIGN ("k accepted briefs feed the drafting
+    # backlog — one run at a time, never k", `skills/terrain/steps/brief.md`),
+    # so the k-th one was reachable only by typing a path, and the amendment
+    # says in as many words that a gate whose answer is "type a state-dir path"
+    # fails the gate-input contract in the same act as offering no gate at all.
+    #
+    # IT SITS AT `START` AND FIRES AFTER THE MINT, which is why it is declared
+    # here rather than beside the terrain gates: it is asked by the run mint,
+    # over artifacts brief creation left behind, and its ask row lands in the
+    # workspace the mint just made. Nothing is checkpointed on that path — the
+    # run is not attached to until the Brief is known, exactly as
+    # `resume-confirmation` leaves its candidate alone.
+    "brief-selection": {
+        "stage": START,
+        "owner_decision": "which Brief in the home this run drafts from, or "
+                          "cold with none",
+    },
     # `sources` WAS HERE (stage 0) and is retired (Story 20.147, #1209): the
     # scope-selection ask retired with harvest — scope is derived from the
     # brief's examine_scope, never composed or approved at a gate. See the
@@ -555,6 +577,114 @@ def intent_gate(labels, ws=None):
         no_recommendation="the article type is the owner's editorial intent; "
                           "nothing the machine has read ranks one against "
                           "another",
+    )
+
+
+# The per-option label ceiling for the brief selection. It is NOT the `effect`
+# budget: within the overflow band (`OVERFLOW_MARGIN`) every overflowing label
+# must also appear in the question text, so the labels have to fit INSIDE
+# `where` as well as beside it. Chosen so the worst case — two overflow
+# members named in one `where` — clears the 240-char budget with room, and
+# enforced by shrinking rather than by hoping (see `_brief_choices`).
+BRIEF_LABEL_BUDGET = 60
+COLD_LABEL = "start cold, with no Brief"
+
+
+def _brief_option_label(entry, budget):
+    """One Brief's option label: its DERIVED name, made to fit by authorship.
+
+    The name is `terrain_brief._brief_label`'s, composed from the record's own
+    content by the module that owns the artifact — never a second name minted
+    here. What this adds is the selection surface's two hard rules: no markup,
+    and no ellipsis ending. So a long name is cut at a WORD boundary and the
+    cut is tidied, rather than clipped mid-word with a trailing "…" the
+    validator would (rightly) refuse.
+    """
+    text = str(entry.get("label") or "").strip() or str(entry.get("id") or "")
+    for m in MARKERS:
+        text = text.replace(m, " ")
+    text = " ".join(text.split())
+    if len(text) > budget:
+        cut = text[:budget]
+        text = cut[:cut.rindex(" ")] if " " in cut else cut
+    return text.rstrip(" .…-—,:;") or str(entry.get("id") or "a Brief")
+
+
+def _brief_choices(briefs, budget):
+    """The option set: one per Brief in the home, plus the cold run.
+
+    THE PREMISE-NEGATING OPTION IS A FULL CITIZEN. Every enumerated option
+    shares the premise that this run should draft from a Brief; the standing
+    fork-gate rule is that where options share a machine-computed premise, one
+    option must negate it. Starting cold is that option, and it is offered
+    without prejudice — nothing in the home is deleted or changed by taking it.
+
+    Each option carries THE EVIDENCE BEARING ON IT — the Brief's id, which is
+    also the address the owner can type back, its lifecycle state and how many
+    Strands it was composed over — attached to the option rather than left in
+    prose above the gate.
+    """
+    choices = [{"label": _brief_option_label(b, budget),
+                "effect": f"drafts from {b.get('id')} ({b.get('state')}, "
+                          f"{b.get('members')} Strand(s)); the Brief is used "
+                          f"exactly as written, and nothing is recomposed"}
+               for b in briefs]
+    choices.append({
+        "label": COLD_LABEL,
+        "effect": "mints the run with no Brief: the draft is grounded in the "
+                  "declared sources alone, and every Brief above stays in the "
+                  "home, untouched"})
+    return choices
+
+
+def brief_selection_gate(briefs, ws=None):
+    """"Which Brief does this run draft from?" — the enumerated selection.
+
+    THE OPTIONS ARE MACHINE-COMPOSED FROM THE HOME (story 20.192, #1343).
+    `draft_brief.home_briefs` reads the resolver's `list-briefs` and the brief
+    records themselves; nothing here walks a path, and no index exists to read.
+    NOTHING IS PRE-SELECTED and the free-form override stands — a Brief the
+    machine could not read, or one living somewhere else entirely, is still
+    reachable by path, which is the override's whole job.
+
+    NO RECOMMENDATION, DECLARED — the honest form, not a waiver (#1222). The
+    machine can order these by date and by lifecycle state, and does neither:
+    ranking by recency is exactly the addressing scheme the 2026-08-03
+    amendment moved the Brief AWAY from, and k accepted Briefs are the design
+    rather than a backlog to burn down in order. Which one to write next is
+    the owner's editorial intent, and a rank here would be a default wearing a
+    suggestion's clothes.
+    """
+    # THE LABELS ARE SIZED AGAINST THE QUESTION THEY MUST FIT IN. Within the
+    # overflow band the members past the control's capacity are named in
+    # `where` — this gate is the first whose option set is DATA and can be any
+    # size, so the fit is computed rather than asserted by an author who saw
+    # three Briefs. `payload` recomputes the overflow itself and is the
+    # authority; no recommendation is passed, so the order it sees is this one.
+    for budget in (BRIEF_LABEL_BUDGET, 40, 24):
+        choices = _brief_choices(briefs, budget)
+        where = (f"{len(briefs)} Brief(s) sit in this repository's Brief "
+                 f"home; this run named none.")
+        if CONTROL_CAPACITY < len(choices) <= CONTROL_CAPACITY + OVERFLOW_MARGIN:
+            where += (" Also enterable as free text: "
+                      + "; ".join(c["label"]
+                                  for c in choices[CONTROL_CAPACITY:]) + ".")
+        if len(where) <= BUDGETS["where"]:
+            break
+    block = len(choices) > CONTROL_CAPACITY + OVERFLOW_MARGIN
+    return payload(
+        where=where,
+        why="Each is a decision you already made, and a run drafts one at a "
+            "time; nothing is pre-selected.",
+        choices=choices,
+        gate="brief-selection", ws=ws,
+        no_recommendation="which Brief to write next is the owner's editorial "
+                          "intent; nothing the machine has read ranks one "
+                          "against another, and ranking by recency is the "
+                          "addressing this home exists to replace",
+        banner="Which Brief does this run draft from?" if block else None,
+        reply_line=("Name one of the Briefs above, or start cold; a Brief "
+                    "elsewhere can be given as a path.") if block else None,
     )
 
 

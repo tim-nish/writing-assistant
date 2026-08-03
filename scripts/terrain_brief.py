@@ -353,6 +353,40 @@ def copy_to_home(path, home_dir, record, stderr=None):
     return [written]
 
 
+def _brief_label(payload):
+    """An owner-meaningful name for a brief, DERIVED and never stored (AC7).
+
+    Date, member set, and the thesis's first words — every part computed from
+    fields the artifact already carries. No naming store, no id field and no
+    slug is added: a stored name is a second identity to keep in sync with the
+    one the path already provides.
+
+    MOVED HERE UNCHANGED (story 20.192, #1343). It stood in
+    `topic-map-directions.py` beside the re-open it named; the stage-0
+    selection gate now enumerates the home and needs the same name for each
+    Brief it offers. Two composers would be two names for one artifact, which
+    is the second identity this docstring already refuses — so the one
+    composer moved to the module that owns the artifact, and the CLI shim
+    imports it back.
+    """
+    life = payload.get("lifecycle") or {}
+    when = ""
+    for h in reversed(list(life.get("history") or [])):
+        if h.get("at"):
+            when = str(h["at"])[:10]
+            break
+    ids = list(payload.get("indexes") or [])
+    if not ids and payload.get("index"):
+        ids = [payload["index"]]
+    who = ", ".join(str(i) for i in ids[:3]) + ("…" if len(ids) > 3 else "")
+    text = str((payload.get("thesis") or {}).get("text")
+               or payload.get("adopted_claim")
+               or payload.get("brief") or "").strip()
+    words = " ".join(text.split()[:8])
+    parts = [p for p in (when, who and f"[{who}]", words) if p]
+    return " — ".join(parts) or "an unnamed brief"
+
+
 def home_migration_notice(path, home_dir, payload):
     """The migration statement owed by a Brief found OUTSIDE the home, or None.
 
