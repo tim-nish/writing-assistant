@@ -38,6 +38,15 @@ The article advances **one claim**, and every section advances it.
   context, distinct and *varied* lesson sections, one synthesis. (A mechanical
   detector flags an identical heading repeated ≥3×; this dimension owns the
   varied-structure judgment.)
+  **A CONTRACT-MANDATED heading is EXEMPT from this judgement (#1377).** A
+  framework's `[EVIDENCE: …]` slot heading recurs once per unit *by contract* —
+  F2's `What actually happened` is keyed on by the evidence gate, and renaming
+  it is the `section-not-found` failure class. The two rules as written admitted
+  no compliant output: a three-lesson deep-dive had to repeat that heading to
+  clear one gate and had to not repeat it to clear this one. The mandated set is
+  **derived from the framework assets**, never hand-listed. Everything else is
+  judged exactly as before — the variation requirement over non-mandated
+  structure is unchanged.
 - **Plan-conformance (#440).** When the run composed an argument plan
   (`$WS/argument-plan.md`: thesis, arc, section intents), the draft must
   **advance that thesis** — a section that does not serve the planned thesis, or
