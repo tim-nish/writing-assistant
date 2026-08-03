@@ -4785,6 +4785,22 @@ def cmd_stage0(args):
     if out.get("resume_requires_confirmation"):
         print(json.dumps(out, indent=2))
         return 0
+    # THE BRIEF SELECTION (story 20.192, #1343): a cold invocation over a home
+    # holding Briefs ASKS which one, instead of leaving the k-th reachable only
+    # by a typed path. Nothing is checkpointed on that path — the run is not
+    # attached to until the Brief is known — and an empty home is STATED and
+    # proceeds cold, because an empty enumeration is a fact, not a blocker.
+    if not getattr(args, "brief", None):
+        home = draft_brief.home_briefs(root, rp)
+        if home:
+            out.update(draft_gates.brief_selection_gate(home, ws=out.get("ws")))
+            out["brief_selection_required"] = True
+            out["briefs"] = [{k: b[k] for k in ("id", "path", "label")}
+                             for b in home]
+            print(json.dumps(out, indent=2))
+            return 0
+        out["brief_selection"] = draft_brief.NO_BRIEFS_NOTE.format(
+            home=rp.terrain_briefs_dir(root))
     if not out.get("resumed"):
         _write_checkpoint(out["ws"], dict(run_state))
         out["checkpointed"] = True

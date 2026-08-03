@@ -256,6 +256,7 @@ from terrain_scope import (  # noqa: E402
 from terrain_brief import (  # noqa: E402
     BRIEF_FILENAME,
     _base_composition_pin,
+    _brief_label,
     _brief_lifecycle,
     _edited_indexes,
     _iteration_block,
@@ -1490,30 +1491,13 @@ def _recompose_gate_blocks(payload, at):
     return note
 
 
-def _brief_label(payload):
-    """An owner-meaningful name for a brief, DERIVED and never stored (AC7).
-
-    Date, member set, and the thesis's first words — every part computed from
-    fields the artifact already carries. No naming store, no id field and no
-    slug is added: a stored name is a second identity to keep in sync with the
-    one the path already provides.
-    """
-    life = payload.get("lifecycle") or {}
-    when = ""
-    for h in reversed(list(life.get("history") or [])):
-        if h.get("at"):
-            when = str(h["at"])[:10]
-            break
-    ids = list(payload.get("indexes") or [])
-    if not ids and payload.get("index"):
-        ids = [payload["index"]]
-    who = ", ".join(str(i) for i in ids[:3]) + ("…" if len(ids) > 3 else "")
-    text = str((payload.get("thesis") or {}).get("text")
-               or payload.get("adopted_claim")
-               or payload.get("brief") or "").strip()
-    words = " ".join(text.split()[:8])
-    parts = [p for p in (when, who and f"[{who}]", words) if p]
-    return " — ".join(parts) or "an unnamed brief"
+# `_brief_label` WAS HERE and MOVED to `terrain_brief.py` (story 20.192,
+# #1343), where the artifact and its reader already live. It is derived from
+# the brief record's own content and from nothing else, so a second consumer —
+# the stage-0 selection gate, which enumerates the home through the sanctioned
+# reader — must compose the SAME name rather than a second one beside it. This
+# is a move: the definition is unchanged and it is re-exported by the import
+# above, so `_tmd._brief_label` still resolves exactly as before.
 
 
 def cmd_brief_open(args):
