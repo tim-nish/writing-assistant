@@ -931,6 +931,68 @@ need(os.path.isfile(os.path.join(on, "draft.md")),
 need(all("interview.json" != i["path"] for i in report["invalidated"]),
      "an UPSTREAM artifact was invalidated: %r" % (report["invalidated"],))
 
+# --- Story 20.208 (#1388): the basis is the boundary BEFORE N, never N's own -
+# The gap the assertions above cannot see: they only ever re-run a block whose
+# outputs the re-run itself rewrites, so an artifact produced DURING the re-run
+# block and NOT rewritten survives unnoticed. That is the observed defect —
+# re-running `quality-gate` left its own provenance-ledger.tsv in place, and the
+# fresh round would have been graded against 86 all-pass rows from the malformed
+# round it was re-run to escape.
+#
+# Boundaries snapshot at a block's CLOSE, so N's own boundary manifest contains
+# N's outputs by construction; a predicate over it preserves exactly what the
+# re-run supersedes. Pre-#1388 every assertion below fails.
+gws = mint("basis")
+B.enable(gws)
+for blk, art in SEQ:
+    drive(gws, blk, art)
+# A second artifact of the quality-gate block, written DURING it — the shape of
+# provenance-ledger.tsv. It is in quality-gate's own closing boundary and in no
+# earlier one.
+mid = os.path.join(gws, "ledger.tsv")
+with open(mid, "w", encoding="utf-8") as fh:
+    fh.write("stale rows from the round being escaped\n")
+R.open_block(gws, "quality-gate", "cmd-quality-gate")
+R.note(outcome="pass", detail="rewrote the gate", route="quality-gate",
+       draft_sha256=R.draft_sha256("a draft"))
+err = io.StringIO()
+with contextlib.redirect_stderr(err):
+    R.close_block(gws)
+qg_boundaries = [b for b in B.boundaries(gws) if b.get("block") == "quality-gate"]
+need(qg_boundaries and "ledger.tsv" in (qg_boundaries[-1].get("manifest") or {}),
+     "fixture precondition: ledger.tsv is not in quality-gate's own closing "
+     "boundary, so the regression would pass vacuously")
+need(all("ledger.tsv" not in (b.get("manifest") or {})
+         for b in B.boundaries(gws) if b.get("block") != "quality-gate"),
+     "fixture precondition: ledger.tsv is in an EARLIER block's boundary, so it "
+     "is upstream and the regression tests nothing")
+grep = B.rerun(gws, "quality-gate")
+need(grep["ok"], "the basis fixture's re-run was refused: %r" % (grep["reasons"],))
+need(any(i["path"] == "ledger.tsv" for i in grep["invalidated"]),
+     "20.208: an artifact produced DURING the re-run block survived it — the "
+     "basis is N's own close boundary, not its upstream (#1388): %r"
+     % (grep["invalidated"],))
+need(not os.path.exists(mid),
+     "20.208: the mid-block artifact was left where a reader would trust it")
+gitem = [i for i in grep["invalidated"] if i["path"] == "ledger.tsv"]
+need(gitem and os.path.isfile(os.path.join(gws, gitem[0]["moved_to"])),
+     "20.208: the mid-block artifact was destroyed rather than set aside — "
+     "invalidated is a state, not a shredder: %r" % (gitem,))
+need(grep["invalidated"]
+     and all(i["path"] != "interview.json" for i in grep["invalidated"])
+     and os.path.isfile(os.path.join(gws, "interview.json")),
+     "20.208: the widened basis reached an UPSTREAM artifact (or invalidated "
+     "nothing, making this vacuous): %r" % (grep["invalidated"],))
+need(grep["invalidated"]
+     and all("upstream basis" in i["why"] for i in grep["invalidated"]),
+     "20.208: the report still explains itself by position relative to N's "
+     "close rather than by basis membership (or invalidated nothing at all, "
+     "which would make this assertion vacuous): %r" % (grep["invalidated"],))
+need("boundary BEFORE" in (B.downstream_of.__doc__ or "")
+     and "N's own" in (B.downstream_of.__doc__ or ""),
+     "20.208: downstream_of's docstring does not state the basis it uses — the "
+     "false claim it carried was the defect's clearest statement (AC-4)")
+
 # --- the module is stdlib-only, like its siblings ----------------------------
 import re as _re
 src = open("scripts/run_block.py", encoding="utf-8").read()
