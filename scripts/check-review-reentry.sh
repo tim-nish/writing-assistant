@@ -549,6 +549,105 @@ assert m and dm and m.group(1).strip() == dm.group(1).strip(), (m, dm)
 assert "# Plan body carried unchanged." in plan
 PYEOF
 
+# --- #1402 (via #1406): re-projection covers element-bearing sections only ---
+# The observed defect: a 7-H2 draft with a 3-entry `sections:` plan refused,
+# naming section 6, then section 7 ('Pointers') — the re-projection matched
+# supplied entries against draft H2 POSITIONS and demanded elements for the
+# remainder, while the plan WRITER accepted the same 3-entry plan. Context and
+# the pointer block are the frame, not the content (F2: they "appear exactly
+# once; the lesson unit between them repeats"), and the only way past the old
+# validator was to write into the durable plan that Context places story
+# elements — false, corrupting the record the check protects.
+slug2=rule-binding
+ws7="$work/ws7"; mkdir -p "$ws7"
+seed_round "$ws7" "L9:one-fix"
+cat > "$ws7/edited.md" <<'EOF'
+---
+slug: rule-binding
+audience: en-practitioner
+generated_by: writing-assistant@0.0.0-test+deadbee   # immutable birth record (#709)
+---
+## Context
+
+Frame sentence.
+
+## Lesson one
+
+First lesson body.
+
+## Lesson two
+
+Second lesson body.
+
+## Lesson three
+
+Third lesson body.
+
+## The list is not finished
+
+Synthesis sentence.
+
+## The other direction
+
+Coda sentence.
+
+## Pointers
+
+Pointer sentence.
+EOF
+python3 "$DP" provenance-segment --draft "$ws7/edited.md" > "$ws7/skel.json" 2>/dev/null
+python3 - "$ws7/skel.json" "$ws7/map.txt" <<'PY1402'
+import json, sys
+rows = json.load(open(sys.argv[1]))["positions"]
+with open(sys.argv[2], "w") as fh:
+    for r in rows:
+        fh.write(f"{r['pos']}[L{r['anchor']}]: narration\n")
+PY1402
+cat > "$adir/plans/$slug2.md" <<'PLAN1402'
+---
+kind: article-plan
+slug: SLUG1402
+intent: share engineering lessons
+claim: "A claim."
+status: drafted
+run_id: r2
+pin: host@8f3c2d1000000000000000000000000000000000
+audience: en-practitioner
+consumed: [el-a, el-b, el-c]
+sections: [{"title": "Lesson one", "elements": ["el-a"]}, {"title": "Lesson two", "elements": ["el-b"]}, {"title": "Lesson three", "elements": ["el-c"]}]
+---
+
+# Plan body carried unchanged.
+PLAN1402
+sed -i "s/SLUG1402/$slug2/" "$adir/plans/$slug2.md"
+if python3 "$DP" review-reentry --draft "$ws7/edited.md" --map "$ws7/map.txt" \
+     --slug "$slug2" --root "$h" --ws "$ws7" --applied 1 \
+     > "$work/re1402.json" 2>"$work/e1402"; then
+  ok "#1402: a 7-H2 draft re-projects over a 3-entry element-bearing sections plan — no refusal naming a frame section"
+else
+  err "#1402: the re-projection refused a frame section again: $(cat "$work/e1402" | head -3)"
+fi
+# The refusal class, not a literal section number: the issue's run saw
+# sections 6/7 under 4/5-entry plans; this fixture's 3-entry plan surfaces
+# section 5 first. Any "section N ... lists no elements" over a frame section
+# is the same defect.
+grep -qE "section [0-9]+ .*lists no elements" "$work/e1402" \
+  && err "#1402: the leftover-section refusal is back: $(cat "$work/e1402")" \
+  || ok "#1402: no leftover-H2 demand — frame sections claim no elements"
+python3 - "$adir/plans/$slug2.md" <<'PY1402B' \
+  && ok "#1402: the re-projected plan still carries exactly the three element-bearing sections — Context/Pointers were not forced to claim elements" \
+  || err "#1402: the re-projected plan's sections drifted: $(sed -n '/^sections:/p' "$adir/plans/$slug2.md")"
+import re, sys
+t = open(sys.argv[1]).read()
+m = re.search(r"^sections:\s*(\[.*\])\s*$", t, re.M)
+assert m, t
+import json
+secs = json.loads(m.group(1))
+titles = [s["title"] for s in secs]
+assert titles == ["Lesson one", "Lesson two", "Lesson three"], titles
+assert all(s.get("elements") for s in secs), secs
+PY1402B
+
 # --- Story 20.210 (#1396): the apply record reconciles by finding id ---------
 # Both directions are different lies, so both are asserted: an accepted finding
 # with no commit is an edit that silently did not happen; a commit matching no
