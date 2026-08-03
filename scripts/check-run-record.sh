@@ -3,7 +3,8 @@
 # tier: inner — pure stdlib Python over fixtures written into a private mktemp
 #   workspace; no network, no shared path, no repo mutation. Measured at
 #   adoption (2026-08-02) well under the runner's INNER_MS ceiling.
-# covers: scripts/run_record.py specs/spec-run-record/** scripts/draft-pipeline.py
+# covers: scripts/run_record.py scripts/run_loop.py specs/spec-run-record/**
+#   scripts/draft-pipeline.py
 #   scripts/probe.py scripts/draft_variants.py skills/draft-article/SKILL.md
 #   skills/draft-article/stages/fan-out.md skills/draft-article/stages/stage3.md
 #   skills/draft-article/stages/gate.md
@@ -432,6 +433,279 @@ print("ok:   a block that records no sub-stage progress emits no sub-unit "
       "records (20.188 AC-3)")
 print("ok:   a sub-unit accounting exceeding its block's own duration_s is "
       "rejected, and rounding alone is not (20.188 AC-4)")
+PY
+
+# --- BOUNDED IMPROVEMENT LOOPS (Story 20.189, #1334; record-formats.md §5) ---
+# Driven through the dispatcher's own `quality-gate` cycles — the first CONSUMER
+# of the loop contract — plus a fabricated loop id no code has ever heard of,
+# because the contract binds by PROPERTY and a check that only exercised the
+# gate would be asserting the gate's history instead of the contract.
+python3 - "$WS" <<'PY' || fail=1
+import contextlib, importlib.util, io, json, os, sys
+sys.path.insert(0, "scripts")
+import run_record as R
+import run_loop as L
+
+spec = importlib.util.spec_from_file_location("dp", "scripts/draft-pipeline.py")
+dp = importlib.util.module_from_spec(spec); spec.loader.exec_module(dp)
+
+ws = os.path.join(sys.argv[1], "loop")
+os.makedirs(ws, exist_ok=True)
+bad = []
+def need(cond, msg):
+    if not cond:
+        bad.append(msg)
+
+def drive(*argv):
+    out, err = io.StringIO(), io.StringIO()
+    with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+        try:
+            code = dp.main(list(argv))
+        except SystemExit as e:
+            code = e.code if isinstance(e.code, int) else 1
+    return code, out.getvalue(), err.getvalue()
+
+FM = "---\naudience: the maintainer\naudience_id: maintainer\n---\n\n"
+CYCLE1 = FM + "## A section\n\nOne short sentence about the thing.\n"
+CYCLE2 = FM + "## A section\n\nOne short sentence about the thing.\n\n" \
+              "## What it costs\n\nA second sentence, added by the revision.\n"
+draft = os.path.join(ws, "draft.md")
+mp = os.path.join(ws, "map.txt")
+with open(mp, "w", encoding="utf-8") as fh:
+    fh.write("P1.S1[L8]: narration\n")
+
+def write(text):
+    with open(draft, "w", encoding="utf-8") as fh:   # THE OVERWRITE, in place
+        fh.write(text)
+
+# Two cycles of the gate, the second overwriting the first's draft in place.
+write(CYCLE1)
+sha1 = R.draft_sha256(CYCLE1)
+drive("quality-gate", "--ws", ws, "--draft", draft, "--map", mp,
+      "--profile", "slim", "--cycle", "1")
+write(CYCLE2)
+sha2 = R.draft_sha256(CYCLE2)
+drive("quality-gate", "--ws", ws, "--draft", draft, "--map", mp,
+      "--profile", "slim", "--cycle", "2")
+
+recs = R.read_records(ws)
+its = L.iterations(recs, "quality-gate")
+
+# --- AC-2: the superseded artifact is addressable by hash, and the record ----
+#           carries its delta beside the verdict it was graded against.
+need(len(its) == 2,
+     "two gate cycles left %d iteration record(s) — a loop that preserves "
+     "nothing leaves only its verdicts, which is the defect" % (len(its),))
+if len(its) == 2:
+    (rec1, it1), (rec2, it2) = its
+    need(it1["artifact_sha256"] == sha1 and it2["artifact_sha256"] == sha2,
+         "the iteration records do not name the drafts actually graded: %r"
+         % ([it1.get("artifact_sha256"), it2.get("artifact_sha256")],))
+    need(L.read_preserved(ws, "quality-gate", sha1) == CYCLE1,
+         "the draft cycle 2 OVERWROTE is not recoverable by hash from the run "
+         "workspace — the superseded artifact did not survive its cycle (AC-2)")
+    need(it2["delta"].get("from") == sha1 and it2["delta"].get("changed") is True
+         and it2["delta"].get("lines_added", 0) > 0,
+         "cycle 2's record does not carry a delta naming what it superseded and "
+         "what changed: %r" % (it2.get("delta"),))
+    need(isinstance(rec2.get("verdict"), dict)
+         and rec2["verdict"].get("outcome") in R.OUTCOMES,
+         "the iteration record carries no verdict — a loop regenerates an "
+         "artifact AGAINST a verdict: %r" % (rec2.get("verdict"),))
+    need(it1["delta"].get("from") is None
+         and "first iteration" in it1["delta"].get("basis", ""),
+         "cycle 1's delta does not say it had no predecessor, so 'nothing "
+         "changed' and 'nothing to compare' are indistinguishable: %r"
+         % (it1.get("delta"),))
+    need(not R.validate(rec2),
+         "the emitted iteration record does not satisfy the validator: %r"
+         % (R.validate(rec2),))
+
+# --- AC-5: the artifact rides the WORKSPACE, never run-events.jsonl ----------
+journal = open(R.run_events_path(ws), encoding="utf-8").read()
+need("A second sentence, added by the revision." not in journal,
+     "the draft's text reached run-events.jsonl — per-iteration artifacts live "
+     "in the run workspace, and the journal carries the judgment (AC-5)")
+need(os.path.isfile(L.artifact_path(ws, "quality-gate", sha1)),
+     "the preserved artifact is not at <ws>/loop/<loop>/<sha256>.md (AC-5)")
+try:
+    L.iteration_record_fields("l", 1, sha1, {"basis": "b", "content": CYCLE1})
+    need(False, "a caller could compose an iteration carrying the ARTIFACT — "
+                "the carrier split is not enforced where records are composed")
+except ValueError:
+    pass
+
+# --- AC-1: the contract binds by PROPERTY — an unheard-of loop is covered ----
+R.open_block(ws, "verify", "verify")
+L.record_iteration(ws, "some-future-loop-nobody-enumerated", 1,
+                   "an artifact of a loop written tomorrow\n", ext=".txt")
+R.note(outcome="fail", detail="graded", route="fixture",
+       draft_sha256=R.draft_sha256("x" * 3))
+R.close_block(1)
+future = L.iterations(R.read_records(ws), "some-future-loop-nobody-enumerated")
+need(len(future) == 1 and not R.validate(future[0][0]),
+     "a loop this codebase has never heard of is not covered — the contract "
+     "binds by PROPERTY (any repeated act regenerating an artifact against a "
+     "verdict), never by an enumerated list (AC-1): %r" % (future,))
+need("some-future-loop" not in open("scripts/run_loop.py", encoding="utf-8").read(),
+     "the fixture's loop id appears in the module — it must be unknown to it")
+for src in ("scripts/run_loop.py",):
+    text = open(src, encoding="utf-8").read()
+    need("quality-gate" not in text.split('"""')[2],
+         "%s names the quality gate in its CODE — the gate is the first "
+         "CONSUMER of the loop contract, never its definition (AC-1)" % (src,))
+
+# --- AC-3: the run's close carries the loop report ---------------------------
+R.open_block(ws, "complete", "complete")
+R.note(outcome="pass", detail="done", route="fixture",
+       draft_sha256=R.draft_sha256(CYCLE2))
+R.close_block(0)
+run_close = [r for r in R.read_records(ws)
+             if r.get("event") == "close" and r.get("block") == "complete"][-1]
+report = run_close.get("loop_report")
+need(isinstance(report, list) and report,
+     "the run's close carries no loop report (AC-3): %r" % (run_close,))
+if isinstance(report, list) and report:
+    gate = [e for e in report if e["loop"] == "quality-gate"]
+    need(len(gate) == 1 and gate[0]["iterations"] == 2
+         and len(gate[0]["changes"]) == 2,
+         "the report does not state the gate loop's iteration count with what "
+         "EACH changed: %r" % (gate,))
+    need(gate and gate[0]["outcome"] == "converged",
+         "a loop whose last iteration PASSED is not reported as converged: %r"
+         % (gate,))
+    need(not R.validate(run_close),
+         "the emitted loop report does not satisfy the validator: %r"
+         % (R.validate(run_close),))
+
+# CHURN is the other half of AC-3, and it must NAME its shape. Driven through
+# the same pure function the run's close uses, over the three churn shapes.
+def churn(*outcomes, **kw):
+    recs, prev = [], None
+    for i, o in enumerate(outcomes, 1):
+        sha = kw.get("sha") or ("%064x" % i)
+        recs.append({"ts": "t", "block": "quality-gate", "event": "close",
+                     "status": "ran", "verdict": {"outcome": o, "over": {}},
+                     "iteration": {"loop": "x", "n": i, "artifact_sha256": sha,
+                                   "delta": {"basis": "b", "from": prev,
+                                             "changed": kw.get("changed", True)}}})
+        prev = sha
+    return L.loop_report(recs)[0]
+
+bound = churn("fail", "fail")
+need(bound["outcome"] == "churned" and "bound" in bound.get("why", ""),
+     "a loop that reached its bound without a pass is not reported as churned "
+     "with that reason (AC-3): %r" % (bound,))
+revisit = churn("fail", "fail", sha="b" * 64)
+need(revisit["outcome"] == "churned" and "re-graded" in revisit.get("why", ""),
+     "a loop that returned to an artifact it had left is not named as an "
+     "oscillation (AC-3): %r" % (revisit,))
+noop = churn("fail", "fail", changed=False)
+need(noop["outcome"] == "churned" and "changing nothing" in noop.get("why", ""),
+     "a cycle spent changing nothing is not named as such (AC-3): %r" % (noop,))
+inflight = L.loop_report([{"ts": "t", "block": "quality-gate", "event": "close",
+                           "status": "ran", "iteration": {
+                               "loop": "x", "n": 1, "artifact_sha256": "a" * 64,
+                               "delta": {"basis": "first"}}}])[0]
+need(inflight["outcome"] == "in-flight",
+     "an iteration whose block carries no outcome was repaired into a churn "
+     "verdict it did not earn (AC-3): %r" % (inflight,))
+
+# --- every §5 rejection class fails with a REASON OF ITS OWN -----------------
+def close(**kw):
+    rec = {"ts": "t", "block": "quality-gate", "event": "close", "status": "ran",
+           "route": ["r"], "exit": 0,
+           "verdict": {"outcome": "fail",
+                       "over": {"draft_sha256": "a" * 64}, "detail": "d"}}
+    rec.update(kw)
+    return rec
+
+IT = {"loop": "x", "n": 1, "artifact_sha256": "a" * 64, "delta": {"basis": "b"}}
+def it(**kw):
+    d = dict(IT); d.update(kw); return d
+
+for label, rec, phrase in [
+    ("an iteration with no loop id", close(iteration=it(loop="")), "`loop` id"),
+    ("an iteration whose n is not 1-based", close(iteration=it(n=0)), "`n` is"),
+    ("an iteration that cannot name its artifact",
+     close(iteration=it(artifact_sha256="nope")), "artifact_sha256"),
+    ("an iteration with no delta", close(iteration=it(delta=None)), "`delta`"),
+    ("a delta with no basis", close(iteration=it(delta={})), "`basis`"),
+    ("a later iteration naming no predecessor",
+     close(iteration=it(n=2)), "wearing a label"),
+    ("an iteration carrying the artifact itself",
+     close(iteration=it(delta={"basis": "b", "content": "the draft"})),
+     "NEVER in run-events.jsonl"),
+    ("an iteration with no verdict",
+     close(iteration=it(), verdict=None), "AGAINST A VERDICT"),
+    ("a report whose count disagrees with its own changes",
+     close(loop_report=[{"loop": "x", "iterations": 3, "outcome": "converged",
+                         "changes": [{"n": 1}]}]), "disagrees with itself"),
+    ("a report with an outcome that is neither",
+     close(loop_report=[{"loop": "x", "iterations": 1, "outcome": "fine",
+                         "changes": [{"n": 1}]}]), "CONVERGED or CHURNED"),
+    ("an unexplained churn label",
+     close(loop_report=[{"loop": "x", "iterations": 1, "outcome": "churned",
+                         "changes": [{"n": 1}]}]), "no `why`"),
+]:
+    reasons = R.validate(rec)
+    need(any(phrase in r for r in reasons),
+         "%s was not rejected with its own reason (looked for %r): %r"
+         % (label, phrase, reasons))
+
+# The STREAM-level rule: a report that disagrees with the journal it summarises.
+lines = [json.dumps({"ts": "t", "block": "quality-gate", "event": "close",
+                     "status": "ran", "route": ["r"], "exit": 0,
+                     "verdict": {"outcome": "fail",
+                                 "over": {"draft_sha256": "a" * 64},
+                                 "detail": "d"},
+                     "iteration": it()}),
+         json.dumps(close(block="complete", loop_report=[
+             {"loop": "x", "iterations": 4, "outcome": "converged",
+              "changes": [{"n": i} for i in range(4)]}]))]
+rows = R.validate_lines(lines)
+need(any("the report is DERIVED from the journal" in r
+         for _n, _k, rs in rows for r in rs),
+     "a loop report claiming more iterations than the stream holds was not "
+     "caught at the stream level: %r" % (rows,))
+
+# --- AC-4: the bound, the delta re-grade and the ledger carry are UNCHANGED --
+code, out, _e = drive("quality-gate", "--ws", ws, "--draft", draft, "--map", mp,
+                      "--profile", "slim", "--cycle", "3")
+blocked = json.loads(out)
+need(code == 1 and blocked["action"] == "publish-blocker"
+     and blocked["publishable"] is False,
+     "the two-cycle bound no longer blocks a third cycle — this story adds "
+     "HISTORY, never a third cycle (AC-4): %r" % (blocked,))
+judge = os.path.join(ws, "judge.txt")
+with open(judge, "w", encoding="utf-8") as fh:
+    fh.write("dim1: fail Section 9\ndim2: pass\n")
+code, out, _e = drive("quality-gate", "--ws", ws, "--draft", draft, "--map", mp,
+                      "--judge", judge, "--cycle", "2",
+                      "--prior-locations", "Section 2")
+graded = json.loads(out)
+need(graded["dimensions"]["dim1"]["verdict"] == "pass"
+     and graded["delta_recheck"]["suppressed_new_interpretive"],
+     "the second-cycle delta re-grade no longer suppresses a fresh interpretive "
+     "finding — preserved history changed the loop's behaviour (AC-4): %r"
+     % (graded.get("delta_recheck"),))
+
+if bad:
+    for b in bad:
+        sys.stderr.write("FAIL: %s\n" % b)
+    sys.exit(1)
+print("ok:   an overwritten iteration artifact stays addressable by hash and its "
+      "record carries the delta beside the verdict (20.189 AC-2)")
+print("ok:   the artifact rides the workspace and never run-events.jsonl, and a "
+      "record composed with artifact content is refused (20.189 AC-5)")
+print("ok:   a loop id no code enumerates is covered — the contract binds by "
+      "property (20.189 AC-1)")
+print("ok:   the run's close carries the loop report: count, what each changed, "
+      "converged or churned with its reason (20.189 AC-3)")
+print("ok:   the two-cycle bound and the delta re-grade behave exactly as before "
+      "(20.189 AC-4)")
+print("ok:   every record-formats.md §5 rejection class fails with a reason of its "
+      "own, and a report disagreeing with its stream is caught at stream level")
 PY
 
 # --- AC-4: the OLD readers are unchanged over a pre-contract journal ----------

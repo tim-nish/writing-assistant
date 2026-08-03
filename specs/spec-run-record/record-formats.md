@@ -7,7 +7,8 @@ declared reader is a machine (SPEC-run-record constraints, D2).
 
 Three record kinds share the file, discriminated by `event` — the block's open
 (§1), the block's close (§2), and the sub-unit records a long block emits
-between them (§4). Lines written before this contract
+between them (§4). A bounded improvement loop adds **no fourth kind**: its
+history rides the close record it already writes (§5). Lines written before this contract
 (`{"ts","stage","event"[,"note"]}`, `cmd_run_event`,
 `scripts/draft-pipeline.py:2597-2611`) are **legacy** and remain readable: a
 consumer treats a missing new field as unknown, never as a violation.
@@ -168,3 +169,101 @@ completed are the records present; the unit in flight has none, because the
 recording *is* the boundary and a half-written unit is never marked done. That
 absence reads as *not done* and is never repaired into a synthetic entry
 (`block_states`' `units`, `sub_units`).
+
+## 5. The bounded improvement loop's history
+
+**What binds, and to what.** A **bounded improvement loop** is *any repeated act
+that regenerates an artifact against a verdict* — whatever it is called and
+wherever it lives. The contract attaches to that **property**, never to an
+enumerated list of loops, so a loop written tomorrow is covered on the day it is
+written (amendments.md, 2026-08-03, the loop-contract paragraphs). Nothing in
+this section, in `scripts/run_loop.py`, or in the validator names a loop; `loop`
+is an opaque id chosen by its emitter. The quality gate's revision cycle
+(`skills/draft-article/stages/gate.md:146-152@f203877`) is the first consumer
+and is not the definition.
+
+**The carrier split (clause (c)).** The superseded artifact lives under the run
+workspace at `<ws>/loop/<loop>/<sha256>.<ext>`, content-addressed with the SAME
+hash `verdict.over.draft_sha256` carries. It is **never** in
+`run-events.jsonl` — a 40-minute draft snapshot is not a judgment, and the
+journal is sized for judgments. The record carries the hash, the delta, and (from
+the close record it rides on) the verdict.
+
+**No fourth record kind.** The iteration rides the block's own **close** record,
+which already carries the verdict the iteration was graded against:
+
+```json
+{
+  "ts": "2026-08-03T11:04:19+00:00",
+  "block": "quality-gate",
+  "event": "close",
+  "status": "ran",
+  "verdict": {"outcome": "fail", "over": {"draft_sha256": "<hex64>"},
+              "detail": "failing: dim3"},
+  "route": ["profile=full", "cycle=2"],
+  "iteration": {
+    "loop": "quality-gate",
+    "n": 2,
+    "artifact_sha256": "<hex64>",
+    "delta": {"from": "<hex64 of the superseded artifact>",
+              "basis": "line diff against the preserved predecessor artifact",
+              "changed": true, "lines_added": 14, "lines_removed": 9,
+              "sections_changed": ["## What it costs"]}
+  }
+}
+```
+
+**Validation.**
+
+- `iteration.loop` empty or absent → reject: the id is what makes one loop's
+  history joinable.
+- `iteration.n` not a 1-based integer → reject.
+- `iteration.artifact_sha256` not lowercase hex64 → reject. The hash **is** the
+  address of the preserved artifact, so a record that cannot name it has lost the
+  artifact the iteration graded.
+- `iteration.delta` absent, or carrying no `basis` → reject. A delta whose basis
+  a reader has to guess cannot tell *nothing changed* from *nothing to compare
+  against* — the two states a first iteration and a no-op iteration would
+  otherwise collapse into.
+- `iteration.n >= 2` whose `delta.from` is absent → reject: a later iteration
+  that cannot name what it superseded is a first iteration wearing a label (the
+  same clause shape §2 applies to `ran-partially`).
+- An `iteration` on a record that ran and carries no `verdict` → reject: a loop
+  regenerates an artifact **against a verdict**, so an iteration with no verdict
+  is not an iteration of one.
+- An `iteration` carrying the artifact — any of `content`, `text`, `artifact`,
+  `artifact_text`, `body`, `draft`, or any string field over 500 characters →
+  reject. This is the carrier split made mechanical.
+
+**The loop report (the run's close).** The close record of the run's terminal
+block (`complete`) carries `loop_report`: one entry per loop the run ran.
+
+```json
+"loop_report": [
+  {"loop": "quality-gate", "iterations": 2, "outcome": "churned",
+   "why": "the loop terminated on a 'fail' verdict: the bound was reached before the artifact passed",
+   "changes": [{"n": 1, "artifact_sha256": "<hex64>", "outcome": "fail", "delta": {…}},
+               {"n": 2, "artifact_sha256": "<hex64>", "outcome": "fail", "delta": {…}}]}
+]
+```
+
+- `outcome` is `converged` (the last iteration's verdict passed), `churned`
+  (anything else), or `in-flight` (the last iteration's block carries no
+  outcome — *entered, did not finish*, the state §2 already refuses to repair).
+  Any other value → reject.
+- `churned` with no `why` → reject: an unexplained churn label tells the next run
+  nothing it can act on. The named shapes are an artifact hash re-graded after
+  having been left, a cycle spent changing nothing, and a bound reached before
+  the artifact passed.
+- `iterations` not equal to `len(changes)` → reject: a report that disagrees with
+  itself is worse than no report.
+- **Stream level.** `iterations` must equal the count of iteration records the
+  journal actually holds for that loop → otherwise reject. The report is a
+  *reading* of records that are already durable, never composed beside them —
+  the same pairing shape §2's `duration_s` rule uses.
+
+**What this does NOT change.** The two-cycle bound, the delta re-grade, and the
+ledger carry are what make a loop converge; none of them is a history mechanism
+and none is touched. This adds history to a loop that already terminates —
+never a third cycle. The revision cycle still overwrites the working artifact;
+what changes is that the superseded version stays addressable.

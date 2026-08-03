@@ -148,7 +148,13 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py quality-gate --ws "$WS" 
 
 1. The fill **revises against the named failing dimensions only** (Read the
    current draft and provenance map before re-writing either — the
-   artifact-write precondition; every cycle here is an overwrite), then re-runs
+   artifact-write precondition; every cycle here is an overwrite — **and the
+   superseded version survives it**: the gate preserves each graded draft under
+   its own hash at `$WS/loop/quality-gate/<sha256>.md` and its cycle's close
+   record carries the delta, so a poor draft from cycle 1 is recoverable without
+   re-running the pipeline. The revision cycle is a *bounded improvement loop*,
+   and that contract binds by property, not by name — SPEC-run-record
+   `record-formats.md` §5), then re-runs
    **both** the quality gate **and** `verify-provenance` — readability revision
    is exactly where an unmarked claim would re-enter, so both gates run every
    cycle.
