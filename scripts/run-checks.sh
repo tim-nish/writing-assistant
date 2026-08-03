@@ -135,6 +135,27 @@
 #                  the GROWTH instrument, but only compared LIKE FOR LIKE: a
 #                  run at another -P reports NOT COMPARABLE and is not checked.
 #                  Changing FULL_TOTAL_P obliges re-measuring FULL_TOTAL_MS.
+#                  AND IT IS COMPARED DISTRIBUTIONALLY, NOT POINT-WISE (#1378).
+#                  A single reading carries the variance the two paragraphs
+#                  above describe — ten readings at one stated -P spanned about
+#                  +/-10% around their median with the ceiling inside the upper
+#                  tail — so comparing this run's number against the constant
+#                  reports WHERE IN THE DISTRIBUTION THIS RUN LANDED, which is
+#                  not the question. Compliance is therefore the p95 of the
+#                  retained readings at FULL_TOTAL_P, plus a margin for the
+#                  estimate's own wobble, against FULL_TOTAL_MS. OVER then means
+#                  THE SUITE GREW. The readings come from the #1354 ledger, which
+#                  already records total_ms, tier, scope and parallel per
+#                  invocation — no new storage is introduced, and none is to be.
+#                  Too few retained readings is the NAMED state NOT YET
+#                  COMPUTABLE: not a pass, and not a fall back to the point-wise
+#                  comparison this replaces. Raising the ceiling, and
+#                  re-declaring it at a measured p95 while still comparing
+#                  point-wise, were both considered and DECLINED — the defect is
+#                  the comparison, not the constant. The criterion binds when a
+#                  violator is FIXED; an existing breach is not retroactively
+#                  re-graded, which costs nothing to honour because this figure
+#                  reports and never fails.
 #   FULL_WALL_MS   real ELAPSED wall clock for the whole run. The cost actually
 #                  paid once per PR: the EXPERIENCE instrument.
 # Wall clock alone goes blind under parallelism (after #957 a new check filling
@@ -229,6 +250,36 @@ FULL_TOTAL_P=8         # the -P this ceiling was measured at (#1001). Summed
                        # elapsed inflates with concurrency, so the figure is
                        # comparable only at this value; any other -P reports
                        # NOT COMPARABLE. Re-measure if this changes.
+# The three knobs of the DISTRIBUTIONAL comparison (#1378). See the header block
+# above for why the comparison is distributional at all; these are the values.
+# ALL THREE ARE PROVISIONAL, and the reason is the same for each: the only
+# evidence available when they were chosen was one day's readings, and deriving
+# a number from a single day's sample is exactly the point-estimate error this
+# story exists to remove — repeating it one level up would be no better. They
+# are defensible starting points to be re-derived once the ledger holds readings
+# from several weeks and several suite sizes.
+FULL_TOTAL_MARGIN_PCT=5  # tolerance on the p95 ESTIMATE, not on the ceiling
+                         # (#1378). At the sample sizes available the p95 is
+                         # itself a noisy statistic — one slow run moves it — so
+                         # a breach is declared only when the estimate clears the
+                         # ceiling by more than the estimate's own wobble. 5% is
+                         # half the observed +/-10% per-reading spread: large
+                         # enough that a single tail reading cannot manufacture
+                         # OVER, small enough that real growth of a few percent
+                         # in the whole distribution still shows. This does NOT
+                         # raise FULL_TOTAL_MS: the constant is untouched, and
+                         # raising it was proposed and declined.
+FULL_TOTAL_MIN_N=10      # readings needed before the criterion is computable at
+                         # all (#1378). Below this a p95 is barely distinguish-
+                         # able from the maximum, so the run reports the named
+                         # state NOT YET COMPUTABLE — never a silent pass and
+                         # never a fall back to point-wise comparison.
+FULL_TOTAL_WINDOW=20     # how many of the most recent qualifying readings the
+                         # distribution is drawn from (#1378). The ledger is
+                         # retained indefinitely by the #1354 amendment, and an
+                         # all-time sample would dilute exactly the growth this
+                         # instrument exists to see: readings taken against a
+                         # smaller suite are not evidence about today's.
 FULL_WALL_MS=120000    # full-tier ceiling on ELAPSED wall clock (ms) — #961, REPORTS ONLY
 
 # Wall clock starts HERE, and the reported figure is the difference against a
@@ -728,26 +779,109 @@ echo "run-checks: tier=$TIER ran=$ran skipped=$skipped fails=$fails total=${tota
 echo "$coverage_line"
 
 # Full-tier budget disclosure (#961). Unconditional on a full run, and it never
-# touches `fails` — a breach is a finding, not a red suite.
+# touches `fails` — a breach is a finding, not a red suite. That is unchanged by
+# the distributional criterion below (#1378): a breached criterion is still a
+# REPORT, and nothing here contributes to the exit status.
 if [ "$TIER" = "full" ]; then
   run_t1=$(date +%s%N)
   wall_ms=$(( (run_t1 - run_t0) / 1000000 ))
   # The summed figure is comparable only at the concurrency it was declared
   # at (#1001). Serial runs (-P absent) are treated as -P 1.
   run_p=$PARALLEL; [ "$run_p" -gt 0 ] || run_p=1
+  # THE COMPARISON IS DISTRIBUTIONAL (#1378). This run's reading is disclosed
+  # unchanged — disclosure was never the defect — but the VERDICT is computed
+  # over the retained readings at FULL_TOTAL_P, this run included, so that OVER
+  # means the suite grew rather than that this run landed in the upper tail.
+  # The two NOT COMPARABLE gates come first and are the #1001 rule unchanged,
+  # not a restatement of it: a reading taken at another -P, or over a scoped
+  # subset of the suite, is not a member of this distribution and is excluded
+  # from it below by exactly the same predicate.
   if [ "$run_p" -ne "$FULL_TOTAL_P" ]; then
     work_verdict="NOT COMPARABLE — ceiling is declared at -P ${FULL_TOTAL_P}, this run used -P ${run_p}; summed elapsed inflates with concurrency, so it is not checked"
-  elif [ "$total_ms" -gt "$FULL_TOTAL_MS" ]; then
-    work_verdict="OVER by $((total_ms - FULL_TOTAL_MS))ms — reported, not failing"
+  elif [ "$SCOPED" = yes ]; then
+    work_verdict="NOT COMPARABLE — this run is scoped to '${GLOB}' and measures part of the suite; the criterion is over unscoped full-tier readings"
   else
-    work_verdict="within, $((FULL_TOTAL_MS - total_ms))ms to spare"
+    work_verdict=$(
+      FTM="$FULL_TOTAL_MS" FTP="$FULL_TOTAL_P" FTMARGIN="$FULL_TOTAL_MARGIN_PCT" \
+      FTMIN="$FULL_TOTAL_MIN_N" FTWIN="$FULL_TOTAL_WINDOW" FTTHIS="$total_ms" \
+      FTLEDGER="$(check_ledger_path 2>/dev/null || true)" python3 - <<'WORK_PY' 2>/dev/null
+import json, os
+
+ceiling = int(os.environ["FTM"])
+want_p  = int(os.environ["FTP"])
+margin  = int(os.environ["FTMARGIN"]) / 100.0
+min_n   = int(os.environ["FTMIN"])
+window  = int(os.environ["FTWIN"])
+this_ms = int(os.environ["FTTHIS"])
+path    = os.environ.get("FTLEDGER", "")
+
+# THE READINGS COME FROM THE EXISTING PER-INVOCATION LEDGER (#1354). It already
+# records total_ms, tier, scope and parallel per invocation, which is the whole
+# reading history this criterion needs; no new store is introduced here and none
+# is to be added. A ledger that is absent or unreadable is not an error: it is
+# simply zero retained readings, and the named state below covers it.
+readings = []
+if path and os.path.isfile(path):
+    try:
+        fh = open(path)
+    except OSError:
+        fh = None
+    if fh is not None:
+        with fh:
+            for line in fh:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    r = json.loads(line)
+                except json.JSONDecodeError:
+                    continue          # a torn line is skipped, never fatal
+                if r.get("tier") != "full":
+                    continue
+                # AC2 / #1001: a reading at another concurrency is EXCLUDED from
+                # the distribution. `parallel` is 0 for a serial run, which the
+                # runner reports as -P 1.
+                if (int(r.get("parallel") or 0) or 1) != want_p:
+                    continue
+                if r.get("scope") != "unscoped":
+                    continue
+                total = r.get("total_ms")
+                if isinstance(total, int) and total > 0:
+                    readings.append((r.get("t0_ms", 0), total))
+
+readings.sort()
+sample = [ms for _, ms in readings][-(window - 1):] if window > 1 else []
+sample.append(this_ms)      # this run is a reading like any other
+n = len(sample)
+
+if n < min_n:
+    print(f"NOT YET COMPUTABLE — {n} reading(s) in the sample at -P {want_p}, the "
+          f"criterion needs {min_n}; this is a named state, not a pass, and the "
+          f"point-wise comparison it replaces is NOT used as a fallback (#1378)")
+else:
+    s = sorted(sample)
+    k = 0.95 * (n - 1)          # linear-interpolated p95
+    lo = int(k)
+    hi = min(lo + 1, n - 1)
+    p95 = s[lo] + (s[hi] - s[lo]) * (k - lo)
+    allowed = ceiling * (1.0 + margin)
+    shape = (f"p95={p95:.0f}ms over {n} reading(s) at -P {want_p} vs "
+             f"FULL_TOTAL_MS + {int(margin * 100)}% estimate margin ({allowed:.0f}ms)")
+    if p95 > allowed:
+        print(f"OVER — {shape}, by {p95 - allowed:.0f}ms: the suite grew — "
+              f"reported, not failing")
+    else:
+        print(f"within — {shape}, {allowed - p95:.0f}ms to spare")
+WORK_PY
+    ) || work_verdict=''
+    [ -n "$work_verdict" ] || work_verdict="NOT YET COMPUTABLE — the retained readings could not be read (#1378); not a pass, and no fallback to point-wise comparison"
   fi
   if [ "$wall_ms" -gt "$FULL_WALL_MS" ]; then
     wall_verdict="OVER by $((wall_ms - FULL_WALL_MS))ms — reported, not failing"
   else
     wall_verdict="within, $((FULL_WALL_MS - wall_ms))ms to spare"
   fi
-  echo "run-checks: FULL-TIER BUDGET work=${total_ms}ms at -P ${run_p} / FULL_TOTAL_MS=${FULL_TOTAL_MS}ms at -P ${FULL_TOTAL_P} — ${work_verdict} (#961, #1001)"
+  echo "run-checks: FULL-TIER BUDGET work=${total_ms}ms at -P ${run_p} / FULL_TOTAL_MS=${FULL_TOTAL_MS}ms at -P ${FULL_TOTAL_P} — ${work_verdict} (#961, #1001, #1378)"
   echo "run-checks: FULL-TIER BUDGET wall=${wall_ms}ms / FULL_WALL_MS=${FULL_WALL_MS}ms — ${wall_verdict} (#961)"
 fi
 
