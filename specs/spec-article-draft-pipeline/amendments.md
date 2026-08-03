@@ -144,3 +144,174 @@ appends to it.
 > `autostart` distinguishes *no binding recorded* from *a different Brief*
 > rather than collapsing the first into the second and taking the expensive
 > branch. Delivery: story 20.193.
+
+> **Amended 2026-08-03 (triage, #1374 coupled with #1375) — a verdict enters
+> the run ledger only from an ACCEPTED round, and round acceptance is
+> mechanical at ingestion. A rejected round's SILENCES are as untrusted as its
+> findings.** The 2026-08-02 (#1287) carry above is unchanged in intent and was
+> executed correctly on input it had no way to distrust. Run
+> `20260803T142748-813020` spawned a first isolated provenance round whose
+> verdict lines all carried the literal placeholder `POS` instead of a position
+> id. Those findings were correctly discarded at
+> `scripts/verify-provenance.py:751` — *"judge graded position 'POS', which is
+> not in the map — the verdict cannot be trusted"*. The **ledger write was not**:
+> `:833-841` records a row for every `pos in sorted(graded)` with
+> `"fail" if pos in round_fail else "pass"`, and `graded` comes from the
+> attestation header, which was well-formed. All 88 positions were therefore
+> recorded PASS at the draft sha. The corrected round returned **13** real
+> violations on byte-identical text; every one was suppressed as
+> `LEDGER DISAGREEMENT … the CARRIED verdict stands`, and `:848` then printed
+> `verify-provenance: PASS (no findings)` four lines below them.
+>
+> **The rejection mechanism already exists and was installed at one of two
+> entry points.** `:315` rejects a round whose **attestation** grades a position
+> not in the map; `:751` treats the same defect in the **verdict body** as a
+> per-finding discard. This is `a-carrier-binds-the-occasions-it-is-installed-on`
+> against this engine's own code: the layer was right and the occasions were
+> not, which is why no artifact of the run looked wrong.
+>
+> **The rule.** Round acceptance is evaluated **before any ledger write**, by
+> the same predicate at both entry points: every verdict line's position id must
+> be a worklist id, each appearing at most once, with verdict tokens from the
+> closed set. A round failing it is **rejected as a unit** — zero ledger rows,
+> zero lines entering the carry, recorded as `rejected: <reason>` and re-run.
+> Ledger rows carry their **round id**, so a round's rows can be struck
+> mechanically rather than by hand-editing a TSV. A verdict may be carried only
+> if its source round is accepted; the carry reads round ids and refuses rows
+> from a rejected one.
+>
+> **Suppressions become first-class in the summary.** `PASS (no findings)` may
+> not be printed over a nonzero suppression count: the terminal line reports
+> `PASS (0 findings, N suppressed disagreements)`, and `N > 0` is a distinct
+> state token rather than `PASS`, so no downstream consumer can read a
+> suppression-laden run as clean. The gate's block record and the completion
+> summary carry `N`.
+>
+> **What is NOT decided here.** The first-wins carry rule itself stands —
+> first-wins with named disclosure remains correct for **equal-trust**
+> disagreement, and #1375 declares reopening it a non-goal. What this adds is
+> the trust precondition the rule always presupposed and never stated.
+>
+> **What would overturn this:** re-spawn cost proving prohibitive against the
+> #118 turn budget — a single malformed line discarding a round's genuine
+> findings, often enough to matter. The fallback is then to quarantine rather
+> than reject: keep the parseable findings, write no ledger rows, record the
+> round `partial`. That is a weaker position (it trusts findings from a round
+> just declared untrustworthy) and is not taken pre-emptively.
+> Delivery: stories 20.202, 20.203.
+
+> **Amended 2026-08-03 (triage, #1376) — the judge hand-off's cited-material
+> artifact HAS NO PRODUCER, and the evidence check's carrier cannot hold arc
+> pointers by construction. One emitter serves both.** The 2026-08-02 (#1288)
+> amendment above re-anchored the per-section evidence-type check on
+> `$WS/examination-pins.txt`, correctly, for the fact-sheet retirement it was
+> answering. What neither it nor the brief-record amendment (2026-08-02, #1044,
+> `stages/stage0.md:407`) reconciled is that `journey_arcs` ride run state
+> **beside `sources`** as declared source material while the pin ledger is
+> **derived from examination records only** (`scripts/examine.py:762`, ledger
+> written at `:789`). An arc is not an examination, so no arc pointer can ever
+> appear in that ledger — the check reports `cannot-determine` for every
+> arc-carrying section, and did so on runs `20260803T105759-992700` and
+> `20260803T142748-813020` with the identical cause. A disclosed gap that
+> recurs on every run of a first-class material class is no longer a
+> disclosure.
+>
+> **The sharper half was found by grounding and corrects the reporting issue's
+> own premise.** `stages/stage3.md:359-363` requires handing the isolated judge
+> *"only the sentences `--list-narration` / `--list-derived` surface **plus the
+> fact-sheet entries they cite**"* — and **nothing emits those entries**. A grep
+> for `cited-material` across `scripts/`, `skills/` and `specs/` returns
+> nothing. The artifact the contract depends on is composed freehand by the
+> drafting agent every run, which is why this run's arcs were dropped from it in
+> silence and detected only because the judge itself remarked on the absence.
+> This is `a-carrier-is-not-installed-until-its-inputs-have-writers` against
+> this pipeline's own judging seam: the reader is specified, the producing site
+> does not exist.
+>
+> **The rule.** One tool emits the run's **declared pointer set** — the union of
+> the examination pins, the brief record's arc cites, and the interview answer
+> ids — and emits the judge's **cited material FROM that set**, ending in a
+> **reconciliation**: every declared pointer either landed in the material or is
+> listed in a named-absence section with its reason, and the absence list is
+> handed to the judge so *ungraded* and *graded-clean* cannot blur. The
+> per-section evidence-type check reads **the same superset**, retiring the
+> recurring `cannot-determine`. One producer, three consumers; a silent skip
+> becomes structurally impossible rather than prohibited.
+>
+> **The alternative that was NOT taken, and why it is recorded.** Making arcs
+> into examination records would need no new artifact and no consumer change —
+> by far the cheapest. It is declined because it makes a declared arc claim to
+> be something it is not: an examination is *"one read answering one stated
+> claim"* (`stages/examine.md`), an arc is material carried from the brief and
+> read by nobody at fill time, and the `time_axis` typing the 2026-08-02 (#1184)
+> episode rule rests on would be muddied — arcs are `state_only` and an episode
+> claim may not ground in them. It also leaves the judge hand-off unfixed.
+>
+> **What would overturn this:** the emitter proving to be tool surface without a
+> defect class to end — this repository's own checker-governance rule holds that
+> "no checker" is a valid outcome and that a proposal must name the class it
+> makes unproducible. The class here is *a declared source class reaching a
+> consumer that silently under-covers it*, and the justification for building
+> rather than prescribing is that the prose duty already existed and was skipped
+> silently this very run. If the reconciliation never fires over several
+> arc-carrying runs, the honest reading is that the duty was sufficient and the
+> emitter is the accretion the rule warns about. Delivery: story 20.204.
+
+> **Amended 2026-08-03 (triage, #1377) — a CONTRACT-MANDATED heading is exempt
+> from the skeleton-uniformity measurements, and the joint constraint is stated
+> at generation. The two rules as written admit NO compliant output.** The
+> per-lesson skeleton detector (added 2026-07-20, #434/#440) counts every
+> `##`-`######` heading casefolded and fails on any repeated
+> `>= QG_SKELETON_REPEAT` times, with no exemption
+> (`scripts/draft-pipeline.py:717-725`). F2 mandates the opposite: its GATE slot
+> is `## GATE {What actually happened}` carrying
+> `[EVIDENCE: episode|example|measurement]`, and the framework's own lesson-unit
+> comment states that "each repeat is one lesson with its OWN 'What actually
+> happened' artifact" — the evidence gate is enforced once per lesson, keyed on
+> that exact heading, and the `section-not-found` class exists precisely to
+> catch a renamed one.
+>
+> **This is stronger than a missing reconciliation, which is how #1377 reports
+> it.** A three-lesson F2 article at deep-dive depth must repeat the mandated
+> heading three times to clear the evidence gate, and must not repeat any
+> heading three times to clear dim4. There is no draft satisfying both. Observed
+> on run `20260803T142748-813020`: the drafting agent kept the canonical heading
+> deliberately, to protect the evidence gate, and uniformed the other four
+> headings along with it — dim1 and dim4 then failed the same act, one full
+> drafting cycle after the choice was made.
+>
+> **The rule.** Contract-mandated headings are named in **one declared list**,
+> derived from the frameworks' own `[EVIDENCE: …]` slot markers rather than
+> restated per check, and are **excluded from the uniformity computation** by
+> both the mechanical dim4 detector and the dim1 rubric-judge instruction. A
+> mandated element cannot be evidence of lazy structure; measuring it as such is
+> the check contradicting a contract shipped beside it. Separately and
+> load-bearing: the fill states the **joint constraint** — mandated headings
+> recur by contract, all other unit-level structure must vary per unit — because
+> the exemption only stops the checks manufacturing the failure while the
+> generation clause is what prevents it.
+>
+> **The lockstep obligation is discharged explicitly.** `stages/gate.md:31-35`
+> holds that this contract lives in three enforcement copies —
+> `scripts/draft-pipeline.py`, `quality-rubric.md`, and that section — and that
+> "a change to one without the others is a defect". All three move together
+> here, and the generation clause is a fourth site by design rather than a
+> fourth copy of the same rule: it constrains what is produced, not what is
+> measured.
+>
+> **What is NOT weakened.** The variation requirement over non-mandated
+> structure stands whole. The observed draft's dim1 finding against its other
+> four repeated headings is correct and is repaired in the ordinary revision
+> cycle, not by this amendment. The evidence gate's heading requirement is
+> unchanged; re-pointing that join was considered as the alternative and
+> declined, because `section-not-found` is already a named class with a named
+> remedy (the heading fix, explicitly not an elicitation) and re-opening it is
+> the larger change.
+>
+> **What would overturn this:** the declared list drifting from the frameworks
+> it mirrors — a mandated heading added to a framework and not to the list would
+> re-create the contradiction silently, which is the same producing-site problem
+> the #1376 amendment above records. Deriving the list from the slot markers
+> rather than maintaining it by hand is what bounds that, and if derivation
+> proves impractical the honest fallback is to move the exemption into the
+> framework asset itself. Delivery: story 20.205.
