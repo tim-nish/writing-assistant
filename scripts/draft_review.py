@@ -214,10 +214,31 @@ def _reproject_plan(slug, root, canonical_text, ws):
         if els is None:
             if len(consumed) == 1:
                 els = list(consumed)
-            elif i < len(old_sections):
+            elif len(headings) == len(old_sections) and i < len(old_sections):
+                # Positional inheritance is sound ONLY for a pure RENAME — the
+                # same number of sections in the same order, one retitled. Once
+                # the section set changes shape (a heading added, a frame
+                # section like `Context` entering the derivation), position no
+                # longer identifies the same section, and inheriting by index
+                # hands one section another's elements. That is worse than
+                # losing the mapping: it writes a FALSE consumption claim into
+                # the durable record the map exists to keep honest (#1402).
                 els = old_sections[i].get("elements", [])
             else:
                 els = []
+        # A section that places no element is not part of the section->element
+        # map — `Context` and the rendered pointer block are the framework's
+        # frame, not lesson units (F2: "`Context` and the pointer block appear
+        # exactly once; the lesson unit between them repeats"). Emitting them
+        # with `elements: []` produced a plan the WRITER refuses
+        # (`write-article-plan.py`: "section N lists no elements"), so a review
+        # that applied edits could not checkpoint itself, and the only way past
+        # was to record falsely that `Context` places every story element —
+        # corrupting the very consumption record the check protects. Re-project
+        # over element-bearing sections only, which is the same set the writer
+        # already validates (#1402).
+        if not els:
+            continue
         new_sections.append({"title": h, "elements": els})
     old_render = json.dumps(old_sections, sort_keys=True)
     new_render = json.dumps(new_sections, sort_keys=True)
