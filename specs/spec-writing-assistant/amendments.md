@@ -307,3 +307,59 @@ and no already-relocated text moves — the rule is prospective.
 > merged-PR definition of done that the story lane and cleanup both use, so it is
 > recorded here and closed rather than carried. Act 2 is discharged, not
 > deferred. Delivery: none; story 20.198 withdrawn, #1363 closed on this record.
+
+> **Amended 2026-08-03 (triage, #1366) — the check suite is ISOLATED from the
+> state root it exercises, with no opt-out, and the substituting fallback
+> ANNOUNCES itself; the "newest workspace" mechanism the filing named does not
+> exist, and the correction is what makes one fix sufficient.** Two faces were
+> observed on 2026-08-03: **851 tmp-derived directories** accumulated in the
+> machine state root (eight more per `--tier full` run, measured), and a
+> concurrent full-tier run wrote **foreign block open/close records into the
+> owner's live draft run**, with `last_stop` claiming a block the real run had
+> not reached — a `run_block.py rerun` at that moment would have restored a
+> foreign checkpoint and moved the live run's artifacts to `invalidated/`. Data
+> loss was averted by a human noticing timestamps that could not be theirs.
+> **The filing attributed the second face to "the resolver fallback … newest
+> workspace resolution", and that mechanism does not exist.** Read at triage:
+> `run_record.workspace_of` falls back to `--ws`/`WS` and then to the
+> resolver's **active-run pointer**, and its own docstring says *"never a scan
+> for the newest workspace, which that resolver forbids in the same breath it
+> writes the pointer"* — the same conclusion #1313 reached when it examined this
+> fallback and called it *"correct rather than a guess"*. The defect was never
+> the fallback's logic. It is that **the pointer lives in the state root**, so a
+> fixture and a live run share one pointer for the same reason they share
+> everything else. **That correction is load-bearing**, because it collapses the
+> remedy: sandboxing the state root gives fixtures their own pointer, and the
+> cross-run attribution becomes unreachable rather than merely refused. The
+> class is already ruled — *owner decision record — 2026-07-22 (a shared-scope
+> resource presenting as private must be isolated or warn loudly)*: "isolated OR
+> warn loudly on collision — silence is not among the options; which of the two
+> is an implementation choice." **The contract, two clauses at two layers.**
+> (1) *Isolation, at the runner:* `scripts/run-checks.sh` gives every spawned
+> check a sandboxed state root, both tiers, no opt-out; the invariant is stated
+> at `docs/storage-architecture.md` D1, which is where the hole was. **The
+> runner is not a check**: its own per-invocation ledger (#1354) resolves its
+> path before the sandbox exists, and an implementation that exported the
+> sandbox for the runner's own shell would delete that ledger at teardown — the
+> failure mode being silence, since the report would simply find fewer
+> invocations than happened. (2) *Disclosure, at the substitution:* when
+> `workspace_of` resolves through the active-run pointer it says so, naming the
+> command and the workspace it attributed to — *owner decision record —
+> 2026-07-28 (a skipped join is reported as a producer defect)*: "make the
+> fallback announce itself at the point of substitution, which is the only place
+> the evidence still exists." This is the layer the runner cannot reach, a
+> direct invocation outside it. **The stronger option — deleting the fallback
+> and making `--ws` mandatory — is DECLINED**, and not on cost: `run_record.py`
+> states the current behaviour deliberately, *"the block then runs unrecorded
+> rather than failing: emission never fails a run"*, and reversing it would make
+> a missing flag fail runs across at least eight check files (eleven such calls
+> in `check-run-record.sh` alone) plus `stage3.md` and `gate.md`, to fix a case
+> clause (1) already makes unreachable. **The 851-directory sweep is NOT
+> licensed by this amendment.** Deleting them is irreversible by an automated
+> actor, and *owner decision record — 2026-07-26 (undo privilege bounds
+> reversibility)* routes such an act through the boundary irreversible acts get:
+> it is a separately confirmed step, taken **after** isolation lands so the
+> population stops regrowing first. **What would overturn clause (2):** evidence
+> that the announce line is never read — it prints inside a fixture — which
+> would make it the warned-plan-nobody-reads shape and reopen the stronger
+> option. Delivery: stories 20.200, 20.201.

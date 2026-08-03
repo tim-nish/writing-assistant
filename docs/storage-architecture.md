@@ -68,6 +68,24 @@ where classifying would be premature.
   only files it creates there are declared products at `output.drafts`.
   Where an intermediate lands is a stated contract resolved through D2 —
   never an agent default.
+  - *Fixture isolation (amended 2026-08-03, #1366):* **a check never runs
+    against the real state root.** `scripts/run-checks.sh` gives every check
+    it spawns a sandboxed state root, both tiers, and there is **no opt-out**
+    — a check that genuinely needs the real one is a defect by definition.
+    This was a hole in D1 rather than a new rule: D1 bounds where the plugin
+    writes *for a run*, and said nothing about the suite that exercises the
+    very machinery that mints run state, so the suite minted real state. Two
+    faces, one cause, both observed 2026-08-03: **851 tmp-derived directories**
+    accumulated in the state root, and a concurrent full-tier run wrote
+    **foreign block records into a live draft run**, where a `run_block.py
+    rerun` would have restored a foreign checkpoint and moved the live run's
+    artifacts aside. The second face is fixed by the first and not separately:
+    the active-run pointer that `run_record.workspace_of` falls back to lives
+    **in the state root**, so a sandboxed root gives fixtures their own
+    pointer and the cross-run attribution becomes unreachable. **The runner is
+    not a check** — its own per-invocation ledger (#1354) resolves before the
+    sandbox exists and continues to land in the real state root, which is the
+    one ordering constraint this clause imposes on its implementation.
   - *Scope note:* configuration placement is exempt until O1 resolves —
     `writing-sources.yaml` currently lives in the host root by the existing
     contract, and this document does not change that (see O1). The
