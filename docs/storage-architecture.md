@@ -331,7 +331,30 @@ when any of these holds, and is a deletion candidate otherwise:
 3. it is **younger than 14 days**.
 
 A host-repo directory whose path no longer exists on disk and whose runs are
-all candidates is itself a candidate.
+all candidates is itself a candidate — **and for such a repo the keep-recent
+clause does not apply.** Amended 2026-08-04 during story 20.215, which found
+the clause **unsatisfiable as first written**: keep-recent always retains
+`min(N, count)` runs, so "all runs are candidates" could never become true for
+a directory that had any runs, and the clause was born unreachable. Measured:
+with N=5 and six old completed runs, the scan yielded one candidate of six.
+The repair is to disable the clause whose rationale deadness removes —
+keep-recent preserves *recent work you might want*, and a host path that no
+longer exists leaves nobody to want it. **The not-`complete` clause is not
+disabled**, because a resumable run of a *moved* repo is exactly what you would
+want back, and neither is the age floor.
+
+**Deadness is three-valued and decidable only from a recorded marker.**
+`repo_key` is deliberately lossy — every run of non-alphanumerics becomes one
+`-` — so reversing the slug would call a live repo dead whenever its path held
+an underscore or a dot. `new-run` therefore writes the host path beside the
+runs at mint; a directory with **no marker** is cannot-determine and is never
+a candidate.
+
+**A non-runs directory is swept only when it is EMPTY.** "Lacks `runs/`" would
+reach any legitimate sibling the state root grows later; a directory holding
+no file anywhere under it cannot be something anyone is using. A non-empty
+one is **report-only** — disclosed, never deleted, because the rule has
+nothing to say about it and guessing would delete work.
 
 **Keep-conditions, not an exclusion list.** The rule is stated positively so
 that "delete something still needed" is unproducible: clause 1 is what protects
