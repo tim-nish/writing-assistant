@@ -95,6 +95,33 @@ else
   esac
 fi
 
+# --- AC2: a run already carrying `<qualifier>@` names its repository ONCE ----
+# The pipeline's own `generated_by` line is `<repo>@<version>+<sha>` — semver
+# build metadata on an already-qualified token, not a second citation. A
+# product carrying BOTH forms yields exactly ONE finding, and it is the bare
+# one: keyed on the property that makes a reference resolvable, never on the
+# field name, so the next generated field carrying a build sha does not reopen
+# it (#1391).
+cat > "$WS/mixed.md" <<'EOF'
+---
+title: A product
+generated_by: writing-assistant@0.1.0+c223004
+---
+the runner declares it serially (`c0408c7`)
+EOF
+mixedout=$(python3 "$MOD" scan "$WS/mixed.md" 2>&1)
+if [ $? -eq 0 ]; then
+  err "AC2 the bare sha beside a generated_by line was admitted — the backstop went blind"
+else
+  nfound=$(printf '%s' "$mixedout" | grep -o 'line [0-9]*:' | wc -l | tr -d ' ')
+  case "$mixedout:$nfound" in
+    *c223004*) err "AC2 generated_by's build-metadata sha was flagged — the run already names its repository (#1391)" ;;
+    *c0408c7*:1) ok "AC2 exactly one finding, and it is the bare sha — the qualified run is admitted (#1391)" ;;
+    *c0408c7*) err "AC2 the bare sha was named but the finding count is $nfound, not 1 — got: $mixedout" ;;
+    *) err "AC2 refused without naming the bare sha — got: $mixedout" ;;
+  esac
+fi
+
 # --- AC3/AC4/AC5: what must be emitted UNCHANGED -----------------------------
 cat > "$WS/good.md" <<'EOF'
 ---
