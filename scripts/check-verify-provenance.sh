@@ -607,6 +607,40 @@ printf '%s' "$out" | grep -q 'ledger carry: 0 carried' \
   && ok "20.207: a legacy row re-grades rather than matching on (position, text) alone" \
   || err "20.207: a legacy row was matched on a PARTIAL key — the silent carry #1389 forbids: $out"
 
+# --- #1399 (via #1406): a period inside a URL is not a sentence boundary -----
+# The observed defect: the segmenter split MID-HOSTNAME, so P1.S1 began
+# "com/tim-nish/..." — the map anchored a fragment, the judge graded a
+# fragment, and the echo check compared against the same fragment, so a
+# mislocated verdict looked correct. Nothing reported it. The fixture is the
+# issue's own minimal reproduction, verbatim; segmentation is THE authority
+# for positions (#755), so the assertion pins the emitted sentences.
+cat > "$work/url-draft.md" <<'EOF'
+Inline link like ([#1395](https://github.com/tim-nish/writing-assistant/issues/1395)) mid sentence.
+
+Reference style like ([#1379][a]) mid sentence.
+
+Bare ref like #1388 mid sentence.
+
+[a]: https://github.com/tim-nish/writing-assistant/issues/1379
+EOF
+python3 "$root/scripts/draft-pipeline.py" provenance-segment --draft "$work/url-draft.md" \
+  > "$work/url-skel.json" 2>/dev/null \
+  || err "#1399: provenance-segment failed on the URL reproduction"
+python3 - "$work/url-skel.json" <<'PY1399' && \
+  ok "#1399: P1.S1 keeps its full sentence across an inline URL, and the position count matches the reference-style form" || \
+  err "#1399: URL splitting regressed: $(cat "$work/url-skel.json")"
+import json, sys
+rows = json.load(open(sys.argv[1]))["positions"]
+by = {r["pos"]: r["sentence"] for r in rows}
+# The whole first sentence, not a mid-hostname fragment.
+assert by.get("P1.S1", "").startswith("Inline link like"), by.get("P1.S1")
+assert "mid sentence." in by["P1.S1"], by["P1.S1"]
+# One position per paragraph — the inline-URL form segments like the
+# reference-style form, so downstream P<n>.S<m> numbering does not shift.
+assert len(rows) == 4, [r["pos"] for r in rows]
+assert by.get("P2.S1", "").startswith("Reference style"), by.get("P2.S1")
+PY1399
+
 if [ "$fail" -eq 0 ]; then
   printf '\nAll verify-provenance checks passed.\n'; exit 0
 else
