@@ -130,14 +130,50 @@ def brief_mismatch(state, brief):
     cold entry (no brief) never mismatches, so the ratified cold default —
     automatic, not opt-in — is untouched.
     """
+    return brief_binding(state, brief) != "same"
+
+
+# The three states a candidate run's brief binding can be in, against a
+# brief-carrying entry (story 20.193, #1338). Collapsing `absent` into
+# `different` is what made the ratified same-brief-only contract (#1207) take
+# its expensive branch on a checkpoint that merely forgot: a stage state
+# written without `run_state` dropped the binding, the discriminator read
+# false, and a fresh multi-30-minute run was minted with nothing deleted and
+# nothing wrong-looking.
+BINDING_SAME = "same"
+BINDING_DIFFERENT = "different"
+BINDING_ABSENT = "absent"
+
+
+def brief_binding(state, brief):
+    """`same` | `different` | `absent` | `cold` — the binding read, three-valued.
+
+    `cold` is a brief-less entry, which never mismatches (the ratified cold
+    default is untouched). `absent` is a candidate run recording NO binding at
+    all: not evidence of a different brief, and never a reason on its own to
+    abandon the run — see `_autostart`, which hands it to the owner as a
+    confirmation instead of minting silently.
+    """
     if not brief:
-        return False
+        return "cold"
     import os
     import sys
     sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
     import draft_brief
-    return (draft_brief.brief_pin((state or {}).get("brief"))
-            != draft_brief.brief_pin(brief))
+    recorded = draft_brief.brief_pin((state or {}).get("brief"))
+    if recorded is None:
+        return BINDING_ABSENT
+    return (BINDING_SAME if recorded == draft_brief.brief_pin(brief)
+            else BINDING_DIFFERENT)
+
+
+def binding_note(run_id, binding):
+    """The one-line receipt for a binding that is not `same`."""
+    if binding == BINDING_ABSENT:
+        return (f"no brief binding recorded (#1338): in-progress run {run_id} "
+                "carries no recorded brief, which is not evidence of a "
+                "different one — the run is offered rather than skipped")
+    return fresh_note(run_id, True)
 
 
 def fresh_note(run_id, other_brief):
@@ -279,3 +315,42 @@ def disclosure_line(run_id, ws, state):
     subject = "; ".join(bits) or "subject unrecorded in checkpoint"
     return (f"resuming run {run_id}{age} — {subject}; next: {state.get('next_stage')}. "
             f"Not your topic? re-run with --fresh (this run stays untouched).")
+
+
+def carry_binding(prior, state, ws):
+    """Carry the run's brief binding across a checkpoint write (story 20.193).
+
+    THE BINDING IS RUN IDENTITY, NOT STAGE STATE, and this is what "a
+    checkpoint cannot omit it" has to mean in a pipeline whose callers all pass
+    a stage's output state: a stage state has no reason to carry a brief, so
+    the write path carries it instead of asking every writer to remember. On
+    run 20260803T105759-992700 exactly such a write dropped it, the
+    same-brief-only discriminator (#1207) then read false, and a fresh
+    multi-30-minute run was minted with nothing deleted and nothing
+    wrong-looking.
+
+    A write that would REBIND the run to a different brief is a different act
+    and raises instead: mutating identity is what makes a later same-brief
+    entry read false, which is the defect one level up from the one observed.
+    Mutates `state` in place, mirroring the write path's own style.
+    """
+    import os
+    import sys
+    if not (prior or {}).get("brief"):
+        return state
+    if not state.get("brief"):
+        state["brief"] = prior["brief"]
+        return state
+    sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
+    import draft_brief
+    if draft_brief.brief_pin(prior["brief"]) != draft_brief.brief_pin(state["brief"]):
+        raise ValueError(
+            "this checkpoint would rebind run %s to a different brief "
+            "(recorded %s, incoming %s) — a run's brief binding is its "
+            "identity, and rebinding makes the same-brief resume contract "
+            "(#1207) read false on the next entry; mint a fresh run for the "
+            "other brief instead"
+            % (os.path.basename(os.path.normpath(ws)),
+               draft_brief.brief_pin(prior["brief"]),
+               draft_brief.brief_pin(state["brief"])))
+    return state

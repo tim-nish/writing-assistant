@@ -3537,7 +3537,10 @@ def cmd_checkpoint(args):
     # one (Story 20.104, #1082; see `draft_resume.py` for why it is declared).
     if getattr(args, "sitting", None):
         state = dict(state, sitting=args.sitting)
-    path = _write_checkpoint(args.ws, state)
+    try:
+        path = _write_checkpoint(args.ws, state)
+    except ValueError as e:                      # a rebinding write (#1338)
+        sys.stderr.write(f"error: {e}\n"); return 1
     print(f"checkpoint: next_stage={state['next_stage']} -> {path}")
     return 0
 
@@ -3550,15 +3553,17 @@ def _write_checkpoint(ws, state):
     path = _checkpoint_path(ws)
     # Skill-contract pin (#743): minted at the FIRST checkpoint write, carried
     # immutably by every later one — it records what the run STARTED under.
-    prior_pin = None
-    if os.path.isfile(path):
-        try:
-            with open(path, encoding="utf-8") as f:
-                prior_pin = (json.load(f) or {}).get("skill_contract_pin")
-        except (OSError, json.JSONDecodeError):
-            prior_pin = None
-    state["skill_contract_pin"] = prior_pin or state.get("skill_contract_pin") \
-        or _skill_contract_pin()
+    prior = {}
+    try:
+        with open(path, encoding="utf-8") as f:
+            prior = json.load(f) or {}
+    except (OSError, json.JSONDecodeError):
+        prior = {}
+    state["skill_contract_pin"] = (prior.get("skill_contract_pin")
+                                   or state.get("skill_contract_pin")
+                                   or _skill_contract_pin())
+    # Run identity carried here so no stage state can drop it (#1338).
+    _load("draft_resume.py").carry_binding(prior, state, ws)
     tmp = path + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(state, f, indent=2)
@@ -3892,7 +3897,14 @@ def _autostart(root, fresh=False, sitting=None, brief=None):
                 continue
             if state.get("next_stage") and state["next_stage"] != DONE_STAGE:
                 _dr = _load("draft_resume.py")
-                if fresh or _dr.brief_mismatch(state, brief):
+                binding = _dr.brief_binding(state, brief)
+                if binding == _dr.BINDING_ABSENT and not fresh:
+                    # The third state (story 20.193, #1338) — see
+                    # `draft_resume.brief_binding` for why it is not `different`.
+                    return _dr.confirmation(run_id, os.path.join(base, run_id),
+                                            state,
+                                            _dr.binding_note(run_id, binding))
+                if fresh or binding == _dr.BINDING_DIFFERENT:
                     # Left untouched, reported, never deleted — by owner
                     # keystroke, or by brief data (#1207).
                     skipped, other_brief = run_id, not fresh
