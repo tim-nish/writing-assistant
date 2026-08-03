@@ -2613,38 +2613,10 @@ def _read_run_events(ws):
 
 
 def _cost_proxies(ws):
-    """Workspace-derivable cost proxies (#742). Output-token totals live in
-    harness transcripts this run cannot see, so the block is expressed over
-    what the workspace records: wall time, retries, judge rounds, subagents.
-    Substrate honesty: each proxy names its basis, and an absent basis reads
-    as absent, never as zero-cost."""
-    import datetime
-    events = _read_run_events(ws)
-    ts = []
-    for e in events:
-        try:
-            ts.append(datetime.datetime.fromisoformat(e["ts"]))
-        except (KeyError, ValueError):
-            pass
-    elapsed_min = round((max(ts) - min(ts)).total_seconds() / 60) if len(ts) >= 2 else None
-    retries = sum(1 for e in events if e.get("event") == "retry")
-    # A gate close record IS a judge round, observed rather than remembered
-    # (20.181) — so the fallback stops being what a live run reports.
-    judge_rounds = sum(1 for e in events if e.get("event") == "judge-round"
-                       or (e.get("event") == "close"
-                           and e.get("block") == "quality-gate"))
-    subagents = sum(1 for e in events if e.get("event") == "subagent")
-    jr_basis = "run-events.jsonl (judge-round events / quality-gate records)"
-    if judge_rounds == 0:
-        # Fallback basis: the judge artifact files the run wrote.
-        judge_rounds = len([f for f in os.listdir(ws) if f.startswith(
-            ("provenance-verdicts", "rubric-verdicts"))]) if os.path.isdir(ws) else 0
-        jr_basis = "verdict artifact files (no judging recorded in the journal)"
-    return {"elapsed_minutes": elapsed_min, "stage_retries": retries,
-            "judge_rounds": judge_rounds, "subagents": subagents,
-            "judge_rounds_basis": jr_basis,
-            "events_recorded": len(events),
-            "basis": "run-events.jsonl" + ("" if events else " (absent — proxies limited to judge artifacts)")}
+    """The run's cost proxies (#742) — the journal's own reader owns them
+    (relocated with story 20.195: this file is at its line ratchet and the
+    sanctioned remedy is moving code to the module that owns it)."""
+    return run_record.cost_proxies(ws)
 
 
 def cmd_cost_block(args):
@@ -4481,6 +4453,8 @@ def cmd_complete(args):
     except OSError as e:
         return product_error("canonical draft (drafts/{slug}.md)", args.draft,
                              f"cannot read the workspace draft: {e}")
+    if (_bare := _load("product_citation.py").complete_refusal(text)):  # backstop #1339
+        return product_error("canonical draft (drafts/{slug}.md)", args.draft, _bare)
     try:
         canonical_path, canonical_sha = _persist_canonical(
             text, args.slug, args.root, create_out=getattr(args, "create_out", False),
