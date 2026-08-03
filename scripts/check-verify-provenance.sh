@@ -539,6 +539,74 @@ grep -qi 'never re-graded, pass or fail' "$SKILL" && grep -qi 'CARRIED FAIL' "$S
   && ok "20.170: stage3 states that an unchanged position is never re-graded, pass or fail" \
   || err "stage3.md does not state the symmetric carry"
 
+# --- Story 20.207 (#1389): the key includes the MAP ROW ----------------------
+# The observed defect: re-classifying a position IS the fix for "narration
+# asserts a checkable claim with no citation", so the remedy leaves the sentence
+# byte-identical. Under the (position, text) key the FAIL carried, its reason
+# talking about a `narration` class the map no longer declared — and because the
+# carry also removes carried positions from the worklist, the judge could never
+# be asked to retire it.
+kws="$work/kws"; mkdir -p "$kws"
+printf '{}\n' > "$kws/checkpoint.json"
+cp "$work/sh-draft.md" "$kws/draft.md"
+cp "$work/sh-map.txt" "$kws/provenance-map.txt"
+KH=$(python3 -c "import hashlib;print(hashlib.sha256(open('$kws/draft.md',encoding='utf-8').read().encode()).hexdigest())")
+kvp() { python3 "$VP" --map "$kws/provenance-map.txt" --draft "$kws/draft.md" "$@"; }
+
+kvp --list-narration >/dev/null 2>&1
+{ printf 'attestation: draft-sha256=%s\ngraded: P1.S1,P1.S2,P1.S3\n' "$KH"
+  printf 'P1.S2: narration asserts a specific, checkable claim with no citation\n'; } \
+  > "$kws/provenance-verdicts.txt"
+kvp --judge-findings "$kws/provenance-verdicts.txt" >/dev/null 2>&1 || true
+
+# AC-1 — the recorded row carries a map-row hash as its own column.
+awk -F'\t' '/^P1\.S2\t/ && NF >= 7 && length($7) == 64 { found = 1 } END { exit !found }' \
+  "$kws/provenance-ledger.tsv" \
+  && ok "20.207: the ledger row carries sha256(map row) as its own column" \
+  || err "20.207: no map-row hash column in the ledger row: $(grep '^P1.S2' "$kws/provenance-ledger.tsv")"
+
+# AC-2 — THE REGRESSION. Reclassify P1.S2 narration -> sourced with a pointer,
+# leaving the sentence byte-identical, and it must RE-GRADE rather than carry.
+before=$(grep -c '^P1\.S2' "$kws/provenance-map.txt" || true)
+sed -i 's/^\(P1\.S2[^:]*\): *narration.*$/\1: sourced <- 1afcac4/' "$kws/provenance-map.txt"
+[ "$before" -eq 1 ] && grep -q '^P1\.S2.*sourced <- 1afcac4' "$kws/provenance-map.txt" \
+  || err "20.207 fixture did not reclassify P1.S2 — the regression would pass vacuously"
+git_unchanged=$(python3 -c "import hashlib;print(hashlib.sha256(open('$kws/draft.md',encoding='utf-8').read().encode()).hexdigest())")
+[ "$git_unchanged" = "$KH" ] \
+  && ok "20.207: the draft is byte-identical across the reclassification (the defect's precondition)" \
+  || err "the fixture edited the draft — that is not the case #1389 reports"
+out=$(kvp --list-sourced 2>&1 >/dev/null)
+# The DISCLOSURE is the evidence, not the absence of a string on a stream that
+# never carries it: pre-#1389 this reads `1 carried (0 pass, 1 fail)`, because
+# the stale FAIL matched on (position, text) alone.
+printf '%s' "$out" | grep -q 'ledger carry: 0 carried' \
+  && ok "20.207: the reclassified position is re-graded, not carried — the disclosure says so" \
+  || err "20.207: the reclassified position was still carried: $out"
+kvp --list-sourced 2>/dev/null | grep -q '^P1\.S2' \
+  && ok "20.207: the reclassified position is back in the emitted worklist and is gradeable" \
+  || err "20.207: the position is neither carried nor listed — it is unreachable by the judge"
+
+# AC-4 — a pre-#1389 ledger row (no map-row column) is NOT matched on a partial
+# key. It re-grades, and the degradation is DISCLOSED by count.
+lws="$work/lws"; mkdir -p "$lws"
+printf '{}\n' > "$lws/checkpoint.json"
+cp "$work/sh-draft.md" "$lws/draft.md"
+cp "$work/sh-map.txt" "$lws/provenance-map.txt"
+LSEG=$(python3 "$VP" --map "$lws/provenance-map.txt" --draft "$lws/draft.md" --list-narration 2>/dev/null \
+       | awk -F': ' '/^P1.S2 /{sub(/^[^:]*: /,""); print; exit}')
+LSEGH=$(python3 -c "import hashlib,sys;print(hashlib.sha256(sys.argv[1].encode()).hexdigest())" "$LSEG")
+printf '# legacy ledger\nP1.S2\t%s\tfail\tdeadbeef\tnarration asserts a checkable claim\tr1\n' \
+  "$LSEGH" > "$lws/provenance-ledger.tsv"
+out=$(python3 "$VP" --map "$lws/provenance-map.txt" --draft "$lws/draft.md" --list-narration 2>&1 >/dev/null)
+printf '%s' "$out" | grep -q 'predate the map-row key' \
+  && ok "20.207: a pre-#1389 ledger row is disclosed by count, never silently dropped" \
+  || err "20.207: the legacy-row degradation was silent: $out"
+# Pre-#1389 this same fixture reads `1 carried (0 pass, 1 fail), 2 re-graded` —
+# the partial-key match in the flesh. Nothing may carry off a legacy row.
+printf '%s' "$out" | grep -q 'ledger carry: 0 carried' \
+  && ok "20.207: a legacy row re-grades rather than matching on (position, text) alone" \
+  || err "20.207: a legacy row was matched on a PARTIAL key — the silent carry #1389 forbids: $out"
+
 if [ "$fail" -eq 0 ]; then
   printf '\nAll verify-provenance checks passed.\n'; exit 0
 else

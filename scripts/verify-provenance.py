@@ -160,6 +160,36 @@ def parse_map(text):
     return entries
 
 
+def map_row_hashes(text):
+    """`{pos: sha256(normalised authored map row)}` — the third component of
+    the #1389 verdict key.
+
+    THE RAW AUTHORED LINE, not a canonicalised set. A map row is already a
+    single line (`P1.S1[L7]: sourced episode <- <sha>`), so there is no set to
+    order and normalisation is whitespace only: internal runs collapse to one
+    space and the ends are stripped, so re-indenting a map does not re-grade a
+    draft. A pointer REORDER therefore changes the hash and re-grades, which is
+    what AC-2 requires — the verdict was reached against the pointers in the
+    order the judge read them.
+
+    Walks the text itself rather than reusing `parse_map`'s tuples, because the
+    hash is over the authored bytes and `parse_map` has already discarded them.
+    Malformed lines are skipped silently here; `parse_map` is the authority
+    that refuses them, and duplicating the refusal would give one contract two
+    enforcement copies."""
+    rows = {}
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        m = PROV_LINE.match(line)
+        if not m:
+            continue
+        norm = " ".join(line.split())
+        rows[m.group("pos")] = hashlib.sha256(norm.encode("utf-8")).hexdigest()
+    return rows
+
+
 def segment_draft(draft_text):
     """The DETERMINISTIC segmentation that defines `P{n}.S{m}` positions
     (Story 19.16, #755): the single authority both the map author and the
@@ -493,11 +523,22 @@ def position_text(pos, anchor, seg_by_pos, draft_lines):
     return seg_by_pos.get(pos) or anchored_text(anchor, draft_lines)
 
 
-def verdict_key(pos, text):
-    """`(position, sha256 of that position's segmented sentence text)` — the
-    #1287 key. Not the draft hash: a draft hash moves on every edit anywhere,
-    which is exactly why nine rounds re-graded text nobody had touched."""
-    return (pos, hashlib.sha256(text.encode("utf-8")).hexdigest())
+def verdict_key(pos, text, map_row_hash=""):
+    """`(position, sha256(segmented sentence), sha256(map row))` — the #1287
+    key WIDENED to the map row (#1389).
+
+    Not the draft hash: a draft hash moves on every edit anywhere, which is
+    exactly why nine rounds re-graded text nobody had touched. But text alone
+    was too narrow in the other direction — re-classifying a position IS the
+    fix for "narration asserts a checkable claim with no citation", so the
+    remedy left the text byte-identical and the carried FAIL answered a
+    question the map had stopped asking. Because the carry also removes carried
+    positions from the worklist, the judge could never be asked to retire it.
+
+    `map_row_hash` defaults to empty so a caller with no map in hand keys
+    exactly as before; the ledger's own reader treats an empty component as
+    legacy and refuses to match it (see `read_ledger`)."""
+    return (pos, hashlib.sha256(text.encode("utf-8")).hexdigest(), map_row_hash)
 
 
 def resolve_ledger(explicit, map_path):
@@ -517,15 +558,26 @@ def resolve_ledger(explicit, map_path):
 
 
 def read_ledger(path):
-    """{(pos, texthash): (outcome, reason)} or (None, reason).
+    """`({(pos, texthash, maprowhash): (outcome, reason)}, None, legacy)` or
+    `(None, reason, 0)`.
 
-    Append-only TSV: `pos<TAB>texthash<TAB>pass|fail<TAB>draft-sha256<TAB>reason`.
-    Later rows never overwrite earlier ones — FIRST-WINS is the carry rule
-    itself: the held verdict stands and a disagreeing one is disclosed, never
-    absorbed."""
+    Append-only TSV: `pos<TAB>texthash<TAB>pass|fail<TAB>draft-sha256<TAB>
+    reason<TAB>round<TAB>maprowhash`. Later rows never overwrite earlier ones —
+    FIRST-WINS is the carry rule itself: the held verdict stands and a
+    disagreeing one is disclosed, never absorbed.
+
+    **A row written before #1389 carries no map-row component and is NOT
+    loaded** (AC-4). It is counted and returned as `legacy` so the caller can
+    disclose the resulting re-grade by name. Keying such a row on the pair
+    alone would be a match on a PARTIAL key — precisely the silent carry
+    against an unknown map row this widening exists to stop — and dropping it
+    without a count would make the re-grade look like an ordinary first round.
+    The format stays append-only, so a mixed ledger is read exactly this way:
+    post-change rows carry, pre-change rows re-grade, and the split is
+    reported."""
     if not os.path.exists(path):
-        return None, f"no verdict ledger yet at {path} (first judge round of this run)"
-    held = {}
+        return None, f"no verdict ledger yet at {path} (first judge round of this run)", 0
+    held, legacy = {}, 0
     try:
         for lineno, raw in enumerate(open(path, encoding="utf-8"), 1):
             ln = raw.rstrip("\n")
@@ -534,11 +586,15 @@ def read_ledger(path):
             parts = ln.split("\t")
             if len(parts) < 4 or parts[2] not in ("pass", "fail"):
                 return None, (f"verdict ledger {path} is malformed at line {lineno} "
-                              "— a ledger that cannot be trusted is not used")
-            held.setdefault((parts[0], parts[1]), (parts[2], parts[4] if len(parts) > 4 else ""))
+                              "— a ledger that cannot be trusted is not used"), 0
+            if len(parts) < 7 or not parts[6].strip():
+                legacy += 1
+                continue
+            held.setdefault((parts[0], parts[1], parts[6].strip()),
+                            (parts[2], parts[4] if len(parts) > 4 else ""))
     except OSError as e:
-        return None, f"verdict ledger {path} is unreadable: {e}"
-    return held, None
+        return None, f"verdict ledger {path} is unreadable: {e}", 0
+    return held, None, legacy
 
 
 def round_id(att_hash, verdict_lines):
@@ -557,22 +613,24 @@ def round_id(att_hash, verdict_lines):
 
 
 def append_ledger(path, rows, rid=""):
-    """Append (pos, texthash, outcome, draft_hash, reason) rows, tagged `rid`. Best-effort:
-    an unwritable ledger degrades the NEXT round to a disclosed full grade, and
-    must never fail a gate the judge already decided."""
+    """Append (pos, texthash, outcome, draft_hash, reason, maprowhash) rows,
+    tagged `rid`. Best-effort: an unwritable ledger degrades the NEXT round to
+    a disclosed full grade, and must never fail a gate the judge already
+    decided."""
     if not rows:
         return None
     try:
         new = not os.path.exists(path)
         with open(path, "a", encoding="utf-8") as fh:
             if new:
-                fh.write("# provenance verdict ledger (Story 20.170, #1287) — "
+                fh.write("# provenance verdict ledger (Story 20.170, #1287; "
+                         "key widened to the map row, Story 20.207, #1389) — "
                          "run-scoped, append-only, first-wins.\n"
                          "# position\tsha256(segmented sentence)\tpass|fail\t"
-                         "draft-sha256\treason\tround\n")
-            for pos, th, outcome, dh, reason in rows:
+                         "draft-sha256\treason\tround\tsha256(map row)\n")
+            for pos, th, outcome, dh, reason, mrh in rows:
                 clean = " ".join((reason or "").split())
-                fh.write(f"{pos}\t{th}\t{outcome}\t{dh}\t{clean}\t{rid}\n")
+                fh.write(f"{pos}\t{th}\t{outcome}\t{dh}\t{clean}\t{rid}\t{mrh}\n")
     except OSError as e:
         return f"verdict ledger {path} could not be written: {e}"
     return None
@@ -658,10 +716,14 @@ def main(argv=None):
     args = p.parse_args(argv)
 
     try:
-        entries = parse_map(_read(args.map))
+        map_text = _read(args.map)
+        entries = parse_map(map_text)
     except ValueError as e:
         sys.stderr.write(f"error: {e}\n")
         return 2
+    # Hashed once here and threaded to both carry sites: the map is read from
+    # a path that may be stdin, so re-reading it is not available (#1389).
+    map_rows = map_row_hashes(map_text)
 
     draft_lines = _read(args.draft).splitlines() if args.draft else None
 
@@ -698,16 +760,22 @@ def main(argv=None):
         # leaves the worklist; the fail half is the load-bearing one.
         if args.draft:
             ledger_path, why = resolve_ledger(args.ledger, args.map)
-            held = None
+            held, legacy = None, 0
             if ledger_path is not None:
-                held, why = read_ledger(ledger_path)
+                held, why, legacy = read_ledger(ledger_path)
             if held is None:
                 sys.stderr.write(f"ledger carry unavailable — full re-grade: {why}\n")
             else:
+                if legacy:
+                    sys.stderr.write(
+                        f"  {legacy} ledger row(s) predate the map-row key (#1389) "
+                        "and are NOT carried — they re-grade rather than match on a "
+                        "partial key\n")
                 keep, n_pass, n_fail = [], 0, 0
                 for e in listed:
                     text = position_text(e[0], e[3], seg_by_pos, draft_lines)
-                    prior = held.get(verdict_key(e[0], text)) if text else None
+                    prior = (held.get(verdict_key(e[0], text, map_rows.get(e[0], "")))
+                             if text else None)
                     if prior is None:
                         keep.append(e)
                         continue
@@ -872,13 +940,17 @@ def main(argv=None):
         # carried verdict stands and a disagreeing one is DISCLOSED BY NAME,
         # for the reason the concatenation refusal gives — whichever verdict
         # won, one of them would have ridden in unexamined.
-        keys = {pos: verdict_key(pos, position_text(pos, anchor, seg_by_pos, draft_lines))
+        # The key is (position, sentence hash, MAP ROW hash) since #1389: a
+        # re-classification leaves the sentence byte-identical, so text alone
+        # carried a verdict about a class the map no longer declares.
+        keys = {pos: verdict_key(pos, position_text(pos, anchor, seg_by_pos, draft_lines),
+                                 map_rows.get(pos, ""))
                 for pos, _c, _p, anchor, _t in entries
                 if position_text(pos, anchor, seg_by_pos, draft_lines)}
         ledger_path, why = resolve_ledger(args.ledger, args.map)
-        held = None
+        held, legacy = None, 0
         if ledger_path is not None:
-            held, why = read_ledger(ledger_path)
+            held, why, legacy = read_ledger(ledger_path)
         if held is None:
             sys.stderr.write(f"ledger carry unavailable — full re-grade: {why}\n")
             held = {}
@@ -887,6 +959,10 @@ def main(argv=None):
                     "  cannot-determine: this round's hand-off carried "
                     f"{len(carried)} position(s) whose verdicts the ledger cannot "
                     "produce — their carried outcomes are neither pass nor fail here\n")
+        elif legacy:
+            sys.stderr.write(
+                f"  {legacy} ledger row(s) predate the map-row key (#1389) and are "
+                "NOT carried — they re-grade rather than match on a partial key\n")
         disagreements = []
         for pos, reason in round_fail.items():
             prior = held.get(keys.get(pos))
@@ -917,7 +993,8 @@ def main(argv=None):
             rows = [(pos, keys[pos][1],
                      "fail" if pos in round_fail else "pass",
                      att_hash or "",
-                     round_fail.get(pos, ""))
+                     round_fail.get(pos, ""),
+                     keys[pos][2])
                     for pos in sorted(graded)
                     if pos in keys and pos not in discarded and keys[pos] not in held]
             err = append_ledger(ledger_path, rows,
