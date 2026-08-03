@@ -190,6 +190,23 @@ def map_row_hashes(text):
     return rows
 
 
+_URL_SPAN = re.compile(r"(?:https?|ftp)://[^\s<>\")\]]+")
+
+
+def _mask_urls(text):
+    """`text` with `.!?` inside URL spans replaced by a neutral character.
+
+    EQUAL LENGTH by construction, so every offset the caller computes against
+    the mask is valid against the original (#1399).
+    """
+    out = list(text)
+    for m in _URL_SPAN.finditer(text):
+        for i in range(m.start(), m.end()):
+            if out[i] in ".!?":
+                out[i] = "\x00"
+    return "".join(out)
+
+
 def segment_draft(draft_text):
     """The DETERMINISTIC segmentation that defines `P{n}.S{m}` positions
     (Story 19.16, #755): the single authority both the map author and the
@@ -239,13 +256,25 @@ def segment_draft(draft_text):
         for ln, l in para:
             offs.append((pos, pos + len(l), ln))
             pos += len(l) + 1
-        sents = list(re.finditer(r"[^.!?]*[.!?](?=\s|$)", text)) or [re.match(r".*", text)]
+        # URL-AWARE (#1399). A period inside a hostname or path is not a
+        # sentence boundary, and the pattern below cannot start a match at one:
+        # `[^.!?]*` stops at the `.` in `github.com`, the lookahead rejects the
+        # following character, and `finditer` then skips forward and begins the
+        # "sentence" MID-URL, silently discarding the prefix. Any draft citing a
+        # link got a mangled skeleton, which the map anchors and the judge is
+        # asked to grade. Mask the terminators inside URL spans with a character
+        # the pattern treats as ordinary text; the mask is EQUAL LENGTH, so
+        # offsets — and therefore line anchors — are untouched, and the emitted
+        # sentence is sliced from the ORIGINAL text.
+        masked = _mask_urls(text)
+        sents = list(re.finditer(r"[^.!?]*[.!?](?=\s|$)", masked)) or [re.match(r".*", masked)]
         for si, m in enumerate(sents, 1):
             st = m.start()
+            sent = text[m.start():m.end()]
             while st < len(text) and text[st] == " ":
                 st += 1
             ln = next((l for a, b, l in offs if a <= st <= b), para[0][0])
-            out.append((f"P{pi}.S{si}", ln, m.group(0).strip()))
+            out.append((f"P{pi}.S{si}", ln, sent.strip()))
     return out
 
 
