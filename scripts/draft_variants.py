@@ -115,13 +115,38 @@ def _load_rws():
 
 
 def _read_pin_ledger(path):
-    """The run's declared pointer set, read from `$WS/examination-pins.txt` —
+    """The run's declared pointer set — the SUPERSET when one exists.
+
+    THE SUPERSET IS PREFERRED MECHANICALLY (Story 20.204, #1376). The pin
+    ledger is DERIVED FROM EXAMINATION RECORDS ONLY (`examine.derive_ledger`),
+    so a brief record's journey-arc cites — declared source material carried
+    BESIDE the host-repo sources — can never appear in it by construction. The
+    per-section evidence-type check then reported `cannot-determine` for every
+    arc-carrying section, on two consecutive runs, with the identical cause: a
+    superset file existed and the check read the subset.
+
+    So when `declared-pointers.txt` sits beside the ledger it is read INSTEAD,
+    and the substitution is disclosed on stderr. Doing this here rather than by
+    instructing a caller to pass a different path is deliberate: a prose duty is
+    what failed, and an agent that forgets the flag reproduces the defect
+    exactly. A workspace with no superset behaves precisely as before.
+
+    Original contract, unchanged for the subset case: the SAME file stage 3
+    hands `verify-provenance` as `--fact-sheet`
     the SAME file stage 3 hands `verify-provenance` as `--fact-sheet`
     (`skills/draft-article/stages/stage3.md`; the flag name predates #1182 and
     was retained on purpose). Same one-pointer-per-line, `#`-comment grammar
     `verify-provenance._load_set` reads, because it is the same file. This
     creates NO store and appends nothing: the ledger stays DERIVED from the
     examination records in claim order (`scripts/examine.py:607-635`)."""
+    superset = os.path.join(os.path.dirname(os.path.abspath(path)),
+                            "declared-pointers.txt")
+    if os.path.exists(superset) and os.path.abspath(superset) != os.path.abspath(path):
+        sys.stderr.write(
+            f"pin ledger: reading the declared superset {superset} instead of "
+            f"{path} — arc cites and interview ids are declared pointers the "
+            "examination-derived ledger cannot carry (#1376)\n")
+        path = superset
     with open(path, encoding="utf-8") as fh:
         return {ln.strip() for ln in fh
                 if ln.strip() and not ln.strip().startswith("#")}
