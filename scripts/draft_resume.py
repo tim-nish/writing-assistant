@@ -168,11 +168,19 @@ def brief_binding(state, brief):
 
 
 def binding_note(run_id, binding):
-    """The one-line receipt for a binding that is not `same`."""
+    """The receipt for a binding that is not `same`.
+
+    THE ABSENT FORM IS A FRAGMENT, NOT A SENTENCE (#1350), because
+    `confirmation` composes it into one — `f"It {why}, so adopting it
+    silently ..."` — under `draft_gates.payload`'s 200-char `why` budget. The
+    first version was a standalone sentence: over budget, so every absent
+    binding raised out of `stage0`, and ungrammatical in the slot besides. The
+    other producer of this slot, `predates_sitting`, returns a fragment; the
+    difference was untyped, so the fixture now asserts the COMPOSITION rather
+    than the note.
+    """
     if binding == BINDING_ABSENT:
-        return (f"no brief binding recorded (#1338): in-progress run {run_id} "
-                "carries no recorded brief, which is not evidence of a "
-                "different one — the run is offered rather than skipped")
+        return "records no brief binding, which is not evidence of a different one"
     return fresh_note(run_id, True)
 
 

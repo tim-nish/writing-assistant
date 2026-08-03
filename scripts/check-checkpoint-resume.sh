@@ -458,6 +458,25 @@ check(dp.predates_sitting("not-a-timestamp", st, None)[0] is True,
       "#1082: an unparseable run id is cannot-determine and is confirmed, "
       "never adopted")
 
+# THE COMPOSITION IS WHAT THE BUDGET BINDS (#1350). `confirmation` builds its
+# `why` field by composing whatever a producer returns into one sentence, under
+# `draft_gates.payload`'s 200-char budget — so a producer returning a standalone
+# sentence raises out of stage0 for every run in that state. Asserted over every
+# producer of that slot, because a test of one note alone is exactly what missed
+# it: the note was fine on its own and only the composition was over.
+for _why in (dp.binding_note("20260803T111345-772701", dp.BINDING_ABSENT),
+             dp.predates_sitting("20260701T010101-1", st, None)[1],
+             dp.predates_sitting("not-a-timestamp", st, None)[1]):
+    try:
+        _built = dp.confirmation("20260803T111345-772701", "/tmp/x",
+                                 {"next_stage": "probe"}, _why)
+    except Exception as e:                       # noqa: BLE001 — the defect shape
+        check(False, "#1350: confirmation could not compose a payload from "
+                     "%r: %s" % (_why[:40], e))
+    else:
+        check(bool(_built["items"][0]["why"]),
+              "#1350: the composed `why` is present for %r" % (_why[:40],))
+
 sys.exit(1 if fail else 0)
 PY104
 
