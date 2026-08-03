@@ -152,8 +152,14 @@ art = b.get("artifact") or {}
 check(art.get("path") == os.path.join(w, "ws", "brief.json")
       and os.path.isfile(art["path"]),
       "the composed brief is WRITTEN, and the path is stated to the owner")
-check(art.get("id") == "brief" and "brief-open" in (art.get("reopen") or ""),
-      "the artifact carries its identity and how to re-open it")
+# THE IDENTITY IS THE STABLE ID, not the `--out` basename (Story 20.191,
+# #1342). It used to be asserted as the literal "brief", which is a fact about
+# the workspace FILE; the Brief's identity is now a digest of its pin and
+# composition, so it survives relocation into the durable home and a re-open.
+check(str(art.get("id") or "").startswith("brief-")
+      and len(art["id"]) > len("brief-")
+      and "brief-open" in (art.get("reopen") or ""),
+      "the artifact carries its identity — a STABLE id — and how to re-open it")
 # AC4 — re-openable. The contrast with the View is the point, so assert the
 # reader exists AND that no rendering gained a cache alongside it.
 r = json.load(open(w + "/brief-reopened.json"))

@@ -108,6 +108,12 @@ clause on this page, and append new amendments there rather than here.
       storage seam — never composed into a host working tree;
     - the lifecycle is **stated on the surface**: composed → inspected →
       adopted, with the current state legible at the gate.
+    *(The artifact's LOCATION in the second bullet is superseded in part by
+    the **2026-08-03** amendment (#1331/#1342): the durable copy lands in the
+    Brief's own home — a directory in a repository, addressed by the Brief's
+    stable id — and the run-workspace copy stays beside it. Nothing else in
+    this clause moves; the ratified text above is unedited, per the
+    pointer-not-copy rule.)*
     Format, artifact path and the step's name are this consumer's to choose;
     the hub ratified the boundary property only. **The never-read-back rule
     does not bind here, and the difference is the point:** a View is a
