@@ -132,10 +132,22 @@ rm -f /tmp/sf_err.$$ "$hostwork/writing-sources.yaml"
 #    runs/ workspace path. check-*.sh are test harnesses that reference these
 #    patterns to assert the resolver's behaviour, not to build production
 #    paths, so they are excluded.
+#
+#    ONE MORE EXEMPTION, NARROW BY CONSTRUCTION (#1366, story 20.200):
+#    `run-checks.sh` may name XDG_STATE_HOME, and nothing else may. The runner
+#    SETS the variable the resolver reads — `XDG_STATE_HOME="$CHECK_SANDBOX"`
+#    per spawn — rather than COMPOSING a path from it, which is the act this
+#    assertion exists to catch. D1's fixture-isolation clause mandates exactly
+#    that set, so without this exemption the check forbids the fix its own
+#    document requires. The exemption is keyed to the one file AND the one
+#    token: `.local/state` and hand-built `runs/` paths still fail there, and
+#    every other file still fails on all four patterns. Widening it to the
+#    whole file, or to a second file, needs its own reason.
 pat='\.local/state|XDG_STATE_HOME|runs/[^ )"'"'"']*<|runs/<run'
 offenders=$(grep -REnoI "$pat" skills scripts 2>/dev/null \
   | grep -v '/__pycache__/' \
   | grep -v '^scripts/resolve-paths.py:' \
+  | grep -v '^scripts/run-checks.sh:[0-9]*:XDG_STATE_HOME$' \
   | grep -v '^scripts/check-[^:]*\.sh:' || true)
 if [ -z "$offenders" ]; then
   ok "single-source: no state/workspace path literal outside resolve-paths.py"
