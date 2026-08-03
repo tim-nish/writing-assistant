@@ -99,10 +99,20 @@ for tok in tokenize.generate_tokens(io.StringIO(src).readline):
     out.append(tok.string)
 print(" ".join(out))
 PYEOF
+  # The #1410 gate CARRIER tokens are exempted BY NAME (Story 20.211): the
+  # brief's structure gate carries composition inputs and requirements while
+  # authoring no candidate — `composed: false` is literal, and the
+  # check-terrain-theses-inner.sh 20.211 section asserts "no candidate is
+  # authored at the gate", which is the coverage this exemption would
+  # otherwise remove. The single-proposer invariant survives re-based: one
+  # owner decision, at the brief; stage-3 is the brief-less fallback and is
+  # not re-raised over an adopted structure.
+  sed -E 's/structure_candidates_block|_composed_structures|structures_block|structure_candidates|STRUCTURE_OPTION_LABEL|_structure_line|structure_framework_matched|structures_recording/CARRIER_TOKEN/g' \
+    "$work/code.py" > "$work/code-exempt.py"
   grep -qiE 'narrative structure|structure candidate|compose.*structure|section_plan|outline' \
-    "$work/code.py" \
+    "$work/code-exempt.py" \
     && err "$src composes narrative structures (18.45 single-proposer invariant)" \
-    || ok "$src composes no narrative structures"
+    || ok "$src composes no narrative structures (carrier plumbing exempted by name, #1410)"
 done
 
 

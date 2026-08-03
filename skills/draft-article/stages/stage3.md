@@ -39,12 +39,12 @@ filling any slot, compose an explicit **argument plan** from the fact sheet
   pointer) it will draw on. A framework governs each section's **content
   obligations, not its literal heading structure**.
 
-**Narrative-structure choice — propose 2-3 candidate structures (CAP-4, Story
-18.26, #503).** A framework's **narrative structure is owner editorial intent
-per artifact, never a hardened tool default**. Before settling the arc, the
-sub-step **proposes 2-3 candidate structures** for the selected elements and
-lets the owner choose. Get the candidates from the selected elements' evidence
-kinds:
+**Narrative-structure choice (CAP-4, Story 18.26, #503) — not re-raised when
+the Brief carries an adopted structure (20.211, #1410): asked exactly once,
+so carry it into the argument plan's arc and skip this sub-step.** Narrative
+structure is owner editorial intent per artifact, never a hardened tool
+default. As the brief-less fallback, propose **2-3 candidate structures** and
+let the owner choose — from the selected elements' evidence kinds:
 
 ```
 python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py structures <<< '{"elements":[{"id":…,"kinds":["chronology",…],"dominant_incident":false}, …]}'
