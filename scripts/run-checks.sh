@@ -502,6 +502,36 @@ fi
 CHECK_SANDBOX=$(mktemp -d 2>/dev/null) || CHECK_SANDBOX=''
 [ -n "$CHECK_SANDBOX" ] && trap 'rm -rf "$CHECK_SANDBOX"' EXIT INT TERM
 
+# --- interpreter resolution (#1380) ------------------------------------------
+# THE INTERPRETER IS RESOLVED ONCE PER RUN, NOT ONCE PER SPAWN. Checks invoke
+# `python3` by name on 1,545 lines, and where that name resolves through a
+# version-manager shim every one of those pays the shim's dispatch on top of
+# real startup: measured 79ms against 17ms for the interpreter the shim itself
+# selects, across 2,428 spawns in one full tier — ~150s of summed work, 31% of
+# FULL_TOTAL_MS, for nothing.
+#
+# The fix is RESOLUTION, not batching. #944 recorded interpreter batching as the
+# third remedy and deferred it pending evidence, and #957 called it spent on the
+# strength of one work-dominated check (check-topic-map, ~19% startup). That
+# reading was right about that check and does not generalise — the heaviest
+# families here measure 70-80% startup — but the remedy it implies (restructure
+# how checks execute) is still not needed. Resolving the name once is enough,
+# and it changes NO call site.
+#
+# `sys.executable` is the binary `python3` would have run anyway, so where there
+# is no shim this is a no-op rather than a substitution: same file, one less
+# indirection. It rides the PATH exported per spawn beside the sandbox above.
+PY_DIR=''
+if [ -n "$CHECK_SANDBOX" ]; then
+  _py=$(python3 -c 'import sys; print(sys.executable)' 2>/dev/null || true)
+  if [ -n "$_py" ] && [ -x "$_py" ] && [ "$_py" != "$(command -v python3)" ]; then
+    PY_DIR="$CHECK_SANDBOX/.py"
+    mkdir -p "$PY_DIR" && ln -sf "$_py" "$PY_DIR/python3" || PY_DIR=''
+  fi
+fi
+CHECK_PATH="$PATH"
+[ -n "$PY_DIR" ] && CHECK_PATH="$PY_DIR:$PATH"
+
 fails=0; ran=0; skipped=0; total_ms=0; fam_ms=0; union_ms=0
 
 # Per-check rows for the ledger (#1354). Tab-separated and assembled into one
@@ -601,7 +631,7 @@ if [ "$PARALLEL" -gt 0 ]; then
       read -r _tok <&9
       (
         c0=$(date +%s%N)
-        XDG_STATE_HOME="$CHECK_SANDBOX" timeout "$FULL_TIMEOUT_S" sh "$f" >/dev/null 2>&1
+        PATH="$CHECK_PATH" XDG_STATE_HOME="$CHECK_SANDBOX" timeout "$FULL_TIMEOUT_S" sh "$f" >/dev/null 2>&1
         crc=$?
         c1=$(date +%s%N)
         printf '%s %s\n' "$(( (c1 - c0) / 1000000 ))" "$crc" > "$tmpd/r.$n"
@@ -624,7 +654,7 @@ if [ "$PARALLEL" -gt 0 ]; then
 
   for f in $rest; do
     t0=$(date +%s%N)
-    XDG_STATE_HOME="$CHECK_SANDBOX" timeout "$FULL_TIMEOUT_S" sh "$f" >/dev/null 2>&1
+    PATH="$CHECK_PATH" XDG_STATE_HOME="$CHECK_SANDBOX" timeout "$FULL_TIMEOUT_S" sh "$f" >/dev/null 2>&1
     rc=$?
     t1=$(date +%s%N)
     report "$f" "$(( (t1 - t0) / 1000000 ))" "$rc"
@@ -647,7 +677,7 @@ else
       esac
     fi
     t0=$(date +%s%N)
-    XDG_STATE_HOME="$CHECK_SANDBOX" timeout "$FULL_TIMEOUT_S" sh "$f" >/dev/null 2>&1
+    PATH="$CHECK_PATH" XDG_STATE_HOME="$CHECK_SANDBOX" timeout "$FULL_TIMEOUT_S" sh "$f" >/dev/null 2>&1
     rc=$?
     t1=$(date +%s%N)
     report "$f" "$(( (t1 - t0) / 1000000 ))" "$rc" "$promoted"
