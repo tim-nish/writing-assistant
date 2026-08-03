@@ -236,6 +236,79 @@ OUT=$(python3 "$ROOT/scripts/hooks/stop-gate-carrier.py" --run-finding "$RWS")
   && ok "a run that determined something is NOT reported as the finding" \
   || err "a determined run was reported as all-indeterminate: $OUT"
 
+# --- 8. A CRASH IN THE AUDIT REPORTS AS A CRASH (#1336) ----------------------
+# The defect: a real finding and an exception both leave the auditor at a
+# non-zero exit, so a KeyError reached the owner worded as a confirmed policy
+# breach ("the ask reached the owner as prose") on three consecutive stops.
+# The discriminator is that a finding prints its verdict object first and a
+# crash prints none. Asserted over the decision function rather than through a
+# stand-in auditor: an environment override whose only writer is a fixture is
+# the dead-input shape this repository refuses.
+if python3 - "$ROOT" <<'PYEOF'
+import importlib.util, os, sys
+spec = importlib.util.spec_from_file_location(
+    "hook", os.path.join(sys.argv[1], "scripts", "hooks", "stop-gate-carrier.py"))
+h = importlib.util.module_from_spec(spec); spec.loader.exec_module(h)
+
+TB = ('Traceback (most recent call last):\n'
+      '  File "gate-inventory.py", line 219, in audit\n'
+      '    r["gate"] for r in rows\n'
+      "KeyError: 'gate'\n")
+
+# The observed shape: non-zero exit, traceback, NO verdict object.
+outcome, sig = h.audit_outcome(1, "", TB)
+assert outcome == "crash", outcome
+assert sig == "KeyError: 'gate'", sig
+
+# A real finding prints its verdict first, and stays a finding.
+found, _ = h.audit_outcome(1, '{"ok": false, "missing": ["thesis"]}\nBOUND: ...',
+                           "error: reached but never emitted: ['thesis']")
+assert found == "finding", found
+assert h.audit_outcome(0, '{"ok": true}', "")[0] is None
+
+# The message says crash, names the exception, and never carries the verdict.
+msg = h.crash_report(sig, 0)
+assert "gate audit crashed" in msg, msg
+assert "KeyError" in msg, msg
+assert "prose" not in msg, msg
+assert "x2" not in msg, msg
+
+# The rider: a repeat identifies as one, and the count climbs.
+assert "same crash as the previous turn (x2)" in h.crash_report(sig, 1)
+assert "(x4)" in h.crash_report(sig, 3)
+
+# Counted from the recorded rows, and a different signature ends the streak.
+import json, tempfile
+ws = tempfile.mkdtemp()
+with open(os.path.join(ws, "stop-gate-verdicts.jsonl"), "w") as f:
+    for _ in range(3):
+        f.write(json.dumps({"result": "cannot-determine", "crash": sig}) + "\n")
+assert h.prior_consecutive_crashes(ws, sig) == 3
+assert h.prior_consecutive_crashes(ws, "ValueError: other") == 0
+with open(os.path.join(ws, "stop-gate-verdicts.jsonl"), "a") as f:
+    f.write(json.dumps({"result": "clean"}) + "\n")
+assert h.prior_consecutive_crashes(ws, sig) == 0, "a clean turn must end the streak"
+PYEOF
+then
+  ok "a crashed audit reports AS a crash, names its exception, never carries the
+      missed-gate verdict, and a repeat identifies itself as repeating"
+else
+  err "the crash-vs-verdict split does not hold: an exception can still reach
+      the owner worded as a confirmed policy breach (#1336)"
+fi
+
+# A crashed turn is a cannot-determine turn, so the all-indeterminate run
+# finding still fires over a run of nothing but crashes.
+CRASHED="$REPRO/20260803T000000-000000"; mkdir -p "$CRASHED"
+printf '{"next_stage": "done"}' > "$CRASHED/checkpoint.json"
+printf '{"result":"cannot-determine","crash":"KeyError: 1"}\n{"result":"cannot-determine","crash":"KeyError: 1"}\n' \
+  > "$CRASHED/stop-gate-verdicts.jsonl"
+OUT=$(python3 "$ROOT/scripts/hooks/stop-gate-carrier.py" --run-finding "$CRASHED")
+printf '%s' "$OUT" | grep -q 'cannot-determine' \
+  && ok "a run whose every turn crashed surfaces as an all-indeterminate run —
+      evidence about the auditor, which is exactly what it is" \
+  || err "a run of crashes produced no all-indeterminate finding: $OUT"
+
 [ "$fail" -eq 0 ] || { echo; echo "stop-gate-carrier checks FAILED."; exit 1; }
 echo
 echo "stop-gate-carrier checks passed."
