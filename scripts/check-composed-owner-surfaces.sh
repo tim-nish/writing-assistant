@@ -4,7 +4,7 @@
 #
 # tier: inner
 # parallel-safe
-# covers: scripts/owner_surface.py skills/completion-summary.md
+# covers: scripts/owner_surface.py skills/completion-summary.md scripts/draft_gates.py
 # grep-binding: token — the one skill grep matches the composer call
 #   fragment ('owner_surface as o'), code-shaped, not relocatable prose.
 # removal-signal: this check retires when the relay layer itself becomes
@@ -114,6 +114,61 @@ for m in bad:
 sys.exit(1 if bad else 0)
 PY
 [ "$fail" -eq 0 ] && ok "a block gate carries its own banner and reply line; a selection gate refuses them"
+
+# THE HANDOVER IS A POSITION RULE (Story 20.194, #1335). The paths were emitted
+# on the run that reported them missing, so presence is not the property: what
+# is asserted is that both persisted paths are the FIRST thing in the block,
+# ahead of every bucket, rendered from `complete`'s JSON, and that a failed
+# `complete` produces no path line at all.
+python3 - <<'PY' || fail=1
+import json, sys
+sys.path.insert(0, "scripts")
+import owner_surface as o
+import draft_gates as dg
+
+bad = []
+D, P = "/w/articles/drafts/foo.md", "/w/articles/plans/foo.md"
+cj = json.dumps({"stage": "complete",
+                 "products": {"canonical": {"path": D}, "plan": {"path": P}}})
+
+out = o.completion_summary("Draft", notes=["n"], blockers=[], cleanup=[],
+                           next_step="Review, or stop?", complete_json=cj)
+head = out.split("\n\n", 1)[0]
+if D not in head or P not in head:
+    bad.append("the persisted product paths are not the summary's FIRST block "
+               "— position, not presence, is what #1335 reports")
+for path in (D, P):
+    if path + "\n" not in out and not out.rstrip().endswith(path):
+        bad.append(f"{path} is not alone on its line")
+if out.index(D) > out.index(o.BUCKETS[1]):
+    bad.append("a bucket precedes the handover block — the ordering against "
+               "publish blockers is declared, never incidental")
+
+blocked = o.completion_summary("Draft", blockers=["[VERIFY] left"],
+                               complete_json=cj)
+if "1 publish blocker" not in blocked.split("\n\n", 1)[0]:
+    bad.append("the handover block does not name the blocker count — a blocker "
+               "outranks the handover and the tie-break must be visible")
+
+try:
+    o.completion_summary("Draft", complete_json="error: completion gate: ...")
+    bad.append("a summary composed over a FAILED complete emitted a block — "
+               "there is no completion to hand over")
+except ValueError:
+    pass
+if o.product_handover(json.dumps({"products": {"canonical": {"path": D}}})):
+    bad.append("a handover rendered with only one product path")
+
+item = dg.review_entry_gate(D)["items"][0]
+if D not in item["where"]:
+    bad.append("the review/stop gate's `where` does not carry the draft path — "
+               "the handover must ride a payload the carrier can observe")
+
+for m in bad:
+    print("FAIL: %s" % m, file=sys.stderr)
+sys.exit(1 if bad else 0)
+PY
+[ "$fail" -eq 0 ] && ok "both persisted paths head the summary, ordered ahead of the buckets, and the review/stop gate carries the draft path"
 
 [ "$fail" -eq 0 ] && printf '\nAll %s checks passed.\n' "$0" \
   || { printf '\n%s FAILED.\n' "$0" >&2; exit 1; }

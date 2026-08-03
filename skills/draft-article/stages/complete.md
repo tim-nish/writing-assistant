@@ -142,10 +142,15 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/write-article-plan.py conformance \
 End every run with the shared
 [**completion summary**](../../completion-summary.md)
 (`${CLAUDE_PLUGIN_ROOT}/skills/completion-summary.md`): the three labelled buckets
-— **informational notes**, **publish blockers**, **optional cleanup** — followed
-by an explicit **next step presented as an in-conversation choice** (here: "run
-review-article on the draft / stop here" — interaction contract, CAP-6/#226:
-paths are reference information, never a required navigation step). Because
+— **informational notes**, **publish blockers**, **optional cleanup** — headed
+by the **product handover block** and followed by an explicit **next step
+presented as an in-conversation choice** (here: gate `review-entry`, composed
+by `draft_gates.review_entry_gate(<draft path>, ws=…, blockers=…)`, whose
+`where` carries the draft path). CAP-6/#226 is narrowed accordingly (amended
+2026-08-03, #1335): a path may not be a decision gate or stand in place of a
+choice, and naming the product this run just wrote is neither — at the terminal
+handover the product path is not reference information, it is the one thing the
+completion exists to hand over. Because
 this run produces an **article body**, the informational bucket includes a
 **reading-time estimate**:
 
@@ -171,11 +176,15 @@ existing budget-triage choice at a stage boundary when the configured
 `run_budget` thresholds (config; shipped defaults 120 min / 12 judge rounds)
 are crossed — an over-budget run is a decision, never archaeology.
 
-The informational bucket also names **both persisted product paths** —
-`drafts/<slug>.md` and `plans/<slug>.md`, copy-pasteable, taken verbatim from
-the `complete` subcommand's JSON (the dual-product completion gate, Story
-13.68). A run whose `complete` invocation failed has no completion to
-summarize: surface the gate's hard error instead.
+**Both persisted product paths** — `drafts/<slug>.md` and `plans/<slug>.md` —
+are the summary's **first block, before any bucket**, rendered from the
+`complete` subcommand's JSON by the composer (`complete_json=<complete's
+stdout>`; the dual-product completion gate, Story 13.68). They are no longer an
+informational-bucket item: on run 20260803T105759-992700 both products
+persisted and the owner still reported *"No file path was shown"*, because line
+2 of a bucket inside 17 lines is a position nobody reads. A run whose
+`complete` invocation failed has no completion to summarize: no path block is
+emitted, and the gate's hard error is surfaced instead.
 
 Any unresolved `[VERIFY]` marker or unrendered figure is a **publish blocker**,
 listed under that bucket and nowhere else. A run stopped by the interview→fill
