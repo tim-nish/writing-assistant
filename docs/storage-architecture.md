@@ -141,6 +141,21 @@ classes, split at the resolver:
 | **run workspaces** (`runs/<run-id>/`) and **debug artifacts** | the machine state root | machine-readable intermediates, caches and resumable state, which a human never opens by intent |
 | the **brief** (`brief.json` and its recompositions) | the run workspace, in the machine state root | machine-read state — the durable record of a selection decision, re-opened *through* `brief-open` and never by a human editing it. **The owner condition is part of this row and not a footnote to it: no owner act may require the owner to identify or type its filename.** The gate offers the continuation; a brief is named to a person by a DERIVED label (date, member set, thesis first words), never by a stored name and never by its path. The file does **not** move — it is machine-read state, and putting it where a human works would invite the hand-editing its lifecycle exists to replace (Story 20.93, #1048/#1049) |
 
+**Amended 2026-08-03 (#1331/#1342, SPEC-terrain amendments): the brief row's
+"the file does not move" is SUPERSEDED — the Brief has a durable home in a
+repository, addressed by a stable id.** What the row got right survives whole:
+the Brief is re-opened *through* `brief-open`, never by hand-editing, and no
+owner act may require the owner to identify or type a filename. What it got
+wrong is where that leaves the artifact — a per-run workspace keyed by
+recency, which this pipeline already distrusts in its own words (`brief_source`
+records **pins first** "because the path is a state-dir location that goes
+stale by relocation while still looking authoritative"). So:
+
+| class | where | why |
+|---|---|---|
+| the **Brief**, addressed by its **stable id** (a digest of its pin and composition) | `<terrain-repo-dir>/briefs/<id>.json` in the writing-assistant working tree — `resolve-paths.py terrain-briefs-dir` | it is the owner's DECISION and is re-opened by design, which is the same property that put the View in a working tree. The **directory listing IS the enumeration**: no index file is written, because an index over a directory is a derived second ledger holding what is recomputable from the directory itself |
+| the **workspace copy** (`brief.json` and its recompositions) | unchanged, in the run workspace | the within-sitting iteration chain lives there (`--from`/`--out`). Both copies are written by the one sanctioned writer from one record, so they are identical in content; **nothing is deleted**, and a Brief found in the old location is copied into the home with the migration stated, never silently |
+
 The split is the one already stated portfolio-wide — human-facing artifacts in
 the working repo, intermediates and resumable state in machine-state dirs
 (owner decision record — 2026-07-16 (artifacts live where the human works)).

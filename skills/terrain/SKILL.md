@@ -111,7 +111,7 @@ step files cite them and restate nothing.
 | **mint the run workspace** (above; the storage contract) | — (in this file) | `resolve-paths.py new-run --terrain --root <host-repo>` |
 | **assemble the map** (what the map carries; the tag and decision-topic axes; the served journey arc and its typed absence) | [`steps/map.md`](steps/map.md) | `terrain_map.py assemble --root <host-repo> > "$WS/map.json"` |
 | **the two screens** (Screen 1's axis payload; Screen 2's whole-member listing, group claim, journey markers and set selection; the Full Report over named group ids; navigation over held state; the size switch) | [`steps/screens.md`](steps/screens.md) | `topic-map-directions.py axis --map "$WS/map.json"` then `topic-map-directions.py member --map "$WS/map.json" --tag <member> --axis <tag\|topic>` |
-| **compose the brief, then a normal run** (brief composition; set recomposition; the coherence consultant's four rules; the named artifact and its lifecycle; the edit-set iteration loop and its retained compositions; the run mint's handoff) | [`steps/brief.md`](steps/brief.md) | `topic-map-directions.py brief --payloads "$WS/presented-payloads.jsonl" --map "$WS/map.json" --out "$WS/brief.json"` |
+| **compose the brief, then a normal run** (brief composition; set recomposition; the coherence consultant's four rules; the named artifact and its lifecycle; the edit-set iteration loop and its retained compositions; the run mint's handoff) | [`steps/brief.md`](steps/brief.md) | `topic-map-directions.py brief --payloads "$WS/presented-payloads.jsonl" --map "$WS/map.json" --out "$WS/brief.json" --home "$(resolve-paths.py terrain-briefs-dir)"` |
 | **the scope statement** (only when the brief carries `gaps`) | [`steps/gap.md`](steps/gap.md) | — (a relay; this step writes nothing anywhere) |
 
 **Routing notes (the dispatcher's whole job):**
@@ -132,7 +132,11 @@ step files cite them and restate nothing.
 - **compose the brief:** free text always wins. A set of two or more returns the
   `consultant` block, whose four rules bind you and may not be traded against
   each other (`steps/brief.md`). The brief is a **named artifact** written to
-  `$WS/brief.json`: relay its `step.line`, `artifact.line` and
+  `$WS/brief.json` **and to its durable home** (`resolve-paths.py
+  terrain-briefs-dir`) under its **stable id** — a digest of its pin and
+  composition, so the same Brief is always the same entry, and the home's
+  listing IS the enumeration of Briefs (no index file exists). Relay its
+  `step.line`, `artifact.line`, `artifact.id` and
   `lifecycle.line` at the gate, and re-open it with `brief-open` when the
   owner returns to it. It is the one artifact this surface **reads back** —
   the owner's decision, not a rendering — and that leaves the View's

@@ -26,6 +26,7 @@ This is a MOVE, not a rewrite: every definition below is the one that stood in
 the same inputs (Story 20.80 AC4).
 """
 
+import hashlib
 import json
 import os
 import re
@@ -75,7 +76,15 @@ from terrain_select import (  # noqa: E402
 #   * the artifact never becomes an index or a lookup — it is read by the
 #     owner returning to their own brief, addressed by the path they were told.
 #
-# WHERE IT LIVES: the per-run workspace, minted by
+# WHERE IT LIVES: SUPERSEDED IN PART on 2026-08-03 (Story 20.191, #1342) — the
+# durable copy now lands in the Brief's HOME, a directory in a repository
+# resolved by `resolve-paths.py terrain-briefs-dir` and addressed by the
+# Brief's stable id; see "THE DURABLE HOME AND THE STABLE ID" below. The
+# workspace copy described here is unchanged and is still written, because the
+# within-sitting iteration chain lives beside it (`--from`/`--out`) and this
+# story deletes nothing. What follows is that workspace copy's own rule:
+#
+# the per-run workspace, minted by
 # `resolve-paths.py new-run --terrain` (D1 — the resolver owns every storage
 # path; this script still just writes where it is told, exactly as `--view`
 # does). That is machine state, outside every working tree, which is also what
@@ -215,6 +224,154 @@ def read_brief_artifact(path):
     if not isinstance(payload, dict) or "brief" not in payload:
         raise ValueError("not a brief artifact (no `brief` key)")
     return payload
+
+
+# --------------------------------------------------------------------------
+# THE DURABLE HOME AND THE STABLE ID (Story 20.191, #1342; SPEC-terrain
+# amendments, the 2026-08-03 block)
+#
+# The block above says the artifact "is read by the owner returning to their
+# own brief, addressed by the path they were told" — and that is exactly what
+# broke. The path was a per-run workspace keyed by recency, which the pipeline
+# already distrusted in its own words (`brief_source` records PINS FIRST
+# "because the path is a state-dir location that goes stale by relocation while
+# still looking authoritative", `skills/draft-article/stages/stage0.md`). So
+# the Brief gains a home in a repository and an address that is not a path:
+#
+#   * WHERE — `resolve-paths.py terrain-briefs-dir`. The home is the resolver's
+#     to know (D1); nothing here composes it, and the caller passes the
+#     directory exactly as it passes `--out` and `--view` today.
+#   * WHO — `write_brief_artifact`, unchanged. No second writer exists: the
+#     home copy goes through the same allowlist-refusing writer as the
+#     workspace copy, with the same payload object, so the two are identical
+#     in content by construction rather than by a comparison someone must run.
+#   * WHAT IT IS CALLED — `brief_id` below: a digest of what the Brief ALREADY
+#     CARRIES. Never a fresh token per write, or saving the same Brief twice
+#     would leave two Briefs in a home whose listing is its enumeration.
+#
+# WHAT THE ID IS COMPUTED FROM, and why each part: the composition PIN (the
+# Brief's indexes name Strands only at that pin), the member INDEXES and the
+# composed BRIEF STRING. Together these are the composition — two Briefs
+# agreeing on all three are the same decision under any reading, and a
+# lifecycle transition (`composed → inspected → adopted`) touches none of
+# them, which is the property that makes the id survive a re-open. What is
+# DELIBERATELY excluded is anything a re-render can change: lifecycle,
+# iteration bookkeeping, the artifact block, the gate's own renderings.
+# --------------------------------------------------------------------------
+
+BRIEF_ID_PREFIX = "brief-"
+# Long enough that a collision is not a practical concern across one host
+# repo's Briefs, short enough to be read aloud and typed at a gate. The whole
+# digest would be neither, and the id is an owner-visible address.
+BRIEF_ID_LEN = 12
+
+
+def brief_id(payload):
+    """The Brief's stable id: deterministic from its pin and its composition.
+
+    DETERMINISTIC, NOT MINTED. The same composition written a second time —
+    re-opened, transitioned, written back — resolves to the same id and so to
+    the same file in the home. An id minted per write would turn the home's
+    listing (which IS its enumeration) into a pile of near-duplicates nobody
+    could choose between, which is the failure the home exists to remove.
+    """
+    pins = payload.get("pins") or {}
+    basis = json.dumps(
+        {"pin": str(pins.get("terrain") or payload.get("pin") or ""),
+         "hub": str(pins.get("hub") or ""),
+         "indexes": [str(i) for i in (payload.get("indexes") or [])],
+         "brief": str(payload.get("brief") or "")},
+        sort_keys=True, ensure_ascii=False)
+    digest = hashlib.sha256(basis.encode("utf-8")).hexdigest()
+    return BRIEF_ID_PREFIX + digest[:BRIEF_ID_LEN]
+
+
+def home_brief_path(home_dir, payload):
+    """Where this Brief lives in the home: `<home>/<stable id>.json`.
+
+    `home_dir` is the resolver's answer (`resolve-paths.py
+    terrain-briefs-dir`), passed in by the caller — this module composes the
+    NAME, which is the artifact's identity, and never the location, which is
+    storage layout (D1).
+    """
+    return os.path.join(home_dir, brief_id(payload) + ".json")
+
+
+def write_brief_home(home_dir, payload):
+    """Write the Brief to its durable home, and return the path written.
+
+    A one-line delegation ON PURPOSE: the home is a LOCATION, not a second
+    artifact class, so it gets no writer of its own. Everything the write
+    refuses, records or formats is `write_brief_artifact`'s, unchanged.
+    """
+    return write_brief_artifact(home_brief_path(home_dir, payload), payload)
+
+
+def write_brief_record(record, path=None, home_dir=None):
+    """Write ONE decision record to every location it has, and return them.
+
+    The workspace copy and the home copy come from the same object through the
+    same writer, so they are identical in content by construction — there is no
+    second composer whose output could drift, and no comparison anyone has to
+    run. A location that was not named is simply not written.
+    """
+    written = []
+    if path:
+        written.append(write_brief_artifact(path, record))
+    if home_dir:
+        written.append(write_brief_home(home_dir, record))
+    return written
+
+
+def copy_to_home(path, home_dir, record, stderr=None):
+    """Copy an opened Brief into the home. Returns `(written_path, notice)`.
+
+    THE WHOLE MIGRATION, IN ONE PLACE, so the CLI holds none of it: the
+    allowlist is applied exactly as the transition write applies it (a Brief
+    predating `BRIEF_KEYS` still migrates, with what it loses named), the write
+    goes through the sanctioned writer, and the notice is composed here beside
+    the act it describes rather than at a call site that could forget it.
+
+    `notice` is None when the Brief is already in its home — an open of the
+    home copy migrates nothing and must not claim to. With a `stderr` stream
+    the notice is written to it and the return is the written paths alone, so
+    a caller cannot hold the migration and forget to state it.
+    """
+    legacy = sorted(set(record) - BRIEF_KEYS)
+    if legacy:
+        record = {k: v for k, v in record.items() if k in BRIEF_KEYS}
+    notice = home_migration_notice(path, home_dir, record)
+    written = write_brief_home(home_dir, record)
+    if notice and legacy:
+        notice += (" Keys predating the artifact allowlist ("
+                   + ", ".join(repr(k) for k in legacy)
+                   + ") are not carried into the home copy.")
+    if stderr is None:
+        return written, notice
+    if notice:
+        stderr.write(notice + "\n")
+    return [written]
+
+
+def home_migration_notice(path, home_dir, payload):
+    """The migration statement owed by a Brief found OUTSIDE the home, or None.
+
+    STATED, NEVER SILENT (Story 20.191 AC3), and never a deletion: an old
+    workspace Brief still opens exactly as it did, keeps its file, and is
+    copied — not moved — into the home under its stable id. What the owner is
+    told is where the durable copy now is and that the old one was left alone,
+    because a relocation a person cannot see is the same defect as the stale
+    path this story is fixing, one directory along.
+    """
+    target = home_brief_path(home_dir, payload)
+    if os.path.abspath(path) == os.path.abspath(target):
+        return None
+    return (f"note: this brief was opened from {path}, which is a per-run "
+            f"workspace — the location the pipeline already treats as going "
+            f"stale by relocation. Its durable home copy is "
+            f"{target}, written under the brief's stable id "
+            f"({brief_id(payload)}). Nothing was deleted or moved: the "
+            f"workspace copy is still there and still opens.")
 
 
 # --------------------------------------------------------------------------
@@ -413,3 +570,76 @@ def _iteration_block(out, prior, edit, artifact_path):
                       "invocations. Comparison held for the sitting, never a "
                       "cache"),
     }
+
+
+# --- WHICH brief a bare `open the brief` reaches (Story 20.92, #1042) --------
+#
+# MOVED HERE FROM `topic-map-directions.py` on 2026-08-03 (Story 20.191),
+# unchanged line for line — the same MOVE the #1025 amendment prescribes:
+# argparse and dispatch stay in the hyphenated CLI, composition moves into
+# importable siblings. It belongs beside the artifact's writer, its reader and
+# its addressing, because "which brief" is an ADDRESSING question, and the
+# durable home now answers a second form of it. The duplicate
+# `BRIEF_ARTIFACT_NAME` constant it carried is gone: `BRIEF_FILENAME` above is
+# the one declaration of the artifact's default basename, and two spellings of
+# one name is exactly the drift the constant existed to prevent.
+
+def _resolve_newest_brief(root=None):
+    """The brief a bare `open the brief` reaches (Story 20.92, #1042).
+
+    THE RULE IS STATED AND DETERMINISTIC, never a heuristic the owner cannot
+    predict: the NEWEST terrain run workspace — run ids are timestamps, so the
+    newest is the last one in sorted order, and the `latest` symlink is skipped
+    because it is a shorthand rather than a distinct run — and inside it the
+    artifact named `brief.json`.
+
+    A workspace may hold several brief artifacts: the edit-set iteration loop
+    writes each recomposition to its own name in the same workspace. Those are
+    NOT guessed between. `brief.json` is the composed brief; when it is absent
+    the other brief-shaped artifacts present are NAMED so the owner picks one,
+    which is a stated ambiguity rather than a silent pick.
+
+    Returns `(path, why)`. `path` is None when nothing resolves, and `why` then
+    says so plainly — this never falls through to starting Step 0 and never
+    composes anything.
+    """
+    # THE RESOLVER OWNS THE LAYOUT (D1). No storage path is composed here: the
+    # run root is ASKED FOR, exactly as every other caller asks for it, and
+    # only the run-id ordering and the artifact name are this function's.
+    import subprocess
+    cmd = [sys.executable,
+           os.path.join(os.path.dirname(os.path.realpath(__file__)),
+                        "resolve-paths.py"),
+           "terrain-runs-root"] + (["--root", root] if root else [])
+    try:
+        base = subprocess.run(cmd, capture_output=True, text=True,
+                              check=True).stdout.strip()
+    except (OSError, subprocess.CalledProcessError) as exc:
+        return None, f"the terrain run root could not be resolved ({exc})"
+    if not os.path.isdir(base):
+        return None, ("no terrain run workspace exists yet, so there is no "
+                      "brief to open. A brief comes from a terrain sitting: "
+                      "say `show the terrain` to start one.")
+    runs = sorted(r for r in os.listdir(base)
+                  if not os.path.islink(os.path.join(base, r))
+                  and os.path.isdir(os.path.join(base, r)))
+    if not runs:
+        return None, ("no terrain run workspace exists yet, so there is no "
+                      "brief to open. Say `show the terrain` to start one.")
+    ws = os.path.join(base, runs[-1])
+    path = os.path.join(ws, BRIEF_FILENAME)
+    if os.path.isfile(path):
+        return path, (f"the newest terrain run workspace ({runs[-1]}) and its "
+                      f"{BRIEF_FILENAME}")
+    others = sorted(f for f in os.listdir(ws)
+                    if f.startswith("brief") and f.endswith(".json"))
+    if others:
+        return None, (
+            f"the newest terrain run workspace ({runs[-1]}) holds no "
+            f"{BRIEF_FILENAME}, but it does hold "
+            f"{', '.join(others)}. Those are recompositions from the "
+            "edit-set loop and are not guessed between — name the one you "
+            "want.")
+    return None, (f"the newest terrain run workspace ({runs[-1]}) holds no "
+                  "brief artifact, so there is nothing to open. A brief is "
+                  "written when a selection is composed with `--out`.")

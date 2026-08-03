@@ -260,8 +260,13 @@ from terrain_brief import (  # noqa: E402
     _edited_indexes,
     _iteration_block,
     _parse_edit,
+    _resolve_newest_brief,
+    brief_id,
+    copy_to_home,
+    home_brief_path,
     read_brief_artifact,
     write_brief_artifact,
+    write_brief_record,
     BRIEF_KEYS,
 )
 
@@ -1187,15 +1192,29 @@ def cmd_brief(args):
     # STRING into the existing stage-0 `--brief` path, and drafting never
     # learns that terrain produced it.
     path = os.path.abspath(args.out) if getattr(args, "out", None) else None
+    # THE DURABLE HOME (Story 20.191, #1342). Passed in, never composed here,
+    # for the same D1 reason `--out` is: `resolve-paths.py terrain-briefs-dir`
+    # owns where the home is, this script owns the artifact's NAME within it.
+    home_dir = getattr(args, "home", None)
+    home = home_brief_path(home_dir, out) if home_dir else None
     if path:
         out["artifact"] = {
-            "id": os.path.splitext(os.path.basename(path))[0],
+            # THE ID IS THE ADDRESS (Story 20.191), not the `--out` basename:
+            # a digest of the pin and the composition, so it survives
+            # relocation, re-opening and a lifecycle transition — which is
+            # what a run's binding to a Brief needs of it.
+            "id": brief_id(out),
             "path": path,
             "line": _brief_artifact_line(path),
             "reopen": f"topic-map-directions.py brief-open --at {path}",
             "read_back": ("by design — this is the owner's decision, not a "
                           "rendering; the never-read-back rule does not bind "
                           "here (CAP-3, 2026-07-31)")}
+    if home:
+        # The durable copy's address, recorded beside the workspace one rather
+        # than instead of it: both files exist, this story deletes nothing, and
+        # a reader must be able to see which is which.
+        out.setdefault("artifact", {"id": brief_id(out)})["home"] = home
     # THE BANNER LIVES ON `lifecycle` (Story 20.116, #1113), and the two homes
     # it does NOT have are recorded because each was tried and each was wrong.
     # A new top-level `transition` key violates the brief payload's CLOSED key
@@ -1231,17 +1250,19 @@ def cmd_brief(args):
     # be shape without content.
     if out.get("indexes"):
         out["iteration"] = _iteration_block(out, prior, out.get("edit"), path)
-    if path:
+    if path or home:
         try:
             # THE ARTIFACT PERSISTS THE DECISION; THE STDOUT PAYLOAD CARRIES
             # THE GATE (Story 20.93, #1048/#1049). `out` is unchanged and is
             # what gets printed — the gate sees exactly what it saw before,
             # undiminished, including the COMPLETE unranked substitution pool
             # the consultant's rule 4 requires. What is written is the decision
-            # record alone.
-            write_brief_artifact(path, _decision_record(out))
+            # record alone — ONE record, handed to the one sanctioned writer
+            # for each location it has, so the workspace copy and the home copy
+            # are identical by construction (Story 20.191 AC2).
+            write_brief_record(_decision_record(out), path, home_dir)
         except OSError as exc:
-            return _err(f"could not write the brief artifact at {path}: {exc}")
+            return _err(f"could not write the brief artifact: {exc}")
     print(json.dumps(out, indent=2, ensure_ascii=False))
     return 0
 
@@ -1495,70 +1516,6 @@ def _brief_label(payload):
     return " — ".join(parts) or "an unnamed brief"
 
 
-BRIEF_ARTIFACT_NAME = "brief.json"
-
-
-def _resolve_newest_brief(root=None):
-    """The brief a bare `open the brief` reaches (Story 20.92, #1042).
-
-    THE RULE IS STATED AND DETERMINISTIC, never a heuristic the owner cannot
-    predict: the NEWEST terrain run workspace — run ids are timestamps, so the
-    newest is the last one in sorted order, and the `latest` symlink is skipped
-    because it is a shorthand rather than a distinct run — and inside it the
-    artifact named `brief.json`.
-
-    A workspace may hold several brief artifacts: the edit-set iteration loop
-    writes each recomposition to its own name in the same workspace. Those are
-    NOT guessed between. `brief.json` is the composed brief; when it is absent
-    the other brief-shaped artifacts present are NAMED so the owner picks one,
-    which is a stated ambiguity rather than a silent pick.
-
-    Returns `(path, why)`. `path` is None when nothing resolves, and `why` then
-    says so plainly — this never falls through to starting Step 0 and never
-    composes anything.
-    """
-    # THE RESOLVER OWNS THE LAYOUT (D1). No storage path is composed here: the
-    # run root is ASKED FOR, exactly as every other caller asks for it, and
-    # only the run-id ordering and the artifact name are this function's.
-    import subprocess
-    cmd = [sys.executable,
-           os.path.join(os.path.dirname(os.path.realpath(__file__)),
-                        "resolve-paths.py"),
-           "terrain-runs-root"] + (["--root", root] if root else [])
-    try:
-        base = subprocess.run(cmd, capture_output=True, text=True,
-                              check=True).stdout.strip()
-    except (OSError, subprocess.CalledProcessError) as exc:
-        return None, f"the terrain run root could not be resolved ({exc})"
-    if not os.path.isdir(base):
-        return None, ("no terrain run workspace exists yet, so there is no "
-                      "brief to open. A brief comes from a terrain sitting: "
-                      "say `show the terrain` to start one.")
-    runs = sorted(r for r in os.listdir(base)
-                  if not os.path.islink(os.path.join(base, r))
-                  and os.path.isdir(os.path.join(base, r)))
-    if not runs:
-        return None, ("no terrain run workspace exists yet, so there is no "
-                      "brief to open. Say `show the terrain` to start one.")
-    ws = os.path.join(base, runs[-1])
-    path = os.path.join(ws, BRIEF_ARTIFACT_NAME)
-    if os.path.isfile(path):
-        return path, (f"the newest terrain run workspace ({runs[-1]}) and its "
-                      f"{BRIEF_ARTIFACT_NAME}")
-    others = sorted(f for f in os.listdir(ws)
-                    if f.startswith("brief") and f.endswith(".json"))
-    if others:
-        return None, (
-            f"the newest terrain run workspace ({runs[-1]}) holds no "
-            f"{BRIEF_ARTIFACT_NAME}, but it does hold "
-            f"{', '.join(others)}. Those are recompositions from the "
-            "edit-set loop and are not guessed between — name the one you "
-            "want.")
-    return None, (f"the newest terrain run workspace ({runs[-1]}) holds no "
-                  "brief artifact, so there is nothing to open. A brief is "
-                  "written when a selection is composed with `--out`.")
-
-
 def cmd_brief_open(args):
     """Re-open a written brief (Story 20.75 AC4/AC5).
 
@@ -1588,6 +1545,25 @@ def cmd_brief_open(args):
     except (OSError, ValueError) as exc:
         return _err(f"unreadable brief artifact at {at}: {exc}")
     args.at = at
+    # THE MIGRATION, STATED AND NEVER SILENT (Story 20.191 AC3, #1342): a brief
+    # in the old per-run workspace still opens, and is COPIED — never moved,
+    # never deleted — into the home under its stable id. `copy_to_home` holds
+    # the whole move; this only decides WHEN it happens and says so.
+    home_dir = getattr(args, "home", None)
+    stored = json.loads(json.dumps(payload))  # the form as it sits on disk
+    home_written = []
+
+    def _home_copy(record):
+        if not home_dir or home_written:
+            return
+        try:
+            home_written.extend(
+                copy_to_home(args.at, home_dir, record, sys.stderr))
+        except OSError as exc:
+            sys.stderr.write(f"note: this brief could not be copied to its "
+                             f"home ({home_dir}): {exc}. It is unchanged "
+                             f"where it is.\n")
+
     life = payload.get("lifecycle") or _brief_lifecycle(BRIEF_LIFECYCLE[0])
     state = life.get("state")
     if args.state:
@@ -1625,6 +1601,10 @@ def cmd_brief_open(args):
             write_brief_artifact(args.at, payload)
         except OSError as exc:
             return _err(f"could not record the transition at {args.at}: {exc}")
+        # THE HOME CARRIES THE TRANSITION TOO, from the record just written
+        # back. The id does not move when the lifecycle does, so this REPLACES
+        # this brief's home copy rather than adding a second beside it.
+        _home_copy(payload)
         # AND THE TRANSITION IS ANNOUNCED HERE TOO (Story 20.116, #1113).
         # Step-3 entry was never the only moment the owner could not confirm —
         # `composed → inspected → adopted` moves here, and a move nobody
@@ -1638,6 +1618,9 @@ def cmd_brief_open(args):
                 workspace=os.path.dirname(os.path.abspath(args.at)))
     else:
         payload["lifecycle"] = _brief_lifecycle(state, life.get("history"))
+    # A PLAIN RE-OPEN STILL MIGRATES, copying the artifact AS IT SITS ON DISK
+    # — reading must never be the act that changes what a brief says.
+    _home_copy(stored)
     payload["lifecycle"]["line"] = _brief_lifecycle_line(state)
     # THE OTHER LINES ARE COMPOSED HERE TOO (Story 20.100, #1078), for the same
     # reason and by the same rule as the lifecycle line above: derived at read
@@ -1681,6 +1664,11 @@ def cmd_brief_open(args):
         # How this brief was reached, stated: a resolved open says which rule
         # resolved it, so the owner can predict the next one.
         "resolved_by": resolved_by or "the path given",
+        # THE STABLE ID (Story 20.191): the address that survives relocation,
+        # stated on every open so a caller never derives it from a path.
+        "id": brief_id(stored),
+        "home": (home_written[0] if home_written
+                 else (home_brief_path(home_dir, stored) if home_dir else None)),
         # THE STANDING EXITS (Story 20.92 AC6). An entry INTO the surface
         # offers what every other gate on it offers — a trigger that landed the
         # owner somewhere with no way onward would be a side door out of the
@@ -1933,6 +1921,14 @@ def main(argv=None):
                         f"the owner's decision, and re-opening it with "
                         f"`brief-open` is the requirement, not a cache. The "
                         f"stage-0 hand-off is unchanged either way.")
+    b.add_argument("--home", metavar="DIR",
+                   help="the Brief's DURABLE HOME — pass `resolve-paths.py "
+                        "terrain-briefs-dir` (Story 20.191, #1342). The brief "
+                        "is written there too, under its STABLE ID, through "
+                        "the same writer and from the same record as `--out`, "
+                        "so the two copies are identical in content. The "
+                        "home's listing IS the enumeration of Briefs; no "
+                        "index is written.")
     bo = sub.add_parser("brief-open",
                         help="re-open a written brief, and optionally record "
                              "its lifecycle transition")
@@ -1951,6 +1947,12 @@ def main(argv=None):
     bo.add_argument("--state", choices=list(BRIEF_LIFECYCLE[1:]),
                     help="record the transition this return represents "
                          f"({' → '.join(BRIEF_LIFECYCLE)}); forward-only")
+    bo.add_argument("--home", metavar="DIR",
+                    help="the Brief's DURABLE HOME (`resolve-paths.py "
+                         "terrain-briefs-dir`). A brief opened from the OLD "
+                         "workspace location is copied there under its stable "
+                         "id and the migration is STATED on stderr — never "
+                         "silently, and never as a move (Story 20.191 AC3).")
     cv = sub.add_parser("cover",
                         help="count the placement cover of COMPOSED candidate "
                              "theses (or a proposed partition) against the "

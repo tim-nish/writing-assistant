@@ -6,10 +6,33 @@ operating detail verbatim; the dispatcher carries the sequence and the
 commands.
 
 ```
+BRIEFS=$(python3 ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-paths.py terrain-briefs-dir)
 python3 ${CLAUDE_PLUGIN_ROOT}/scripts/topic-map-directions.py brief \
   --payloads "$WS/presented-payloads.jsonl" --map "$WS/map.json" \
-  --out "$WS/brief.json"
+  --out "$WS/brief.json" --home "$BRIEFS"
 ```
+
+## The Brief has a DURABLE HOME, and a stable id
+
+**Added 2026-08-03** (SPEC-terrain amendments, the 2026-08-03 block; Story
+20.191, #1342). `--out` alone put the Brief in a per-run workspace keyed by
+recency — the location the pipeline already distrusts in its own words, since
+the brief record writes `brief_source` **pins first** "because the path is a
+state-dir location that goes stale by relocation while still looking
+authoritative". `--home` is the fix, and it is **not optional in this step**:
+
+- **where** — `resolve-paths.py terrain-briefs-dir`, a directory in a
+  repository, beside the View. Never compose it by hand; the resolver owns
+  every storage path.
+- **what it is called** — the Brief's **stable id** (`artifact.id`, e.g.
+  `brief-8b6298ec19f0`): a digest of the Brief's pin and composition, so it is
+  the same id every time the same Brief is written, and it survives a re-open
+  and a lifecycle transition. Relay it — it is the address a later invocation
+  binds to, where a path is not.
+- **what is written** — the same record `--out` writes, through the same
+  writer. The workspace copy is unchanged and is **not** deleted.
+- **enumeration** — `resolve-paths.py list-briefs`. The directory listing IS
+  the enumeration; there is no index file, and writing one is barred.
 
 ## The brief is a NAMED ARTIFACT with a visible lifecycle
 
@@ -34,8 +57,13 @@ terrain surface reads back:**
 
 ```
 python3 ${CLAUDE_PLUGIN_ROOT}/scripts/topic-map-directions.py brief-open \
-  [--at "$WS/brief.json"] [--state inspected|adopted]
+  [--at "$WS/brief.json"] [--state inspected|adopted] --home "$BRIEFS"
 ```
+
+Pass `--home` here too. A brief opened from the **old** workspace location is
+copied into the home under its stable id and **the migration is stated on
+stderr** — relay it. Nothing is moved and nothing is deleted: the workspace
+copy is still there and still opens.
 
 ### The named trigger: `open the brief [<path>]` (Story 20.92, #1042)
 

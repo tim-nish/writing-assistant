@@ -44,6 +44,13 @@ Subcommands:
                              create and print a fresh per-run workspace (Story 9.2)
   run-workspace --run-id ID [--root R]
                              print an existing run workspace path (no create)
+  terrain-briefs-dir [--root R]
+                             the Brief's durable home for this host repo
+                             (Story 20.191) — a query, creating nothing
+  terrain-brief --id ID [--root R]
+                             the home path of ONE Brief, by its stable id
+  list-briefs [--root R]     every Brief in the home, one path per line: the
+                             listing IS the enumeration, and no index exists
   active-run-pointer [--cwd D]
                              <state-root>/<cwd-key>/active-run.json — the run
                              pointer the checkpoint write leaves for the Stop
@@ -426,6 +433,68 @@ def topic_map_view(root):
     return os.path.join(terrain_repo_dir(root), TOPIC_MAP_VIEW_BASENAME)
 
 
+# --------------------------------------------------------------------------
+# THE BRIEF'S DURABLE HOME (Story 20.191, #1342; SPEC-terrain amendments, the
+# 2026-08-03 block)
+#
+# A Brief used to live only in the per-run workspace that composed it — machine
+# state, keyed by recency, which the pipeline already distrusted in its own
+# words: the brief record writes `brief_source` PINS FIRST "because the path is
+# a state-dir location that goes stale by relocation while still looking
+# authoritative" (`skills/draft-article/stages/stage0.md`). The amendment stops
+# working around that and moves the artifact.
+#
+# WHY BESIDE THE VIEW. The Brief is the owner's DECISION and is re-opened by
+# design, which is exactly the property that put the View in a working tree
+# (#874) and left run workspaces in the state root (#935). The class split runs
+# at the same seam: the Brief is output, not an intermediate, so it lands under
+# `terrain_repo_dir` — host-qualified, because one tool serves many host repos.
+#
+# THE DIRECTORY IS THE ENUMERATION. No index file is written here and none may
+# be: an index over a directory is a derived second ledger holding what is
+# recomputable from the directory itself, which is the shape the amendment
+# declined by name. `list_home_briefs` below is a LISTING, not a store.
+BRIEFS_DIR = "briefs"
+BRIEF_SUFFIX = ".json"
+
+
+def terrain_briefs_dir(root):
+    """The Brief's durable home for one host repo: `<terrain-repo-dir>/briefs`.
+
+    Only this function composes it (D1). A Brief is addressed by its stable id
+    within the home, never by the run workspace that happened to compose it.
+    """
+    return os.path.join(terrain_repo_dir(root), BRIEFS_DIR)
+
+
+def terrain_brief_home(root, brief_id):
+    """The home path of ONE Brief, addressed by its stable id.
+
+    The id is the artifact's identity and is computed from what the Brief
+    already carries (`terrain_brief.brief_id`) — never minted here, and never
+    fresh per write, or the home would accumulate a copy per save.
+    """
+    return os.path.join(terrain_briefs_dir(root), str(brief_id) + BRIEF_SUFFIX)
+
+
+def list_home_briefs(root):
+    """Every Brief in the home, as absolute paths, sorted by id.
+
+    THE LISTING IS THE ENUMERATION (Story 20.191 AC4): read from the directory
+    every time, so a Brief added, replaced or removed by hand is reflected with
+    nothing to repair. A missing home is an empty listing, not an error — a
+    host repo with no terrain sitting yet simply has no Briefs.
+    """
+    d = terrain_briefs_dir(root)
+    try:
+        names = os.listdir(d)
+    except OSError:
+        return []
+    return [os.path.join(d, n) for n in sorted(names)
+            if n.endswith(BRIEF_SUFFIX)
+            and os.path.isfile(os.path.join(d, n))]
+
+
 SOURCES_BASENAME = "writing-sources.yaml"
 
 
@@ -657,6 +726,34 @@ def cmd_run_workspace(args):
     return 0
 
 
+def cmd_terrain_briefs_dir(args):
+    """The Brief's durable home for this host repo (Story 20.191, #1342).
+
+    A QUERY, exactly like `terrain-view`: it creates nothing. The directory is
+    created by the sanctioned writer when a Brief is written there, for the
+    reason #935 recorded — a resolver that mkdirs leaves a repo-key directory
+    behind for every host whose path was merely asked for.
+    """
+    print(terrain_briefs_dir(host_root(args.root)))
+    return 0
+
+
+def cmd_terrain_brief(args):
+    """The home path of one Brief, addressed by its stable id."""
+    print(terrain_brief_home(host_root(args.root), args.id))
+    return 0
+
+
+def cmd_list_briefs(args):
+    """Enumerate the home — the LISTING IS the enumeration, and there is no
+    index file to read or repair (Story 20.191 AC4). One path per line; an
+    empty home prints nothing and exits 0, because "no Briefs yet" is a fact
+    about this host repo rather than a failure."""
+    for p in list_home_briefs(host_root(args.root)):
+        print(p)
+    return 0
+
+
 def cmd_topic_map_view(args):
     path = topic_map_view(host_root(args.root))
     if not path:
@@ -789,6 +886,26 @@ def main(argv=None):
                         "tool's own output root (#874); creates its directory")
     sp.add_argument("--root", help="host-repo root (default: git top-level of cwd; errors outside a git repo)")
 
+    sp = sub.add_parser("terrain-briefs-dir",
+                        help="print the Brief's durable home for this host "
+                             "repo (Story 20.191, #1342); creates nothing")
+    sp.add_argument("--root", help="host-repo root (default: git top-level of cwd; errors outside a git repo)")
+
+    sp = sub.add_parser("terrain-brief",
+                        help="print the home path of ONE Brief, addressed by "
+                             "its stable id")
+    sp.add_argument("--id", required=True,
+                    help="the Brief's stable id (`terrain_brief.brief_id`) — "
+                         "computed from the Brief's pin and composition, never "
+                         "minted fresh per write")
+    sp.add_argument("--root", help="host-repo root (default: git top-level of cwd; errors outside a git repo)")
+
+    sp = sub.add_parser("list-briefs",
+                        help="enumerate the Briefs in the home, one path per "
+                             "line — the listing IS the enumeration, and no "
+                             "index file exists (Story 20.191)")
+    sp.add_argument("--root", help="host-repo root (default: git top-level of cwd; errors outside a git repo)")
+
     sp = sub.add_parser("list-drafts", help="enumerate run workspaces holding a draft.md, "
                         "with picker metadata (Story 13.31)")
     sp.add_argument("--root", help="host-repo root (default: git top-level of cwd; errors outside a git repo)")
@@ -816,6 +933,9 @@ def main(argv=None):
         "terrain-output-root": cmd_terrain_output_root,
         "terrain-runs-root": cmd_terrain_runs_root,
         "terrain-view": cmd_topic_map_view,
+        "terrain-briefs-dir": cmd_terrain_briefs_dir,
+        "terrain-brief": cmd_terrain_brief,
+        "list-briefs": cmd_list_briefs,
         "list-drafts": cmd_list_drafts,
         "active-run-pointer": cmd_active_run_pointer,
         "target": cmd_target,
