@@ -5,7 +5,7 @@
 # is only read. No shared path, no ambient state, no network.
 # covers: scripts/topic-map-directions.py scripts/terrain_theses.py
 #   scripts/terrain_journey.py scripts/terrain_text.py scripts/strand_cover.py
-#   skills/terrain/steps/brief.md
+#   skills/terrain/steps/brief.md skills/terrain/steps/brief-gates.md
 # tier: inner — CANDIDATE THESES and the k-GROUP PROPOSAL (Story 20.78,
 #   #995/#988) against a derived fixture map; no seam, no corpus, no assembly.
 #   Its own check rather than more assertions in
@@ -42,7 +42,13 @@ cd "$root"
 D="scripts/topic-map-directions.py"
 T="scripts/terrain_theses.py"
 FIX="scripts/fixtures/terrain/screen-map.json"
-SKILL="skills/terrain/steps/brief.md"
+# The brief's contract spans the step file and its post-adoption companion
+# since the 20.212 split (the four-gate sequence crossed the 600-line ceiling).
+# Asserted over the CONCATENATION, exactly as check-review-reentry.sh does for
+# the review phases: a token moving between the two is a relocation, never a
+# deletion, and this check must not read one as the other.
+SKILL=$(mktemp)
+cat skills/terrain/steps/brief.md skills/terrain/steps/brief-gates.md > "$SKILL"
 
 fail=0
 err() { printf 'FAIL: %s\n' "$1" >&2; fail=1; }
@@ -641,7 +647,8 @@ check(gates_src.find('"journey-incorporation"') < gates_src.find('"structure"')
       < gates_src.find('"resume-confirmation"'),
       "GATES declares `structure` after `journey-incorporation` — the "
       "registry order is load-bearing")
-prose = open("skills/terrain/steps/brief.md", encoding="utf-8").read()
+prose = (open("skills/terrain/steps/brief.md", encoding="utf-8").read()
+         + open("skills/terrain/steps/brief-gates.md", encoding="utf-8").read())
 check('draft_gates.gate("structure"' in prose,
       "brief.md routes the candidates through the declared carrier — a gate "
       "with no writer is dead code wearing enforcement's name")
@@ -649,6 +656,96 @@ s3 = open("skills/draft-article/stages/stage3.md", encoding="utf-8").read()
 check("not re-raised" in s3 or "not re-raise" in s3,
       "stage3 states the narrative-structure gate is not re-raised over a "
       "brief-adopted structure — asked exactly once")
+
+# --- Story 20.212 (#1411): THE PLAIN-REGISTER COMMITMENT ----------------------
+def check(cond, msg):        # noqa: F811 — this block labels its own story
+    global fail
+    if cond: print("ok:   " + msg)
+    else:    print("FAIL: " + msg); fail = 1
+# Negative run (rule 6): every assertion watched failing against main@c8e74ed
+# (pre-20.212) — block absent, kind unrouteable, adoption unguarded.
+b = json.load(open(w + "/ws/brief-final.json"))
+ids = [m["index"] for m in b["members"]]
+final2 = json.load(open(w + "/b-final.json"))
+pr = final2.get("plain_register") or {}
+check(pr.get("state") == "candidates-pending" and pr.get("composed") is False,
+      "20.212: an adopted brief raises the register block, composed:false")
+check("candidates" not in pr,
+      "20.212: no candidate is authored at the gate")
+reqs2 = pr.get("requirements") or []
+check(any("never 'write for a child'" in r for r in reqs2),
+      "20.212: the requirements refuse audience impersonation by name")
+check(any("ROUND-TRIP CONCESSION" in r for r in reqs2),
+      "20.212: the requirements demand the round-trip concession")
+check("quoted as served" in str(pr.get("boundary") or "").lower()
+      or "QUOTED AS SERVED" in str(pr.get("boundary") or ""),
+      "20.212: the block states the journey boundary — arcs stay quoted")
+
+rend = lambda xs: [{"index": i, "plain": "a simple sentence",
+                    "cite": "LESSONS.md:1@abc1234"} for i in xs]
+rgood = {"kind": "plain-register", "over": ids, "pin": b["pin"],
+         "candidates": [
+    {"plain": "when one thing changes, the other stops working",
+     "concession": "loses the word 'invariant'; restored in the body",
+     "renderings": rend(ids)},
+    {"plain": "a rule only helps where someone checks it",
+     "concession": "nothing lost", "renderings": rend(ids)}]}
+json.dump(rgood, open(w + "/r-good.json", "w"))
+r = run("cover", "--composed", w + "/r-good.json",
+        "--from", w + "/ws/brief-final.json")
+check(r.returncode == 0, "20.212: a conforming register set passes the cover: "
+      + r.stderr[:120])
+noc = json.loads(json.dumps(rgood)); noc["candidates"][0].pop("concession")
+json.dump(noc, open(w + "/r-noconc.json", "w"))
+r = run("cover", "--composed", w + "/r-noconc.json",
+        "--from", w + "/ws/brief-final.json")
+check(r.returncode != 0 and "round-trip concession" in (r.stdout + r.stderr),
+      "20.212: a candidate with no concession is refused — losslessness "
+      "asserted silently is the derivation hazard's quiet form")
+nocite = json.loads(json.dumps(rgood))
+nocite["candidates"][0]["renderings"][0]["cite"] = ""
+json.dump(nocite, open(w + "/r-nocite.json", "w"))
+r = run("cover", "--composed", w + "/r-nocite.json",
+        "--from", w + "/ws/brief-final.json")
+check(r.returncode != 0 and "invention wearing simplicity" in (r.stdout + r.stderr),
+      "20.212: a rendering with no served-claim cite is refused")
+rsilent = json.loads(json.dumps(rgood))
+rsilent["candidates"][1]["renderings"] = rend(ids[:1])
+json.dump(rsilent, open(w + "/r-silent.json", "w"))
+r = run("cover", "--composed", w + "/r-silent.json",
+        "--from", w + "/ws/brief-final.json")
+check(r.returncode != 0 and "neither renders nor discloses" in (r.stdout + r.stderr),
+      "20.212: a silent Strand drop is refused — the close inherits the gap")
+
+ans2 = json.load(open(w + "/a-adopt-struct.json"))
+ans2["plain_register"] = rgood["candidates"][0]["plain"]
+json.dump(ans2, open(w + "/a-adopt-reg2.json", "w"))
+base = ["brief", "--answer", w + "/a-adopt-reg2.json", "--map", w + "/map.json",
+        "--composed", w + "/c-good.json", "--incorporation", w + "/i-good.json",
+        "--structures", w + "/s-good.json"]
+r = run(*base)
+check(r.returncode != 0 and "adopted from" in (r.stdout + r.stderr),
+      "20.212: adopting a commitment without --register is refused (#1079)")
+r = run(*(base + ["--register", w + "/r-good.json",
+                  "--out", w + "/ws/brief-reg.json"]))
+check(r.returncode == 0, "20.212: adoption with candidates succeeds: "
+      + r.stderr[:150])
+if r.returncode == 0:
+    prb = (json.loads(r.stdout).get("plain_register") or {})
+    check(prb.get("state") == "adopted"
+          and len(prb.get("candidates") or []) == 2,
+          "20.212: an adopted commitment records the WHOLE offer")
+
+gsrc = open("scripts/draft_gates.py", encoding="utf-8").read()
+check(gsrc.find('"structure"') < gsrc.find('"plain-register"')
+      < gsrc.find('"resume-confirmation"'),
+      "20.212: GATES declares `plain-register` after `structure`")
+prose2 = (open("skills/terrain/steps/brief.md", encoding="utf-8").read()
+          + open("skills/terrain/steps/brief-gates.md", encoding="utf-8").read())
+check('draft_gates.gate("plain-register"' in prose2,
+      "20.212: brief.md routes the candidates through the declared carrier")
+check("never re-expressed" in prose2 or "quoted as served" in prose2,
+      "20.212: brief.md restates the journey boundary at the new gate")
 sys.exit(1 if fail else 0)
 PYEOF
 [ $? -eq 0 ] || fail=1

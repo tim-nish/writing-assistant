@@ -212,7 +212,6 @@ check-story-element-selection.sh
 check-subcommand-carriers.sh
 check-substituted-served-path.sh
 check-substrate-purity.sh
-check-terrain-decisions.sh
 check-terrain-member.sh
 check-topic-map-depth.sh
 check-topic-map-screen.sh

@@ -1,6 +1,25 @@
 #!/usr/bin/env sh
 # parallel-safe
-# covers: scripts/terrain_brief.py scripts/terrain_directions.py scripts/terrain_map.py scripts/topic-map-directions.py skills/draft-article/SKILL.md skills/draft-article/stages/stage0.md skills/terrain/SKILL.md skills/terrain/steps/brief.md
+# tier: inner — greps and small stdlib-python reads over tracked text; no
+#   network, no repo mutation, far under the runner's INNER_MS ceiling.
+# measured: 130ms (three runs, 2026-08-04, all 130ms)
+# ends: a ratified terrain BRIEF DECISION losing its carrier in prose — a
+#   decision recorded in the spec while the skill that must execute it says
+#   something else, or says nothing. The class is not generation-side
+#   preventable here: the two artifacts are authored in different sittings by
+#   different acts (a spec amendment and a skill edit), so nothing at the
+#   point of writing either one can see the other's state.
+# removal-signal: the brief's decisions become derivable from a single
+#   declared source both surfaces render — e.g. the gate registry growing an
+#   owner-facing contract field the skill projects rather than restates — at
+#   which point the two cannot disagree and this check has no subject.
+#   Also retires if the terrain brief step stops being skill-driven prose.
+#
+# The three headers above are owed because this file LEFT the admission
+# baseline the moment it was edited (#1356): the exemption covers files that
+# predate the clauses, not edits to them. The edit was naming
+# steps/brief-gates.md in `covers:` after the 20.212 companion split.
+# covers: scripts/terrain_brief.py scripts/terrain_directions.py scripts/terrain_map.py scripts/topic-map-directions.py skills/draft-article/SKILL.md skills/draft-article/stages/stage0.md skills/terrain/SKILL.md skills/terrain/steps/brief.md skills/terrain/steps/brief-gates.md
 # covers-note (#1321): the derivation also proposed scripts/check-brief-pointer-unresolved.sh
 #   and specs/spec-article-draft-pipeline/**. Both appear in this file in PROSE only — a
 #   sibling check named as the owner of an assertion, and a spec cited for a ratified value.

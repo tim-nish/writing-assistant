@@ -5,7 +5,7 @@
 # the repo is only read. (The `mktemp` SKILL file outlives the run because the
 # later `trap` replaces the earlier one — a leak, not a collision.)
 # tier: inner — full-report assertions against a synthesized fixture map; no
-# covers: scripts/terrain_members.py scripts/terrain_text.py scripts/topic-map-directions.py skills/terrain/SKILL.md skills/terrain/steps/brief.md skills/terrain/steps/gap.md skills/terrain/steps/map.md skills/terrain/steps/screens.md
+# covers: scripts/terrain_members.py scripts/terrain_text.py scripts/topic-map-directions.py skills/terrain/SKILL.md skills/terrain/steps/brief.md skills/terrain/steps/brief-gates.md skills/terrain/steps/gap.md skills/terrain/steps/map.md skills/terrain/steps/screens.md
 #   seam, no corpus, no assembly. Measured 2026-07-30 at adoption: ~0.9s
 #   (ceiling 2s).
 # removal-signal: the terrain checks are retired or re-shaped under the #910
