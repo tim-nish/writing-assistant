@@ -238,6 +238,121 @@ FULL_WALL_MS=120000    # full-tier ceiling on ELAPSED wall clock (ms) — #961, 
 # to concurrency, which is the whole defect FULL_WALL_MS exists to catch.
 run_t0=$(date +%s%N)
 
+# --- the per-invocation ledger (#1354, story 20.199) --------------------------
+# The runner computes every check's elapsed ms on every run — that is how
+# INNER_MS is enforced — plus the family total and, at the full tier, the two
+# #961 figures, and DISCARDS all of it at exit. So the two questions the owner
+# asks cannot be answered from anything the repository holds: what a sitting's
+# total elapsed time is, and what share of it is checker runtime.
+#
+# EMISSION IS A SIDE EFFECT OF RUNNING. Nothing new is measured; the values stop
+# being thrown away. Siting is settled by docs/storage-architecture.md's
+# machine-state-root row and is not re-decided here: the record is
+# machine-readable, resumable and never opened by hand. Its RETENTION is settled
+# by the 2026-08-03 #1354 amendment — NOT GC-eligible on clutter grounds,
+# because #1355 rules 2 and 4 make it the catch record a retirement review reads.
+#
+# THE REPORT STORES NOTHING. `report --sitting <ts>` recomputes from this file on
+# demand: primary capture is permitted, a stored derived tally is not.
+# THE PATH RESOLVES THROUGH `resolve-paths.py`, NEVER INLINE. D1 fixes that
+# every storage path has exactly one migration point, and composing the state
+# root from environment variables here would be a second one —
+# `check-path-resolver.sh` caught exactly that in this file's first draft. Resolved ONCE per invocation
+# and only when a run will actually record: `report` resolves it itself, and
+# `--list` never reaches the write.
+check_ledger_path() {
+  root=$(python3 "$(dirname "$0")/resolve-paths.py" state-root 2>/dev/null) || return 1
+  [ -n "$root" ] || return 1
+  printf '%s/check-ledger.jsonl' "$root"
+}
+
+# `report` is a subcommand, handled before the run path. It never runs a check.
+if [ "${1:-}" = "report" ]; then
+  shift
+  sitting=''
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --sitting) sitting="$2"; shift 2 ;;
+      *) echo "run-checks: report: unknown argument '$1'" >&2; exit 2 ;;
+    esac
+  done
+  [ -n "$sitting" ] || { echo "run-checks: report wants --sitting <start-ts>, an ISO8601 or epoch-seconds lower bound" >&2; exit 2; }
+  CHECK_LEDGER=$(check_ledger_path) || { echo "run-checks: cannot resolve the state root via resolve-paths.py" >&2; exit 2; }
+  [ -f "$CHECK_LEDGER" ] || { echo "run-checks: no ledger at $CHECK_LEDGER — nothing has been recorded yet" >&2; exit 1; }
+  CHECK_LEDGER="$CHECK_LEDGER" SITTING="$sitting" python3 - <<'REPORT_PY'
+import json, os, sys, datetime
+
+path, sitting = os.environ["CHECK_LEDGER"], os.environ["SITTING"]
+
+def to_epoch_ms(v):
+    v = v.strip()
+    if v.isdigit():
+        n = int(v)
+        return n * 1000 if n < 10**12 else n
+    try:
+        return int(datetime.datetime.fromisoformat(v.replace("Z", "+00:00")).timestamp() * 1000)
+    except ValueError:
+        sys.exit(f"run-checks: report: cannot parse --sitting {v!r} as ISO8601 or epoch seconds")
+
+lo = to_epoch_ms(sitting)
+runs = []
+for line in open(path):
+    line = line.strip()
+    if not line:
+        continue
+    try:
+        r = json.loads(line)
+    except json.JSONDecodeError:
+        continue                      # a torn line is skipped, never fatal
+    if r.get("t0_ms", 0) >= lo:
+        runs.append(r)
+
+if not runs:
+    sys.exit(f"run-checks: report: no invocations recorded at or after {sitting}")
+
+wall_ms   = max(r["t1_ms"] for r in runs) - min(r["t0_ms"] for r in runs)
+# Summed CHECK time, not summed run time: it is what the ranking is built from,
+# so the share and the ranking cannot disagree.
+checker_ms = sum(c["ms"] for r in runs for c in r["checks"])
+
+# TOTAL COST PER SITTING = sum(runtime x invocations). Accumulating each
+# invocation's ms IS that product -- a 1s check invoked 30 times accumulates
+# 30s and outranks a 20s check invoked once, which per-invocation runtime alone
+# would invert.
+cost, inv = {}, {}
+for r in runs:
+    for c in r["checks"]:
+        cost[c["name"]] = cost.get(c["name"], 0) + c["ms"]
+        inv[c["name"]]  = inv.get(c["name"], 0) + 1
+ranked = sorted(cost.items(), key=lambda kv: -kv[1])
+
+share = (checker_ms / wall_ms * 100) if wall_ms else 0.0
+print(f"sitting since {sitting} — {len(runs)} invocation(s)")
+print(f"  wall clock     {wall_ms/1000:9.1f}s")
+print(f"  checker time   {checker_ms/1000:9.1f}s   (summed across invocations)")
+print(f"  checker share  {share:9.1f}%")
+if wall_ms and checker_ms > wall_ms:
+    print("  note: share exceeds 100% because concurrent runs (-P) sum more check")
+    print("        time than they occupy wall clock. Both figures are correct.")
+
+# The threshold set is DERIVED from the measured distribution -- the smallest
+# set covering >=80% of summed cost. "Top five" was an example, never the rule.
+print(f"\n  top contributors by TOTAL cost per sitting (runtime x invocations)")
+print(f"  the smallest set covering >=80% of {checker_ms/1000:.1f}s:")
+acc = 0
+for name, ms in ranked:
+    acc += ms
+    pct = ms / checker_ms * 100 if checker_ms else 0
+    print(f"    {ms/1000:8.1f}s  {pct:5.1f}%  x{inv[name]:<4d} {name}")
+    if acc >= 0.8 * checker_ms:
+        break
+covered = acc / checker_ms * 100 if checker_ms else 0
+print(f"  -> that set is {covered:.1f}% of summed checker cost; "
+      f"{len(ranked)} check name(s) ran in total")
+REPORT_PY
+  exit $?
+fi
+
 TIER=inner
 PARALLEL=0
 CHANGED=''
@@ -368,6 +483,12 @@ fi
 
 fails=0; ran=0; skipped=0; total_ms=0; fam_ms=0; union_ms=0
 
+# Per-check rows for the ledger (#1354). Tab-separated and assembled into one
+# JSON line at exit — the rows are collected in the PARENT shell by report(),
+# exactly like the counters above, so a -P wave cannot interleave them.
+LEDGER_ROWS=$(mktemp) || LEDGER_ROWS=''
+[ -n "$LEDGER_ROWS" ] && trap 'rm -f "$LEDGER_ROWS"' EXIT INT TERM
+
 # report FILE MS RC [PROMOTED] — the single place a check's outcome becomes a
 # line. Both the serial path and the parallel wave call it from the PARENT
 # shell, so the counters it maintains are the run's counters and no two lines
@@ -402,6 +523,20 @@ report() {
     fi
   fi
   printf '%6sms  %-8s %s\n' "$2" "$status" "$1"
+  # One ledger row per check (#1354). The verdict is a TOKEN rather than the
+  # message above: the message is prose that changes with its wording, and a
+  # record consumers filter on must be stable. `over` is carried separately
+  # because a check can both fail and breach the ceiling.
+  if [ -n "$LEDGER_ROWS" ]; then
+    case "$3" in
+      0)   v=ok ;;
+      124) v=timeout ;;
+      *)   v=fail ;;
+    esac
+    over=false
+    [ "$TIER" = "inner" ] && [ "$2" -gt "$INNER_MS" ] && over=true
+    printf '%s\t%s\t%s\t%s\n' "$1" "$2" "$v" "$over" >> "$LEDGER_ROWS"
+  fi
   ran=$((ran+1))
   total_ms=$((total_ms + $2))
   case " $PREFIX_FILES " in
@@ -561,6 +696,53 @@ if [ "$TIER" = "full" ]; then
   fi
   echo "run-checks: FULL-TIER BUDGET work=${total_ms}ms at -P ${run_p} / FULL_TOTAL_MS=${FULL_TOTAL_MS}ms at -P ${FULL_TOTAL_P} — ${work_verdict} (#961, #1001)"
   echo "run-checks: FULL-TIER BUDGET wall=${wall_ms}ms / FULL_WALL_MS=${FULL_WALL_MS}ms — ${wall_verdict} (#961)"
+fi
+
+# --- the ledger write (#1354, story 20.199) ----------------------------------
+# Written on EVERY run that executed checks, including a failing one — a failed
+# run is the case the record exists for. `--list` is excluded deliberately and
+# not by oversight: it executes nothing, so a record for it would carry zero
+# runtime while incrementing the invocation count that rule 2's cost ranking and
+# rule 4's "exercised runs" both read. An inspection is not an exercise.
+if [ -n "$LEDGER_ROWS" ] && [ "$ran" -gt 0 ] && CHECK_LEDGER=$(check_ledger_path); then
+  led_t1=$(date +%s%N)
+  led_scope='unscoped'
+  [ "$SCOPED" = yes ] && led_scope="$GLOB"
+  mkdir -p "$(dirname "$CHECK_LEDGER")" 2>/dev/null && \
+  LED_ROWS="$LEDGER_ROWS" LED_OUT="$CHECK_LEDGER" \
+  LED_T0=$((run_t0 / 1000000)) LED_T1=$((led_t1 / 1000000)) \
+  LED_TIER="$TIER" LED_SCOPE="$led_scope" LED_P="$PARALLEL" \
+  LED_TOTAL="$total_ms" LED_FAM="$fam_ms" LED_UNION="$union_ms" \
+  LED_RAN="$ran" LED_FAILS="$fails" python3 - <<'LEDGER_PY' 2>/dev/null || true
+import json, os, datetime
+rows = []
+with open(os.environ["LED_ROWS"]) as fh:
+    for line in fh:
+        parts = line.rstrip("\n").split("\t")
+        if len(parts) != 4:
+            continue
+        name, ms, verdict, over = parts
+        rows.append({"name": name, "ms": int(ms), "verdict": verdict,
+                     "over_inner": over == "true"})
+t0 = int(os.environ["LED_T0"])
+rec = {
+    "ts": datetime.datetime.fromtimestamp(
+        t0 / 1000, datetime.timezone.utc).isoformat().replace("+00:00", "Z"),
+    "t0_ms": t0,
+    "t1_ms": int(os.environ["LED_T1"]),
+    "tier": os.environ["LED_TIER"],
+    "scope": os.environ["LED_SCOPE"],
+    "parallel": int(os.environ["LED_P"]),
+    "ran": int(os.environ["LED_RAN"]),
+    "fails": int(os.environ["LED_FAILS"]),
+    "total_ms": int(os.environ["LED_TOTAL"]),
+    "family_ms": int(os.environ["LED_FAM"]),
+    "union_ms": int(os.environ["LED_UNION"]),
+    "checks": rows,
+}
+with open(os.environ["LED_OUT"], "a") as out:
+    out.write(json.dumps(rec, separators=(",", ":")) + "\n")
+LEDGER_PY
 fi
 
 [ "$fails" -eq 0 ]
