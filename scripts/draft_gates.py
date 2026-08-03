@@ -217,12 +217,14 @@ START = "start"              # the run mint: article type, sources, workspace
 PROBE = "probe"              # feasibility read (checkpoint: next_stage=probe)
 INTERVIEW = "interview"      # the gap interview (next_stage=interview)
 FILL = "fill"                # the framework fill (next_stage=fill)
+DONE = "done"                # the run's terminal process (next_stage=done):
+                             # both products persisted, nothing left to run
 
 # The closed set, for a consumer asserting over the vocabulary rather than
 # restating it. PRE_RUN names the members that by construction have no
 # `next_stage` counterpart; the rest MUST equal one.
 PRE_RUN_PROCESSES = (TERRAIN, START)
-PROCESSES = (TERRAIN, START, PROBE, INTERVIEW, FILL)
+PROCESSES = (TERRAIN, START, PROBE, INTERVIEW, FILL, DONE)
 
 GATES = {
     # IN PIPELINE ORDER, and the order is load-bearing: story 20.117 renders
@@ -327,6 +329,22 @@ GATES = {
     "visual-set": {
         "stage": FILL,
         "owner_decision": "the visual set — which figures the article carries",
+    },
+    # THE TERMINAL HANDOVER (Story 20.194, #1335). `skills/completion-summary.md`
+    # has named this ask since the first draft run — "run review-article on the
+    # draft / stop here" — with no declared id, so it was composed freely every
+    # time and its payload carried nothing a carrier could observe. The
+    # amendment of 2026-08-03 puts the draft path IN the payload's `where`,
+    # which is only expressible once the gate exists here.
+    #
+    # `done` IS REACHED BY A REVIEW RUN TOO (`draft_review.py` writes it), and
+    # that is not a second declaration: a review sitting has just performed the
+    # thing this gate offers, so it passes the id to `gate-inventory.py
+    # --pending --answered` exactly as any other answered gate.
+    "review-entry": {
+        "stage": DONE,
+        "owner_decision": "run review-article on the persisted draft, or stop "
+                          "here",
     },
 }
 
@@ -583,6 +601,53 @@ def probe_entry_gate(source_count, ws=None, brief=True):
                        "nothing is read and the run stays resumable"},
         ],
         gate="probe-entry", ws=ws,
+        recommended=0,
+    )
+
+
+def review_entry_gate(draft_path, ws=None, blockers=0):
+    """"Run review-article on the draft, or stop here?" — the terminal handover.
+
+    THE PATH RIDES THE PAYLOAD (amended 2026-08-03, #1335). The completion
+    summary's first block already names both persisted products; this gate
+    carries the draft path in `where` so the handover is something the carrier
+    can OBSERVE rather than prose it cannot. The owner reported not being able
+    to find the artifact on a run that emitted its paths — a payload field is
+    the half of that repair a check can assert over.
+
+    The path is the caller's, and the caller's is `complete`'s JSON: the same
+    string the handover block renders, never a second composition of it. When
+    the framed sentence would break the `where` budget the framing is dropped
+    and the path stays — the path is the field's content, and prose around it
+    is not.
+    """
+    framed = f"The run is complete. The draft is persisted at {draft_path}."
+    where = framed if len(framed) <= BUDGETS["where"] else f"draft: {draft_path}"
+    why = ("Review reads the persisted draft and rewrites nothing on its own, "
+           "so it costs a pass and no edits; stopping keeps both products "
+           "exactly as they are.")
+    if blockers:
+        why = (f"{blockers} publish blocker(s) stand, and review is where they "
+               f"are triaged; stopping keeps both products exactly as they "
+               f"are, unpublishable until the blockers are cleared.")
+    return payload(
+        where=where,
+        why=why,
+        choices=[
+            {"label": "run review-article on the draft",
+             "effect": "runs the review passes over the persisted draft and "
+                       "reports findings; it applies no edits, so nothing "
+                       "changes without your say"},
+            {"label": "stop here",
+             "effect": "ends the sitting with both products persisted where "
+                       "the block above names; review remains available later "
+                       "over the same draft"},
+        ],
+        gate="review-entry", ws=ws,
+        # RANKED, AND OVERTURNABLE: review is recommended because it is
+        # read-only over a draft nothing has checked end to end yet. What
+        # overturns it is the owner already knowing the draft is publishable —
+        # in which case a review pass reports findings nobody will act on.
         recommended=0,
     )
 

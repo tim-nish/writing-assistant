@@ -36,8 +36,11 @@ form that survives wrapping, which is the whole reason the rule is "on its own
 line" rather than merely "whole".
 """
 
+import json
+
 __all__ = ["ArtifactPath", "artifact_block", "is_elided",
-           "completion_summary", "BUCKETS"]
+           "completion_summary", "product_handover", "BUCKETS",
+           "HANDOVER_PRODUCTS"]
 
 # The visible cut used everywhere in this codebase for a deliberate truncation.
 # An artifact path may never carry it: a path with a cut in it is unopenable,
@@ -140,7 +143,69 @@ def is_elided(text):
 BUCKETS = ("informational notes", "publish blockers", "optional cleanup")
 
 
-def completion_summary(stage, notes=(), blockers=(), cleanup=(), next_step=None):
+# --- The handover block (Story 20.194, #1335) --------------------------------
+#
+# THE PATHS WERE EMITTED AND THE HANDOVER STILL FAILED. On run
+# 20260803T105759-992700 both products persisted, zero blockers, and the owner
+# reported *"No file path was shown, so I cannot see the generated artifact."*
+# The paths were line 2 of the informational bucket inside 17 owner-facing
+# lines. Whether a person finds a signal is a property of its FIXED POSITION,
+# not of its presence — so this is a position rule, not another sentence in a
+# bucket (amended 2026-08-03, `specs/spec-article-draft-pipeline/amendments.md`).
+#
+# RENDERED, NEVER COMPOSED. The input is `complete`'s own JSON: a path a run
+# types is a path a run can mistype. There is no second store — `cmd_complete`
+# already returns both persisted absolute paths and this reads them.
+
+# The two declared products of a draft run, in handover order, with the label
+# the owner reads. Declared here so the block cannot name one and forget the
+# other.
+HANDOVER_PRODUCTS = (("canonical", "draft"), ("plan", "plan"))
+
+
+def product_handover(complete_json, blockers=()):
+    """The completion summary's FIRST BLOCK: both persisted product paths.
+
+    `complete_json` is what `draft-pipeline.py complete` printed — the parsed
+    dict or its raw stdout. Returns None when it carries no completed run:
+    unparseable output, a missing `products` key, or a product with no path.
+    A `complete` that FAILED prints no JSON at all, so there is nothing to
+    hand over and no path line is emitted; the gate's hard error is what the
+    owner is owed instead.
+
+    THE ORDERING AGAINST THE BLOCKER BUCKET IS DECLARED, NOT INCIDENTAL. This
+    block precedes every bucket, publish blockers included — and because a
+    blocker is the one thing that outranks the handover, the block's last line
+    NAMES the blocker count when there is one. That is the tie-break the
+    amendment asks for: fixed position for the handover, and no run where the
+    first thing read hides the fact that the draft must not be published yet.
+    """
+    data = complete_json
+    if isinstance(data, (str, bytes)):
+        try:
+            data = json.loads(data)
+        except (ValueError, TypeError):
+            return None
+    if not isinstance(data, dict):
+        return None
+    products = data.get("products")
+    if not isinstance(products, dict):
+        return None
+    lines = []
+    for key, label in HANDOVER_PRODUCTS:
+        entry = products.get(key)
+        path = entry.get("path") if isinstance(entry, dict) else None
+        if not path:
+            return None
+        lines.append(artifact_block(label, path))
+    n = len([b for b in blockers if str(b).strip()])
+    if n:
+        lines.append(f"{n} publish blocker(s) below — do not publish yet.")
+    return "\n".join(lines)
+
+
+def completion_summary(stage, notes=(), blockers=(), cleanup=(), next_step=None,
+                       complete_json=None):
     """The completion summary, composed — never assembled in chat.
 
     Every bucket renders, including an empty one: "publish blockers: none" is a
@@ -151,8 +216,23 @@ def completion_summary(stage, notes=(), blockers=(), cleanup=(), next_step=None)
     `next_step` is the in-conversation choice the interaction contract requires
     (CAP-6, #226). It is rendered as a line here and asked through the gate
     carrier; this composer states it, it does not ask it.
+
+    `complete_json` is `complete`'s output; given it, the handover block heads
+    the summary ahead of every bucket. Passing something this composer cannot
+    read both paths out of RAISES rather than silently dropping the block — a
+    handover that vanished is the defect #1335 reports, and a summary printed
+    over a failed `complete` would report a completion that did not happen.
     """
-    lines = [f"{stage} — complete.", ""]
+    lines = []
+    if complete_json is not None:
+        head = product_handover(complete_json, blockers=blockers)
+        if head is None:
+            raise ValueError(
+                "complete_json carries no completed run — both product paths "
+                "must be readable from `complete`'s JSON. A failed `complete` "
+                "has no completion to summarize: surface its hard error")
+        lines += [head, ""]
+    lines += [f"{stage} — complete.", ""]
     for label, items in zip(BUCKETS, (notes, blockers, cleanup)):
         items = [str(i).strip() for i in items if str(i).strip()]
         if items:

@@ -69,10 +69,22 @@ of an invocation, never a silent death at `error_max_turns`.
 ```
 python3 -c "import sys; sys.path.insert(0,'${CLAUDE_PLUGIN_ROOT}/scripts'); \
   import owner_surface as o; print(o.completion_summary(<stage>, notes=[…], \
-  blockers=[…], cleanup=[…], next_step=<the choice>))"
+  blockers=[…], cleanup=[…], next_step=<the choice>, \
+  complete_json=<complete's stdout>))"
 ```
 
-Print what it returns, unchanged. The three bucket headings are `BUCKETS` in
+Print what it returns, unchanged.
+
+**The persisted product paths head the summary, before any bucket (2026-08-03,
+#1335).** Pass `complete`'s own stdout as `complete_json` on a draft run: the
+composer renders both persisted paths as the **first block**, ahead of every
+bucket including publish blockers, and when blockers exist that block's last
+line names their count — the ordering is declared there, never left to
+whoever assembles the reply. The paths are **rendered from that JSON, never
+retyped**. A `complete` that FAILED prints no JSON: there is no completion to
+summarize, so no path line is emitted and the gate's hard error is what the
+owner is owed instead (passing anything the composer cannot read both paths
+out of raises rather than silently dropping the block). The three bucket headings are `BUCKETS` in
 that module — one string, never N paraphrases — and every bucket renders even
 when empty, because "publish blockers: none" is a fact the owner needs and a
 vanishing bucket is indistinguishable from one nobody filled. The 2026-08-01
@@ -101,7 +113,14 @@ not the list's completeness but its non-member fallback, and this one's was
 
 The cases below are **worked examples beneath that rule**:
 
-- **draft run** → "run review-article on the draft / stop here".
+- **draft run** → "run review-article on the draft / stop here", through its
+  declared builder (gate `review-entry`), which carries the draft path in the
+  payload's `where` so the handover rides something a carrier can observe:
+
+  ```
+  draft_gates.review_entry_gate(<draft path from complete's JSON>, ws=<run ws>,
+                                blockers=<count>)
+  ```
 - **review run** → "apply the accepted findings, then re-run review" or "the
   draft is publishable".
 - **partially-completed run** → the resume command above is the next step.
