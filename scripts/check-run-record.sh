@@ -1242,6 +1242,95 @@ if [ "$ws_flag_miss" -eq 0 ]; then
   ok "every documented provenance/quality-gate/verify invocation passes --ws (CAP-1, #1313)"
 fi
 
+# --- Story 20.209 (#1390): the canonical draft's WRITE CARRIER ---------------
+# The invariant: after fill creates it, every mutation of draft.md is recorded
+# with predecessor, successor and reason; an unrecorded write is DETECTABLE and
+# REPORTED, never silently absorbed. Carrier: the run workspace's own git,
+# initialised at mint; rendering: git log -p, no bespoke differ.
+CW=$(mktemp -d) || err "mktemp failed for the carrier fixture"
+cwrap() { rm -rf "$CW" "$WS"; }
+trap 'cwrap' EXIT INT TERM
+
+# AC-2 — mint initialises the workspace repo, with its own local identity.
+# XDG_STATE_HOME is redirected so the fixture never touches the real state root
+# (the same isolation check-footprint-invariant.sh uses).
+mkdir -p "$CW/host" "$CW/state"
+git -C "$CW/host" init -q 2>/dev/null
+MWS=$(XDG_STATE_HOME="$CW/state" python3 scripts/resolve-paths.py new-run --root "$CW/host" 2>"$CW/mint.err")
+if [ -d "$MWS/.git" ] \
+   && [ "$(git -C "$MWS" config user.name)" = "writing-assistant-carrier" ]; then
+  ok "20.209: mint initialises the workspace git with its own identity (AC-2)"
+else
+  err "20.209: a minted workspace carries no usable git repo: $MWS $(cat "$CW/mint.err")"
+fi
+
+# AC-3 — a carrier write records actor and reason; fill's creation is the first
+# recorded state.
+printf 'v1: the draft as fill wrote it\n' \
+  | python3 scripts/run_loop.py draft-write "$MWS" --actor fill \
+      --reason "created by the per-section fill" >/dev/null 2>&1 \
+  || err "20.209: the carrier refused fill's creation write"
+printf 'v2: P4.S2 rewritten\n' \
+  | python3 scripts/run_loop.py draft-write "$MWS" --actor agent-edit \
+      --reason "answers finding P4.S2" >/dev/null 2>&1 \
+  || err "20.209: the carrier refused an agent edit"
+git -C "$MWS" log --format='%s' -- draft.md | grep -q '^agent-edit: answers finding P4.S2$' \
+  && git -C "$MWS" log --format='%s' -- draft.md | grep -q '^fill: created by the per-section fill$' \
+  && ok "20.209: each recorded write carries its actor and reason as the commit message (AC-3)" \
+  || err "20.209: recorded writes do not carry actor+reason: $(git -C "$MWS" log --format='%s' -- draft.md | tr '\n' '|')"
+printf 'x\n' | python3 scripts/run_loop.py draft-write "$MWS" --actor fill >/dev/null 2>&1 \
+  && err "20.209: a write with no --reason was recorded — the reason is the point (#1390)" \
+  || ok "20.209: a write without its reason is refused"
+
+# AC-4/AC-7 — THE REGRESSION: one carrier write, one out-of-band write, exactly
+# one unrecorded-write report naming the two states it sits between.
+printf 'v3: a freehand edit no carrier saw\n' > "$MWS/draft.md"
+irc=0; insp=$(python3 scripts/run_loop.py draft-inspect "$MWS" 2>&1) || irc=$?
+[ "$irc" -ne 0 ] \
+  && printf '%s' "$insp" | grep -q '"disk_sha256"' \
+  && printf '%s' "$insp" | grep -q '"recorded_sha256"' \
+  && [ "$(printf '%s' "$insp" | grep -c '"note"')" = "1" ] \
+  && ok "20.209: exactly one unrecorded write is reported, naming the two states it sits between (AC-4/AC-7)" \
+  || err "20.209: the out-of-band write was not detected as exactly one gap (rc=$irc): $insp"
+# The next carrier write commits the gap as ITS OWN row, never absorbed.
+printf 'v4: the next carrier write\n' \
+  | python3 scripts/run_loop.py draft-write "$MWS" --actor revision-cycle \
+      --reason "cycle 2 dim1 fix" > "$CW/w4.json" 2>&1
+grep -q '"unrecorded_write_detected": true' "$CW/w4.json" \
+  && [ "$(git -C "$MWS" log --format='%s' -- draft.md | grep -c '^unrecorded-write:')" = "1" ] \
+  && ok "20.209: the gap becomes its own history row, not part of the next write's diff (AC-4)" \
+  || err "20.209: the gap was absorbed: $(git -C "$MWS" log --format='%s' -- draft.md | tr '\n' '|')"
+
+# AC-5 — the rendering is git's own log -p: unified diffs with reason lines.
+logout=$(python3 scripts/run_loop.py draft-log "$MWS" 2>&1)
+printf '%s' "$logout" | grep -q '^diff --git' \
+  && printf '%s' "$logout" | grep -q 'revision-cycle: cycle 2 dim1 fix' \
+  && ok "20.209: git log -p renders each step as a unified diff with its reason (AC-5)" \
+  || err "20.209: the rendering is not git log -p output: $(printf '%s' "$logout" | head -3)"
+
+# AC-6 — a clean inspection states its SCOPE, never the class.
+insp=$(python3 scripts/run_loop.py draft-inspect "$MWS" 2>&1) \
+  && printf '%s' "$insp" | grep -q '"recorded_writes_examined": 4' \
+  && printf '%s' "$insp" | grep -q '"working_copy_examined": true' \
+  && printf '%s' "$insp" | grep -q '"clean_within_scope": true' \
+  && ok "20.209: a clean inspection names the scope it examined — 4 recorded writes and the working copy (AC-6)" \
+  || err "20.209: the clean report does not state its scope: $insp"
+
+# Degradation — a workspace with no git still gets its write, and says so.
+mkdir -p "$CW/bare"
+dg=$(printf 'y\n' | python3 scripts/run_loop.py draft-write "$CW/bare" \
+       --actor fill --reason r 2>&1)
+[ -f "$CW/bare/draft.md" ] && printf '%s' "$dg" | grep -q '"degraded"' \
+  && ok "20.209: without a workspace repo the write lands and the degradation is disclosed — never a held-hostage draft" \
+  || err "20.209: the degraded path misbehaved: $dg"
+
+# The prose half: both writer sites route through the carrier, or the carrier
+# has readers and no writers.
+grep -q 'draft-write' skills/draft-article/stages/stage3.md \
+  && grep -q 'draft-write' skills/draft-article/stages/gate.md \
+  && ok "20.209: the fill and the revision cycle both name the carrier — it has writers, not only a detector" \
+  || err "20.209: a stage writes draft.md without naming the carrier (a reader with no writer is dead code wearing enforcement's name)"
+
 # --- AC-6: the spec carrier this check answers to still exists ---------------
 for f in specs/spec-run-record/SPEC.md specs/spec-run-record/record-formats.md; do
   [ -f "$f" ] || err "$f is absent — this check's contract carrier is gone (AC-6)"
