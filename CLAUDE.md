@@ -93,6 +93,40 @@ this repo's to state: it lives in `claude-toolkit/specs/spec-triage-gh/SPEC.md`
 `specs/spec-spec-sitting/SPEC.md`. This section is the duty owed by agents
 working in *this* repository, which is where the incident happened.
 
+## A control surface names its operating doc (#1367)
+
+**A change that ships a CONTROL SURFACE — a mode, flag, or affordance whose
+guard becomes true only by someone performing an act — names, in the same
+change, the operating doc that carries the enable affordance.** Not a later
+task, not a follow-up issue: the same change, because the change that
+introduces the surface is the only moment at which its absence is a decision
+rather than an oversight.
+
+This is ambient here rather than in a skill for the reason the fork-gate
+section already states: the rule is broken at the moment an agent ships a
+surface, in any sitting including one that does not present as capability
+work, and a skill binds only the sittings that invoke it.
+
+**Declare the surface where it lives**, in the greppable-header shape
+`# tier:` and `# removal-signal:` already use:
+
+```
+# control-surface: <name> — enabled by <the act>; operating doc: <path>
+```
+
+`scripts/check-subcommand-carriers.sh` asserts over the **declared** set: every
+`# control-surface:` names an operating doc that exists and mentions the
+surface. It extends that check rather than joining the family, because the
+class is the second conjunct of the one it already guards — a carrier exists,
+and the guard can never be true.
+
+**The known residual, stated rather than hidden:** the signal covers declared
+surfaces; whether they get declared is what this clause covers, and nothing
+mechanical catches an undeclared one. Block mode (#1360) is the observed
+instance — call sites present, invocation-site check green, and the mode dark
+on every skill-driven run because nothing told the agent to enable it. A
+passing audit and a dark feature were the same observation.
+
 ## Validation tiers (#913)
 
 Checks run through `scripts/run-checks.sh`, never as an ad-hoc full-suite

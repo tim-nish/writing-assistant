@@ -310,3 +310,48 @@ lives (O1).
 3. **Cross-run artifacts** — if dogfooding surfaces state that must outlive
    a run (e.g. a reusable fact-sheet cache), it forces the state/cache
    split D2 skipped; that is the signal to revisit, not before.
+
+### D2a — Run workspaces have a declared lifecycle (2026-08-04, #1393)
+
+D2 makes every per-run intermediate live in one disposable directory. It never
+said when a workspace **stops** being kept, so nothing ever deleted one: the
+state root grows monotonically, and on 2026-08-04 it held **191 directories and
+340 run directories** — one per host-repo path ever operated on (including dead
+paths whose repos no longer exist there) and one per run forever. The owner
+reads that as unknown clutter, correctly, because most of it is state nothing
+will read again.
+
+**The retention rule, declared rather than inferred.** A run workspace is KEPT
+when any of these holds, and is a deletion candidate otherwise:
+
+1. its checkpoint is **not at `complete`** — held, resumable, or mid-flight
+   under block mode;
+2. it is among the **N most recent completed runs for its host repo**
+   (default 5);
+3. it is **younger than 14 days**.
+
+A host-repo directory whose path no longer exists on disk and whose runs are
+all candidates is itself a candidate.
+
+**Keep-conditions, not an exclusion list.** The rule is stated positively so
+that "delete something still needed" is unproducible: clause 1 is what protects
+`resume`, the only consumer that depends on a workspace persisting, and it
+protects it by a property of the workspace rather than by anyone remembering to
+list it.
+
+**Deletion is proposed, never automatic.** `gc` lists candidates with their
+reasons and deletes only on explicit confirmation. There is no background
+purge and no scheduled sweep: the state root is machine state, but deleting it
+is an owner act, and an automatic purge would be an undo privilege granted
+without the matching observation.
+
+**Accretion surfaces where someone is already standing.** When `new-run` mints
+a workspace while the root holds more than M candidates, it emits one notice
+line naming the count and the `gc` command — so the accumulation is seen at the
+moment a person is already touching the state root, rather than waiting for
+them to browse a directory that was never meant for browsing.
+
+**Non-goals**, recorded so they are not re-proposed: no archive or compress
+tier, no config knobs beyond N and the age, and nothing that keeps a run alive
+for permanent preservation — anything needing that is copied out, not kept in
+the state root. Delivery: story 20.215.
