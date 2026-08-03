@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 # parallel-safe
 # tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
-# covers: scripts/draft-pipeline.py skills/draft-article/stages/stage3.md
+# covers: scripts/draft-pipeline.py skills/draft-article/stages/stage3.md scripts/terrain_structure.py skills/terrain/steps/brief.md
 # check-brief-informed-structures.sh — verify Story 18.45 (#558, SPEC-article-
 # draft-pipeline CAP-9 2026-07-22 #554 amendment): the SHIPPED structure
 # proposer's INPUT is widened to the owner's free-form coverage brief (#505), so
@@ -142,10 +142,31 @@ n=$(grep -c '^def _narrative_structures' "$DP" || true)
 n=$(grep -c '"structures": cmd_structures' "$DP" || true)
 [ "$n" = "1" ] && ok "exactly one structures subcommand carries it" \
   || err "expected exactly 1 structures dispatch entry, found $n"
+# terrain_structure.py is EXEMPTED BY NAME, and the exemption is narrower than
+# it looks (Story 20.211, #1410). It defines no proposer: like its two brief-gate
+# siblings it authors no candidate (`composed: false` is literal) and supplies
+# composition inputs, requirements and the after-composition count. The one
+# proposer in code is still `_narrative_structures` above.
+#
+# What #1410 DID introduce is a second GATE, and the invariant survives because
+# that ruling declared the PRECEDENCE rather than leaving two mechanisms to
+# compete: the brief's gate is the owner decision, and stage 3 is not re-raised
+# over a brief-adopted structure. An undeclared precedence is what this
+# assertion exists to prevent, so the precedence clause is asserted here rather
+# than assumed — the exemption costs coverage only if that clause goes missing,
+# and now it cannot go missing silently.
 grep -rlE '^def .*(narrative_structure|propose_structures|structure_candidates)' \
-  "$root/scripts" 2>/dev/null | grep -v 'draft-pipeline.py' > "$work/others" || true
-[ ! -s "$work/others" ] && ok "no other script defines a structure proposer" \
+  "$root/scripts" 2>/dev/null \
+  | grep -v 'draft-pipeline.py' | grep -v 'terrain_structure.py' \
+  > "$work/others" || true
+[ ! -s "$work/others" ] && ok "no other script defines a structure proposer (the #1410 brief-gate block builder is exempted by name; it composes nothing)" \
   || err "a second structure proposer exists: $(cat "$work/others")"
+grep -q 'composed.*False' "$root/scripts/terrain_structure.py" 2>/dev/null \
+  && ok 'the exempted brief-gate module authors no candidate — composed:false is literal' \
+  || err 'scripts/terrain_structure.py no longer declares composed:false — the exemption above rested on it composing nothing, so the single-proposer invariant is now unguarded'
+grep -q 'not re-raised' "$root/skills/draft-article/stages/stage3.md" \
+  && ok "the two gates carry a DECLARED precedence: stage 3 is not re-raised over a brief-adopted structure (#1410)" \
+  || err "stage3.md no longer declares the precedence between the brief structure gate and this one — two structure mechanisms with no precedence is exactly what 18.45 forbids"
 
 # --- 9. SKILL states the widened-input contract --------------------------------
 norm() { tr '\n' ' ' < "$1" | tr -s ' ' | sed 's/\*\*//g; s/`//g'; }

@@ -543,11 +543,18 @@ def verify_cover(composed, brief, brief_path=None):
         # without a cycle.
         from terrain_journey import verify_incorporation
         return verify_incorporation(composed, selected)
+    if kind == "structure-candidates":
+        # The structure count lives beside its composer too (Story 20.211,
+        # #1410), imported at the routing for the same no-cycle reason.
+        from terrain_structure import verify_structures
+        return verify_structures(composed, selected)
     return {"kind": kind or None, "complete": False,
             "refusals": ["the composed file names no `kind`: it is "
-                         "`candidate-theses`, `partition`, or "
-                         "`journey-incorporation`, and the three are counted "
-                         "differently — a thesis may omit a Strand it "
-                         "discloses, a partition may not, and an "
+                         "`candidate-theses`, `partition`, "
+                         "`journey-incorporation`, or `structure-candidates`, "
+                         "and the four are counted differently — a thesis may "
+                         "omit a Strand it discloses, a partition may not, an "
                          "incorporation cover runs over the members whose "
-                         "arcs are served."]}
+                         "arcs are served, and a structure cover additionally "
+                         "refuses a bare framework name where ordered moves "
+                         "belong."]}

@@ -520,5 +520,138 @@ sys.exit(1 if fail else 0)
 PYEOF
 [ $? -eq 0 ] || fail=1
 
+# --- Story 20.211 (#1410): STRUCTURE IS COMPOSED, NEVER SELECTED FROM A STOCK.
+# Negative run (governance rule 6): every assertion below was watched failing
+# against main@06f291d (pre-20.211 modules) — block absent, kind unrouteable,
+# adoption unguarded — before this section landed.
+python3 - "$work" <<'PYEOF' || fail=1
+import json, subprocess, sys
+w = sys.argv[1]
+fail = 0
+def check(cond, msg):
+    global fail
+    if cond: print("ok:   20.211: " + msg)
+    else:    print("FAIL: 20.211: " + msg); fail = 1
+run = lambda *a: subprocess.run(
+    ["python3", "scripts/topic-map-directions.py"] + list(a),
+    capture_output=True, text=True)
+
+final = json.load(open(w + "/b-final.json"))
+small = json.load(open(w + "/b-small.json"))
+sc = final.get("structure_candidates") or {}
+# The gate is raised by ADOPTION, sequenced after the register, composed by
+# nobody yet.
+check(sc.get("state") == "candidates-pending" and sc.get("composed") is False,
+      "an adopted brief raises the structure block, `composed: false` literal")
+check("structure_candidates" not in small,
+      "no structure gate before a thesis is adopted — absent, not empty")
+check("candidates" not in sc,
+      "no candidate is authored at the gate — a framework menu is exactly "
+      "what must not ship (#1410)")
+check((sc.get("inputs") or {}).get("thesis") == "one reading",
+      "the inputs carry THIS brief's adopted thesis")
+check((sc.get("inputs") or {}).get("journey_incorporation"),
+      "the adopted register rides the inputs — a journey-shaped candidate "
+      "must agree with the register the owner already chose")
+reqs = sc.get("requirements") or []
+check(any("bespoke" in r for r in reqs) and
+      any("never a framework name" in r for r in reqs),
+      "the requirements carry the #911 instrument and the no-menu rule")
+
+# The cover: a conforming set passes; the menu returning through the answer
+# file is refused; so are a missing rationale and a silent drop.
+b = json.load(open(w + "/ws/brief-final.json"))
+ids = [m["index"] for m in b["members"]]
+gd = lambda xs: [{"index": i, "cite": "LESSONS.md:1@abc1234"} for i in xs]
+good = {"kind": "structure-candidates", "over": ids, "pin": b["pin"],
+        "candidates": [
+    {"structure": "open with the failure case; walk each member's claim; "
+                  "close by composing them into the thesis",
+     "rationale": "the widened Strand's arc is the strongest concrete anchor",
+     "places": ids, "grounds": gd(ids)},
+    {"structure": "state the thesis plainly; contrast the two engineering "
+                  "members; end on the people member as the cost",
+     "rationale": "the topic split in the set motivates a contrast shape",
+     "places": ids[:2], "grounds": gd(ids[:2]),
+     "omits": [{"index": ids[2], "why": "reads as an aside in this shape"}]}]}
+json.dump(good, open(w + "/s-good.json", "w"))
+r = run("cover", "--composed", w + "/s-good.json",
+        "--from", w + "/ws/brief-final.json")
+check(r.returncode == 0, "a conforming structure set passes the cover: "
+      + r.stderr[:120])
+menu = json.loads(json.dumps(good))
+menu["candidates"][0] = {"structure": "ki-sho-ten-ketsu",
+                         "places": ids, "grounds": gd(ids)}
+json.dump(menu, open(w + "/s-menu.json", "w"))
+r = run("cover", "--composed", w + "/s-menu.json",
+        "--from", w + "/ws/brief-final.json")
+check(r.returncode != 0 and "menu" in (r.stdout + r.stderr),
+      "a bare framework name where ordered moves belong is refused — the "
+      "menu returning through the answer file")
+silent = json.loads(json.dumps(good))
+silent["candidates"][1].pop("omits")
+json.dump(silent, open(w + "/s-silent.json", "w"))
+r = run("cover", "--composed", w + "/s-silent.json",
+        "--from", w + "/ws/brief-final.json")
+check(r.returncode != 0 and "neither places nor discloses" in (r.stdout + r.stderr),
+      "a silent Strand drop is refused, by name")
+one = json.loads(json.dumps(good)); one["candidates"] = one["candidates"][:1]
+json.dump(one, open(w + "/s-one.json", "w"))
+r = run("cover", "--composed", w + "/s-one.json",
+        "--from", w + "/ws/brief-final.json")
+check(r.returncode != 0 and "at least" in (r.stdout + r.stderr),
+      "one candidate is the machine deciding — refused")
+
+# Adoption: the #1079 rule and the #911 instrument, both refusals named.
+ans = json.load(open(w + "/a-adopt-reg.json"))
+ans["structure"] = good["candidates"][0]["structure"]
+json.dump(ans, open(w + "/a-adopt-struct.json", "w"))
+r = run("brief", "--answer", w + "/a-adopt-struct.json",
+        "--map", w + "/map.json", "--composed", w + "/c-good.json",
+        "--incorporation", w + "/i-good.json")
+check(r.returncode != 0 and "adopted from" in (r.stdout + r.stderr),
+      "adopting a structure without --structures is refused (#1079)")
+r = run("brief", "--answer", w + "/a-adopt-struct.json",
+        "--map", w + "/map.json", "--composed", w + "/c-good.json",
+        "--incorporation", w + "/i-good.json",
+        "--structures", w + "/s-good.json")
+check(r.returncode != 0 and "bespoke" in (r.stdout + r.stderr),
+      "adopting a structure with no framework_matched is refused — the #911 "
+      "instrument makes silence impossible")
+ans["structure_framework_matched"] = "bespoke"
+json.dump(ans, open(w + "/a-adopt-struct.json", "w"))
+r = run("brief", "--answer", w + "/a-adopt-struct.json",
+        "--map", w + "/map.json", "--composed", w + "/c-good.json",
+        "--incorporation", w + "/i-good.json",
+        "--structures", w + "/s-good.json",
+        "--out", w + "/ws/brief-struct.json")
+check(r.returncode == 0, "adoption with candidates + explicit bespoke "
+      "succeeds: " + r.stderr[:150])
+if r.returncode == 0:
+    out = json.loads(r.stdout)
+    scb = out.get("structure_candidates") or {}
+    check(scb.get("state") == "adopted"
+          and len(scb.get("candidates") or []) == 2,
+          "an adopted structure records the WHOLE offer beside the choice")
+
+# The registry and the prose both carry the gate.
+import re
+gates_src = open("scripts/draft_gates.py", encoding="utf-8").read()
+check(gates_src.find('"journey-incorporation"') < gates_src.find('"structure"')
+      < gates_src.find('"resume-confirmation"'),
+      "GATES declares `structure` after `journey-incorporation` — the "
+      "registry order is load-bearing")
+prose = open("skills/terrain/steps/brief.md", encoding="utf-8").read()
+check('draft_gates.gate("structure"' in prose,
+      "brief.md routes the candidates through the declared carrier — a gate "
+      "with no writer is dead code wearing enforcement's name")
+s3 = open("skills/draft-article/stages/stage3.md", encoding="utf-8").read()
+check("not re-raised" in s3 or "not re-raise" in s3,
+      "stage3 states the narrative-structure gate is not re-raised over a "
+      "brief-adopted structure — asked exactly once")
+sys.exit(1 if fail else 0)
+PYEOF
+[ $? -eq 0 ] || fail=1
+
 [ "$fail" -eq 0 ] && printf '\nAll %s checks passed.\n' "$0" \
   || { printf '\n%s FAILED.\n' "$0" >&2; exit 1; }

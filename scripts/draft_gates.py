@@ -251,6 +251,17 @@ GATES = {
         "owner_decision": "journey incorporation — how the selected members' "
                           "journey material enters the article",
     },
+    # AFTER JOURNEY INCORPORATION (Story 20.211, #1410): candidates are
+    # COMPOSED from this Brief's adopted thesis, member set, and served arcs
+    # — never selected from a framework stock — so a journey-shaped candidate
+    # can lean on the register the owner just chose. A brief carrying an
+    # adopted structure means the stage-3 narrative-structure gate is not
+    # re-raised: a decided owner question is asked exactly once.
+    "structure": {
+        "stage": TERRAIN,
+        "owner_decision": "structure — which composed candidate shapes THIS "
+                          "article's moves",
+    },
     "resume-confirmation": {
         "stage": START,
         "owner_decision": None,   # asked only when a run predates the sitting

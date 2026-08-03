@@ -173,6 +173,15 @@ BRIEF_KEYS = frozenset({
                               # the offered options and the adopted choice,
                               # the same provenance role `candidate_theses`
                               # plays for the thesis
+    "structure_candidates",   # THIS article's composed structure (Story
+                              # 20.211, #1410) — a disclosure riding the
+                              # brief once a thesis is adopted; carries the
+                              # offered candidates, the adopted structure,
+                              # and its `framework_matched` provenance
+                              # (explicit `bespoke`, the #911 instrument),
+                              # the same provenance role as its two siblings.
+                              # Decision content per the #1414 amendment's
+                              # Brief-disclosure clause.
     "edit",                # the signed set change (`+L12 −L3`) that produced a
                            # recomposition (#997). The owner names what changes,
                            # so this is unrecomposable owner history, not a

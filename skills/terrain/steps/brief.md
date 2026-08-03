@@ -305,6 +305,56 @@ outline; concrete design belongs to realization.** Nothing here reaches into
 the fill's own instructions, and the fill does not branch on this block
 existing.
 
+## Structure — composed for THIS article, one selection later
+
+**Added 2026-08-03** (Story 20.211; #1410, the owner ruling *(owner decision
+record — 2026-08-03 (article structure proposed, not templated))*). Once a
+thesis is adopted the command returns `structure_candidates` with
+`composed: false`, and that is literal: it carries the composition **inputs**
+(the adopted thesis, the member set with served glosses and arcs, and the
+adopted journey register when one exists), the `requirements`, and the count
+that verifies what comes back. **There is no framework stock to select from
+— that is the ruling, not a preference.** Compose 2–3 candidates from THIS
+brief's state, each stated **operationally** — ordered moves with a one-line
+rationale naming the material that motivates it (*"open with the failure
+case: J2 is the strongest concrete anchor for the thesis"*) — never a
+framework name as the candidate. A journey-shaped candidate
+(failure-case-first, reversal-led) is admissible and **names the served arc
+that licenses it**; it must agree with the adopted register, which rides the
+inputs so you cannot compose blind to it. A candidate *may* cite a framework
+as vocabulary ("close to ki-shō-ten-ketsu") when that helps the owner
+evaluate it; whatever remains of `skills/draft-article/frameworks/` after
+#911's window is reference prose, and no path enumerates it for selection.
+
+**PUT THE CANDIDATES THROUGH THE CARRIER**, exactly as the thesis and
+register go:
+
+```
+draft_gates.gate("structure", where=…, why=…, choices=[…], ws=<run ws>)
+```
+
+The standing requirements bind unchanged: every candidate over the same
+complete set; every candidate places every selected Strand or discloses the
+omission by name; placements cite served renderings at the pin; enumerated,
+never ranked-and-trimmed; a recommendation beside the candidates naming its
+axes and overturn condition; free text wins. **Then run the count — after
+composition, not optional** — the same `cover` command over
+`{"kind": "structure-candidates", …}` (the shape the block hands you in
+`structure_candidates.answer`); it additionally refuses a bare framework name
+where ordered moves belong.
+
+To record the owner's choice, pass it back as `structure` in the answer
+**with `--structures <the composed candidates file>`** (the #1079 rule a
+third time) **and `structure_framework_matched`** — the matched framework's
+name, or the literal `bespoke` when nothing was matched. The explicit
+`bespoke` is #911's instrument: the composer ignoring the reference
+frameworks must be a measurement, never a silence, and the brief refuses an
+adoption that omits the value. **The adopted structure crosses into drafting
+as a disclosure** — direction at the brief; placement belongs to the outline;
+concrete design belongs to realization — and a brief carrying one means the
+stage-3 `narrative-structure` gate is **not re-raised**: a decided owner
+question is asked exactly once.
+
 ## A large selection may be proposed as k article-scoped groups
 
 **Added 2026-07-31** (SPEC-terrain CAP-3, #988). Reviewing fifteen Strands as
