@@ -120,6 +120,37 @@ need(res3["ok"] is False and res3["render_missing"] == ["intent"],
      "an EMITTED payload with no render: declaration is not caught — that is "
      "the second half of the #1114 defect")
 
+# THE ASK LOG MIXES THREE ROW SHAPES, AND ONLY ONE CARRIES A GATE (#1336).
+# The capture path writes surface-keyed asks (`validate-proposal-payload.py
+# --ws --surface`) and answer rows, neither of which has a gate id — so a
+# gate-less row is not an edge case, it is what every run that captures a
+# payload produces. No fixture held one, and `audit` indexed `r["gate"]`
+# unguarded: every such run raised KeyError, and because the audit runs inside
+# the Stop hook the crash surfaced as a policy verdict about gate rendering.
+wsmix = tempfile.mkdtemp()
+with open(os.path.join(wsmix, "presented-payloads.jsonl"), "w",
+          encoding="utf-8") as f:
+    item = {"where": "w", "why": "y", "choices": [{"label": "a", "effect": "b"}],
+            "render": {"control": "selection", "recommended": None}}
+    f.write(json.dumps({"kind": "ask", "gate": "probe-entry",
+                        "stage": "probe", "items": [item]}) + "\n")
+    # surface-keyed ask: no `gate`, by contract
+    f.write(json.dumps({"kind": "ask", "surface": "interview",
+                        "payload": {"items": [item]}}) + "\n")
+    # answer row: no `gate`, no `items`
+    f.write(json.dumps({"kind": "answer", "ask_id": 3,
+                        "answer": {"selection": "Stop here"}}) + "\n")
+resmix = gi.audit(wsmix, reached=["probe-entry"])
+need(resmix["ok"] is True,
+     "an ask log mixing gate rows, surface rows and answer rows did not audit "
+     "clean: %r" % (resmix,))
+need(resmix["render_missing"] == [],
+     "a gate-less row was reported as missing a render: declaration — a row "
+     "with no gate is not a gate emission and cannot be missing one: %r"
+     % (resmix["render_missing"],))
+need(resmix["missing"] == [],
+     "the reached gate was not credited beside gate-less rows: %r" % (resmix,))
+
 # An unknown gate id in `reached` is a programming error, not a silent pass.
 try:
     gi.audit(ws, reached=["nope"])

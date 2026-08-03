@@ -50,6 +50,20 @@ writer is the defect, not the safety net. The subject is now the pointer the
 checkpoint write leaves at `<state-root>/<cwd-key>/active-run.json`, resolved
 from the Stop payload's documented `cwd` alone.
 
+A CRASH IS REPORTED AS A CRASH, NEVER AS A VERDICT (#1336).
+A real finding and an exception both leave the auditor at a non-zero exit, and
+this file read only the exit code — so a `KeyError` in `gate-inventory` reached
+the owner three turns running, worded as a confirmed policy breach ("the ask
+reached the owner as prose"), pointing the debugger at gate rendering when the
+fact was a traceback. The discriminator is that a finding prints its verdict
+object BEFORE exiting non-zero and a crash prints none (`audit_outcome`). A
+crashed audit now says so, names the exception, records `cannot-determine`
+beside a crash signature, and EXITS 0 — an audit that could not run has
+determined nothing, and holding the turn open on it is the three-consecutive-
+stops loop itself. A repeating crash identifies as repeating rather than
+re-presenting as a fresh finding, because a hook that cries the same wolf every
+turn trains the owner to skip real findings.
+
 AND IT RECORDS WHAT IT DECIDED, PER TURN. `cannot-determine` was named as the
 thing to watch and given no watcher — a rate written to a stream nobody reads.
 Every evaluated turn now appends its verdict to the run workspace, so a run
@@ -172,7 +186,86 @@ def _settled_from(stdout):
     return obj.get("tool_call_settled") if isinstance(obj, dict) else None
 
 
-def _record_verdict(ws, payload, subject_found, settled, result):
+def _audit_json(stdout):
+    """The auditor's own JSON verdict, or None when it printed none.
+
+    THIS IS THE CRASH DISCRIMINATOR (#1336). A real finding always prints its
+    verdict object before exiting non-zero (`gate-inventory.main` prints the
+    JSON, then its BOUND, then returns 1); a crash raises out of `main`, so it
+    exits non-zero having printed no JSON at all. Both were read here as
+    "returncode != 0", which is how a KeyError came to reach the owner worded
+    as a confirmed policy breach.
+    """
+    text = stdout or ""
+    i = text.find("{")
+    if i < 0:
+        return None
+    try:
+        obj, _ = json.JSONDecoder().raw_decode(text[i:])
+    except ValueError:
+        return None
+    return obj if isinstance(obj, dict) else None
+
+
+def audit_outcome(returncode, stdout, stderr):
+    """`("crash", signature)` | `("finding", None)` | `(None, None)`.
+
+    The whole crash-vs-verdict decision, in one pure function so it can be
+    exercised without a crashing auditor to hand — the alternative was an
+    environment override whose only writer would have been the fixture, which
+    is the dead-input shape this repository refuses.
+    """
+    if returncode == 0:
+        return None, None
+    if _audit_json(stdout) is None:
+        return "crash", crash_signature(stderr)
+    return "finding", None
+
+
+def crash_report(signature, prior_repeats):
+    """The owner-facing line for a crashed audit.
+
+    Composed here rather than at the call site so the repetition rider and the
+    wording are asserted together: the message must never carry the
+    missed-gate accusation, and a repeat must say so.
+    """
+    again = (f" — same crash as the previous turn (x{prior_repeats + 1})"
+             if prior_repeats else "")
+    return (f"gate audit crashed: {signature}{again} — no verdict this turn. "
+            f"Nothing is asserted about gates; fix the auditor, not the gates.")
+
+
+def crash_signature(stderr):
+    """One line identifying WHICH crash this is, for the repetition rider.
+
+    The last non-empty line of a Python traceback is the exception type and
+    message, which is stable across turns for a deterministic crash and
+    different for a different one — so counting consecutive equal signatures
+    counts a repeating crash without ever comparing tracebacks in full.
+    """
+    lines = [ln.strip() for ln in (stderr or "").splitlines() if ln.strip()]
+    if not lines:
+        return "no stderr from the audit"
+    return lines[-1][:200]
+
+
+def prior_consecutive_crashes(ws, signature):
+    """How many of the immediately preceding recorded turns crashed the same way.
+
+    Read BEFORE this turn's row is appended, so the count the owner sees is
+    "this is the Nth in a row" rather than an off-by-one. A different
+    signature, or any non-crash turn, ends the streak: a repeating crash is
+    the thing worth naming, not a crash-prone run in general.
+    """
+    n = 0
+    for row in reversed(read_verdicts(ws)):
+        if row.get("crash") != signature:
+            break
+        n += 1
+    return n
+
+
+def _record_verdict(ws, payload, subject_found, settled, result, crash=None):
     """Append this turn's verdict to the run workspace (Story 20.156).
 
     Append-only JSONL: one line per evaluated turn, so the RATE is countable
@@ -186,6 +279,12 @@ def _record_verdict(ws, payload, subject_found, settled, result):
                "subject-found": subject_found,
                "settled": settled,
                "result": result}
+        if crash:
+            # Recorded BESIDE `result`, never instead of it: a crashed turn is
+            # a cannot-determine turn, so the all-indeterminate run finding
+            # keeps firing over it. The signature is what makes repetition
+            # countable (#1336).
+            row["crash"] = crash
         with open(os.path.join(ws, VERDICT_FILE), "a", encoding="utf-8") as f:
             f.write(json.dumps(row) + "\n")
     except Exception:
@@ -301,13 +400,23 @@ def main():
     # asked (no transcript), False = asked and the file had not caught up.
     # Neither is a pass, and neither may be recorded as one.
     settled = _settled_from(proc.stdout)
-    if proc.returncode != 0:
+    # A CRASH IS NOT A VERDICT (#1336). The auditor printing no verdict object
+    # while exiting non-zero is an exception, not a finding — and reporting it
+    # as one points the debugger at gate rendering when the fact is a
+    # traceback. A diagnostic must not require the health of the thing it
+    # diagnoses in order to report honestly.
+    outcome, signature = audit_outcome(proc.returncode, proc.stdout, proc.stderr)
+    crashed = outcome == "crash"
+    repeats = prior_consecutive_crashes(ws, signature) if crashed else 0
+    if crashed:
+        result = CANNOT_DETERMINE
+    elif outcome == "finding":
         result = "finding"
     elif settled is True:
         result = "clean"
     else:
         result = CANNOT_DETERMINE
-    _record_verdict(ws, payload, True, settled, result)
+    _record_verdict(ws, payload, True, settled, result, crash=signature)
 
     # THE VOLUME MEASUREMENT (Story 20.153, #1225), reported and never blocking.
     # `SPEC.md:80` records that this repository cannot constrain the relay
@@ -324,6 +433,15 @@ def main():
                 f"budget of {tb.TURN_LINE_BUDGET} outside the gate payload. "
                 f"Detail belongs in the run workspace behind one pointer "
                 f"line.\n")
+
+    if crashed:
+        # SAYS WHAT HAPPENED, AND BLOCKS NOTHING. Exit 0: an audit that could
+        # not run has determined nothing, so holding the turn open on it is
+        # the three-consecutive-stops loop #1336 reports. The repetition rider
+        # is the second half — a hook that cries the same wolf every turn
+        # trains the owner to skip real findings.
+        sys.stderr.write(crash_report(signature, repeats) + "\n")
+        return 0
 
     if proc.returncode == 0:
         return 0
