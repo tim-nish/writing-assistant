@@ -173,6 +173,11 @@ BRIEF_KEYS = frozenset({
                               # the offered options and the adopted choice,
                               # the same provenance role `candidate_theses`
                               # plays for the thesis
+    "plain_register",         # the child-level commitment both article ends
+                              # realize (Story 20.212, #1411) — a disclosure
+                              # riding the brief once a thesis is adopted;
+                              # carries the offered candidates and the
+                              # adopted commitment, the same provenance role
     "structure_candidates",   # THIS article's composed structure (Story
                               # 20.211, #1410) — a disclosure riding the
                               # brief once a thesis is adopted; carries the
@@ -686,3 +691,53 @@ def _resolve_newest_brief(root=None):
     return None, (f"the newest terrain run workspace ({runs[-1]}) holds no "
                   "brief artifact, so there is nothing to open. A brief is "
                   "written when a selection is composed with `--out`.")
+
+
+def post_adoption_blocks(members, pin, claim, answer, incorporation_block,
+                         structures_block, register_block, fit):
+    """The three post-adoption brief gates, in sequence, as one emission:
+    journey incorporation (#1045), structure (#1410), plain register (#1411).
+
+    ONE LOOP RATHER THAN THREE COPIES, because the third copy is where they
+    start to drift — the shape is identical by design (each module builds its
+    own block and returns None where its gate is not raised) and the
+    recorded block is the #1079 provenance in every case: an adoption with no
+    record of what it was adopted from keeps the answer while losing the
+    question. `fit` is the caller's line-fitter, passed rather than imported
+    so this module keeps no opinion about rendering width.
+    """
+    from terrain_journey import journey_incorporation_block
+    from terrain_register import (REGISTER_OPTION_LABEL, _register_line,
+                                  plain_register_block)
+    from terrain_structure import (STRUCTURE_OPTION_LABEL, _structure_line,
+                                   structure_candidates_block)
+    from terrain_text import (JOURNEY_INCORPORATION_OPTION_LABEL,
+                              _journey_incorporation_line)
+    out = {}
+    for key, block, label, line, recorded in (
+        ("journey_incorporation",
+         journey_incorporation_block(
+             members, pin, claim,
+             adopted=answer.get("journey_incorporation")),
+         JOURNEY_INCORPORATION_OPTION_LABEL,
+         lambda b: _journey_incorporation_line(len(b["with_journey"]),
+                                               len(members)),
+         incorporation_block),
+        ("structure_candidates",
+         structure_candidates_block(
+             members, pin, claim, adopted=answer.get("structure"),
+             adopted_register=answer.get("journey_incorporation")),
+         STRUCTURE_OPTION_LABEL,
+         lambda b: _structure_line(len(members), len(b["with_journey"])),
+         structures_block),
+        ("plain_register",
+         plain_register_block(members, pin, claim,
+                              adopted=answer.get("plain_register")),
+         REGISTER_OPTION_LABEL,
+         lambda b: _register_line(len(members)),
+         register_block),
+    ):
+        if block:
+            out[key] = {"label": label, "line": fit(line(block)),
+                        **block, **(recorded or {})}
+    return out

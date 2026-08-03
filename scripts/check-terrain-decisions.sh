@@ -1,6 +1,6 @@
 #!/usr/bin/env sh
 # parallel-safe
-# covers: scripts/terrain_brief.py scripts/terrain_directions.py scripts/terrain_map.py scripts/topic-map-directions.py skills/draft-article/SKILL.md skills/draft-article/stages/stage0.md skills/terrain/SKILL.md skills/terrain/steps/brief.md
+# covers: scripts/terrain_brief.py scripts/terrain_directions.py scripts/terrain_map.py scripts/topic-map-directions.py skills/draft-article/SKILL.md skills/draft-article/stages/stage0.md skills/terrain/SKILL.md skills/terrain/steps/brief.md skills/terrain/steps/brief-gates.md
 # covers-note (#1321): the derivation also proposed scripts/check-brief-pointer-unresolved.sh
 #   and specs/spec-article-draft-pipeline/**. Both appear in this file in PROSE only — a
 #   sibling check named as the owner of an assertion, and a spec cited for a ratified value.

@@ -262,6 +262,16 @@ GATES = {
         "owner_decision": "structure — which composed candidate shapes THIS "
                           "article's moves",
     },
+    # AFTER STRUCTURE (Story 20.212, #1411): the commitment is a translation
+    # of the ADOPTED thesis plus the selected Strands' claims, derived under
+    # operational constraints. It sits last in the brief sequence because
+    # #1412's close composes these renderings into the article's ending, so
+    # the structure that decides where the ending falls is settled first.
+    "plain-register": {
+        "stage": TERRAIN,
+        "owner_decision": "plain register — the commitment both article ends "
+                          "realize",
+    },
     "resume-confirmation": {
         "stage": START,
         "owner_decision": None,   # asked only when a run predates the sitting

@@ -543,6 +543,10 @@ def verify_cover(composed, brief, brief_path=None):
         # without a cycle.
         from terrain_journey import verify_incorporation
         return verify_incorporation(composed, selected)
+    if kind == "plain-register":
+        # The register count lives beside its composer (Story 20.212, #1411).
+        from terrain_register import verify_register
+        return verify_register(composed, selected)
     if kind == "structure-candidates":
         # The structure count lives beside its composer too (Story 20.211,
         # #1410), imported at the routing for the same no-cycle reason.
@@ -551,7 +555,8 @@ def verify_cover(composed, brief, brief_path=None):
     return {"kind": kind or None, "complete": False,
             "refusals": ["the composed file names no `kind`: it is "
                          "`candidate-theses`, `partition`, "
-                         "`journey-incorporation`, or `structure-candidates`, "
+                         "`journey-incorporation`, `structure-candidates`, or "
+                         "`plain-register`, "
                          "and the four are counted differently — a thesis may "
                          "omit a Strand it discloses, a partition may not, an "
                          "incorporation cover runs over the members whose "

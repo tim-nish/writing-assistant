@@ -161,6 +161,11 @@ from terrain_text import (  # noqa: E402
 # arrives beside a file at its ratchet. The count it carries is the SAME
 # placement cover the drafting composer already runs, counted at the earlier
 # gate rather than re-invented there.
+# The post-adoption gate emission and the two adoption recorders live beside
+# the brief and their composers (20.166/20.211/20.212).
+from terrain_register import register_recording  # noqa: E402
+from terrain_structure import structures_recording  # noqa: E402
+
 from terrain_theses import (  # noqa: E402
     PARTITION_MIN_GROUPS,
     PARTITION_OFFER_MIN,
@@ -170,21 +175,6 @@ from terrain_theses import (  # noqa: E402
     partition_proposal_block,
     thesis_candidates_block,
     verify_cover,
-)
-
-# JOURNEY-INCORPORATION options over an adopted brief (Story 20.166, #1045).
-# The same mechanism one gate later: composition inputs and requirements out,
-# composed options counted after the fact through the same `cover` dispatch.
-from terrain_journey import (  # noqa: E402
-    journey_incorporation_block,
-)
-
-# STRUCTURE candidates over an adopted brief (Story 20.211, #1410).
-from terrain_structure import (  # noqa: E402
-    STRUCTURE_OPTION_LABEL,
-    _structure_line,
-    structure_candidates_block,
-    structures_recording,
 )
 
 # The candidate-directions layer this surface proposes with (Story 20.56,
@@ -264,6 +254,7 @@ from terrain_scope import (  # noqa: E402
 from terrain_brief import (  # noqa: E402
     BRIEF_FILENAME,
     _base_composition_pin,
+    post_adoption_blocks,
     _brief_label,
     _brief_lifecycle,
     _edited_indexes,
@@ -443,7 +434,8 @@ def _consultant_block(matches, cands, map_data):
 
 def _brief_from_index(answer, cands, map_pin, map_data=None,
                       composed_block=None, judge=None,
-                      incorporation_block=None, structures_block=None):
+                      incorporation_block=None, structures_block=None,
+                      register_block=None):
     """An INDEXED selection from the View: `{index, note}` (Story 18.67, #602),
     where `index` names a SET (Story 20.54, #937).
 
@@ -744,40 +736,16 @@ def _brief_from_index(answer, cands, map_pin, map_data=None,
     # against earlier. Outside the set-only branch above deliberately: a
     # one-member brief with an adopted claim and a served arc still owes the
     # register its disclosure, and the degenerate case takes the same path.
-    ji = journey_incorporation_block(
-        members, answer_pin, claim or None,
-        adopted=answer.get("journey_incorporation"))
-    if ji:
-        out["journey_incorporation"] = {
-            "label": JOURNEY_INCORPORATION_OPTION_LABEL,
-            "line": _fit(_journey_incorporation_line(
-                len(ji["with_journey"]), len(members))),
-            **ji,
-        }
-        # THE COMPOSED OPTIONS ARE RECORDED HERE, by the same rule as the
-        # candidate theses (#1079): an adopted register with no record of
-        # what it was adopted from keeps the answer while losing the
-        # question.
-        if incorporation_block:
-            out["journey_incorporation"].update(incorporation_block)
-    # The structure gate, one selection later (Story 20.211, #1410) — see
-    # terrain_structure.py's head.
-    sc = structure_candidates_block(
-        members, answer_pin, claim or None,
-        adopted=answer.get("structure"),
-        adopted_register=answer.get("journey_incorporation"))
-    if sc:
-        out["structure_candidates"] = {
-            "label": STRUCTURE_OPTION_LABEL,
-            "line": _fit(_structure_line(len(members),
-                                         len(sc["with_journey"]))),
-            **sc, **(structures_block or {})}
+    out.update(post_adoption_blocks(
+        members, answer_pin, claim or None, answer, incorporation_block,
+        structures_block, register_block, _fit))
     return out
 
 
 def brief_from_answer(answer, cands, map_pin=None, map_data=None,
                       composed_block=None, judge=None,
-                      incorporation_block=None, structures_block=None):
+                      incorporation_block=None, structures_block=None,
+                      register_block=None):
     """The owner's outcome as the brief string for stage-0 `--brief`.
 
     Free text ALWAYS wins: machine-proposed wording becomes the brief only when
@@ -799,7 +767,7 @@ def brief_from_answer(answer, cands, map_pin=None, map_data=None,
     if _selection_terms(answer):
         return _brief_from_index(answer, cands, map_pin, map_data,
                                  composed_block, judge, incorporation_block,
-                                 structures_block)
+                                 structures_block, register_block)
     for c in cands:
         if selection == c["direction"]:
             return {"brief": c["direction"], "provenance": "owner-authored",
@@ -1065,10 +1033,15 @@ def cmd_brief(args):
             "file>` — the same file `cover` reads. The rejected options are "
             "the provenance of the choice.")
     # Structure adoption rules (20.211, #1410) live beside their composer.
-    structures_block, sc_err = structures_recording(
+    # The structure and register adoption rules live beside their composers
+    # (20.211/20.212): #1079 provenance, plus #911's explicit `bespoke`.
+    structures_block, err_ = structures_recording(
         getattr(args, "structures", None), answer)
-    if sc_err:
-        return _err(sc_err)
+    if not err_:
+        register_block, err_ = register_recording(
+            getattr(args, "register", None), answer)
+    if err_:
+        return _err(err_)
     # THE ITERATION LOOP (Story 20.77, #997). An edit is resolved to a member
     # set BEFORE composition, so everything below is the ordinary indexed
     # path: recomposition is REACHED here, never re-implemented.
@@ -1145,7 +1118,8 @@ def cmd_brief(args):
             answer = dict(answer, index=indexes, note=note)
     out = brief_from_answer(answer, cands, map_pin, map_data,
                             composed_block, getattr(args, 'judge', None),
-                            incorporation_block, structures_block)
+                            incorporation_block, structures_block,
+                            register_block)
     # What each selected element's episode DISCLOSES travels beside the brief
     # and the run proceeds — there is no refusal path here on evidence. The
     # host-repo join that used to compute a writability verdict and mint a
@@ -1363,6 +1337,8 @@ RENDERED_KEYS = {
     # The structure block follows the incorporation split exactly (20.211).
     "structure_candidates": ("line", "label", "requirements",
                              "payload_contract", "answer", "inputs"),
+    "plain_register": ("line", "label", "requirements", "payload_contract",
+                       "answer", "inputs", "boundary"),
 }
 
 
@@ -1927,11 +1903,13 @@ def main(argv=None):
                         "(`journey_incorporation` in the answer) REQUIRES "
                         "this, by the #1079 rule: the rejected options are "
                         "the provenance of the choice (Story 20.166, #1045).")
+    b.add_argument("--register", metavar="PATH",
+                   help="the composed plain-register candidates (the file "
+                        "`cover` reads); adopting one REQUIRES it (#1411).")
     b.add_argument("--structures", metavar="PATH",
                    help="the composed structure candidates (the file `cover` "
-                        "reads). Adopting a structure REQUIRES this plus "
-                        "`structure_framework_matched` (explicit `bespoke`) — "
-                        "the #1079 rule and the #911 instrument (#1410).")
+                        "reads); adopting one REQUIRES this plus "
+                        "`structure_framework_matched` (#1410).")
     b.add_argument("--out", metavar="PATH",
                    help=f"write the brief as a durable artifact here — pass "
                         f"the run workspace's {BRIEF_FILENAME} (Story 20.75). "

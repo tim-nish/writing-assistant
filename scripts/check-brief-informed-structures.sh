@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 # parallel-safe
 # tier: full — measured over the inner ceiling (#913); end-to-end/scenario class
-# covers: scripts/draft-pipeline.py skills/draft-article/stages/stage3.md scripts/terrain_structure.py skills/terrain/steps/brief.md
+# covers: scripts/draft-pipeline.py skills/draft-article/stages/stage3.md scripts/terrain_structure.py skills/terrain/steps/brief.md skills/terrain/steps/brief-gates.md
 # check-brief-informed-structures.sh — verify Story 18.45 (#558, SPEC-article-
 # draft-pipeline CAP-9 2026-07-22 #554 amendment): the SHIPPED structure
 # proposer's INPUT is widened to the owner's free-form coverage brief (#505), so
