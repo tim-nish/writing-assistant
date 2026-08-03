@@ -347,3 +347,26 @@ appends to it.
 > **A pre-widening ledger row is not matched at all.** Rows written before this change carry no map-row column, and `read_ledger` refuses to key them on the pair alone: they are counted and the count is disclosed (`N ledger row(s) predate the map-row key (#1389) and are NOT carried`). Matching them on a partial key would be exactly the silent carry against an unknown map row this widening exists to stop, and dropping them without a count would make the resulting re-grade look like an ordinary first round. The format stays append-only, so a mixed ledger reads correctly in one pass.
 >
 > **Verified on both control-flow paths**, which is why the assertions read the `ledger carry:` disclosure rather than the absence of a string: against the pre-widening module the same fixture reports `ledger carry: 1 carried (0 pass, 1 fail), 0 re-graded` for a position reclassified `narration -> sourced` on byte-identical text — the defect in the flesh — and `1 carried (0 pass, 1 fail), 2 re-graded` for the legacy-row case. Two assertions drafted against the wrong stream passed vacuously on the pre-fix module and were replaced before this landed.
+
+> **Amendment 2026-08-03 (#1396) — review-applied edits ride the SAME
+> run-workspace git carrier as the drafting loop: a workspace copy, one commit
+> per accepted finding, one persist.** The #1390 decision above made git in the
+> run workspace the carrier for every mutation of the canonical draft between
+> `fill` and `verify`; review's apply step sat outside it, so N accepted
+> findings landed on the host-repo canonical as one unattributed write. The
+> widening keeps one carrier rather than minting a second: re-entry's existing
+> pre-arbitration snapshot IS the workspace copy; each accepted finding is
+> applied to that copy as **one commit whose message names the finding id**;
+> re-entry's gates run over the workspace result; and the canonical is
+> persisted to the host repo in **one write**, the same single-write shape the
+> `complete` gate already uses. **Reconciliation is count-shaped (#1376's
+> pattern):** a disposition marked `accepted` with no commit naming its finding
+> id is a relayed gap at re-entry, never a silent absence — the arbitration
+> record and the write record reconcile by finding id. **No host-repo commit
+> authority is created or implied:** the pipeline still never commits in the
+> owner's repository; the per-finding history lives in the run workspace and
+> renders as `git log -p`, exactly as the parent decision's rendering clause
+> states. The declined alternative — per-finding commits directly in the host
+> repo — died on two grounds: it grants an authority no footprint contract has
+> ever granted, and it entangles the fix with the host repo's own tracking
+> policy (the observing repo's drafts are untracked, so no baseline exists).
