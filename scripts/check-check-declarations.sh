@@ -100,7 +100,6 @@ check-canonical-adaptation.sh
 check-capabilities-manifest.sh
 check-checkpoint-resume.sh
 check-complete-gate.sh
-check-completion-summary.sh
 check-config-defect-routing.sh
 check-config-resolution.sh
 check-config-validation.sh
@@ -167,7 +166,6 @@ check-provenance-pin.sh
 check-publication-boundary.sh
 check-quality-gate-delta.sh
 check-quality-gate.sh
-check-quality-rubric.sh
 check-reading-time-depth.sh
 check-readme.sh
 check-recommended-default-provenance.sh
@@ -179,7 +177,6 @@ check-retired-vocabulary.sh
 check-review-arbitration.sh
 check-review-coldread.sh
 check-review-consulted.sh
-check-review-declared-register.sh
 check-review-diff.sh
 check-review-findings-class.sh
 check-review-policy-pass.sh

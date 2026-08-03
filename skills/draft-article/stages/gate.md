@@ -109,6 +109,14 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py quality-gate --ws "$WS" 
 - **Audience presence is checked mechanically here too (Story 13.41):** an
   absent or unfilled `audience` fails the gate — the named reader must be set at
   the fill before the draft can progress.
+- **Dimension 5 (both ends realize the plain-register commitment, #1412)** is
+  judged in the same pass. Hand the judge the Brief's **adopted commitment**
+  and the draft's **two end sections** — and **never a target sentence,
+  because none exists**: the check is semantic recoverability per end, and a
+  **string match is the anti-check** (near-identical thesis sentences at open
+  and close FAIL). Where the Brief carries no commitment the dimension emits
+  `dim5: n/a — no plain-register commitment on the brief`; the line is always
+  written, because an absent line cannot be told apart from one nobody ran.
 - **Dimensions 1–2** are judged by **one single-pass cheap-tier rubric judge**
   emitting **pass/fail per dimension + failing locations, no rewritten text**;
   its verdicts feed `--judge`. **Verdict grammar (exact — instruct the judge

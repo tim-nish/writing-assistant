@@ -1,4 +1,15 @@
 #!/usr/bin/env sh
+# tier: inner — greps over the completion-summary convention and the rubric it
+#   cites; no network, no repo mutation.
+# measured: 490ms (three runs, 2026-08-04: 470/490/510ms)
+# ends: the completion summary quoting a dimension count that disagrees with
+#   the rubric it names. NOT generation-side preventable: the summary text and
+#   the rubric are separate hand-authored assets edited in different sittings.
+# removal-signal: the summary rendering its count from the rubric at emit time
+#   rather than restating it, at which point the two cannot disagree.
+#
+# Headers owed because the file LEFT the admission baseline when edited
+# (#1356): the edit derived the count instead of hardcoding four (#1412).
 # parallel-safe
 # covers: scripts/reading-time.py skills/completion-summary.md skills/draft-article/quality-rubric.md skills/draft-article/stages/complete.md skills/review-article/SKILL.md skills/review-article/phases/arbitration.md skills/review-article/phases/entry.md skills/review-article/phases/passes.md skills/review-article/phases/reentry.md
 # check-completion-summary.sh — verify the three-bucket completion summary
@@ -155,10 +166,12 @@ grep -q 'grep -cE .\^## Dimension' "$CONV" \
 grep -qi 'rubric_dimensions' "$REVIEW" \
   && ok "review SKILL points the re-entry summary at rubric_dimensions" \
   || err "review SKILL does not source the count from rubric_dimensions"
-# The convention's own count must agree with the rubric it cites (four).
+# The convention's own count must agree with the rubric it cites — DERIVED,
+# never a literal: the count is the rubric's to change (dim5 arrived #1412),
+# and a literal here would fail on a change it has no opinion about.
 rn=$(grep -cE '^## Dimension [0-9]' "$RUBRIC")
-[ "$rn" -eq 4 ] && ok "rubric defines four dimensions (the count the summary must quote)" \
-  || err "rubric dimension count unexpected: $rn"
+[ "$rn" -ge 4 ] && ok "the rubric defines $rn dimensions (the count the summary must quote, derived)" \
+  || err "rubric dimension count implausible: $rn"
 
 # 6. Editor's assessment leads the review summary (Story 13.33, SPEC-review-ux CAP-4).
 grep -qi "editor's assessment" "$REVIEW" && ok "review summary leads with the editor's assessment" \

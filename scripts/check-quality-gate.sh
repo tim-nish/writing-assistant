@@ -288,7 +288,7 @@ grep -qi 'mechanically' "$SKILL" && grep -qi 'single-pass' "$SKILL" \
 # The rubric belongs to the draft-article skill's file set; the split statement
 # is contract wherever in that set it sits (#1322/#1325), so the assertion
 # reads the set rather than one file.
-grep -rqi 'Dimensions 1–2 are judged' skills/draft-article/ \
+grep -rqi 'Dimensions 1–2 and 5 are judged\|Dimensions 1–2 are judged' skills/draft-article/ \
   && ok "rubric: states the judged/mechanical split (dims 1-2 judged)" || err "rubric missing the split"
 grep -qi -- '--audience-known' "$SKILL" \
   && ok "SKILL: the audience allowlist is passed once, from the ratified answer" \
