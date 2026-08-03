@@ -156,6 +156,23 @@ being checked. Summing CPU instead was tested and rejected: it inflates
 concurrency), never a red suite — the inner tier's ceilings fail, these do
 not, and that asymmetry is deliberate.
 
+**`FULL_TOTAL_MS` is compared DISTRIBUTIONALLY, not against one reading
+(#1378).** A single full run carries the variance the paragraph above
+describes, so checking this run's number against the constant reported *where
+in the distribution this run landed*, not whether the suite grew. Compliance is
+instead the **p95 of the retained readings at the declared concurrency, plus a
+margin for that estimate's own wobble** — drawn from the per-invocation ledger
+(#1354), which already records them; **no new storage**. Readings at any other
+concurrency are excluded, which is the existing NOT COMPARABLE rule doing its
+job rather than a second one. Too few retained readings is the **named state
+NOT YET COMPUTABLE** — never a silent pass, and never a fallback to the
+point-wise comparison. A breached criterion is still a **report**: nothing here
+fails the run. The values (margin, minimum sample, window) are declared in
+`scripts/run-checks.sh` and are **provisional** — do not restate them here.
+Raising the ceiling, and re-declaring it at a measured p95 while still comparing
+point-wise, were both considered and declined; the defect was the comparison.
+This binds on the next violator-fix, not retroactively.
+
 **Adding a check is an ADMISSION DECISION, not a reflex (#1355/#1356).** The
 ceilings above bound what the family costs; the five governance rules in
 `scripts/run-checks.sh`'s header bound what may join it, and they bind **you**,
