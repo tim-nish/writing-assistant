@@ -37,6 +37,18 @@ examinations concurrently and derive once at the join
 (`examine.py --ws "$WS" --derive-ledger [--order <claim-ids>]`); a single
 examination derives it itself and needs neither flag.
 
+**The ledger's pointer is INTERNAL; the product's citation is CONSTRUCTED from
+the record.** `examination-pins.txt` carries a commit as a bare sha — that is
+the provenance form `verify-provenance` types. When a commit-grounded claim
+reaches the reader, render its citation from the record's `pin`, which already
+carries the repository qualifier:
+`python3 scripts/product_citation.py render --pin "<repo>@<sha>"` (or
+`cite-map --ws "$WS"` for the whole run, keyed by the bare ledger cite). A bare
+sha names no repository and resolves to nothing for an external reader, so it
+is unconstructible rather than detected; `complete` refuses one as a backstop
+(SPEC-writing-assistant, amendment 2026-08-03, #1339). Issue and URL
+references are emitted unchanged.
+
 **Concurrent examinations are scheduled by the fill, not by this step** — the
 enumeration, the dispatch, and the join are [`fan-out.md`](fan-out.md)'s (story
 20.164, #1248). What binds HERE is unchanged by any of it: **one examination
