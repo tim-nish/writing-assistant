@@ -215,9 +215,16 @@ def audit(ws, reached, transcript_path=None, settle_marker=None):
     rows = read_asks(ws)
     emitted = {r.get("gate") for r in rows}
     missing = [g for g in reached if g not in emitted]
+    # A row with no `gate` is not a gate emission and cannot be missing a
+    # render directive: `validate-proposal-payload.py --ws --surface` captures
+    # surface-keyed asks, and `--answer` captures answer rows, neither of which
+    # carries a gate id. Indexing them raised KeyError, and because this audit
+    # runs inside the Stop hook the crash presented as the hook's own
+    # cannot-determine fallback on every turn of a run that captured any.
     render_missing = sorted({
         r["gate"] for r in rows
-        if not all((it or {}).get("render") for it in (r.get("items") or [{}]))})
+        if r.get("gate")
+        and not all((it or {}).get("render") for it in (r.get("items") or [{}]))})
     tool_call_gaps, settled = [], None
     if transcript_path is not None:
         called, settled = read_tool_calls(transcript_path, settle_marker)
