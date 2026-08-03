@@ -164,8 +164,22 @@ def bare_commit_citations(text):
             run = _enclosing_run(line, m.start())
             if "://" in run:
                 continue
+            # A run that already carries `<qualifier>@` names its repository
+            # ONCE for the whole run, so a sha later in that same run is not
+            # bare — `writing-assistant@0.1.0+c223004` is semver build metadata
+            # on an already-qualified string, not a citation. Keyed on the
+            # property that makes a reference resolvable rather than on a field
+            # name, so the next generated field carrying a build sha does not
+            # reopen this (#1391).
+            if _QUALIFIED_RUN_RE.match(run):
+                continue
             findings.append((i, line.strip(), tok))
     return findings
+
+
+# A run whose leading token is `<qualifier>@…` — the repository is named for
+# the whole run (#1391).
+_QUALIFIED_RUN_RE = re.compile(r"^[`\'\"(\[]*[A-Za-z][\w.-]*@")
 
 
 def _enclosing_run(line, pos):
