@@ -152,6 +152,42 @@ def _read_pin_ledger(path):
                 if ln.strip() and not ln.strip().startswith("#")}
 
 
+def _mandated_headings(framework_dir=None):
+    """Headings a framework MANDATES, derived from the assets themselves (#1377).
+
+    A framework's `[EVIDENCE: …]` slot heading recurs once per unit by contract
+    — F2's `What actually happened`, which the evidence gate keys on — so it
+    cannot be evidence of lazy structure and is exempt from the dim4 skeleton
+    measurement. DERIVED, never hand-listed: a maintained list drifts from the
+    frameworks it mirrors, which is the producing-site defect #1376 records.
+    Rationale: SPEC-article-draft-pipeline amendments, 2026-08-03 (#1377).
+    """
+    base = framework_dir or os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                         "..", "skills", "draft-article", "frameworks")
+    out = set()
+    try:
+        names = sorted(os.listdir(base))
+    except OSError:
+        return out
+    for name in names:
+        if not name.endswith(".md"):
+            continue
+        try:
+            with open(os.path.join(base, name), encoding="utf-8") as fh:
+                lines = fh.read().splitlines()
+        except OSError:
+            continue
+        for ln in lines:
+            m = re.match(r"^#{2,6}\s+(.*?)\s*(?:\(|\[)", ln)
+            if not m or "[EVIDENCE:" not in ln:
+                continue
+            h = re.sub(r"^GATE\s+", "", m.group(1).strip()).strip()
+            h = h[1:-1].strip() if h.startswith("{") and h.endswith("}") else h
+            if h:
+                out.add(re.sub(r"\s+", " ", h).strip().lower())
+    return out
+
+
 def cmd_quality_gate(args):
     """Stage 3→4 quality gate (Story 11.4). Dimensions 3 and 4 are mechanical
     here; dimensions 1–2 come from the single-pass judge's verdicts (--judge, a
@@ -310,7 +346,7 @@ def cmd_quality_gate(args):
     # Dimension 4: mechanical. The measured mechanics behind the verdict are
     # kept beside it (Story 18.18) so the verdict RECORD can stamp dim4 with
     # what was measured, symmetrically with dim3's inventory stamp.
-    d4 = _host._dimension4(draft, prov_entries)
+    d4 = _host._dimension4(draft, prov_entries, _mandated_headings())
     results["dim4"] = ("pass", "") if not d4 else ("fail", "; ".join(d4))
     dim4_measures = _host._dimension4_measures(draft, prov_entries)
 

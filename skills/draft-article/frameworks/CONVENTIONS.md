@@ -69,6 +69,16 @@ with unrelated factual material (thresholds, config values) is **not fill**
 (CAP-3). The tag never survives into a draft — it annotates the template
 heading only, like `[SKIP: …]`.
 
+**The joint heading constraint (#1377).** A slot carrying an `[EVIDENCE: …]`
+tag recurs once per unit **by contract** — the evidence gate keys on that exact
+heading, and renaming it is the `section-not-found` class. **Every other
+unit-level heading must vary per unit**, which is what the quality gate's
+dimensions 1 and 4 measure. Both hold together: vary the others, keep the
+mandated one. Stating it here is what prevents the defect; the checks' exemption
+(they skip mandated headings when measuring repetition) only stops them
+manufacturing it. A fill that uniformed every heading to protect the evidence
+gate has read one contract and not the other.
+
 ## Config-bound frontmatter
 
 Every framework opens with an `article` frontmatter block. Its **field set,

@@ -27,8 +27,11 @@ stitched-fact-sheet and **per-lesson-skeleton** drafts (a framework skeleton
 reproduced verbatim per lesson), and a **plan-conformance** check requires the
 draft to advance the argument plan's thesis (the fill's sub-step above). A
 mechanical **per-lesson skeleton detector** (an identical `##` heading repeated
-≥3×) is the zero-token backstop; the dim1 judge owns the varied-structure and
-plan-conformance judgment. **This contract lives in three enforcement copies
+≥3×, **excluding contract-mandated headings** — #1377) is the zero-token
+backstop; the dim1 judge owns the varied-structure and plan-conformance
+judgment, under the same exemption. A framework's `[EVIDENCE: …]` slot heading
+recurs per unit by contract and cannot be evidence of lazy structure; the
+mandated set is derived from the framework assets rather than restated here. **This contract lives in three enforcement copies
 that move in lockstep** — `scripts/draft-pipeline.py` (the mechanical
 skeleton/stitched checks), [`quality-rubric.md`](../quality-rubric.md) (the dim1
 contract the judge grades against), and this section — a change to one without

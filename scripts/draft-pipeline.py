@@ -678,7 +678,7 @@ def _dimension3(draft_text, allowlist=()):
     return sorted(violations, key=lambda v: (v[1], v[0]))
 
 
-def _dimension4(draft_text, prov_entries):
+def _dimension4(draft_text, prov_entries, mandated=()):
     """Mechanical readability-mechanics checks; returns a list of failing
     locations (empty = pass)."""
     fails = []
@@ -718,7 +718,10 @@ def _dimension4(draft_text, prov_entries):
     for h in re.findall(r"^#{2,6}\s+(.+?)\s*$", draft_text, re.MULTILINE):
         key = re.sub(r"\s+", " ", h).strip().lower()
         heading_counts[key] = heading_counts.get(key, 0) + 1
-    repeated = {h: c for h, c in heading_counts.items() if c >= QG_SKELETON_REPEAT}
+    # A contract-mandated heading recurs BY CONTRACT and is exempt (#1377);
+    # the set is derived by the caller from the framework assets.
+    repeated = {h: c for h, c in heading_counts.items()
+                if c >= QG_SKELETON_REPEAT and h not in set(mandated)}
     if repeated:
         worst = max(repeated, key=repeated.get)
         fails.append(f"per-lesson skeleton repetition: heading '{worst}' repeated "
