@@ -4964,6 +4964,9 @@ def main(argv=None):
     sp.add_argument("--rubric-applied", action="store_true",
                     help="a rubric-mapped finding was applied — the required-checks worklist adds "
                          "the quality gate's mechanical dimensions")
+    sp.add_argument("--arbitration-events",
+                    help="the round's arbitration record (default: <ws>/arbitration-events.jsonl); with --applied > 0 its "
+                         "accepted dispositions reconcile by finding id against review-apply commits (#1396) or persist refuses")
     SITTING_HELP = ("declare this sitting (Story 20.104, #1082): a "
                     "same-sitting run resumes silently, an earlier one is "
                     "confirmed. Absent, the day-boundary rule applies.")

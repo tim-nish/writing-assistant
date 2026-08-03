@@ -176,6 +176,20 @@ the host tree:
 cp <output.drafts>/<slug>.md "$WS/pre-arbitration-<slug>.md"
 ```
 
+**And seed the workspace WRITE CARRIER from the same read** (#1396, Story
+20.210): the snapshot is also the working copy the accepted findings will be
+applied to, and its first recorded state is the pre-arbitration draft —
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/run_loop.py draft-write "$WS" \
+  --actor review-entry --reason "pre-arbitration snapshot of <slug>" \
+  --from <output.drafts>/<slug>.md
+```
+
+Edits land on `$WS/draft.md` through this carrier, one commit per accepted
+finding (see arbitration); the host canonical is written **once**, by
+`review-reentry`, after the re-entry gates pass over the workspace result.
+
 ## Configuration validation
 
 Before any review pass, validate the resolved configuration (CAP-5):
