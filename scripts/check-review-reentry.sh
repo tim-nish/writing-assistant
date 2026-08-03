@@ -80,7 +80,31 @@ python3 "$root/scripts/resolve-writing-sources.py" --root "$h" \
   set-draft-location "$a/drafts/" >/dev/null 2>&1
 
 slug=retry-storms
+
+# Story 20.210 (#1396): re-entry reconciles the arbitration record against the
+# workspace git carrier's review-apply commits before persisting. Every fixture
+# workspace that reaches the persist path therefore seeds what a real round
+# produces: the carrier (a git repo with one review-apply commit per accepted
+# finding) and the round's arbitration-events.jsonl with matching identities.
+seed_round() {
+  # seed_round <ws> <id>... — one accepted finding per id
+  sw="$1"; shift
+  git -C "$sw" init -q 2>/dev/null || true
+  git -C "$sw" config user.name t; git -C "$sw" config user.email t@t.invalid
+  printf 'seed\n' > "$sw/draft.md"
+  git -C "$sw" add draft.md; git -C "$sw" commit -qm "review-entry: pre-arbitration snapshot"
+  : > "$sw/arbitration-events.jsonl"
+  for id in "$@"; do
+    printf 'edit for %s\n' "$id" >> "$sw/draft.md"
+    git -C "$sw" add draft.md
+    git -C "$sw" commit -qm "review-apply: $id: fixture edit"
+    printf '{"type":"review-arbitration","pass":"prose","criterion":"c","severity":"should","disposition":"accepted","finding":"%s"}\n' "$id" \
+      >> "$sw/arbitration-events.jsonl"
+  done
+}
+
 ws="$work/ws"; mkdir -p "$ws"
+seed_round "$ws" "L6:prose-fix" "L7:anchor-fix"
 cat > "$ws/edited.md" <<'EOF'
 ---
 slug: retry-storms
@@ -279,6 +303,7 @@ cat > "$ws/bad-map.txt" <<'EOF'
 P1.S1[L5]: sourced <- docs/retries.md:12
 EOF
 ws2="$work/ws2"; mkdir -p "$ws2"
+seed_round "$ws2" "L5:one"
 if python3 "$DP" review-reentry --draft "$ws/edited.md" --map "$ws/bad-map.txt" \
      --slug "$slug" --root "$h" --ws "$ws2" --applied 1 >/dev/null 2>"$work/e_map"; then
   err "review-reentry accepted an invalid map"
@@ -314,6 +339,7 @@ assert d['noop'] is True and d['applied']==0, d
 # map by design — and --map was unconditionally required, which made a reviewed
 # derivation permanently unable to checkpoint.
 d="$work/derived"; mkdir -p "$d/host" "$d/a/drafts" "$d/ws"
+seed_round "$d/ws" "ja-1" "ja-2" "ja-3"
 cat > "$d/host/writing-sources.yaml" <<YAML
 sources:
   - path: .
@@ -405,6 +431,7 @@ PYT
 #     the gate can judge alone; whether the pin RESOLVES is the reported check's
 #     job (#704 re-triage — the gate may not call the ancestry lint).
 rm -rf "$d/ws2"; mkdir -p "$d/ws2"
+seed_round "$d/ws2" "ja-1"
 sed 's/^adapted_from: .*/adapted_from: not-a-valid-pin/' "$d/edited.ja.md" \
   > "$d/malformed.ja.md"
 if python3 "$DP" review-reentry --draft "$d/malformed.ja.md" --slug retry-storms.ja \
@@ -420,6 +447,7 @@ fi
 # (2b) The RESOLUTION check is reported, not run — the same status
 #      verify-provenance has for an authored draft.
 rm -rf "$d/ws2b"; mkdir -p "$d/ws2b"
+seed_round "$d/ws2b" "ja-1" "ja-2" "ja-3"
 mk_derived "$src_sha"
 python3 "$DP" review-reentry --draft "$d/edited.ja.md" --slug retry-storms.ja \
   --root "$d/host" --ws "$d/ws2b" --applied 3 2>/dev/null \
@@ -443,6 +471,7 @@ assert 'verify-provenance' not in checks, o
 # (3) An AUTHORED canonical still requires --map — the class was typed, not
 #     weakened.
 rm -rf "$d/ws3"; mkdir -p "$d/ws3"
+seed_round "$d/ws3" "au-1"
 if python3 "$DP" review-reentry --draft "$d/a/drafts/retry-storms.md" --slug retry-storms \
      --root "$d/host" --ws "$d/ws3" --applied 1 >/dev/null 2>"$d/e3"; then
   err "#704: an authored canonical re-entered with no --map"
@@ -519,6 +548,66 @@ dm = re.search(r"^audience: ([^#\n]+)", draft, re.M)
 assert m and dm and m.group(1).strip() == dm.group(1).strip(), (m, dm)
 assert "# Plan body carried unchanged." in plan
 PYEOF
+
+# --- Story 20.210 (#1396): the apply record reconciles by finding id ---------
+# Both directions are different lies, so both are asserted: an accepted finding
+# with no commit is an edit that silently did not happen; a commit matching no
+# accepted disposition is a write claiming an acceptance nobody recorded.
+ws4="$work/ws4"; mkdir -p "$ws4"
+seed_round "$ws4" "L6:real-fix"
+printf '{"type":"review-arbitration","pass":"prose","criterion":"c","severity":"should","disposition":"accepted","finding":"L9:ghost"}\n' \
+  >> "$ws4/arbitration-events.jsonl"
+if python3 "$DP" review-reentry --draft "$ws/edited.md" --map "$ws/map.txt" \
+     --slug "$slug" --root "$h" --ws "$ws4" --applied 2 >/dev/null 2>"$work/e_ghost"; then
+  err "20.210: an accepted finding with NO review-apply commit was not refused"
+else
+  grep -q 'L9:ghost' "$work/e_ghost" && grep -q 'did not happen or bypassed' "$work/e_ghost" \
+    && ok "20.210: an accepted finding naming no commit refuses, BY finding id (AC-2)" \
+    || err "20.210: the gap is not named by finding id: $(cat "$work/e_ghost")"
+fi
+[ ! -f "$ws4/checkpoint.json" ] \
+  && ok "20.210: no done/reviewed checkpoint over an unreconciled apply record" \
+  || err "20.210: checkpoint written despite an unreconciled record"
+
+ws5="$work/ws5"; mkdir -p "$ws5"
+seed_round "$ws5" "L6:real-fix"
+printf 'rogue edit\n' >> "$ws5/draft.md"
+git -C "$ws5" add draft.md; git -C "$ws5" commit -qm "review-apply: L10:rogue: nobody accepted this"
+if python3 "$DP" review-reentry --draft "$ws/edited.md" --map "$ws/map.txt" \
+     --slug "$slug" --root "$h" --ws "$ws5" --applied 1 >/dev/null 2>"$work/e_rogue"; then
+  err "20.210: a review-apply commit matching no accepted disposition was not refused"
+else
+  grep -q 'L10:rogue' "$work/e_rogue" && grep -q 'nobody recorded' "$work/e_rogue" \
+    && ok "20.210: a write claiming an unrecorded acceptance refuses, naming the commit (AC-2)" \
+    || err "20.210: the rogue write is not named: $(cat "$work/e_rogue")"
+fi
+
+# An accepted disposition with NO identity cannot reconcile — refused, never
+# skipped: an unjoinable acceptance is the silent-absence class itself.
+ws6="$work/ws6"; mkdir -p "$ws6"
+seed_round "$ws6" "L6:real-fix"
+printf '{"type":"review-arbitration","pass":"prose","criterion":"c","severity":"should","disposition":"accepted"}\n' \
+  >> "$ws6/arbitration-events.jsonl"
+python3 "$DP" review-reentry --draft "$ws/edited.md" --map "$ws/map.txt" \
+     --slug "$slug" --root "$h" --ws "$ws6" --applied 2 >/dev/null 2>"$work/e_noid" || true
+grep -q 'no finding identity' "$work/e_noid" \
+  && ok "20.210: an accepted disposition with no identity is a named refusal, not a skip" \
+  || err "20.210: identity-less accepted row slipped through: $(cat "$work/e_noid")"
+
+# AC-3 — per-finding inspectability: the carrier's log answers "what did this
+# accepted finding change" with that finding's own diff.
+logout=$(python3 "$root/scripts/run_loop.py" draft-log "$ws" 2>&1)
+printf '%s' "$logout" | grep -q 'review-apply: L6:prose-fix' \
+  && printf '%s' "$logout" | grep -q '^diff --git' \
+  && ok "20.210: git log -p answers per accepted finding, by its id (AC-3)" \
+  || err "20.210: the per-finding rendering is missing: $(printf '%s' "$logout" | head -2)"
+
+# AC-5 — the pipeline made NO commit in any host repository on any path above.
+for repo in "$h" "$a"; do
+  git -C "$repo" rev-parse HEAD >/dev/null 2>&1 \
+    && err "20.210: a commit exists in the host-side repo $repo — the pipeline never commits in the owner's repositories" \
+    || ok "20.210: no commit in $(basename "$repo") — per-finding history lives in the run workspace only (AC-5)"
+done
 
 if [ "$fail" -eq 0 ]; then
   printf '\nAll review-reentry checks passed.\n'; exit 0

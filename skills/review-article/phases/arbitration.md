@@ -52,6 +52,21 @@ complete.
 - **No finding is skipped and none is auto-applied.** Apply an accepted fix
   yourself, or via **one targeted edit instruction per finding**; never
   open-ended rewriting.
+  **Each accepted fix lands on the workspace copy through the write carrier,
+  one commit per finding** (#1396, Story 20.210) — never on the host canonical
+  directly, which `review-reentry` writes exactly once at the end:
+
+  ```
+  python3 ${CLAUDE_PLUGIN_ROOT}/scripts/run_loop.py draft-write "$WS" \
+    --actor review-apply --reason "<finding anchor>: <one-line summary>" \
+    --from -
+  ```
+
+  The reason **opens with the finding's identity** — the same `anchor` (e.g.
+  `L64:exploration-axes`) you will put in its dispositions line — because
+  re-entry reconciles accepted dispositions against these commits **by that
+  identity** and refuses on a gap in either direction: an accepted finding
+  naming no commit, or a commit naming no accepted finding.
 - **A rejected finding is rejected.** Do **not** re-litigate it in a later pass or
   a second cycle — the decision stands.
 - The round is **top-down and single-pass** over the ranked list: the

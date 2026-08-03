@@ -92,10 +92,16 @@ records which evidence class the run used.
    the JSON's `plan_reprojection` is relayed in the completion summary; a
    derived canonical or a plan-less slug skips with a note),
    and writes the `done/reviewed` checkpoint — **refusing (non-zero, no
-   checkpoint) when the map is invalid, or when `--rubric-applied` but the
+   checkpoint) when the map is invalid, when `--rubric-applied` but the
    versioned `rubric-verdicts-v2.txt` from step 3 is missing or partial** (a
    re-entry may not claim PASS over an unpersisted/partial verdict record,
-   #496):
+   #496), **or when the arbitration record and the workspace write record do
+   not reconcile by finding id** (#1396, Story 20.210 — it reads
+   `$WS/arbitration-events.jsonl` against the carrier's `review-apply`
+   commits *before* persisting anything, so an accepted finding whose edit
+   silently did not happen, or a write claiming an acceptance nobody
+   recorded, stops the one host write from landing; the edited draft you pass
+   is the workspace copy, `$WS/draft.md`):
 
    ```
    # authored canonical — evidence is the rebuilt provenance map

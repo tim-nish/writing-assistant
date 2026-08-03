@@ -340,6 +340,69 @@ def cmd_review_consulted(args):
     return 0
 
 
+def _reconcile_apply_record(ws, events_path):
+    """The #1396 count reconciliation: every disposition marked `accepted` in
+    the round's arbitration record names a `review-apply` commit on the
+    workspace git carrier, and every `review-apply` commit names an accepted
+    disposition. Returns a list of gap strings — empty means reconciled.
+
+    Both directions are checked because each is a different lie: an accepted
+    finding with no commit is an edit that silently did not happen; a commit
+    whose identity matches no accepted disposition is a write claiming an
+    acceptance nobody recorded. The identity is `finding_identity`'s — the
+    #497 anchor-or-summary-slug — read from the event's `finding` field, never
+    recomputed here, so there is one identity function in the repo.
+
+    A workspace with no git carrier history cannot reconcile, and
+    cannot-determine is a refusal, not a pass: the write record is half of
+    what reconciles, and its absence is the gap #1390 exists to make loud."""
+    gaps = []
+    try:
+        with open(events_path, encoding="utf-8") as fh:
+            lines = [ln for ln in fh.read().splitlines() if ln.strip()]
+    except OSError as e:
+        return ["the arbitration record is unreadable (%s: %s) — CAP-5's "
+                "emitter lands it at <ws>/arbitration-events.jsonl every "
+                "round, so its absence means the round's dispositions were "
+                "never persisted" % (events_path, e)]
+    accepted = []
+    for ln in lines:
+        try:
+            ev = json.loads(ln)
+        except ValueError:
+            continue
+        if ev.get("disposition") == "accepted":
+            accepted.append(ev)
+    r = subprocess.run(
+        ["git", "-C", ws, "log", "--format=%s", "--", "draft.md"],
+        capture_output=True, text=True)
+    if r.returncode != 0:
+        return ["the workspace carries no write record for draft.md (%s) — "
+                "the carrier (#1390) records each applied finding as a "
+                "commit, and without that half nothing reconciles"
+                % (r.stderr.strip() or "no git history")]
+    subjects = [s for s in r.stdout.splitlines() if s.strip()]
+    apply_subjects = [s for s in subjects if s.startswith("review-apply:")]
+    for ev in accepted:
+        ident = str(ev.get("finding") or "").strip()
+        if not ident:
+            gaps.append("an accepted disposition (%s/%s) carries no finding "
+                        "identity — give the finding an anchor so its write "
+                        "is joinable (#497)"
+                        % (ev.get("pass", "?"), ev.get("criterion", "?")))
+            continue
+        if not any(ident in s for s in apply_subjects):
+            gaps.append("accepted finding %r names no review-apply commit — "
+                        "the edit either did not happen or bypassed the "
+                        "carrier" % ident)
+    idents = [str(ev.get("finding") or "").strip() for ev in accepted]
+    for s in apply_subjects:
+        if not any(i and i in s for i in idents):
+            gaps.append("write record %r names no accepted disposition — a "
+                        "commit claiming an acceptance nobody recorded" % s)
+    return gaps
+
+
 def cmd_review_reentry(args):
     """Post-arbitration re-entry into the gate regime (Story 13.70). Invoked by
     the review SKILL after an arbitration round that applied >=1 accepted
@@ -450,6 +513,21 @@ def cmd_review_reentry(args):
                 "done/reviewed; re-run the gate on the edited draft. No "
                 "checkpoint written.\n")
             return 1
+
+    # The #1396 reconciliation (Story 20.210) — BEFORE the canonical is
+    # persisted, so the one host write never lands from a workspace whose
+    # disposition record and write record disagree. Refusal writes no
+    # checkpoint, exactly like every other refusal here.
+    events_path = (getattr(args, "arbitration_events", None)
+                   or os.path.join(args.ws, "arbitration-events.jsonl"))
+    apply_gaps = _reconcile_apply_record(args.ws, events_path)
+    if apply_gaps:
+        sys.stderr.write(
+            "error: review-reentry: the arbitration record and the workspace "
+            "write record do not reconcile (#1396) — no checkpoint written, "
+            "nothing persisted:\n"
+            + "".join("  - %s\n" % g for g in apply_gaps))
+        return 1
 
     # Read the edited draft first: its own frontmatter decides which evidence
     # class this re-entry runs under (Story 18.110, #704), and that decides
