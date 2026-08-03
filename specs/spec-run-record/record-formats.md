@@ -5,8 +5,10 @@ The one artifact this contract governs — `<ws>/run-events.jsonl`, at the path
 field set is the contract; concrete syntax is normative, because the only
 declared reader is a machine (SPEC-run-record constraints, D2).
 
-Two record kinds share the file, discriminated by `event`. Lines written before
-this contract (`{"ts","stage","event"[,"note"]}`, `cmd_run_event`,
+Three record kinds share the file, discriminated by `event` — the block's open
+(§1), the block's close (§2), and the sub-unit records a long block emits
+between them (§4). Lines written before this contract
+(`{"ts","stage","event"[,"note"]}`, `cmd_run_event`,
 `scripts/draft-pipeline.py:2597-2611`) are **legacy** and remain readable: a
 consumer treats a missing new field as unknown, never as a violation.
 
@@ -106,3 +108,63 @@ what it reported instead.
 
 Wording is illustrative; the **discrimination** is normative. A run whose
 workspace holds a policy surface may never record the first row.
+
+## 4. Sub-unit record
+
+Written inside a **long block**, at the boundary that block already
+checkpoints — `draft-pipeline.py progress --ws "$WS" --stage <stage> --done
+<unit>`, the sub-stage progress recording that is already declared to be the
+durability boundary (`skills/draft-article/stages/stage0.md:546-563@5b5dcba`).
+The instrument **follows** that boundary and never creates one: a block that
+records no sub-stage progress emits no sub-unit records, which is why the probe
+— atomic at `probe.py record` — stays silent here (amendments.md, 2026-08-03,
+clause (b)).
+
+```json
+{
+  "ts": "2026-08-02T19:11:38+00:00",
+  "block": "fill",
+  "event": "unit",
+  "unit": "why-the-seam-exists",
+  "duration_s": 214.7,
+  "since": "unit",
+  "batch": 2,
+  "command": "progress"
+}
+```
+
+- `unit` is **the same token `progress --done` takes**, unnormalised, so the
+  checkpoint's `progress.<stage>.done` list and this stream join without a
+  translation table. A record without it is rejected.
+- `duration_s` is the elapsed seconds since the previous boundary, computed by
+  the emitting command — the same discipline §2 states, one level down.
+- `since` names **which** boundary that was: `open` (the block's own open
+  record — this is its first unit), `unit` (the previous sub-unit of this
+  block), or `run` (the journal's last record, because the block has no open
+  record yet — the fill's mandatory command opens the block at fill close, so
+  section units are genuinely recorded outside the span). A `duration_s` with
+  no `since` is rejected: a duration whose span a reader has to reconstruct is
+  the reconstruction this contract abolishes.
+- `batch` appears only when one `progress` call recorded **several** units. The
+  boundary cannot separate them, so the interval is shared evenly and the
+  record says so — a share presented as a measurement would be the same
+  invention the contract refuses elsewhere.
+- The record kind is emitted **once per unit, at the unit's own recording**.
+  `progress` is idempotent per unit, and a re-recorded unit adds nothing, so it
+  emits nothing.
+
+**The accounting rule (stream level).** The sub-unit records lying **between a
+block's open and its close** sum to no more than that close's own `duration_s`.
+A sub-unit accounting larger than the block it sits in is a **defect** — the
+units are being measured from a boundary outside the block, or the block's own
+duration is wrong — and the validator says so; it is never written off as
+rounding. The only slack allowed is the emitter's own 3-decimal rounding, once
+per record. Units recorded with `since: "run"`, outside any open span, are
+attributable but are **not** asserted over — the same conditional-on-pairing
+shape §2's `duration_s` rule uses.
+
+**An interrupted block reads off this stream directly.** The units that
+completed are the records present; the unit in flight has none, because the
+recording *is* the boundary and a half-written unit is never marked done. That
+absence reads as *not done* and is never repaired into a synthetic entry
+(`block_states`' `units`, `sub_units`).

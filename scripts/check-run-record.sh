@@ -258,6 +258,182 @@ print("ok:   the verdict hash IS the provenance attestation's, under its hex64 d
 print("ok:   an open with no close is well-formed and reads as entered-not-finished (AC-5)")
 PY
 
+# --- SUB-UNIT RECORDS (Story 20.188, #1341; record-formats.md §4) ------------
+# Driven through `draft-pipeline.py progress` — the boundary the long blocks
+# ALREADY checkpoint — so what is asserted is that the instrument rides that
+# boundary, never that a call site exists somewhere.
+python3 - "$WS" <<'PY' || fail=1
+import contextlib, importlib.util, io, json, os, sys, time
+sys.path.insert(0, "scripts")
+import run_record as R
+
+spec = importlib.util.spec_from_file_location("dp", "scripts/draft-pipeline.py")
+dp = importlib.util.module_from_spec(spec); spec.loader.exec_module(dp)
+
+ws = os.path.join(sys.argv[1], "subunit")
+os.makedirs(ws, exist_ok=True)
+bad = []
+def need(cond, msg):
+    if not cond:
+        bad.append(msg)
+
+def drive(*argv):
+    out, err = io.StringIO(), io.StringIO()
+    with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+        try:
+            code = dp.main(list(argv))
+        except SystemExit as e:
+            code = e.code if isinstance(e.code, int) else 1
+    return code, out.getvalue(), err.getvalue()
+
+# The fill block is entered, then units are recorded at the progress boundary.
+R.open_block(ws, "fill", "provenance")
+code, _o, _e = drive("progress", "--ws", ws, "--stage", "fill",
+                     "--done", "why-the-seam-exists")
+need(code == 0, "the progress boundary itself failed: %s" % _e)
+time.sleep(1.05)      # so the second unit's interval is measurable, not 0.0
+drive("progress", "--ws", ws, "--stage", "fill", "--done", "what-it-costs")
+
+recs = R.read_records(ws)
+units = R.sub_units(recs, "fill")
+
+# --- AC-1: one record per recorded unit, carrying the id and its duration ----
+need([u["unit"] for u in units] == ["why-the-seam-exists", "what-it-costs"],
+     "the progress boundary did not emit one sub-unit record per unit, in "
+     "order, under the unit's own id: %r" % (units,))
+need(all(isinstance(u.get("duration_s"), (int, float)) for u in units),
+     "a sub-unit record carries no duration: %r" % (units,))
+need(all(u.get("since") in R.SINCE for u in units),
+     "a sub-unit duration does not name the boundary it was measured from: %r"
+     % (units,))
+need(units[0]["since"] == "open" and units[1]["since"] == "unit",
+     "the first unit is not measured from the block's open, or the second is "
+     "not measured from the first: %r" % ([u.get("since") for u in units],))
+need(units[1]["duration_s"] >= 1.0,
+     "the second unit's duration did not span the real interval between the "
+     "two boundaries: %r" % (units[1],))
+
+# the unit id is the SAME token `progress --done` takes — no translation table
+ck = json.load(open(os.path.join(ws, "checkpoint.json"), encoding="utf-8"))
+need(ck["progress"]["fill"]["done"] == [u["unit"] for u in units],
+     "the checkpoint's done list and the sub-unit stream do not join on the "
+     "same token: %r vs %r" % (ck["progress"]["fill"]["done"], units))
+
+# --- AC-1: at that boundary and NEVER a second one --------------------------
+before = len(R.sub_units(R.read_records(ws)))
+drive("progress", "--ws", ws, "--stage", "fill", "--done", "why-the-seam-exists")
+need(len(R.sub_units(R.read_records(ws))) == before,
+     "re-recording an already-done unit emitted a SECOND sub-unit record — "
+     "`progress` is idempotent per unit and so is its instrument (AC-1)")
+
+# --- AC-2: an interrupted block is attributable, the in-flight unit is not ---
+# The block is never closed: this is exactly the run that died mid-fill.
+states = {s["block"]: s for s in R.block_states(R.read_records(ws))}
+need(states["fill"]["state"] == "entered-not-finished",
+     "the interrupted fill does not read as entered-not-finished: %r"
+     % (states["fill"],))
+need(states["fill"]["units"] == ["why-the-seam-exists", "what-it-costs"],
+     "the units that completed before the interruption are not attributable "
+     "from the stream: %r" % (states["fill"],))
+need("the-one-in-flight" not in json.dumps(R.read_records(ws)),
+     "a unit that was never recorded done appears in the journal — the "
+     "in-flight unit must never be invented (AC-2)")
+rows = R.validate_lines([json.dumps(r) for r in R.read_records(ws)])
+need([n for n, _k, rs in rows if rs] == [],
+     "the interrupted journal does not pass its own validator: %r" % (rows,))
+need(any(k == "unit" for _n, k, _rs in rows),
+     "sub-unit records do not classify as `unit`: %r" % (rows,))
+
+# --- AC-3: a block that records NO sub-stage progress emits no unit records --
+aws = os.path.join(sys.argv[1], "atomic")
+os.makedirs(aws, exist_ok=True)
+R.open_block(aws, "probe", "probe.py record")
+R.note(outcome="pass", detail="configuration read", route="probe")
+R.close_block(0)
+need(R.sub_units(R.read_records(aws)) == [],
+     "a block that records no sub-stage progress emitted sub-unit records — "
+     "the instrument follows the existing boundary, it does not create one "
+     "(AC-3)")
+# and the stage token of a non-block emits nothing even when progress is called
+need(R.emit_units(aws, "harvest", ["a-batch"]) == [],
+     "a stage that is not a block of the block<->command table emitted a "
+     "sub-unit record (AC-3)")
+
+# --- AC-4: the sub-unit accounting is BOUNDED by the block's own duration ----
+def stream(unit_durations, block_duration):
+    op = R.open_record("fill", "provenance")
+    out = [op]
+    for i, d in enumerate(unit_durations):
+        out.append(R.unit_record("fill", "s%d" % i, duration_s=d,
+                                 since="open" if i == 0 else "unit"))
+    out.append(R.close_record(
+        "fill", "ran", ["single pass"], command="provenance",
+        verdict=R.verdict("pass", R.draft_sha256("d"), detail="filled"),
+        duration_s=block_duration))
+    return R.validate_lines([json.dumps(r) for r in out])
+
+okrows = stream([120.0, 300.5, 60.25], 900.0)
+need([n for n, _k, rs in okrows if rs] == [],
+     "a sub-unit accounting INSIDE its block's duration was rejected: %r"
+     % (okrows,))
+badrows = stream([600.0, 400.0], 900.0)
+reasons = [r for _n, _k, rs in badrows for r in rs]
+need(reasons, "a sub-unit accounting that EXCEEDS its block's own duration_s "
+              "was ACCEPTED — that is a defect, not a rounding note (AC-4)")
+need(any("EXCEEDS" in r or "exceed" in r.lower() for r in reasons),
+     "the over-accounting rejection does not say what it found: %r" % (reasons,))
+# rounding alone never trips it: three records rounded at 3 decimals
+need([n for n, _k, rs in stream([300.0, 300.0, 300.001], 900.0) if rs] == [],
+     "the emitter's own 3-decimal rounding was reported as an over-accounting")
+# a unit outside any open span is attributable but not asserted over
+outside = [R.unit_record("fill", "s0", duration_s=5000.0, since="run"),
+           R.open_record("fill", "provenance"),
+           R.close_record("fill", "ran", ["single pass"], command="provenance",
+                          verdict=R.verdict("pass", R.draft_sha256("d"),
+                                            detail="filled"),
+                          duration_s=10.0)]
+need([n for n, _k, rs in R.validate_lines([json.dumps(r) for r in outside])
+      if rs] == [],
+     "a unit recorded OUTSIDE the block's open/close span was accounted "
+     "against it — the rule is conditional on the span, exactly as §2's is")
+
+# --- the §4 shape rejects, each with its own reason --------------------------
+CLASSES = {
+    "no unit id": {"ts": "t", "block": "fill", "event": "unit"},
+    "unknown block": R.unit_record("harvest", "s0"),
+    "duration with no since": {"ts": "t", "block": "fill", "event": "unit",
+                               "unit": "s0", "duration_s": 3.0},
+    "non-numeric duration": {"ts": "t", "block": "fill", "event": "unit",
+                             "unit": "s0", "duration_s": "3s", "since": "open"},
+    "batch of one": {"ts": "t", "block": "fill", "event": "unit",
+                     "unit": "s0", "batch": 1},
+}
+seen = {}
+for label, rec in CLASSES.items():
+    rs = R.validate(rec)
+    need(rs != [], "the %s class was ACCEPTED — %r" % (label, rec))
+    seen[label] = " | ".join(rs)
+for a in seen:
+    for b in seen:
+        if a < b:
+            need(seen[a] != seen[b],
+                 "the %r and %r sub-unit classes are rejected with the SAME "
+                 "reason" % (a, b))
+
+if bad:
+    for b in bad:
+        sys.stderr.write("FAIL: %s\n" % b)
+    sys.exit(1)
+print("ok:   the progress boundary emits one sub-unit record per recorded unit, "
+      "under the same token, and never a second one (20.188 AC-1)")
+print("ok:   an interrupted block's completed units are attributable and the "
+      "in-flight one is not invented (20.188 AC-2)")
+print("ok:   a block that records no sub-stage progress emits no sub-unit "
+      "records (20.188 AC-3)")
+print("ok:   a sub-unit accounting exceeding its block's own duration_s is "
+      "rejected, and rounding alone is not (20.188 AC-4)")
+PY
+
 # --- AC-4: the OLD readers are unchanged over a pre-contract journal ----------
 python3 - "$WS" <<'PY' || fail=1
 import importlib.util, json, os, sys

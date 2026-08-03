@@ -82,6 +82,20 @@ HEX64 = re.compile(r"^[0-9a-f]{64}$")
 
 EVENT_OPEN = "open"
 EVENT_CLOSE = "close"
+# The sub-unit record (story 20.188, #1341; record-formats.md §4). Emitted at
+# the boundary the long blocks ALREADY checkpoint — `progress --done <unit>` —
+# so the instrument reuses that boundary rather than inventing a second one.
+EVENT_UNIT = "unit"
+
+# What a sub-unit's `duration_s` was measured FROM, carried on the record so a
+# reader never has to guess which boundary the number spans:
+#   `open` — the block's own open record (this is the block's first unit);
+#   `unit` — the previous sub-unit record of the same block;
+#   `run`  — the journal's last record, because the block has NO open record
+#            yet (the fill's mandatory command opens the block at its close).
+#            Such a unit is attributable but is NOT inside the block's own
+#            open/close span, so the §4 accounting rule is not asserted over it.
+SINCE = ("open", "unit", "run")
 
 
 # --- paths, hashes -----------------------------------------------------------
@@ -213,6 +227,108 @@ def close_record(block, status, route, verdict=None, skipped=None,
     if verdict is not None:
         rec["verdict"] = verdict
     return rec
+
+
+def unit_record(block, unit, duration_s=None, since=None, batch=None,
+                command=None, ts=None):
+    """One sub-unit record (record-formats.md §4), written at the boundary the
+    long block already checkpoints.
+
+    `unit` is the SAME token `progress --done` takes — not a normalisation of
+    it — so the checkpoint's `progress.<stage>.done` list and this stream join
+    without a translation table.
+
+    `batch` is set only when one `progress` call recorded several units at
+    once: the boundary cannot separate them, so the interval is shared evenly
+    and the record SAYS SO rather than presenting a share as a measurement.
+    """
+    rec = {"ts": ts or _now(), "block": block, "event": EVENT_UNIT,
+           "unit": unit}
+    if duration_s is not None:
+        rec["duration_s"] = duration_s
+        rec["since"] = since
+    if batch is not None and batch > 1:
+        rec["batch"] = batch
+    if command is not None:
+        rec["command"] = command
+    return rec
+
+
+def last_boundary(ws, block):
+    """`(ts, since)` — the boundary a sub-unit of `block` is measured from.
+
+    Inside the block's own open/close span that is the block's open record, or
+    the latest sub-unit recorded after it. A block with no open record in the
+    journal falls back to the journal's LAST record (`since: "run"`): the
+    fill's mandatory command opens the block at fill close, so section units
+    are recorded while the block is genuinely unopened, and a real elapsed
+    interval that names what it spans beats a null. `(None, None)` for an
+    empty journal — nothing to measure from, so nothing is written.
+    """
+    open_ts = None
+    since = None
+    last_ts = None
+    for rec in read_records(ws):
+        ts = rec.get("ts")
+        if ts:
+            last_ts = ts
+        if rec.get("block") != block:
+            continue
+        kind = classify(rec)
+        if kind == EVENT_OPEN:
+            open_ts, since = ts, "open"
+        elif kind == EVENT_CLOSE:
+            open_ts, since = None, None
+        elif kind == EVENT_UNIT and open_ts is not None:
+            open_ts, since = ts, "unit"
+    if open_ts is not None:
+        return open_ts, since
+    return (last_ts, "run") if last_ts else (None, None)
+
+
+def emit_units(ws, stage, units, command="progress"):
+    """Emit one sub-unit record per NEWLY recorded unit (CAP-1 for sub-units).
+
+    Called from `progress`'s one write path with the units that call actually
+    added, so a re-recorded unit — the command is idempotent per unit — emits
+    nothing a second time. A `stage` that is not a block of the block<->command
+    table emits nothing at all: the instrument follows the existing checkpoint
+    boundary, it never creates one (story 20.188 AC-3).
+
+    NEVER raises and never fails the caller's own write: emission is a side
+    effect of a boundary that has already happened.
+    """
+    units = [u for u in (units or []) if _nonempty_str(u)]
+    if not ws or stage not in BLOCKS or not units:
+        return []
+    try:
+        anchor, since = last_boundary(ws, stage)
+        elapsed = duration_between(anchor, _now()) if anchor else None
+        share = (round(elapsed / len(units), 3)
+                 if elapsed is not None else None)
+        out = []
+        for unit in units:
+            rec = unit_record(stage, unit, duration_s=share, since=since,
+                              batch=len(units), command=command)
+            append(ws, rec)
+            out.append(rec)
+        return out
+    except Exception as e:                               # pragma: no cover
+        sys.stderr.write("run-record: sub-unit emission degraded: %s\n" % e)
+        return []
+
+
+def sub_units(records, block=None):
+    """Every sub-unit record in the stream, in order, optionally one block's.
+
+    The reader half of AC-2: after an interrupted block, the units that
+    completed are read straight off this list. The one in flight has no record
+    and is NEVER synthesized from the gap — an absent unit reads as *not
+    recorded done*, which is exactly what the checkpoint boundary means.
+    """
+    return [r for r in records
+            if classify(r) == EVENT_UNIT
+            and (block is None or r.get("block") == block)]
 
 
 def skip(step, why):
@@ -520,6 +636,8 @@ def classify(rec):
         return EVENT_OPEN
     if event == EVENT_CLOSE and "block" in rec:
         return EVENT_CLOSE
+    if event == EVENT_UNIT and "block" in rec:
+        return EVENT_UNIT
     return "unknown"
 
 
@@ -548,6 +666,44 @@ def _validate_open(rec):
                 "open record's inputs.draft_sha256 is %r, not the attestation's "
                 "lowercase hex64 (`draft-sha256=<hex64>`, "
                 "verify-provenance.py:213-241)" % (ds,))
+    return reasons
+
+
+def _validate_unit(rec):
+    """The sub-unit record's own shape (record-formats.md §4)."""
+    reasons = []
+    if rec.get("block") not in BLOCKS:
+        reasons.append(
+            "sub-unit record names block %r, which is not one of the "
+            "block<->command table's blocks (%s)"
+            % (rec.get("block"), ", ".join(BLOCKS)))
+    if not _nonempty_str(rec.get("unit")):
+        reasons.append(
+            "sub-unit record carries no `unit` id — the id is the SAME token "
+            "`progress --done` takes, and without it the record cannot be "
+            "joined to the checkpoint's own done list (record-formats.md §4)")
+    dur = rec.get("duration_s")
+    if dur is not None:
+        if not isinstance(dur, (int, float)) or isinstance(dur, bool):
+            reasons.append("sub-unit `duration_s` is %r, not a number of seconds"
+                           % (dur,))
+        elif dur < 0:
+            reasons.append("sub-unit `duration_s` is negative (%r)" % (dur,))
+        if rec.get("since") not in SINCE:
+            reasons.append(
+                "sub-unit carries a `duration_s` and `since` is %r — a duration "
+                "that does not name the boundary it was measured from is a "
+                "number a reader has to reconstruct, which is the "
+                "reconstruction this contract abolishes (one of %s)"
+                % (rec.get("since"), " | ".join(SINCE)))
+    batch = rec.get("batch")
+    if batch is not None and (not isinstance(batch, int) or isinstance(batch, bool)
+                              or batch < 2):
+        reasons.append(
+            "sub-unit `batch` is %r — it is set only when ONE recording "
+            "boundary covered several units (an integer of 2 or more), and it "
+            "declares the duration to be an even share rather than a "
+            "measurement" % (batch,))
     return reasons
 
 
@@ -680,6 +836,9 @@ def validate(rec):
     if kind == EVENT_CLOSE:
         common = _validate_common(rec)
         return common + _validate_close(rec)
+    if kind == EVENT_UNIT:
+        common = _validate_common(rec)
+        return common + _validate_unit(rec)
     return []
 
 
@@ -738,6 +897,7 @@ def _with_pairing_reasons(recs, rows):
     validator, and what it asserts is the contract.
     """
     open_seen = {}
+    inside = {}
     for idx, rec in enumerate(recs):
         if not isinstance(rec, dict):
             continue
@@ -745,7 +905,18 @@ def _with_pairing_reasons(recs, rows):
         kind = classify(rec)
         if kind == EVENT_OPEN:
             open_seen[block] = True
+            inside[block] = []
+        elif kind == EVENT_UNIT:
+            # Only units INSIDE the block's own open/close span are accounted
+            # against it. A unit recorded while the block has no open record
+            # (`since: "run"`) is attributable but spans an interval the block
+            # never owned, so asserting over it would manufacture a defect.
+            if open_seen.get(block) and isinstance(
+                    rec.get("duration_s"), (int, float)):
+                inside.setdefault(block, []).append(rec["duration_s"])
         elif kind == EVENT_CLOSE:
+            rows[idx][2].extend(_unit_accounting(block, rec,
+                                                 inside.pop(block, [])))
             if open_seen.get(block) and rec.get("duration_s") is None:
                 rows[idx][2].append(
                     "close record for block %r has a matching open record and "
@@ -759,6 +930,28 @@ def _with_pairing_reasons(recs, rows):
                     % (rec["duration_s"],))
             open_seen[block] = False
     return rows
+
+
+def _unit_accounting(block, close, durations):
+    """The sub-unit accounting rule (story 20.188 AC-4, record-formats.md §4).
+
+    The sub-unit durations recorded inside a block are bounded by the block's
+    own `duration_s`. An accounting that exceeds its block is a DEFECT — the
+    sub-units are being measured from a boundary outside the block, or the
+    block's own duration is wrong — and it is asserted, not written off as
+    rounding. The tolerance is only the rounding the emitter itself performs
+    (3 decimals, once per record), so it can never absorb a real excess.
+    """
+    total = round(sum(durations), 6)
+    block_dur = close.get("duration_s")
+    if not durations or not isinstance(block_dur, (int, float)):
+        return []
+    if total <= block_dur + 0.001 * max(1, len(durations)):
+        return []
+    return ["the %d sub-unit records inside block %r sum to %gs, which EXCEEDS "
+            "the block's own duration_s of %gs — a sub-unit accounting larger "
+            "than the block it sits in is a defect, not a rounding note "
+            "(record-formats.md §4)" % (len(durations), block, total, block_dur)]
 
 
 # --- reading and appending ---------------------------------------------------
@@ -814,12 +1007,18 @@ def block_states(records):
     at the quality gate was in, and reading it as absence is what made a
     three-line journal indistinguishable from a complete account.
     """
-    order, opens, closes = [], {}, {}
+    order, opens, closes, units = [], {}, {}, {}
     for rec in records:
         kind = classify(rec)
-        if kind not in (EVENT_OPEN, EVENT_CLOSE):
+        if kind not in (EVENT_OPEN, EVENT_CLOSE, EVENT_UNIT):
             continue
         block = rec.get("block")
+        if kind == EVENT_UNIT:
+            # A sub-unit does not by itself make a block appear in this list:
+            # the states below are states of the OPEN/CLOSE pair, and a block
+            # known only by its units has entered nothing yet.
+            units.setdefault(block, []).append(rec.get("unit"))
+            continue
         if block not in order:
             order.append(block)
         if kind == EVENT_OPEN:
@@ -838,7 +1037,13 @@ def block_states(records):
             state = "closed-without-open"
         out.append({"block": block, "state": state, "close": close,
                     "opens": len(opens.get(block, [])),
-                    "closes": len(closes.get(block, []))})
+                    "closes": len(closes.get(block, [])),
+                    # The units this block recorded done. On an
+                    # `entered-not-finished` block these are exactly what
+                    # survived the interruption; the unit in flight is absent
+                    # because it was never recorded, and absence is read as
+                    # *not done*, never repaired into a synthetic entry.
+                    "units": units.get(block, [])})
     return out
 
 

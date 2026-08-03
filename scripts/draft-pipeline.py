@@ -3619,6 +3619,10 @@ def cmd_progress(args):
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(state, f, indent=2)
     os.replace(tmp, path)
+    # The sub-unit records ride this same boundary (story 20.188, #1341;
+    # record-formats.md §4) — only the units this call actually added, so a
+    # re-recorded unit never emits twice.
+    run_record.emit_units(args.ws, args.stage, added)
     out = {"stage": args.stage, "done": done, "added": added}
     if args.stop_note:
         out["budget_stop"] = state["budget_stop"]
