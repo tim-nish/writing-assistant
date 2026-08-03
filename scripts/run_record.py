@@ -443,7 +443,39 @@ def workspace_of(args):
         rec = rp.read_active_run() if rp is not None else None
         ws = (rec or {}).get("ws")
         source = "active-run pointer"
+        _announce_substitution(ws)
     return (ws, source) if ws and os.path.isdir(ws) else (None, source)
+
+
+# Emitted at most once per process: a process runs one command, so a second
+# line would report the same substitution twice.
+_ANNOUNCED = [False]
+
+
+def _announce_substitution(ws):
+    """Say so when a workspace was SUBSTITUTED rather than declared (#1366).
+
+    The fallback above is correct — #1313 examined it and said so — but it is
+    silent, and silence is what let a check fixture's block records land in a
+    live draft run on 2026-08-03, detected only because a human noticed
+    timestamps that could not be theirs. The served position sites the remedy
+    exactly here: make the fallback announce itself at the point of
+    substitution, which is the only place the evidence still exists.
+
+    This DISCLOSES and never gates: stderr only, no exit-status effect, and a
+    `None` workspace still means the block runs unrecorded rather than failing.
+    Nothing is emitted when `--ws` or `WS` was given — the line marks
+    substitution, not resolution, and a line on every invocation would be the
+    warned-plan-nobody-reads shape this is meant to avoid.
+    """
+    if _ANNOUNCED[0]:
+        return
+    _ANNOUNCED[0] = True
+    cmd = " ".join(sys.argv[:2]) if sys.argv else "(unknown command)"
+    where = ws if ws else "no active run — this block runs unrecorded"
+    sys.stderr.write(
+        "run-record: workspace SUBSTITUTED — %s declared no --ws/WS, so records "
+        "are attributed via the active-run pointer to: %s\n" % (cmd, where))
 
 
 def file_sha256(path):
