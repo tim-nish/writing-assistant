@@ -157,7 +157,15 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/draft-pipeline.py quality-gate --ws "$WS" 
    record carries the delta, so a poor draft from cycle 1 is recoverable without
    re-running the pipeline. The revision cycle is a *bounded improvement loop*,
    and that contract binds by property, not by name — SPEC-run-record
-   `record-formats.md` §5), then re-runs
+   `record-formats.md` §5. **Every revision write to `$WS/draft.md` — the
+   fix for each finding, each cycle's rewrite — lands through the write
+   carrier** (#1390, Story 20.209): `python3
+   ${CLAUDE_PLUGIN_ROOT}/scripts/run_loop.py draft-write "$WS" --actor
+   revision-cycle --reason "<the finding id(s) this write answers>" --from -`.
+   The loop snapshots above record only graded rounds; the carrier records
+   every write between them, which is exactly the set the loop cannot see —
+   a freehand edit is detected and committed as an `unrecorded-write` gap
+   row rather than absorbed), then re-runs
    **both** the quality gate **and** `verify-provenance` — readability revision
    is exactly where an unmarked claim would re-enter, so both gates run every
    cycle.

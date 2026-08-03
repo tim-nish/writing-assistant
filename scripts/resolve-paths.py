@@ -595,18 +595,55 @@ def new_run(root, run_id=None, terrain=False):
         ws = os.path.join(base, run_id)
         os.makedirs(ws)  # exist_ok=False: an explicit id must be new
         _update_latest(base, ws)
+        _init_ws_git(ws)
         return ws
     while True:
         ws = os.path.join(base, _timestamp_run_id())
         try:
             os.makedirs(ws)
             _update_latest(base, ws)
+            _init_ws_git(ws)
             return ws
         except FileExistsError:
             ws = os.path.join(base, _timestamp_run_id() + "-" + os.urandom(3).hex())
             os.makedirs(ws, exist_ok=False)
             _update_latest(base, ws)
+            _init_ws_git(ws)
             return ws
+
+
+def _init_ws_git(ws):
+    """Initialise the run workspace's own git repository (Story 20.209, #1390).
+
+    The workspace git is the WRITE CARRIER for the canonical draft: every
+    mutation of `draft.md` after `fill` creates it is recorded as a commit
+    with its reason, and a write that reaches the file without one is
+    detectable (`run_loop.py draft-inspect`). Initialised at mint because the
+    carrier's detection is relative to a repository that must predate the
+    first write — a repo created lazily at the first carrier call could not
+    tell fill's creation from an out-of-band rewrite of it.
+
+    The repository lives in the STATE ROOT, never the host tree (the
+    footprint invariant, verified before this shipped: the state root is
+    outside the host repo and `check-footprint-invariant.sh` passes with a
+    workspace repo present). Identity is set locally so recording never
+    depends on the operator's global git config.
+
+    Degrades, never fails: a machine without git mints a workspace exactly as
+    before, with the degradation on stderr — the same discipline as
+    `run_loop.preserve`, because instrumentation must never fail the run it
+    observes."""
+    try:
+        for cmd in (["git", "init", "-q"],
+                    ["git", "config", "user.name", "writing-assistant-carrier"],
+                    ["git", "config", "user.email",
+                     "carrier@writing-assistant.invalid"]):
+            r = subprocess.run(cmd, cwd=ws, capture_output=True, text=True)
+            if r.returncode != 0:
+                raise OSError(r.stderr.strip() or "exit %d" % r.returncode)
+    except (OSError, FileNotFoundError) as e:
+        sys.stderr.write("resolve-paths: workspace git unavailable — draft "
+                         "writes will not be recorded (%s)\n" % e)
 
 
 def run_workspace(root, run_id):

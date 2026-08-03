@@ -44,6 +44,7 @@ import difflib
 import json
 import os
 import re
+import subprocess
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
@@ -440,6 +441,169 @@ def report_pairing_reasons(records, report_rec):
     return reasons
 
 
+# --- the canonical draft's WRITE CARRIER (Story 20.209, #1390) ---------------
+# THE INVARIANT, stated where it is enforced: after `fill` creates it, every
+# mutation of the canonical draft is recorded with its predecessor state, its
+# successor state, and the reason it was made; a mutation that reaches the file
+# without being recorded is DETECTABLE and REPORTED, never silently absorbed.
+#
+# The carrier is the run workspace's own git repository (initialised at mint,
+# `resolve-paths._init_ws_git`), taken as a second instance of the
+# resource-layer commit-time diff detector: a freehand write is one no
+# tool-boundary hook can observe, and the resource layer observes it by
+# construction. The rendering is `git log -p` — no bespoke differ exists here.
+#
+# WHY DETECTION COMMITS THE STRAY STATE rather than only naming it: the
+# invariant owes the PREDECESSOR of the next recorded write. An out-of-band
+# state left uncommitted would become that predecessor invisibly — absorbed
+# into the next carrier commit's diff, which is exactly the "adjacent recorded
+# step" the story's AC-4 forbids. Committing it under the `unrecorded-write`
+# actor preserves both states and makes the gap a first-class, greppable row
+# of the same history.
+
+DRAFT = "draft.md"
+UNRECORDED = "unrecorded-write"
+
+
+def _git(ws, *args):
+    """(returncode, stdout) for a git call inside the workspace repo."""
+    try:
+        r = subprocess.run(["git", "-C", ws] + list(args),
+                           capture_output=True, text=True)
+        return r.returncode, (r.stdout if r.returncode == 0 else r.stderr)
+    except (OSError, FileNotFoundError) as e:               # pragma: no cover
+        return 127, str(e)
+
+
+def _carrier_ready(ws):
+    """The workspace repo exists and answers. A reason string when it does not
+    — the carrier degrades with that reason, never fails the run it observes
+    (the `preserve` discipline)."""
+    if not ws or not os.path.isdir(os.path.join(ws, ".git")):
+        return ("no workspace git repository — the workspace predates the "
+                "carrier or git was unavailable at mint")
+    rc, out = _git(ws, "rev-parse", "--git-dir")
+    return None if rc == 0 else "workspace git does not answer: %s" % out.strip()
+
+
+def _head_draft(ws):
+    """The draft's last RECORDED state, or None before the first record."""
+    rc, out = _git(ws, "show", "HEAD:" + DRAFT)
+    return out if rc == 0 else None
+
+
+def _disk_draft(ws):
+    try:
+        with open(os.path.join(ws, DRAFT), encoding="utf-8") as fh:
+            return fh.read()
+    except OSError:
+        return None
+
+
+def _commit_draft(ws, message):
+    rc, out = _git(ws, "add", DRAFT)
+    if rc != 0:
+        return "git add failed: %s" % out.strip()
+    rc, out = _git(ws, "commit", "-q", "-m", message, "--", DRAFT)
+    return None if rc == 0 else "git commit failed: %s" % out.strip()
+
+
+def draft_write(ws, text, actor, reason):
+    """THE one write path for the canonical draft: record, then write, as one
+    act. Returns a report dict; `error` is set only when nothing was recorded.
+
+    Detection runs first: a disk state differing from the last recorded state
+    is committed under the `unrecorded-write` actor BEFORE this write lands,
+    so the gap is its own history row and this write's diff shows only this
+    write. The creation case (disk state, no record yet) is the same gap —
+    something wrote the file outside the carrier, fill included."""
+    report = {"stage": "draft-write", "ws": ws, "actor": actor,
+              "reason": reason, "unrecorded_write_detected": False}
+    why = _carrier_ready(ws)
+    if why:
+        # Degraded: the write must still happen — the carrier never holds the
+        # draft hostage — but it is unrecorded and says so.
+        report["degraded"] = why
+        try:
+            with open(os.path.join(ws, DRAFT), "w", encoding="utf-8") as fh:
+                fh.write(text)
+        except OSError as e:
+            report["error"] = str(e)
+        return report
+    head, disk = _head_draft(ws), _disk_draft(ws)
+    if disk is not None and disk != head:
+        err = _commit_draft(
+            ws, "%s: disk state %s differs from last recorded state %s — "
+                "committed as its own step so the gap is not absorbed into "
+                "the next write's diff"
+                % (UNRECORDED,
+                   run_record.draft_sha256(disk)[:12],
+                   run_record.draft_sha256(head)[:12] if head is not None
+                   else "(none — created outside the carrier)"))
+        if err:
+            report["error"] = err
+            return report
+        report["unrecorded_write_detected"] = True
+    try:
+        with open(os.path.join(ws, DRAFT), "w", encoding="utf-8") as fh:
+            fh.write(text)
+    except OSError as e:
+        report["error"] = str(e)
+        return report
+    err = _commit_draft(ws, "%s: %s" % (actor, reason))
+    if err:
+        report["error"] = err
+        return report
+    report["sha256"] = run_record.draft_sha256(text)
+    return report
+
+
+def draft_inspect(ws):
+    """The detection half, runnable at any moment: is the draft's disk state
+    the last recorded state, and which gaps does the history already carry?
+
+    A CLEAN RESULT STATES ITS SCOPE, NEVER THE CLASS (the binding condition
+    that travels with the resource-layer detector position): this carrier is
+    after-the-fact by construction, so `clean` here means "the N recorded
+    writes examined and the working copy agree", never "the draft is clean".
+    """
+    why = _carrier_ready(ws)
+    if why:
+        return {"stage": "draft-inspect", "ws": ws, "degraded": why}
+    rc, out = _git(ws, "log", "--format=%H %s", "--", DRAFT)
+    commits = [ln for ln in out.splitlines() if ln.strip()] if rc == 0 else []
+    recorded_gaps = [c.split(" ", 1)[1] for c in commits
+                     if c.split(" ", 1)[1].startswith(UNRECORDED + ":")]
+    head, disk = _head_draft(ws), _disk_draft(ws)
+    pending = None
+    if disk is not None and disk != head:
+        pending = {"file": DRAFT,
+                   "disk_sha256": run_record.draft_sha256(disk),
+                   "recorded_sha256": (run_record.draft_sha256(head)
+                                       if head is not None else None),
+                   "note": ("the working copy differs from the last recorded "
+                            "state — a write reached the file outside the "
+                            "carrier" if head is not None else
+                            "the file exists and no write was ever recorded "
+                            "— it was created outside the carrier")}
+    return {"stage": "draft-inspect", "ws": ws,
+            "scope": {"recorded_writes_examined": len(commits),
+                      "working_copy_examined": True},
+            "unrecorded": ([pending] if pending else []),
+            "recorded_gaps": recorded_gaps,
+            "clean_within_scope": pending is None}
+
+
+def draft_log(ws):
+    """The human rendering: each recorded step as a unified diff with its
+    reason line. `git log -p` IS the renderer — no diff code lives here."""
+    why = _carrier_ready(ws)
+    if why:
+        return 1, "draft-log unavailable: %s\n" % why
+    rc, out = _git(ws, "log", "-p", "--reverse", "--", DRAFT)
+    return (0, out) if rc == 0 else (1, out)
+
+
 def _cmd_report(ws):
     print(json.dumps({"stage": "run-loop-report", "ws": ws,
                       "at": datetime.datetime.now(datetime.timezone.utc)
@@ -453,7 +617,44 @@ def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
     if len(argv) == 2 and argv[0] == "report":
         return _cmd_report(argv[1])
-    sys.stderr.write("usage: run_loop.py report <ws>\n")
+    if len(argv) >= 2 and argv[0] == "draft-write":
+        # run_loop.py draft-write <ws> --actor <a> --reason <r> [--from <file>]
+        # The new text arrives via --from (default: stdin), never as an
+        # argument — draft bodies do not belong in `ps` output.
+        ws, rest = argv[1], argv[2:]
+        opts = {}
+        it = iter(rest)
+        for flag in it:
+            if flag in ("--actor", "--reason", "--from"):
+                opts[flag[2:]] = next(it, None)
+            else:
+                sys.stderr.write("draft-write: unknown flag %r\n" % flag)
+                return 2
+        if not opts.get("actor") or not opts.get("reason"):
+            sys.stderr.write("draft-write: --actor and --reason are required "
+                            "— a recorded write without its reason is the "
+                            "gap this carrier exists to close (#1390)\n")
+            return 2
+        src = opts.get("from")
+        text = (sys.stdin.read() if not src or src == "-"
+                else open(src, encoding="utf-8").read())
+        rep = draft_write(ws, text, opts["actor"], opts["reason"])
+        print(json.dumps(rep, indent=2))
+        return 1 if rep.get("error") else 0
+    if len(argv) == 2 and argv[0] == "draft-inspect":
+        rep = draft_inspect(argv[1])
+        print(json.dumps(rep, indent=2))
+        return 0 if rep.get("clean_within_scope") else 1
+    if len(argv) == 2 and argv[0] == "draft-log":
+        rc, out = draft_log(argv[1])
+        (sys.stdout if rc == 0 else sys.stderr).write(out)
+        return rc
+    sys.stderr.write(
+        "usage: run_loop.py report <ws>\n"
+        "       run_loop.py draft-write <ws> --actor <a> --reason <r> "
+        "[--from <file|->]\n"
+        "       run_loop.py draft-inspect <ws>\n"
+        "       run_loop.py draft-log <ws>\n")
     return 2
 
 
