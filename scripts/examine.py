@@ -61,6 +61,12 @@ reachable is not the same finding as an empty result from a source that was
 read — the journey join asserted absence from a search over zero bytes (#1181)
 precisely because it did not keep those apart.
 
+A third case sits between them, and it is the one a truncating budget creates:
+material that was read and matched and then dropped because the budget was
+already spent. Prose's match budget is therefore split PER DECLARED REPOSITORY
+and the record discloses `crowded_out` per repository (story 20.186, #1337) —
+absent from an older record, where it reads UNKNOWN rather than zero.
+
 THE WRITER CONTRACTS (#1248, story 20.162)
 ------------------------------------------
 An examination writes ONLY ITS OWN RECORD, and the pin ledger
@@ -466,40 +472,189 @@ def declared_prose(root):
     return [ln.strip() for ln in out.splitlines() if ln.strip()]
 
 
+def declared_roots(root):
+    """The declared source ROOTS, from the enumerator that already knows them.
+
+    `resolve-writing-sources.py sources` prints one resolved root per line —
+    the same declaration `files` enumerates under. This tool never walks paths
+    to discover a repository: the grouping below is a join against these roots,
+    so a repository exists here only because the declaration named it.
+    """
+    ok, out, _ = run([sys.executable, SRC_RES, "--root", root, "sources"])
+    if not ok:
+        return []
+    return [ln.strip() for ln in out.splitlines() if ln.strip()]
+
+
+def _repository_of_root(path, cache):
+    """The repository a declared root belongs to — its git top-level, else the
+    root itself. Two roots in one repository (`.` plus `docs/`) collapse to one
+    group, which is what "per repository" has to mean for the budget to be the
+    fence it claims to be."""
+    if path in cache:
+        return cache[path]
+    d = path if os.path.isdir(path) else os.path.dirname(path)
+    ok, out, _ = run(["git", "-C", d, "rev-parse", "--show-toplevel"],
+                     timeout=10)
+    repo = out.strip() if ok and out.strip() else os.path.realpath(path)
+    cache[path] = repo
+    return repo
+
+
+def prose_groups(root, prose):
+    """Declared prose grouped BY REPOSITORY, in the enumerator's own order.
+
+    Group order is first appearance in `resolve-writing-sources.py files`
+    output, which is sorted at the source — so the grouping, and therefore the
+    split below, is a function of the declaration and the pin, never of what
+    matched. Returns [(label, [path, …]), …].
+    """
+    roots = sorted(declared_roots(root), key=len, reverse=True)
+    cache, order, groups = {}, [], {}
+    for path in prose:
+        owner = next((r for r in roots
+                      if path == r or path.startswith(r.rstrip(os.sep) + os.sep)),
+                     None)
+        repo = (_repository_of_root(owner, cache) if owner
+                else os.path.realpath(root))
+        if repo not in groups:
+            groups[repo] = []
+            order.append(repo)
+        groups[repo].append(path)
+    # Label by basename, the form the pins already use; a collision between two
+    # same-named repositories falls back to the full path rather than merging
+    # two repositories under one honest-looking name.
+    names = [os.path.basename(r.rstrip(os.sep)) or r for r in order]
+    labels = [n if names.count(n) == 1 else r for n, r in zip(names, order)]
+    return [(lab, groups[r]) for lab, r in zip(labels, order)]
+
+
+def split_budget(sizes, limit):
+    """Split `limit` across N repositories, then REDISTRIBUTE the unused share.
+
+    An equal share (remainder to the earlier repositories, so the split is a
+    function of order and not of content), capped at what each repository
+    actually has; whatever a repository does not use is handed round, one at a
+    time in the same order, to those that still have matches. A repository with
+    fewer matches than its share therefore denies the remainder to nobody, and
+    the total returned is unchanged from the single-budget behaviour whenever
+    enough matches exist anywhere.
+    """
+    n = len(sizes)
+    if n == 0:
+        return [], []
+    q, r = divmod(max(limit, 0), n)
+    shares = [q + (1 if i < r else 0) for i in range(n)]
+    take = [min(sizes[i], shares[i]) for i in range(n)]
+    left = max(limit, 0) - sum(take)
+    while left > 0:
+        moved = False
+        for i in range(n):
+            if left == 0:
+                break
+            if take[i] < sizes[i]:
+                take[i] += 1
+                left -= 1
+                moved = True
+        if not moved:
+            break
+    return shares, take
+
+
+def _prose_hits(path, root, pat, sha):
+    """The first matching line of one declared document, as an item — one hit
+    per file; the caller reads the file if it wants more."""
+    try:
+        with open(path, encoding="utf-8", errors="replace") as fh:
+            lines = fh.readlines()
+    except OSError:
+        return None
+    for n, line in enumerate(lines, 1):
+        if pat and pat.search(line):
+            rel = os.path.relpath(path, root)
+            return {
+                "source_type": "prose",
+                "time_axis": False,
+                "when": f"state at {sha}",
+                "pin": f"{rel}:{n}@{sha}",
+                "cite": f"{rel}:{n}@{sha}",   # path:line@sha pointer form
+                "ref": rel,
+                "title": rel,
+                "excerpt": line.strip()[:600],
+                "admissible_for": "state claims only — not an episode source",
+            }
+    return None
+
+
 def examine_prose(root, terms, limit):
     """Declared documents at HEAD. STATE-ONLY by construction: these describe
     the position as it stands, not how it moved, so they are returned with
-    `time_axis: false` and the caller must not ground an episode in them."""
+    `time_axis: false` and the caller must not ground an episode in them.
+
+    THE BUDGET IS PER DECLARED REPOSITORY, AND WHAT IT CUT OFF IS DISCLOSED
+    (story 20.186, #1337). The single budget this replaces was spent in path
+    order — `for path in prose: if len(items) >= limit: break` — so a
+    declaration spanning several repositories gave the whole of it to whichever
+    sorted first, and an examination could report every prose hit from one
+    repository while never reaching the host's own documents. That is the
+    coverage contract failing in the one way `searched`/`skipped` cannot show:
+    the source WAS read, so nothing was skipped, and the truncation left no
+    trace. So the split is per repository with the unused share redistributed,
+    and the record carries `budget` — per repository, the share, what was
+    returned, and `crowded_out`, the matches the budget cut off.
+
+    `crowded_out` is a THIRD thing, distinct from both existing coverage
+    fields: `skipped` names a source never read, `found` counts what came back,
+    and this counts what was read, matched, and then dropped for want of
+    budget. It is exact rather than a flag, which is why every declared
+    document is scanned even after the budget is full — a scan that stopped at
+    the budget could not say what the budget cost.
+    """
     files = declared_prose(root)
     if not files:
-        return [], "no declared path sources resolved"
+        return [], "no declared path sources resolved", None
     prose = [f for f in files if f.endswith((".md", ".txt", ".rst"))]
-    items, sha = [], head_sha(root)
+    sha = head_sha(root)
     pat = re.compile("|".join(re.escape(t) for t in terms), re.I) if terms else None
-    for path in prose:
-        if len(items) >= limit:
-            break
-        try:
-            with open(path, encoding="utf-8", errors="replace") as fh:
-                lines = fh.readlines()
-        except OSError:
-            continue
-        for n, line in enumerate(lines, 1):
-            if pat and pat.search(line):
-                rel = os.path.relpath(path, root)
-                items.append({
-                    "source_type": "prose",
-                    "time_axis": False,
-                    "when": f"state at {sha}",
-                    "pin": f"{rel}:{n}@{sha}",
-                    "cite": f"{rel}:{n}@{sha}",   # path:line@sha pointer form
-                    "ref": rel,
-                    "title": rel,
-                    "excerpt": line.strip()[:600],
-                    "admissible_for": "state claims only — not an episode source",
-                })
-                break   # one hit per file; the caller reads the file if it wants more
-    return items, None
+    groups = prose_groups(root, prose)
+    matched = [[it for it in (_prose_hits(p, root, pat, sha) for p in paths)
+                if it is not None]
+               for _, paths in groups]
+    shares, take = split_budget([len(m) for m in matched], limit)
+    items = []
+    for hits, t in zip(matched, take):
+        items += hits[:t]
+    budget = {
+        "limit": limit,
+        "split": "per declared repository, in the enumerator's order; an "
+                 "unused share is redistributed",
+        "repositories": [
+            {"repository": label,
+             "share": share,
+             "returned": t,
+             # What the budget cut off. Absent from a record written before
+             # this disclosure existed, and absence there is UNKNOWN — never
+             # zero (`prose_budget` below is the reader that keeps it so).
+             "crowded_out": len(hits) - t}
+            for (label, _), share, t, hits in zip(groups, shares, take, matched)
+        ],
+    }
+    return items, None, budget
+
+
+def prose_budget(record):
+    """Read the prose budget disclosure back from a record — THREE-VALUED.
+
+    Returns the block, or None for a record whose prose source carries no
+    `budget` key at all. None is CANNOT-DETERMINE: such a record was written
+    before the disclosure existed and says nothing about what its budget cut
+    off, which is not the same finding as a run that cut off nothing and says
+    so with `crowded_out: 0`.
+    """
+    for s in record.get("searched", []):
+        if s.get("source") == "prose":
+            return s.get("budget")
+    return None
 
 
 def _scope_refusal(scope_path, member_index, repository):
@@ -685,7 +840,9 @@ def gather_sources(root, want, terms, anchors, limit, with_thread):
     emitted `searched`/`skipped`/`evidence` sequences are exactly the ones a
     sequential run produced. Per-source error and skip semantics are the
     source functions' own and are untouched — each still returns
-    `(items, why)`, and an exception raised inside a source surfaces from
+    `(items, why)` — optionally with a third element carrying that source's own
+    coverage disclosure (prose's per-repository budget, #1337) — and an
+    exception raised inside a source surfaces from
     `.result()` in the calling thread exactly as it did inline.
     """
     jobs = {
@@ -801,8 +958,15 @@ def main(argv=None):
     for source in SOURCE_ORDER:
         if source not in results:
             continue
-        items, why = results[source]
+        # Sources return `(items, why)`; a source with a coverage disclosure of
+        # its own returns a third element, merged into its `searched` entry.
+        # ADDITIVE by construction: a two-element return is exactly what it was.
+        res = results[source]
+        items, why = res[0], res[1]
+        extra = res[2] if len(res) > 2 else None
         found = {"source": source, "found": len(items)}
+        if extra:
+            found["budget"] = extra
         if source == "issues":
             found["thread_included"] = not args.no_thread
         (searched if why is None else skipped).append(

@@ -406,5 +406,92 @@ grep -qi 'owner-paced' "$FO" && grep -qi 'composition' "$FO" \
   && ok "fan-out names what its timings do NOT improve (owner-paced gates, composition)" \
   || err "fan-out.md does not exclude owner-paced gates / composition from the win"
 
+# --- the prose budget is PER DECLARED REPOSITORY (Story 20.186, #1337) -------
+# A single budget spent in path order gave the whole of it to whichever
+# repository sorted first, and left no trace: the source WAS read, so nothing
+# was skipped. Fixture: two declared repositories, the second with more matches
+# than the first, and a budget too small for either alone.
+o="$work/other"; mkdir -p "$o"
+git -C "$o" init -q
+for f in one two three four five; do
+  printf 'the quota was split across repositories\n' > "$o/$f.md"
+done
+git -C "$o" add -A
+git -C "$o" -c user.email=t@example.com -c user.name=t commit -qm "quota notes"
+for f in h1 h2 h3; do
+  printf 'the quota is the budget the host repository gets\n' > "$h/$f.md"
+done
+# Legacy in-repo declaration: the fixture consults no config home (see the
+# parallel-safety note at the top of this file).
+cat > "$h/writing-sources.yaml" <<'EOF'
+sources:
+  - path: .
+  - path: ../other
+EOF
+git -C "$h" add -A
+git -C "$h" -c user.email=t@example.com -c user.name=t commit -qm "declare two repositories"
+
+H="$h" python3 - <<'PY' && ok "the prose budget splits per declared repository, redistributes the unused share, and discloses what it crowded out (#1337)" || err "the per-repository prose budget (#1337) does not hold — see the assertion above"
+import contextlib, io, json, os, sys
+sys.path.insert(0, "scripts")
+import examine
+
+H = os.environ["H"]
+
+def examined(limit):
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        assert examine.main(["--root", H, "--claim", "the quota was split",
+                             "--terms", "quota", "--sources", "prose",
+                             "--limit", str(limit)]) == 0
+    return buf.getvalue()
+
+d = json.loads(examined(4))
+pros = next(s for s in d["searched"] if s["source"] == "prose")
+b = pros["budget"]
+assert b["limit"] == 4, b
+by = {r["repository"]: r for r in b["repositories"]}
+assert set(by) == {"host", "other"}, by
+
+# AC-1: the budget is SPLIT, not spent in path order — both repositories are
+# represented, which the single budget could not guarantee.
+assert sorted(r["returned"] for r in b["repositories"]) == [2, 2], b
+assert len(d["evidence"]) == 4 and pros["found"] == 4, d["counts"]
+refs = [e["ref"] for e in d["evidence"]]
+assert any(r.startswith("../other/") for r in refs), refs
+assert any(not r.startswith("..") for r in refs), refs
+
+# AC-2: a repository whose matches exceeded its share carries the count the
+# budget CUT OFF — a third finding, neither `skipped` nor a per-source count.
+assert by["host"]["crowded_out"] == 1, by["host"]
+assert by["other"]["crowded_out"] == 3, by["other"]
+assert "prose" not in {s["source"] for s in d["skipped"]}, d["skipped"]
+
+# AC-1 again: an unused share is REDISTRIBUTED — at a budget of 8 the host's
+# 3 matches do not deny the remaining 5 to the other repository.
+d8 = json.loads(examined(8))
+b8 = {r["repository"]: r for r in
+      next(s for s in d8["searched"] if s["source"] == "prose")["budget"]["repositories"]}
+assert b8["host"]["returned"] == 3 and b8["other"]["returned"] == 5, b8
+assert all(r["crowded_out"] == 0 for r in b8.values()), b8
+assert len(d8["evidence"]) == 8, d8["counts"]
+
+# AC-4: DETERMINISTIC — the same claim at the same pin gives byte-identical
+# records; the split derives from the enumerator's order, never from content.
+assert examined(4) == json.dumps(d, indent=2) + "\n", "the examination is not reproducible"
+
+# AC-3: the disclosure is THREE-VALUED — a record written before it exists
+# reads UNKNOWN, never zero.
+assert examine.prose_budget(d) is not None
+assert examine.prose_budget({"searched": [{"source": "prose", "found": 4}]}) is None
+assert examine.prose_budget({"searched": []}) is None
+
+# AC-5: one declared repository is today's behaviour — one share, the whole
+# budget, evidence in the enumerator's own order.
+solo = examine.split_budget([9], 4)
+assert solo == ([4], [4]), solo
+assert examine.split_budget([1, 1], 9) == ([5, 4], [1, 1]), "a small repo is not padded"
+PY
+
 [ "$fail" -eq 0 ] || { printf '\nexamine checks FAILED.\n' >&2; exit 1; }
 printf '\nAll examine checks passed.\n'

@@ -112,6 +112,24 @@ an anchorless commits query are *cannot-determine*, never absence. When an
 examination grounds nothing, say which of the two findings it is, from the
 record; an absence claim is admissible only over sources `searched` lists.
 
+**The prose budget is per declared repository, and what it crowded out is
+disclosed** (story 20.186, #1337). A single match budget spent in path order
+gave the whole of it to whichever repository sorted first — every prose hit
+came back from one declared repository and none from the host's own documents,
+with nothing in `searched`/`skipped` to show it, because the source *was* read.
+So the budget is split across the declared repositories in the enumerator's
+order, an unused share is redistributed to the repositories that still have
+matches, and the prose entry in `searched` carries `budget`: per repository,
+its `share`, what it `returned`, and `crowded_out` — the matches that were read
+and matched and then dropped for want of budget. **`crowded_out` is a third
+finding**, neither `skipped` (a source never read) nor `found` (a per-source
+count): read it before treating a repository's silence as absence, and ask
+again with narrower terms or a larger `--limit` when it is non-zero. A record
+carrying no `budget` block predates the disclosure — that is *unknown*, never
+zero. The split derives from the declaration and the pin alone, never from what
+matched, so the same claim examined twice against the same pin still gives
+byte-identical records.
+
 ### The article floor, restated over examinations
 
 The floor is unchanged in shape: **every article carries ≥1 sourced or
