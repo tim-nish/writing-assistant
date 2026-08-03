@@ -214,6 +214,25 @@
 #   5. THE SANCTIONED SHRINK LEVER IS ASSERTION ALTITUDE. Reduction happens by
 #      merging single-assertion scripts into fewer fixture-based checks, and by
 #      removing valueless coverage under rule 2 — never by chasing a count.
+#   6. AN ASSERTION IS ADMISSIBLE ONLY WITH A NAMED NEGATIVE RUN (#1395). Every
+#      NEW ASSERTION — in a new check or added to an existing one; the rule
+#      binds PER ASSERTION, because the motivating instances were assertions
+#      added to existing files — names the run it was watched FAILING against:
+#      the defect's parent commit, or the guarded predicate surgically
+#      disabled. A guard verified only on its passing path certifies nothing,
+#      and its declared reach silently exceeds its delivered reach — the
+#      scope-conformance class of #1374/#1376/#1388, whose tell inside this
+#      suite was three assertions in one sitting that passed VACUOUSLY against
+#      pre-fix code (a grep of a stream that never carries the string; all()
+#      over an empty list; a literal section number where the defect names a
+#      class). The named run goes in the commit or PR that lands the
+#      assertion; this is a generation-side constraint and deliberately NOT a
+#      checker — a docstring-vs-predicate conformance check would be satisfied
+#      by prose edits, a class whose membership test is a claim taken on
+#      trust. (The sibling install-state class — a capability shipped, its
+#      install never run, #1379 — is an OBLIGATION with no event to hook; its
+#      remedy is observability at close, not admission rules, and it is
+#      remedied elsewhere.)
 #
 # RULES 2 AND 4 READ THE PER-INVOCATION LEDGER (#1354) AND BIND ON ITS DELIVERY.
 # They are ratified now and unenforceable until it lands; the interval is stated
