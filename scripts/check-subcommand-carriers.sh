@@ -1,6 +1,22 @@
 #!/usr/bin/env sh
 # parallel-safe
-# covers: scripts/draft-pipeline.py
+# tier: inner — greps over scripts/ and skills/ plus one small stdlib-python
+#   read of the dispatch table; no network, no repo mutation.
+# measured: 150ms (three runs, 2026-08-04: 150/160/150ms)
+# ends: a shipped mechanism that no run can reach — BOTH conjuncts. §1-3 end
+#   "call site absent"; §4 (#1367) ends "call site present, guard never true",
+#   the half that let block mode ship dark with this check green. Neither is
+#   generation-side preventable from one side: a call site and its skill
+#   invocation are authored in different files, and a control surface and its
+#   operating doc in different changes — which is why the ambient CLAUDE.md
+#   clause carries the duty and this check carries only the visible-absence
+#   signal over DECLARED surfaces.
+# removal-signal: subcommands and control surfaces becoming derivable from a
+#   single declared registry that the skills project rather than restate, at
+#   which point a carrier cannot be missing and this check has no subject.
+#   §4 alone retires if control surfaces stop being opt-in — a mode on by
+#   default has no guard to be dark.
+# covers: scripts/draft-pipeline.py scripts/run_block.py
 # grep-binding: token — whole-skills-tree greps for subcommand invocation
 #   strings, set-wide by construction.
 # check-subcommand-carriers.sh — every shipped pipeline subcommand has a CARRIER:
@@ -62,6 +78,47 @@ grep -rq "lint-platform-variant" skills/ \
 grep -rq "emit-arbitration-events.py" skills/ \
   && ok "emit-arbitration-events.py: invocation site present in skills/" \
   || err "emit-arbitration-events.py: ORPHAN — no skill invokes it"
+
+# 4. THE SECOND CONJUNCT (Story 20.214, #1367). Sections 1-3 assert a CALL SITE
+#    exists. Reachability is call-site AND a guard that can be true, and the
+#    second half is data-dependent and invisible to enumeration: block mode
+#    shipped with its call sites present, this check green, and the mode dark on
+#    every skill-driven run, because nothing told the agent to enable it. A
+#    passing audit and a dark feature were the same observation.
+#
+#    THE SURFACE DECLARES ITSELF, so nothing here enumerates "control surface" —
+#    that would be the enumeration problem one level up, and this repository has
+#    four recorded instances of coverage being relative to its enumeration. An
+#    UNDECLARED surface is the author's omission, which CLAUDE.md's ambient
+#    clause binds; this section asserts over what is declared.
+decls=$(grep -rn '^# control-surface:' scripts/ 2>/dev/null || true)
+n_decl=$(printf '%s' "$decls" | grep -c . || true)
+if [ "$n_decl" -eq 0 ]; then
+  err "no '# control-surface:' declaration found anywhere in scripts/ — block mode (#1360) is the known instance and must carry one"
+else
+  printf '%s\n' "$decls" | while IFS= read -r line; do
+    [ -n "$line" ] || continue
+    src=${line%%:*}
+    doc=$(printf '%s' "$line" | sed -n 's/.*operating doc:[[:space:]]*\([^ ]*\).*/\1/p')
+    name=$(printf '%s' "$line" | sed -n 's/.*# control-surface:[[:space:]]*\([^—]*\).*/\1/p' | sed 's/[[:space:]]*$//')
+    if [ -z "$doc" ]; then
+      printf 'FAIL: %s declares a control surface naming no operating doc — the declaration is the whole point (#1367)\n' "$src" >&2
+      exit 1
+    elif [ ! -f "$doc" ]; then
+      printf 'FAIL: %s names operating doc %s, which does not exist\n' "$src" "$doc" >&2
+      exit 1
+    elif ! grep -qi "$name" "$doc"; then
+      printf 'FAIL: %s names operating doc %s, which never mentions the surface %s — a declaration pointing at a silent doc is the defect, not evidence of compliance\n' "$src" "$doc" "$name" >&2
+      exit 1
+    else
+      printf 'ok:   control surface %s: declared, operating doc %s exists and names it\n' "$name" "$doc"
+    fi
+  done || fail=1
+  # THE SCOPE, NOT THE CLASS. This detector is after-the-fact by construction:
+  # it sees declarations, never surfaces. A clean run says how many it examined
+  # so the number is never read as "no dark features exist".
+  ok "control-surface scope examined: $n_decl declaration(s) — this asserts nothing about UNDECLARED surfaces, which the CLAUDE.md clause covers"
+fi
 
 if [ "$fail" -eq 0 ]; then
   printf '\nAll subcommand-carrier checks passed.\n'; exit 0

@@ -1,4 +1,12 @@
 #!/usr/bin/env python3
+# control-surface: block mode — enabled by `run_block.py enable "$WS"` after the mint, or WA_BLOCK_MODE=1 before it; operating doc: skills/draft-article/SKILL.md
+#
+# Declared per CLAUDE.md's control-surface clause (#1367). This module's
+# guard is data-dependent — the mode is opt-in and off by default — so a
+# call-site check passes while the mode stays dark on every run nobody
+# enabled. #1360 is that instance. The declaration is what makes the gap
+# visible; check-subcommand-carriers.sh §4 asserts the named doc exists
+# and mentions the surface.
 """The development BLOCK MODE: stop at a block boundary, re-run one block
 against preserved upstream state (Story 20.190, #1332; SPEC-run-record
 amendments.md, 2026-08-03, "The block mode adds no record class").

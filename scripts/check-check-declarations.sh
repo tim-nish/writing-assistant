@@ -206,7 +206,6 @@ check-stage5-variants.sh
 check-staging-candidates.sh
 check-stale-variant.sh
 check-story-element-selection.sh
-check-subcommand-carriers.sh
 check-substituted-served-path.sh
 check-substrate-purity.sh
 check-terrain-member.sh
