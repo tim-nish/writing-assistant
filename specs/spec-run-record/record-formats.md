@@ -47,6 +47,7 @@ Written by the same command at block close, before the block's
   },
   "route": ["the branch taken", "the fallback applied", "the degradation"],
   "skipped": [{"step": "per-section evidence-type check", "why": "…"}],
+  "duration_s": 812.4,
   "exit": 1
 }
 ```
@@ -71,6 +72,15 @@ Written by the same command at block close, before the block's
   survives when the outcome is later disputed.
 - `exit` is the command's own exit status. A non-zero exit still emits
   (CAP-1) — a failed block is the case the record exists for.
+- `duration_s` is the block's elapsed seconds, **computed by the emitting
+  command from its own open record** — never differenced by a reader, which is
+  the reconstruction this contract exists to abolish. A close record whose
+  matching open record exists in the same journal and which carries no
+  `duration_s` → reject (story 20.187, #1333). The rule is conditional on the
+  pairing: an open with no close still means *entered, did not finish*, and a
+  close read without its open is not asserted over. Readers stay tolerant
+  either way — `read_records` never validates, so a journal written before this
+  field is still readable; what rejects is the validator.
 
 An **open with no matching close** is well-formed and means *entered, did not
 finish*. It is never repaired by a later writer and never read as absence.

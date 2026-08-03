@@ -174,8 +174,25 @@ def open_record(block, command, inputs=None, ts=None):
             "command": command, "inputs": dict(inputs or {})}
 
 
+def duration_between(open_ts, close_ts):
+    """Elapsed seconds between two record timestamps, or None if either is
+    unusable.
+
+    Computed BY THE EMITTING COMMAND from its own open record (story 20.187,
+    #1333) — a reader differencing two `ts` values is the reconstruction this
+    spec exists to abolish, so the number is written once, at the boundary that
+    knows it, and never derived downstream.
+    """
+    try:
+        a = datetime.datetime.fromisoformat(open_ts)
+        b = datetime.datetime.fromisoformat(close_ts)
+    except (TypeError, ValueError):
+        return None
+    return round((b - a).total_seconds(), 3)
+
+
 def close_record(block, status, route, verdict=None, skipped=None,
-                 exit_code=0, command=None, ts=None):
+                 exit_code=0, command=None, ts=None, duration_s=None):
     """The block-close record (record-formats.md §2), written at block close —
     before the block's `checkpoint.json` write (CAP-4), by the block's own
     command, whatever its exit status.
@@ -191,6 +208,8 @@ def close_record(block, status, route, verdict=None, skipped=None,
            "exit": exit_code}
     if command is not None:
         rec["command"] = command
+    if duration_s is not None:
+        rec["duration_s"] = duration_s
     if verdict is not None:
         rec["verdict"] = verdict
     return rec
@@ -349,12 +368,16 @@ def derived_skips(ws, block):
 def open_block(ws, block, command, inputs=None):
     """Enter a block: write the open record and arm its close."""
     _PENDING.clear()
+    rec = open_record(block, command, inputs=inputs)
     _PENDING.update({
         "ws": ws, "block": block, "command": command,
+        # The open record's own timestamp, held so the close computes its
+        # duration from the boundary it actually entered at (story 20.187).
+        "opened_ts": rec["ts"],
         "judgment": {"outcome": None, "detail": None, "status": None,
                      "route": [], "skipped": [],
                      "draft_sha256": None, "map_sha256": None}})
-    return append(ws, open_record(block, command, inputs=inputs))
+    return append(ws, rec)
 
 
 def close_block(exit_code=0):
@@ -377,10 +400,37 @@ def close_block(exit_code=0):
     if status == "did-not-run":
         outcome = "n/a"
     detail = j["detail"] or "%s exited %d" % (p["command"], exit_code)
-    return append(p["ws"], close_record(
+    rec = close_record(
         block, status, j["route"] or [p["command"]],
         verdict=verdict(outcome, j["draft_sha256"], j["map_sha256"], detail),
-        skipped=skipped, exit_code=exit_code, command=p["command"]))
+        skipped=skipped, exit_code=exit_code, command=p["command"])
+    # The open ts is normally in hand from `open_block`; a close written by a
+    # process that did not open the block (a resumed run) falls back to the
+    # journal's own last matching open. Neither path differences timestamps at
+    # READ time — both compute here, at the boundary, and write the number.
+    opened = p.get("opened_ts") or last_open_ts(p["ws"], block)
+    dur = duration_between(opened, rec["ts"]) if opened else None
+    if dur is not None:
+        rec["duration_s"] = dur
+    return append(p["ws"], rec)
+
+
+def last_open_ts(ws, block):
+    """The `ts` of the most recent unclosed open record for `block`, or None.
+
+    Used only when the closing process did not open the block (a resumed run):
+    the pairing is by block and recency, which is the same pairing
+    `validate_lines` asserts over a stream.
+    """
+    open_ts = None
+    for rec in read_records(ws):
+        if rec.get("block") != block:
+            continue
+        if classify(rec) == EVENT_OPEN:
+            open_ts = rec.get("ts")
+        elif classify(rec) == EVENT_CLOSE:
+            open_ts = None
+    return open_ts
 
 
 def before_checkpoint():
@@ -657,7 +707,58 @@ def validate_lines(lines):
             out.append((i, "unparseable", ["line is not valid JSON: %s" % e]))
             continue
         out.append((i, classify(rec), validate(rec)))
-    return out
+    return _with_pairing_reasons(lines_records(out, lines), out)
+
+
+def lines_records(out, lines):
+    """The parsed records behind `validate_lines`' rows, in the same order."""
+    recs = []
+    for raw in lines:
+        raw = raw.strip()
+        if not raw:
+            continue
+        try:
+            recs.append(json.loads(raw))
+        except json.JSONDecodeError:
+            recs.append(None)
+    return recs
+
+
+def _with_pairing_reasons(recs, rows):
+    """Stream-level reasons — the ones a single record cannot carry.
+
+    `duration_s` is the first of them (story 20.187, #1333): a close record
+    whose matching OPEN record exists in this stream and which carries no
+    duration is invalid, because the emitting command had everything it needed
+    to write one. The rule is deliberately conditional on the pairing — an
+    open record with no close still means *entered, did not finish*, and a
+    close with no open (a stream read from the middle) is not asserted over.
+    READERS stay tolerant either way: `read_records` and the pipeline's own
+    reader never validate, so a legacy journal is still readable — this is the
+    validator, and what it asserts is the contract.
+    """
+    open_seen = {}
+    for idx, rec in enumerate(recs):
+        if not isinstance(rec, dict):
+            continue
+        block = rec.get("block")
+        kind = classify(rec)
+        if kind == EVENT_OPEN:
+            open_seen[block] = True
+        elif kind == EVENT_CLOSE:
+            if open_seen.get(block) and rec.get("duration_s") is None:
+                rows[idx][2].append(
+                    "close record for block %r has a matching open record and "
+                    "no `duration_s` — the elapsed seconds are computed by the "
+                    "emitting command from its own open record, never "
+                    "differenced by a reader (record-formats.md §2)" % (block,))
+            elif rec.get("duration_s") is not None and not isinstance(
+                    rec["duration_s"], (int, float)):
+                rows[idx][2].append(
+                    "`duration_s` is %r, not a number of seconds"
+                    % (rec["duration_s"],))
+            open_seen[block] = False
+    return rows
 
 
 # --- reading and appending ---------------------------------------------------
