@@ -47,6 +47,20 @@ The article advances **one claim**, and every section advances it.
   **derived from the framework assets**, never hand-listed. Everything else is
   judged exactly as before — the variation requirement over non-mandated
   structure is unchanged.
+  **Beat order and heading strings are different properties (#1398).** This
+  judgement, and the mechanical detector beside it, measure heading **strings**:
+  an identical heading set repeated per unit fails (mandated set exempt, above).
+  A constant **beat order** rendered under distinct headings is *not* skeleton
+  repetition — and for `arc: thematic-braid` it is the **satisfying form**: the
+  braid's "one shape seen three times" is shown by same-order beats under
+  per-unit headings, never by verbatim heading sets. This clause binds every
+  consumer of the rubric, including review's structure pass (which consults this
+  file): a structure finding demanding "the same subsection skeleton" of a braid
+  contradicts it — the compliant demand is *same beat order, distinct headings*.
+  Escalation, recorded at adoption (2026-08-03): if a braid under this clause
+  still collides between the fill→verify gate and review, the fix is arc-aware
+  evaluation reading the plan's recorded `arc:` — never a widening of this
+  exemption.
 - **Plan-conformance (#440).** When the run composed an argument plan
   (`$WS/argument-plan.md`: thesis, arc, section intents), the draft must
   **advance that thesis** — a section that does not serve the planned thesis, or
