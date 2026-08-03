@@ -363,3 +363,49 @@ and no already-relocated text moves — the rule is prospective.
 > that the announce line is never read — it prints inside a fixture — which
 > would make it the warned-plan-nobody-reads shape and reopen the stronger
 > option. Delivery: stories 20.200, 20.201.
+
+> **Amended 2026-08-03 (triage, #1356) — act 3's altitude merges are DECLINED on
+> the measurement act 3 itself asked for, and the cost it was aiming at is
+> located: 2,428 interpreter spawns per full tier, at a 4.6x startup penalty
+> that merging files removes none of.** #1356 act 3 instructed a merge of the
+> largest `check-<subject>-*` families into one fixture-based check per family,
+> ranked "by member count x summed ms from the same single measured run". The
+> ledger delivered by story 20.199 made that ranking computable for the first
+> time, and it ranks `check-terrain-*` (16 members, 240,091ms),
+> `check-policy-*` (8, 297,625ms) and `check-review-*` (13, 136,184ms) at the
+> top — exactly the families act 3 anticipated. **The act still fails, because
+> its saving does not exist.** Measured: the per-file `sh` floor is **~0.7ms**
+> (ten spawns, 7ms), so merging `check-terrain-*` from 16 files to one removes
+> fifteen files and about **10ms** from a family costing ~30,000ms per full run
+> — **0.03%**. The ~0.5s figure the #944 amendment records is *interpreter*
+> startup, not per-file cost, and **merging `sh` wrappers removes not one
+> interpreter spawn**: `check-policy-block` makes 44, `check-review-reentry` 41,
+> `check-terrain-theses-inner` 17, each measured 70–80% startup-bound. So act 3
+> is the case rule 5 of the checker governance rules names in its own words —
+> *"never by chasing a count target, which invites cosmetic merges that lower
+> the count while keeping the cost"* — and declining it the day that rule landed
+> is the rule working rather than being waived. **Where the cost is.** `python3`
+> resolves through a **pyenv shim** on the measuring machine: **79ms** per spawn
+> against **17ms** for the interpreter the shim itself selects. A full tier makes
+> **2,428** spawns, so the shim costs **~150s of summed work — 31% of
+> `FULL_TOTAL_MS`**. All of it originates in the check `*.sh` files (1,545
+> invocation lines); **no python script re-invokes `python3` by name**, and
+> fourteen already use `sys.executable`, so the python side is correct and this
+> is not a portability defect there. **This discharges the third remedy's
+> deferral.** The #944 amendment recorded interpreter batching as the third
+> remedy and explicitly did not take it — *"it restructures how checks execute
+> and waits on its own evidence"* — and #957 called batching "spent as a lever"
+> on the strength of `check-topic-map`'s profile (55 spawns ≈ 4.1s of 22s). That
+> reading was correct about that check and **does not generalise**: the families
+> measured here are the opposite shape, and one work-dominated specimen was too
+> narrow a base for the conclusion. The evidence the deferral asked for now
+> exists. **The remedy is not batching but resolution**: the runner resolves the
+> interpreter once and puts it on the PATH it *already* exports per spawn for the
+> #1366 sandbox — one line, no call-site changes across 1,545 invocations.
+> Measured 51% off six of the heaviest checks with all six still passing. **On a
+> machine without pyenv the change is a no-op**, since `python3` already is the
+> binary `sys.executable` names: the benefit is environment-specific, the
+> correctness is not. **What would overturn it:** a machine where the checks are
+> meant to run an interpreter *other* than `sys.executable` — a venv they should
+> ignore — which was not tested. Delivery: none for act 3; the interpreter
+> resolution is filed and implemented separately. #1356 closes.
