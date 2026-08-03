@@ -484,7 +484,7 @@ def cmd_review_reentry(args):
             sys.stderr.write(
                 "error: review-reentry: the re-entry verdict record is partial "
                 "— missing " + ", ".join(v2_gaps) + "; the re-run gate must "
-                "write all four dimension verdicts (dim3 with its inventory "
+                "write all five dimension verdicts (dim3 with its inventory "
                 "stamp, dim4 with measured values) to rubric-verdicts-v2.txt "
                 "before re-entry may report done/reviewed. No checkpoint "
                 "written.\n")

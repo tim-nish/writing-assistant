@@ -151,7 +151,7 @@ fi
 [ ! -f "$wsv/checkpoint.json" ] && ok "no checkpoint over a missing v2 verdict record" \
   || err "checkpoint written despite a missing v2 verdict record"
 # A PARTIAL v2 record (the #492 dim1/dim2-only shape) is refused just the same.
-printf 'dim1: pass\ndim2: pass\n' > "$wsv/rubric-verdicts-v2.txt"
+printf 'dim1: pass\ndim2: pass\n' > "$wsv/rubric-verdicts-v2.txt"  # still partial: dim3-5 absent
 if python3 "$DP" review-reentry --draft "$ws/edited.md" --map "$ws/map.txt" \
      --slug "$slug" --root "$h" --ws "$wsv" --applied 2 --rubric-applied \
      >/dev/null 2>"$work/e_v2partial"; then
@@ -238,7 +238,8 @@ assert os.path.isabs(d['verdicts_v2']) and d['verdicts_v2'].endswith('rubric-ver
   || err "re-entry JSON shape wrong"
 # Story 18.21 (#496): the summary's dimension count is the RUBRIC's own, carried
 # as rubric_dimensions — never a hardcoded literal. It must equal the count of
-# `## Dimension N` sections in quality-rubric.md (four).
+# `## Dimension N` sections in quality-rubric.md — derived, so the #1412
+# dim5 addition flows through without editing a literal here.
 rn=$(grep -cE '^## Dimension [0-9]' "$root/skills/draft-article/quality-rubric.md")
 printf '%s' "$out" | python3 -c "
 import json,sys

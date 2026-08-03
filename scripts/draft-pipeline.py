@@ -763,7 +763,7 @@ def _dimension4_measures(draft_text, prov_entries):
 # over a record missing any of the four dimensions or the dim3 inventory stamp
 # (#492: the dim1/dim2-only regression where review silently compensated for a
 # gate that never recorded dim3/dim4).
-_DIM_LINE_RE = re.compile(r"^\s*(dim[1-4])\s*:", re.IGNORECASE)
+_DIM_LINE_RE = re.compile(r"^\s*(dim[1-9]\d*)\s*:", re.IGNORECASE)
 
 # The versioned rubric is the single authority for HOW MANY dimensions exist.
 # A completion summary that reports the quality-gate outcome quotes THIS count,
@@ -777,10 +777,9 @@ _RUBRIC_DIM_RE = re.compile(r"^## Dimension [0-9]", re.MULTILINE)
 
 
 def _render_verdict_record(results, vocab_stamp, dim4_measures, draft_text=None):
-    """Serialize the complete four-dimension verdict record. dim3 carries its
-    `dim3_inventory` stamp (version + counts); dim4 carries the measured
-    mechanics. Verdict tokens (pass/fail/waived) come straight from the gate's
-    own `results`, so the record cannot diverge from the gate that wrote it.
+    """Serialize the complete five-dimension verdict record: dim3 with its
+    inventory stamp, dim4 with measures, dim5 (#1412) always written (`n/a`
+    included). Tokens come from `results`, so it cannot diverge from its gate.
 
     Sha-bound (Story 19.15, #751): with `draft_text`, the record opens with
     `attestation: draft-sha256=<hex>` — the same convention the provenance
@@ -789,9 +788,8 @@ def _render_verdict_record(results, vocab_stamp, dim4_measures, draft_text=None)
     while stale)."""
     def verdict(dim):
         return results.get(dim, ("missing", ""))[0]
-    lines = ["# fill->verify quality-gate verdict record — all four dimensions "
-             "(dim3 inventory + dim4 measures stamped, Story 18.18; sha-bound, "
-             "Story 19.15).",
+    lines = ["# fill->verify quality-gate verdict record — all five dimensions "
+             "(dim3 inventory + dim4 measures; sha-bound, 18.18/19.15).",
              f"dim1: {verdict('dim1')}",
              f"dim2: {verdict('dim2')}"]
     if draft_text is not None:
@@ -806,19 +804,21 @@ def _render_verdict_record(results, vocab_stamp, dim4_measures, draft_text=None)
     lines.append(f"dim3: {verdict('dim3')}{stamp}")
     measures = "  [" + " ".join(f"{k}={v}" for k, v in dim4_measures.items()) + "]"
     lines.append(f"dim4: {verdict('dim4')}{measures}")
+    lines.append("dim5: " + (results["dim5"][0] if results.get("dim5")
+                             else "n/a — no plain-register commitment"))
     return "\n".join(lines) + "\n"
 
 
 def _verdict_record_gaps(text):
-    """Completeness gaps in a verdict record: any of the four dimensions absent,
-    or the dim3 line missing its inventory stamp. Empty list == complete. This
-    is the predicate the completion gate blocks on (#492)."""
+    """Completeness gaps in a verdict record: any of the five dimensions absent
+    (dim5 required even where n/a — #1412), or the dim3 line missing its
+    inventory stamp. Empty == complete; the completion gate blocks on it (#492)."""
     dims = {}
     for ln in text.splitlines():
         m = _DIM_LINE_RE.match(ln)
         if m:
             dims[m.group(1).lower()] = ln
-    gaps = [d for d in ("dim1", "dim2", "dim3", "dim4") if d not in dims]
+    gaps = [d for d in ("dim1", "dim2", "dim3", "dim4", "dim5") if d not in dims]
     if "dim3" in dims and "dim3_inventory" not in dims["dim3"]:
         gaps.append("dim3_inventory")
     return gaps

@@ -1,4 +1,18 @@
 #!/usr/bin/env sh
+# tier: inner — greps over the review skill, its prompts companion, and the
+#   quality rubric; no network, no repo mutation.
+# measured: 100ms (three runs, 2026-08-04, all 100ms)
+# ends: a LANGUAGE-SCOPED criterion entering the shared quality rubric, which
+#   also gates the EN draft Stage 3->4 path — turning a Japanese defect into an
+#   English gate (Story 20.4's property). NOT generation-side preventable: the
+#   rubric is a hand-authored versioned asset and nothing at its writing point
+#   knows which language paths consume it.
+# removal-signal: the EN and JA gates stopping sharing one rubric asset, at
+#   which point extending either cannot reach the other.
+#
+# Headers owed because the file LEFT the admission baseline when edited
+# (#1356): the edit re-based 20.4's guard from its version pin onto its
+# property (#1412).
 # parallel-safe
 # covers: config/language-conventions.yaml scripts/resolve-user-config.py skills/draft-article/quality-rubric.md skills/review-article/SKILL.md skills/review-article/phases/arbitration.md skills/review-article/phases/entry.md skills/review-article/phases/passes.md skills/review-article/phases/reentry.md skills/review-article/review-prompts.md specs/spec-article-review/SPEC.md specs/spec-canonical-adaptation/SPEC.md
 # check-review-declared-register.sh — the review pass grades a derived
@@ -99,22 +113,41 @@ else
   err "the skill does not point at review-prompts.md for the contract"
 fi
 
-# --- 4. the four-dimension rubric is NOT extended ----------------------------
-# The chosen alternative was explicitly "no fifth dimension": the rubric also
-# gates the EN draft Stage 3->4 path, so extending it would turn a Japanese
+# --- 4. no LANGUAGE-SCOPED criterion becomes an always-firing dimension ------
+# Story 20.4's chosen alternative was "no fifth dimension", and it was pinned
+# here as `rubric-version == 1` plus the literal "Four dimensions". Those are
+# PROXIES for a moment, not the decision: re-based 2026-08-04 (#1412) onto the
+# property 20.4 was actually about — the rubric ALSO gates the EN draft Stage
+# 3->4 path, so a Japanese-specific criterion added to it would turn a Japanese
 # defect into an English gate.
+#
+# The served position is the one that settles it: scope a trigger to the
+# PROPERTY being claimed about rather than to the assertion, and a count
+# survives as the OCCASION to check the property, never as the trigger
+# *(owner decision record — 2026-08-01 (a trigger is scoped to the property,
+# not to the count))*.
+#
+# #1412's dim5 does not violate the property and is why the re-base happened:
+# it is CONDITIONAL — a run whose Brief carries no plain-register commitment
+# emits `dim5: n/a` and passes — so an EN draft with no commitment is
+# unaffected, which is exactly what a naturalness dimension could never have
+# been. The naturalness ban below is therefore UNCHANGED and still verbatim.
 
-ver=$(sed -n 's/^<!-- rubric-version: \([0-9][0-9]*\) -->$/\1/p' "$RUBRIC" | head -1)
-if [ "$ver" = "1" ]; then
-  ok "rubric-version is still 1 — the rubric was not extended"
+if grep -qiE '^## Dimension [0-9]+ —.*(japanese|語|naturalness)' "$RUBRIC"; then
+  err "a LANGUAGE-SCOPED dimension entered the rubric — it gates the EN draft"\
+" Stage 3->4 path too, so this turns a Japanese defect into an English gate"\
+" (Story 20.4's property, re-based #1412)"
 else
-  err "rubric-version is '$ver', expected 1: Story 20.4 must not touch the rubric"
+  ok "no language-scoped dimension in the rubric (20.4's property, not its version pin)"
 fi
 
-if grep -q 'Four dimensions' "$RUBRIC"; then
-  ok "the rubric still declares FOUR dimensions"
-else
-  err "$RUBRIC no longer declares four dimensions — the closed set moved"
+# Any dimension beyond 20.4's four must state how it behaves where its subject
+# is absent — the conditional discipline that keeps the EN path unaffected.
+if [ "$(grep -cE '^## Dimension [0-9]' "$RUBRIC")" -gt 4 ]; then
+  grep -qi 'n/a' "$RUBRIC" \
+    && ok "a dimension beyond the original four declares its absent-subject behaviour (n/a), so the EN path stays unaffected" \
+    || err "the rubric grew past four dimensions with no n/a clause — an"\
+" unconditional new dimension gates every draft, which is what 20.4 refused"
 fi
 
 if grep -qi 'natural' "$RUBRIC"; then

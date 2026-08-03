@@ -1,18 +1,20 @@
 # Article-quality rubric
 
-<!-- rubric-version: 1 -->
+<!-- rubric-version: 2 -->
 
 The fixed quality standard a draft must meet at the fill→verify gate
 (SPEC-article-draft-pipeline CAP-7; `docs/harness-architecture.md` D4).
 "Readable" is **this rubric**, not whatever an agent happens to produce.
 
 This is a **versioned plugin asset**: exemplar-derived threshold tuning edits
-**this file** (bump `rubric-version` above), never the specs. Four dimensions,
+**this file** (bump `rubric-version` above), never the specs. Five dimensions,
 each with an **operational check** — a test with a definite verdict, not a vibe.
-Dimensions 1–2 are judged by one single-pass cheap-tier rubric judge;
+Dimensions 1–2 and 5 are judged by one single-pass cheap-tier rubric judge;
 dimensions 3 and 4 are mechanical (zero tokens — dimension 3 became a
 deterministic scan on 2026-07-17, #305). A draft **passes** only when every
-dimension passes.
+dimension passes — and dimension 5 is **conditional**, which is stated as an
+explicit `n/a` verdict with its reason rather than an absent line, because an
+absent line cannot be told apart from one nobody ran.
 
 ## Dimension 1 — Narrative arc
 
@@ -170,6 +172,35 @@ v1 defaults**, tuned here from dogfood/exemplar runs (Open question 3):
 
 A metric crossing its threshold is a dimension-4 **fail**, reported with the
 location and the measured value.
+
+## Dimension 5 — Both ends realize the plain-register commitment (judged; added 2026-08-04, #1412)
+
+Both ends of the article realize the Brief's plain-register commitment
+(#1411) **semantically — never as the same sentence.**
+
+- **Operational check — recoverability, per end:** after reading the opening
+  alone, can the reader state the committed claim? After reading the close
+  alone, can they? Each end is a separate verdict against the **adopted
+  commitment**, and the judge is handed that commitment and the two end
+  sections — **never a target sentence, because none exists.**
+- **A string match is the ANTI-check.** Identical or near-identical thesis
+  sentences at open and close **fail** this dimension. The commitment is a
+  proposition, not a template slot; a draft that pastes one sentence at both
+  ends has rebuilt the fixed-template shape the structure ruling (#1410)
+  removed, and it fails here even though both ends "carry" the claim.
+- **The close composes the simplified Strand renderings.** The closing
+  restatement places the committed renderings or **discloses omissions by
+  name** — the standing cover-counted-in-placements requirement, applied at
+  the close.
+- **Realization form is not this dimension's.** Whether the opening is a
+  complete simple statement, a leading question, or a failure-case entry is
+  decided by the adopted **structure** (#1410). This dimension asserts only
+  that whatever realization was chosen carries the committed claim.
+- **Conditional, and its absence is a DISCLOSURE.** A run whose Brief carries
+  no plain-register commitment has nothing to realize: the dimension emits
+  `dim5: n/a — no plain-register commitment on the brief` and the draft may
+  still pass. That is a fact about the brief, never a gap and never a silent
+  skip — the verdict record carries the line either way.
 
 ## Dimension separation — length is dimension 4's, flow is dimensions 1–2's (#349, Story 13.66)
 
