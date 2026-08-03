@@ -452,7 +452,7 @@ and no already-relocated text moves — the rule is prospective.
 >
 > **The substrate already exists and this builds on it rather than adding
 > storage.** The per-invocation check ledger (#1354, story 20.199,
-> `scripts/run-checks.sh:241-330`) records per-check rows per invocation, so a
+> `scripts/run-checks.sh:241-330@90575bc`) records per-check rows per invocation, so a
 > reading history at a stated concurrency is derivable from what the runner
 > already retains. No second ledger is introduced — which is also what keeps
 > this consistent with the assemble-on-demand stance the counting rules take

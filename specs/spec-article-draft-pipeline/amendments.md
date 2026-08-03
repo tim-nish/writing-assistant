@@ -153,7 +153,7 @@ appends to it.
 > `20260803T142748-813020` spawned a first isolated provenance round whose
 > verdict lines all carried the literal placeholder `POS` instead of a position
 > id. Those findings were correctly discarded at
-> `scripts/verify-provenance.py:751` — *"judge graded position 'POS', which is
+> `scripts/verify-provenance.py:751@90575bc` — *"judge graded position 'POS', which is
 > not in the map — the verdict cannot be trusted"*. The **ledger write was not**:
 > `:833-841` records a row for every `pos in sorted(graded)` with
 > `"fail" if pos in round_fail else "pass"`, and `graded` comes from the
@@ -206,9 +206,9 @@ appends to it.
 > amendment above re-anchored the per-section evidence-type check on
 > `$WS/examination-pins.txt`, correctly, for the fact-sheet retirement it was
 > answering. What neither it nor the brief-record amendment (2026-08-02, #1044,
-> `stages/stage0.md:407`) reconciled is that `journey_arcs` ride run state
+> `stages/stage0.md:407@90575bc`) reconciled is that `journey_arcs` ride run state
 > **beside `sources`** as declared source material while the pin ledger is
-> **derived from examination records only** (`scripts/examine.py:762`, ledger
+> **derived from examination records only** (`scripts/examine.py:762@90575bc`, ledger
 > written at `:789`). An arc is not an examination, so no arc pointer can ever
 > appear in that ledger — the check reports `cannot-determine` for every
 > arc-carrying section, and did so on runs `20260803T105759-992700` and
@@ -217,7 +217,7 @@ appends to it.
 > disclosure.
 >
 > **The sharper half was found by grounding and corrects the reporting issue's
-> own premise.** `stages/stage3.md:359-363` requires handing the isolated judge
+> own premise.** `stages/stage3.md:359-363@90575bc` requires handing the isolated judge
 > *"only the sentences `--list-narration` / `--list-derived` surface **plus the
 > fact-sheet entries they cite**"* — and **nothing emits those entries**. A grep
 > for `cited-material` across `scripts/`, `skills/` and `specs/` returns
@@ -263,7 +263,7 @@ appends to it.
 > per-lesson skeleton detector (added 2026-07-20, #434/#440) counts every
 > `##`-`######` heading casefolded and fails on any repeated
 > `>= QG_SKELETON_REPEAT` times, with no exemption
-> (`scripts/draft-pipeline.py:717-725`). F2 mandates the opposite: its GATE slot
+> (`scripts/draft-pipeline.py:717-725@90575bc`). F2 mandates the opposite: its GATE slot
 > is `## GATE {What actually happened}` carrying
 > `[EVIDENCE: episode|example|measurement]`, and the framework's own lesson-unit
 > comment states that "each repeat is one lesson with its OWN 'What actually
@@ -291,7 +291,7 @@ appends to it.
 > the exemption only stops the checks manufacturing the failure while the
 > generation clause is what prevents it.
 >
-> **The lockstep obligation is discharged explicitly.** `stages/gate.md:31-35`
+> **The lockstep obligation is discharged explicitly.** `stages/gate.md:31-35@90575bc`
 > holds that this contract lives in three enforcement copies —
 > `scripts/draft-pipeline.py`, `quality-rubric.md`, and that section — and that
 > "a change to one without the others is a defect". All three move together
