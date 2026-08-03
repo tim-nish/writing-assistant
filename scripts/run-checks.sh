@@ -153,6 +153,63 @@
 # on every full run, whether or not the ceiling is exceeded. Under -P each
 # check's line is buffered and printed by the parent in glob order, so
 # concurrent runs never interleave into one line.
+#
+# ---------------------------------------------------------------------------
+# CHECKER GOVERNANCE (#1355/#1356). The thresholds above bound what the family
+# COSTS; these five rules bound what may JOIN it. They are declared here, beside
+# the numbers they govern, for the same declare-once-in-the-enforcement reason,
+# and they bind the agent path at triage and spec time — most recent members
+# were added by a sitting resolving "add a check" from an issue.
+#
+# THE BINDING QUANTITY IS TOTAL COST PER SHIP-CYCLE — sum of runtime x
+# invocations — never per-invocation runtime, and never checker count in the
+# abstract. A count target invites cosmetic merges that lower the count and keep
+# the cost.
+#
+#   1. ADMISSION. A proposal to add a checker is accepted only when it states:
+#      the DEFECT CLASS IT ENDS (a generation-side constraint that makes the
+#      class unproducible is the preferred answer, and "no checker" is a valid
+#      outcome); its tier and MEASURED runtime; and its REMOVAL SIGNAL. "The
+#      effect may be small but having one is better than none" is formally
+#      INADMISSIBLE — it prices the benefit and not the cost, and cost multiplies
+#      by loop position. The removal-signal half is already enforced by
+#      check-check-declarations.sh (#922); the defect-class and measured-runtime
+#      halves are what #1355 adds.
+#   2. COST-RANKED LEAN OBLIGATION. The smallest set of checks covering >=80% of
+#      summed per-sitting cost carries an obligation the rest do not: at review,
+#      compare the areas where the check has actually caught meaningful defects
+#      against the areas of its coverage where nothing has ever fired, and REMOVE
+#      the coverage that has shown no value. Expensive checks must stay lean to
+#      stay at all.
+#   3. FREQUENCY DEMOTION IS THE DEFAULT FOR EXPENSIVE CHECKERS. A high-total-
+#      cost check runs once per ship-cycle at the full tier unless a persuasive,
+#      evidence-backed reason for higher frequency is declared IN THE CHECK, in
+#      the same greppable-header shape as `tier:` and `parallel-safe`. The burden
+#      of proof sits on frequency, not on demotion.
+#   4. RETENTION REVIEW. Zero failures across N EXERCISED runs — runs whose scope
+#      actually reached the check's subject — makes it a removal CANDIDATE:
+#      reviewed, never auto-deleted, because a never-firing check may be
+#      deterring rather than dead, and the review is where that is judged.
+#   5. THE SANCTIONED SHRINK LEVER IS ASSERTION ALTITUDE. Reduction happens by
+#      merging single-assertion scripts into fewer fixture-based checks, and by
+#      removing valueless coverage under rule 2 — never by chasing a count.
+#
+# RULES 2 AND 4 READ THE PER-INVOCATION LEDGER (#1354) AND BIND ON ITS DELIVERY.
+# They are ratified now and unenforceable until it lands; the interval is stated
+# rather than left to be discovered. Rules 1, 3 and 5 bind immediately.
+#
+# WHAT IS NOT LICENSED, because it was proposed and DECLINED at the #1356 gate:
+# inverting the `tier:` default polarity. Measured at triage — 174 checks, 55
+# full, 36 explicit inner, 83 headerless; a scoped inner run selects 5 checks
+# when this file is edited and 31 when a skill file is. The 119 figure is the
+# UNSCOPED run, which #944 already fails by design. And with `# covers:` at 174
+# of 174, promotion (#1321) is fully armed: demoting a check does NOT remove it
+# from the per-edit loop when its subject changes, it removes only the ceiling.
+# The inversion would have traded #913's load-bearing property — the ceiling
+# polices the default, so a new slow check cannot hide — for approximately no
+# reduction in what runs. Also not licensed: raising any ceiling, and deleting
+# any check on count grounds.
+# ---------------------------------------------------------------------------
 
 INNER_MS=2000          # inner-tier per-check runtime ceiling (ms)
 INNER_TOTAL_MS=15000   # inner-tier FAMILY ceiling for an unscoped run (ms) — #944

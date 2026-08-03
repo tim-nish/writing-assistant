@@ -155,3 +155,26 @@ being checked. Summing CPU instead was tested and rejected: it inflates
 +45% under load. Nothing time-based is concurrency-independent here. A breach is a finding to act on (re-tier, fixture-ise, or raise the
 concurrency), never a red suite — the inner tier's ceilings fail, these do
 not, and that asymmetry is deliberate.
+
+**Adding a check is an ADMISSION DECISION, not a reflex (#1355/#1356).** The
+ceilings above bound what the family costs; the five governance rules in
+`scripts/run-checks.sh`'s header bound what may join it, and they bind **you**,
+at triage and spec time, because most recent members were added by a sitting
+resolving "add a check" from an issue. The binding quantity is **total cost per
+ship-cycle** — Σ(runtime × invocations) — never per-invocation runtime and never
+count. The header is the single copy; what is ambient here is the duty. A
+proposal to add a check states the **defect class it ends** (a generation-side
+constraint that makes the class unproducible is the preferred answer, and "no
+checker" is a valid outcome), its tier and **measured** runtime, and its
+**removal signal** — and "better than none" is inadmissible, because it prices
+only the benefit while cost multiplies by loop position.
+
+**The scoped per-edit run is genuinely small, and the number matters because a
+wrong one has already driven a proposal.** Measured 2026-08-03 on a clean tree:
+174 checks (55 full, 36 explicit inner, 83 headerless), and a *scoped* inner run
+selects **5** when `scripts/run-checks.sh` is edited and **31** when a skill file
+is. The 119 figure is the **unscoped** run — the one #944 fails by design. An
+inversion of the `tier:` default polarity was proposed on that figure and
+**declined**: with `# covers:` at 174 of 174, #1321's promotion means demoting a
+check does not remove it from the per-edit loop when its subject changes, only
+its ceiling. Scope your run; do not re-tier to make it quiet.

@@ -139,6 +139,7 @@ classes, split at the resolver:
 |---|---|---|
 | Terrain's **View** (`terrain-view.md`) — the owner-facing full report | the writing-assistant working tree | a human opens it to read; it is the deliverable |
 | **run workspaces** (`runs/<run-id>/`) and **debug artifacts** | the machine state root | machine-readable intermediates, caches and resumable state, which a human never opens by intent |
+| the **check ledger** (`run-checks.sh`'s per-invocation JSONL record) | the machine state root | machine-readable capture written as a side effect of running, never opened by hand — the row above governs its siting and this row adds only what that row does not settle. **It is NOT GC-eligible on clutter grounds** (#1354): the open question below defers GC on the premise that state-root artifacts are debug clutter, and the #1355 governance rules falsify that premise for this one by making it the catch record a retirement review reads. A bound placed on it later is a decision about what such a review is entitled to see, never a disk-space cleanup. The **report** over it stores nothing — it recomputes on demand, because primary capture is permitted where a stored derived tally is not |
 | the **brief** (`brief.json` and its recompositions) | the run workspace, in the machine state root | machine-read state — the durable record of a selection decision, re-opened *through* `brief-open` and never by a human editing it. **The owner condition is part of this row and not a footnote to it: no owner act may require the owner to identify or type its filename.** The gate offers the continuation; a brief is named to a person by a DERIVED label (date, member set, thesis first words), never by a stored name and never by its path. The file does **not** move — it is machine-read state, and putting it where a human works would invite the hand-editing its lifecycle exists to replace (Story 20.93, #1048/#1049) |
 
 **Amended 2026-08-03 (#1331/#1342, SPEC-terrain amendments): the brief row's
@@ -282,6 +283,12 @@ lives (O1).
 1. **O1 above** — the `writing-sources.yaml` model; tripwire-gated.
 2. **GC policy** for old run workspaces — deferred until disk or clutter
    shows up in practice; candidate: keep last N runs per repo.
+   **Bounded 2026-08-03 (#1354): the check ledger is carved out of this
+   deferral and is not GC-eligible on clutter grounds** (see its row above).
+   The deferral rests on the premise that state-root artifacts are debug
+   clutter; that premise is false for a record a governance rule reads. The
+   deferral itself stands for everything else, unchanged — this is a carve-out,
+   not a reopening, and item 3 below is still the signal that would reopen it.
 3. **Cross-run artifacts** — if dogfooding surfaces state that must outlive
    a run (e.g. a reusable fact-sheet cache), it forces the state/cache
    split D2 skipped; that is the signal to revisit, not before.

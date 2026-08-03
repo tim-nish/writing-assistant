@@ -115,3 +115,124 @@ and no already-relocated text moves — the rule is prospective.
 > not as a relaxation here.
 >
 > Delivery: story 20.195.
+
+> **Amended 2026-08-03 (triage, #1355/#1356) — the check family gains an
+> ADMISSION GATE whose acceptance conditions include a removal signal declared
+> at birth, and a cost-ranked lean obligation; the proposed inversion of the
+> `tier:` default polarity is DECLINED on a measured premise, and what stands in
+> its place is closing the promotion ceiling exemption and classifying the
+> pre-adoption baseline.** The filing premise was that 119 checkers sit in the
+> per-edit loop and that a headerless default is what puts them there. Measured
+> at triage on a clean tree, the family is **174 checks — 55 declaring
+> `# tier: full`, 36 declaring `# tier: inner`, and 83 headerless** — and the
+> per-edit loop is not 119 wide, because #944 and #998 already narrowed it: a
+> scoped inner run selects **5 checks** when `run-checks.sh` itself is edited and
+> **31** when a skill file is (30 of those 31 arriving through the `# covers:`
+> union, which #1326 already rules a finding rather than a failure). The 119
+> figure is the **unscoped** run, which #944 fails by design and whose named
+> remedy is scoping. **Two further measurements decide the fork.** First,
+> `# covers:` now stands at **174 of 174**, so #1321's promotion is fully armed:
+> a `# tier: full` check whose own declaration matches a changed path runs in the
+> inner tier anyway. Demotion therefore does **not** remove a check from the
+> per-edit loop when its subject changes — it removes only the ceiling, since a
+> promoted check is reported `PROMOTED-SLOW` rather than failed. Inverting the
+> polarity would thus have traded #913's load-bearing property — *the ceiling
+> polices the default, so a new slow check cannot hide* — for approximately no
+> reduction in what actually runs. Second, the admission path **already** forbids
+> a headerless new check: the declarations gate has required an explicit
+> `# tier: inner|full` and a `# removal-signal:` of every post-adoption check
+> since #922, so the default governs the 83-member pre-adoption baseline and
+> nothing else. **The contract, in five rules, declared in `run-checks.sh`'s
+> header beside the thresholds they govern.** (1) *Admission.* A proposal to add
+> a checker is accepted only when it states the defect class it ends — a
+> generation-side constraint that makes the class unproducible being the
+> preferred answer, and "no checker" a valid outcome — its tier and **measured**
+> runtime, and its removal signal. "Better than none" is formally inadmissible:
+> it prices the benefit and not the cost, which multiplies by loop position. The
+> removal-signal half already ships; the defect-class and measured-runtime halves
+> are what this adds. (2) *Cost-ranked lean obligation.* The smallest set of
+> checks covering ≥80% of summed per-sitting cost carries an obligation the rest
+> do not — at review, compare where the check has caught meaningful defects
+> against the coverage where nothing has ever fired, and remove what has shown no
+> value. (3) *Frequency demotion is the default for expensive checkers*, declared
+> in the check itself in the greppable-header shape `tier:` and `parallel-safe`
+> already use; the burden of proof sits on frequency, not on demotion. (4)
+> *Retention review*: zero failures across N **exercised** runs makes a check a
+> removal candidate — reviewed, never auto-deleted, because a never-firing check
+> may be deterring rather than dead. (5) *The sanctioned shrink lever is
+> assertion altitude* — merging single-assertion scripts into fewer
+> fixture-based checks, and removing valueless coverage under rule 2, never
+> chasing a count target, which invites cosmetic merges that lower the count and
+> keep the cost. Rules 2 and 4 read a per-sitting cost record and therefore
+> **bind on the delivery of the ledger amended below**; they are ratified now and
+> unenforceable until it lands, and that interval is stated rather than left to
+> be discovered. Rules 1, 3 and 5 bind immediately and need no history. **The
+> rules are themselves subject to the standard they set** — a rule corpus
+> accretes exactly as a check suite does (*owner decision record — 2026-08-02
+> (constrain generation, not post-hoc detection)*), which is why there are five
+> and not one per collected complaint, and why rule 1 prefers a generation-side
+> constraint to a new member. **What replaces act 1.** The promotion exemption
+> closes: a check promoted into the inner tier by a coverage hit is subject to
+> `INNER_MS` like any other inner member, because #1321 gave promotion the
+> execution cost of an inner check while #1326 left it the reporting semantics of
+> a full one, and that pairing is what would have made a demotion sweep look like
+> relief. And the 83 headerless members declare their tier explicitly, by ratchet
+> under the existing classify-when-touched adoption shape — the retrospective
+> sweep stays declined. **Not licensed by this amendment:** inverting either
+> default polarity, raising any ceiling, and deleting any check on count grounds.
+> **What would overturn it:** evidence that sittings run the inner tier
+> **unscoped** in practice, which would make 119 the real per-edit number and the
+> measurement above beside the point. That is checkable from the ledger below,
+> which records each invocation's scope — so the deferral owes no separate
+> generating mechanism (*owner decision record — 2026-07-30 (a deferral to data
+> owes its generating mechanism)*). Act 3 of #1356, the altitude merges, yields
+> no story here: its own ordering makes it follow-up sittings per family, and its
+> ranking input is the ledger that does not yet exist. Delivery: stories 20.196,
+> 20.197, 20.198.
+
+> **Amended 2026-08-03 (triage, #1354) — the runner MEASURES everything and
+> RETAINS none of it; the family's budget gains a per-invocation ledger in the
+> machine state root and a report that RECOMPUTES rather than storing counts.**
+> Every ceiling this family declares — `INNER_MS`, `INNER_TOTAL_MS`,
+> `FULL_TOTAL_MS`, `FULL_WALL_MS` — is computed per run and discarded at exit,
+> so the two questions the owner asks cannot be answered from anything the
+> repository holds: what a sitting's total elapsed time is, and what share of it
+> is checker runtime. The family has bounded one scope at a time and left the
+> next unwatched three times (#944 the member, #961 the tier); the **sitting** is
+> the scope above the tier, and it is unbounded because it is unmeasured, which
+> is the prior condition rather than the same defect. **The contract:**
+> `run-checks.sh` appends one JSONL record per invocation carrying the timestamp,
+> the tier, the **scope** (the glob, or unscoped), each check's name, elapsed ms
+> and verdict, and the family total; and a `report` subcommand renders a
+> sitting's wall clock, summed checker time, checker share, and the ranking by
+> **total cost per sitting — Σ(runtime × invocations)**, never per-invocation
+> runtime alone, so a one-second check invoked thirty times outranks a
+> twenty-second check invoked once. The reported set is the smallest covering
+> ≥80% of summed cost; the threshold is derived from the measured distribution
+> and "top five" was an example, never the rule. **Emission is a side effect of
+> running.** Nothing new is measured — the runner already holds every value the
+> record carries; it stops discarding them, which is the same shape as the
+> record-as-a-side-effect-of-the-act contract SPEC-run-record already carries.
+> **The verdicts ride the same record as the timings, deliberately:** one writer,
+> two consumers, because the catch record rules 2 and 4 of the amendment above
+> read is the same data as the cost ranking. **Siting is settled and not
+> restated:** the record is machine-readable, resumable and never opened by a
+> human by intent, which is exactly the class `docs/storage-architecture.md` D2
+> assigns to the machine state root. What D2 does **not** settle is retention —
+> its open question defers GC "until disk or clutter", taken on the premise that
+> the artifacts are debug clutter, and rules 2 and 4 above falsify that premise
+> by making this record load-bearing. **So the retention rule is stated here: the
+> check ledger is not GC-eligible on clutter grounds**, and any bound placed on
+> it later is a decision about what a retirement review is entitled to see, never
+> a disk-space cleanup. **The report stores nothing.** It is a subcommand that
+> recomputes from the ledger on demand, because primary capture — a record
+> written at the act, holding what no other carrier holds — is permitted while a
+> stored derived tally is not; a digest that read a stored count would breach
+> that rule and one that recomputes does not. **Not licensed:** a second stored
+> ledger of any kind, a ceiling declared against the per-sitting quantity before
+> it has been measured even once (the aspirational-ceiling failure #961 refused —
+> an instrument that cries wolf on its first run), and any change to the four
+> existing ceilings. **What would overturn the retention clause:** a ruling that
+> rules 2 and 4 will read a bounded recent window rather than history, which
+> would return this record to the ordinary state-growth class D2 already defers.
+> Delivery: story 20.199.
