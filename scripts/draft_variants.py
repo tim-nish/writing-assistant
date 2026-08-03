@@ -35,6 +35,7 @@ import sys  # noqa: F401  (kept: extracted code may reach for it)
 
 sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
 import run_record  # noqa: E402  (the gate's record is a side effect of running)
+import run_loop  # noqa: E402  (the revision cycle is a bounded improvement loop)
 
 # The host (`draft-pipeline.py`), bound once at import by the dispatcher. Never
 # imported here: the host owns these helpers, and a second import path to them
@@ -166,6 +167,17 @@ def cmd_quality_gate(args):
                                "third cycle" % args.cycle)
         return 1
     draft = sys.stdin.read() if args.draft == "-" else open(args.draft, encoding="utf-8").read()
+    # The revision cycle is a bounded improvement loop — a repeated act that
+    # regenerates an artifact against a verdict — so the draft this cycle grades
+    # is PRESERVED under its own hash in the run workspace before it is graded,
+    # and this iteration's delta against the previous cycle's preserved draft
+    # rides the gate block's own close record (story 20.189, #1334;
+    # record-formats.md §5). The cycle still OVERWRITES the working draft; what
+    # changes is that the superseded version stays addressable. The gate is the
+    # FIRST consumer of the contract, never its definition: nothing in
+    # `run_loop` knows what a quality gate is.
+    run_loop.record_iteration(run_record.workspace_of(args)[0], "quality-gate",
+                              getattr(args, "cycle", 1), draft)
     prov_entries = []
     if args.map:
         try:

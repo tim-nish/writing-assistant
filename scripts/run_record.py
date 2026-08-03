@@ -80,6 +80,11 @@ DRAFT_DECIDING_BLOCKS = ("fill", "quality-gate", "verify", "complete")
 
 HEX64 = re.compile(r"^[0-9a-f]{64}$")
 
+# The block whose close IS the run's close. Its record carries the loop report
+# (story 20.189, #1334; record-formats.md §5) — the one place a reader learns
+# what every bounded improvement loop of the run cost and whether it converged.
+RUN_CLOSING_BLOCK = "complete"
+
 EVENT_OPEN = "open"
 EVENT_CLOSE = "close"
 # The sub-unit record (story 20.188, #1341; record-formats.md §4). Emitted at
@@ -206,7 +211,8 @@ def duration_between(open_ts, close_ts):
 
 
 def close_record(block, status, route, verdict=None, skipped=None,
-                 exit_code=0, command=None, ts=None, duration_s=None):
+                 exit_code=0, command=None, ts=None, duration_s=None,
+                 iteration=None, loop_report=None):
     """The block-close record (record-formats.md §2), written at block close —
     before the block's `checkpoint.json` write (CAP-4), by the block's own
     command, whatever its exit status.
@@ -214,6 +220,11 @@ def close_record(block, status, route, verdict=None, skipped=None,
     Nothing here defaults `status` or `route`: a default would be this module
     guessing the judgment on the emitter's behalf, which is the failure the
     contract exists to remove. Both are positional and required.
+
+    `iteration` and `loop_report` are the bounded improvement loop's history
+    (story 20.189, #1334; record-formats.md §5) — composed by `run_loop.py`,
+    carried here. Both are OPTIONAL and both are metadata about an artifact
+    that lives in the workspace: the record never carries the artifact itself.
     """
     rec = {"ts": ts or _now(), "block": block, "event": EVENT_CLOSE,
            "status": status,
@@ -226,6 +237,10 @@ def close_record(block, status, route, verdict=None, skipped=None,
         rec["duration_s"] = duration_s
     if verdict is not None:
         rec["verdict"] = verdict
+    if iteration is not None:
+        rec["iteration"] = iteration
+    if loop_report:
+        rec["loop_report"] = loop_report
     return rec
 
 
@@ -443,7 +458,7 @@ def file_sha256(path):
 
 
 def note(outcome=None, detail=None, route=None, skipped=None,
-         draft_sha256=None, map_sha256=None, status=None):
+         draft_sha256=None, map_sha256=None, status=None, iteration=None):
     """The running command fixes what its own close record will say (CAP-2).
 
     The wrapper guarantees a record EXISTS; only the command knows what it
@@ -457,7 +472,7 @@ def note(outcome=None, detail=None, route=None, skipped=None,
     j = _PENDING["judgment"]
     for key, value in (("outcome", outcome), ("detail", detail),
                        ("status", status), ("draft_sha256", draft_sha256),
-                       ("map_sha256", map_sha256)):
+                       ("map_sha256", map_sha256), ("iteration", iteration)):
         if value is not None:
             j[key] = value
     if route is not None:
@@ -491,7 +506,7 @@ def open_block(ws, block, command, inputs=None):
         # duration from the boundary it actually entered at (story 20.187).
         "opened_ts": rec["ts"],
         "judgment": {"outcome": None, "detail": None, "status": None,
-                     "route": [], "skipped": [],
+                     "route": [], "skipped": [], "iteration": None,
                      "draft_sha256": None, "map_sha256": None}})
     return append(ws, rec)
 
@@ -519,7 +534,15 @@ def close_block(exit_code=0):
     rec = close_record(
         block, status, j["route"] or [p["command"]],
         verdict=verdict(outcome, j["draft_sha256"], j["map_sha256"], detail),
-        skipped=skipped, exit_code=exit_code, command=p["command"])
+        skipped=skipped, exit_code=exit_code, command=p["command"],
+        iteration=j.get("iteration"),
+        # The RUN's close carries the loop report (story 20.189 AC-3): every
+        # bounded improvement loop the run ran, how many iterations it took,
+        # what each changed, and whether it converged or churned. DERIVED from
+        # the journal's own iteration records at the last block's close — a
+        # reading of durable records, never a second source of truth.
+        loop_report=(loop_report_for(p["ws"])
+                     if block == RUN_CLOSING_BLOCK else None))
     # The open ts is normally in hand from `open_block`; a close written by a
     # process that did not open the block (a resumed run) falls back to the
     # journal's own last matching open. Neither path differences timestamps at
@@ -529,6 +552,41 @@ def close_block(exit_code=0):
     if dur is not None:
         rec["duration_s"] = dur
     return append(p["ws"], rec)
+
+
+_RUN_LOOP = []
+
+
+def _run_loop():
+    """`run_loop.py`, or None. The loop's history is ITS module (story 20.189);
+    this module carries the fields and asks it for the shape, so neither half
+    restates the other. A missing module degrades to no report.
+
+    Memoised: `validate()` asks per line, and re-execing a module per journal
+    line would make the validator's cost quadratic in the journal.
+    """
+    if not _RUN_LOOP:
+        here = os.path.dirname(os.path.realpath(__file__))
+        if here not in sys.path:
+            sys.path.insert(0, here)
+        try:
+            import run_loop as mod                         # the ordinary path
+        except ImportError:                                # pragma: no cover
+            mod = _load("run_loop.py")
+        _RUN_LOOP.append(mod)
+    return _RUN_LOOP[0]
+
+
+def loop_report_for(ws):
+    """The run's loop report, derived from the journal. `None` on any failure —
+    a run never fails because its history could not be summarised."""
+    mod = _run_loop()
+    if mod is None or not ws:
+        return None
+    try:
+        return mod.loop_report(read_records(ws)) or None
+    except Exception:                                      # pragma: no cover
+        return None
 
 
 def last_open_ts(ws, block):
@@ -760,6 +818,15 @@ def _validate_close(rec):
                        % (exit_code,))
 
     reasons.extend(_validate_verdict(rec, block, status))
+    # The bounded improvement loop's history (story 20.189, record-formats.md
+    # §5). Delegated whole: the loop module owns that shape, and a validator
+    # that restated it would be the second copy the split exists to avoid. A
+    # record carrying neither field validates exactly as it did before — this
+    # adds history, never a precondition.
+    mod = _run_loop()
+    if mod is not None:
+        reasons.extend(mod.validate_iteration(rec))
+        reasons.extend(mod.validate_loop_report(rec))
     return reasons
 
 
@@ -917,6 +984,14 @@ def _with_pairing_reasons(recs, rows):
         elif kind == EVENT_CLOSE:
             rows[idx][2].extend(_unit_accounting(block, rec,
                                                  inside.pop(block, [])))
+            # A loop report is a READING of the stream's own iteration records
+            # (story 20.189 AC-3), so one that disagrees with the stream is a
+            # reconstruction — the same stream-level shape `duration_s` uses.
+            if rec.get("loop_report") is not None:
+                mod = _run_loop()
+                if mod is not None:
+                    rows[idx][2].extend(
+                        mod.report_pairing_reasons(recs, rec))
             if open_seen.get(block) and rec.get("duration_s") is None:
                 rows[idx][2].append(
                     "close record for block %r has a matching open record and "
