@@ -92,7 +92,7 @@ def wellformed():
         verdict=R.verdict("fail", H, detail="cycle 2 failed on section 3"),
         skipped=[R.skip("per-section evidence-type check",
                         "the harness that runs it was unavailable")],
-        exit_code=1, command="quality-gate")
+        exit_code=1, command="quality-gate", duration_s=812.4)
 
 # --- the well-formed record passes -------------------------------------------
 need(R.validate(wellformed()) == [],
@@ -131,6 +131,28 @@ CLASSES = {
 # requirement below is not asked to separate two spellings of one defect.
 need(R.validate(mutate(skipped=DELETE)) != [],
      "`ran-partially` with the `skipped` key absent entirely was ACCEPTED")
+
+# --- `duration_s` is a STREAM-level rule, so it is asserted over a stream ----
+# (story 20.187, #1333). A close paired with an open and carrying no duration
+# is rejected; the same close read WITHOUT its open is not asserted over, and
+# an open with no close stays well-formed.
+_open = R.open_record("quality-gate", "quality-gate", {"draft_sha256": H, "cycle": 2})
+_nodur = {k: v for k, v in wellformed().items() if k != "duration_s"}
+_rows = R.validate_lines([json.dumps(_open), json.dumps(_nodur)])
+need(any(r[2] for r in _rows),
+     "a close record paired with its open and carrying no `duration_s` was ACCEPTED")
+need(any("duration_s" in x for r in _rows for x in r[2]),
+     "the missing-duration rejection does not name `duration_s`")
+_lone = R.validate_lines([json.dumps(_nodur)])
+need(not any(r[2] for r in _lone),
+     "a close record read WITHOUT its open was asserted over — the rule is "
+     "conditional on the pairing")
+_openonly = R.validate_lines([json.dumps(_open)])
+need(not any(r[2] for r in _openonly),
+     "an open record with no close was rejected — it means `entered, did not finish`")
+_badtype = dict(wellformed()); _badtype["duration_s"] = "812s"
+need(any(r[2] for r in R.validate_lines([json.dumps(_open), json.dumps(_badtype)])),
+     "a non-numeric `duration_s` was ACCEPTED")
 
 reasons_seen = {}
 for label, rec in CLASSES.items():
