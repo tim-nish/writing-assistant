@@ -373,14 +373,27 @@ def _producer(ws, rel, block):
 
 
 def downstream_of(ws, block):
-    """What the workspace gained or changed AFTER block N closed.
+    """What the workspace holds that is NOT IN BLOCK N'S UPSTREAM BASIS.
 
-    Computed against block N's own boundary manifest, so N's outputs (which N
-    is about to rewrite) are not in it, and an artifact a later block merely
-    read is not either.
+    The basis is the boundary BEFORE N — the same manifest `upstream_drift()`
+    is stated over — never N's own (#1388). Boundaries are snapshotted at a
+    block's CLOSE (`record_boundary`), so N's own manifest contains N's outputs
+    by construction, and a predicate stated over it preserves precisely the
+    artifacts a re-run of N supersedes. That was the defect: the six artifacts
+    the `quality-gate` re-run left in place were not missed from a list, their
+    survival was guaranteed by the choice of basis. This docstring previously
+    asserted the opposite ("so N's outputs are not in it"), which is false
+    against the shipped snapshot point.
+
+    An artifact a later block merely READ is still not selected, because an
+    unmodified upstream file matches the basis on sha.
     """
-    target = boundary_of(ws, block)
+    target = upstream_boundary(ws, block)
     if target is None:
+        # No preserved upstream — N is the first recorded block, so there is no
+        # basis to compare against and nothing is claimed. `cmd_rerun` reports
+        # the absent upstream in its own right; inventing a basis here would
+        # invalidate the whole workspace on the strength of a missing file.
         return []
     kept = target.get("manifest") or {}
     out = []
@@ -390,11 +403,13 @@ def downstream_of(ws, block):
         producer = _producer(ws, rel, block)
         out.append({"path": rel,
                     "produced_by": producer,
-                    "why": ("built after block %r closed%s — a re-run of %r "
-                            "supersedes the upstream it was built on"
+                    "why": ("not in block %r's upstream basis (the boundary "
+                            "before it)%s — a re-run of %r consumes the "
+                            "preserved upstream and supersedes everything else"
                             % (block,
-                               " by block %r" % producer if producer else
-                               " by a step with no recorded boundary",
+                               ", produced by block %r" % producer if producer
+                               else ", produced by a step with no recorded "
+                                    "boundary",
                                block))})
     return out
 
