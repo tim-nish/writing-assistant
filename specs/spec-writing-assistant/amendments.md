@@ -409,3 +409,66 @@ and no already-relocated text moves — the rule is prospective.
 > meant to run an interpreter *other* than `sys.executable` — a venv they should
 > ignore — which was not tested. Delivery: none for act 3; the interpreter
 > resolution is filed and implemented separately. #1356 closes.
+
+> **Amended 2026-08-03 (triage, #1378) — the FULL tier's work ceiling is
+> compared DISTRIBUTIONALLY, not point-wise: the 2026-07-30 ruling applied one
+> scope up, and binding on the next violator-fix rather than as new
+> enforcement.** The owner ruled on this exact shape at the MEMBER scope on
+> 2026-07-30 — a ceiling compared point-wise against a variance-bearing
+> measurement reports the variance, compliance is declared with headroom, and a
+> raise is never the remedy — with a distributional criterion (p95-with-margin)
+> binding when a violator is FIXED rather than as new enforcement. That
+> disposition is applied here unchanged; what is decided is its scope, not the
+> principle.
+>
+> owner decision record — 2026-07-30 (a ceiling compared point-wise against a
+> variance-bearing measurement reports the variance)
+>
+> **The evidence, and why it is stronger at this scope.** Ten full-tier readings
+> taken 2026-08-03 at one stated concurrency, same machine, over a suite that
+> moved by a handful of lines, span roughly ±10% around their median. The
+> declared ceiling sits inside that band's upper tail, so a reading of OVER
+> carries no information about whether the suite grew. The tier scope matters
+> more than the member scope did: this ceiling is explicitly the GROWTH
+> instrument, and an instrument that fires on noise stops being read. Erosion is
+> slow enough that ten same-day samples are the cheapest evidence this will ever
+> have.
+>
+> **A regression was suspected and cleared by direct measurement, recorded so
+> the reading is not later re-litigated.** The highest of the ten was
+> investigated as a suspected cost from the state-root isolation change
+> (#1366). Measured directly, the same twenty checks with and without the
+> sandbox differ by **+441ms, +0.9%**, extrapolating to a few seconds across the
+> full suite — an order of magnitude below what the breach would have required.
+> The reading was variance.
+>
+> **The rule.** Compliance for the summed-work ceiling is a **distributional**
+> criterion — p95 with margin over retained readings **at the same declared
+> concurrency**, the like-for-like requirement the header already imposes — and
+> it **binds when a violator is fixed**, never as new enforcement on the next
+> run. The value itself is not restated here: `scripts/run-checks.sh` is the
+> single enforcement copy and this repository's standing instruction forbids
+> restating the declared numbers in any spec or check.
+>
+> **The substrate already exists and this builds on it rather than adding
+> storage.** The per-invocation check ledger (#1354, story 20.199,
+> `scripts/run-checks.sh:241-330`) records per-check rows per invocation, so a
+> reading history at a stated concurrency is derivable from what the runner
+> already retains. No second ledger is introduced — which is also what keeps
+> this consistent with the assemble-on-demand stance the counting rules take
+> elsewhere.
+>
+> **What is explicitly NOT decided.** Raising the ceiling. The same ruling names
+> silent cap relaxation as never an exit, and #1378 refuses it in its own text.
+> Re-declaring the constant at a measured p95 while keeping a point-wise
+> comparison was considered and declined: a point-wise comparison against a
+> variance-bearing measurement reports the variance at any threshold, so moving
+> the line changes how often it misfires and never whether it can. The
+> 2026-07-30 ruling named the comparison, not the value.
+>
+> **What would overturn this:** a p95-with-margin criterion proving unable to
+> detect a real regression the point-wise one would have caught — growth that
+> hides inside the band. The band is roughly ±10%, so a sub-10% regression is
+> exactly what this trades away, knowingly. If one is ever missed and
+> attributable, the honest correction is a second instrument sensitive to
+> monotone drift, not a return to point-wise comparison. Delivery: story 20.206.
