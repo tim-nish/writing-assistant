@@ -63,8 +63,10 @@ import importlib.util
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
+import time
 
 PLUGIN = "writing-assistant"
 
@@ -536,6 +538,32 @@ def runs_dir(root):
     return os.path.join(repo_dir(root), "runs")
 
 
+HOST_MARKER = ".host-path"
+GC_KEEP_RECENT = 5          # completed runs kept per host repo
+GC_MIN_AGE_DAYS = 14        # nothing younger is ever a candidate
+GC_NOTICE_AT = 20           # candidates above which `new-run` says so
+
+
+def _write_host_marker(root):
+    """Record the host repo's real path beside its runs, so `gc` can tell a
+    dead host path from a live one EXACTLY rather than by guessing.
+
+    `repo_key` is deliberately lossy — every run of non-alphanumerics becomes
+    one `-` — so `-home-ada-my_repo` and `-home-ada-my-repo` are the same key
+    and reversing it is ambiguous. A gc that reversed the slug would call a
+    live repo dead whenever its path held an underscore or a dot. Marker
+    written at mint; workspaces predating it are cannot-determine, and `gc`
+    treats that as NOT dead (see `_gc_scan`).
+    """
+    try:
+        d = repo_dir(root)
+        os.makedirs(d, exist_ok=True)
+        with open(os.path.join(d, HOST_MARKER), "w", encoding="utf-8") as fh:
+            fh.write(root + "\n")
+    except OSError:
+        pass        # best-effort, exactly like `latest`
+
+
 def _timestamp_run_id():
     """A timestamp-based, per-invocation-unique run id (D3): local time down to
     the microsecond, so two runs never collide on the same id."""
@@ -596,6 +624,8 @@ def new_run(root, run_id=None, terrain=False):
         os.makedirs(ws)  # exist_ok=False: an explicit id must be new
         _update_latest(base, ws)
         _init_ws_git(ws)
+        _write_host_marker(root)
+        _gc_notice()
         return ws
     while True:
         ws = os.path.join(base, _timestamp_run_id())
@@ -603,12 +633,16 @@ def new_run(root, run_id=None, terrain=False):
             os.makedirs(ws)
             _update_latest(base, ws)
             _init_ws_git(ws)
+            _write_host_marker(root)
+            _gc_notice()
             return ws
         except FileExistsError:
             ws = os.path.join(base, _timestamp_run_id() + "-" + os.urandom(3).hex())
             os.makedirs(ws, exist_ok=False)
             _update_latest(base, ws)
             _init_ws_git(ws)
+            _write_host_marker(root)
+            _gc_notice()
             return ws
 
 
@@ -646,6 +680,142 @@ def _init_ws_git(ws):
                          "writes will not be recorded (%s)\n" % e)
 
 
+def _gc_notice():
+    """One line at mint when the root holds more than GC_NOTICE_AT candidates.
+
+    Accretion surfaces where someone is already standing. Best-effort and
+    silent on any error: a housekeeping notice must never fail a mint.
+    """
+    try:
+        scan = _gc_scan(state_root())
+        n = len(scan["runs"]) + len(scan["repos"]) + len(scan["stray"])
+        if n > GC_NOTICE_AT:
+            sys.stderr.write(
+                "resolve-paths: %d stale workspace(s) in the state root — "
+                "`resolve-paths.py gc --dry-run` lists them\n" % n)
+    except Exception:                                      # pragma: no cover
+        pass
+
+
+def _run_state(ws):
+    """(`complete`|`incomplete`|`unknown`, mtime) for one run workspace.
+
+    `unknown` is NOT folded into `incomplete`: a workspace whose checkpoint is
+    unreadable is a workspace nobody can say is finished, and the keep rule
+    treats it exactly as it treats an unfinished one — kept. Three-valued
+    because guessing here deletes resumable work.
+    """
+    cp = os.path.join(ws, "checkpoint.json")
+    try:
+        mtime = os.stat(ws).st_mtime
+    except OSError:
+        return "unknown", 0.0
+    try:
+        with open(cp, encoding="utf-8") as fh:
+            data = json.load(fh)
+    except (OSError, ValueError):
+        return "unknown", mtime
+    stage = str(data.get("next_stage") or data.get("stage") or "").strip()
+    done = bool(data.get("reviewed")) or stage in ("complete", "done")
+    return ("complete" if done else "incomplete"), mtime
+
+
+def _gc_scan(root_dir, now=None, keep_recent=GC_KEEP_RECENT,
+             min_age_days=GC_MIN_AGE_DAYS):
+    """Deletion candidates under a state root, each with the reason it
+    qualified. Pure: reads, never writes, never deletes.
+
+    THE RULE IS STATED AS KEEP-CONDITIONS (docs/storage-architecture.md D2a).
+    A run is KEPT when any holds — checkpoint not `complete`; among the
+    `keep_recent` most recent completed runs for its host repo; younger than
+    `min_age_days`. Everything else is a candidate. Written this way so
+    "delete something still needed" is unproducible rather than merely
+    unlikely: the first clause is what protects `resume`, and it protects it
+    by a property of the workspace rather than by anyone remembering to list
+    it.
+    """
+    now = now if now is not None else time.time()
+    cutoff = now - min_age_days * 86400
+    out = {"repos": [], "runs": [], "stray": [], "unknown": []}
+    try:
+        entries = sorted(os.listdir(root_dir))
+    except OSError:
+        return out
+    for key in entries:
+        rd = os.path.join(root_dir, key)
+        if not os.path.isdir(rd):
+            continue
+        runs_d = os.path.join(rd, "runs")
+        if not os.path.isdir(runs_d):
+            # A directory with no runs/ is not thereby disposable — that
+            # predicate would reach any legitimate sibling the state root
+            # grows later, which is the over-broad shape this rule must not
+            # have. Narrowed to EMPTY: a directory holding no file anywhere
+            # under it cannot be something anyone is using, so the rule
+            # cannot delete work. A non-empty non-runs directory is reported
+            # REPORT-ONLY and never deleted — an unknown is disclosed, not
+            # swept.
+            has_files = any(files for _r, _d, files in os.walk(rd))
+            if has_files:
+                out["unknown"].append(
+                    {"path": rd, "why": "no runs/ directory and not empty — "
+                     "reported, never deleted: the rule has nothing to say "
+                     "about it and guessing would delete work"})
+            else:
+                out["stray"].append({"path": rd, "why": "empty directory with "
+                                     "no runs/ — holds no file anywhere"})
+            continue
+        # Deadness is read BEFORE the run loop, because it changes which
+        # keep-clauses apply (D2a, amended 2026-08-04 in story 20.215): the
+        # keep-recent clause preserves "recent work you might want", and a
+        # host path that no longer exists leaves nobody to want it. The
+        # not-`complete` clause is NOT disabled — a resumable run of a moved
+        # repo is exactly what you would want back — and neither is the age
+        # floor.
+        marker = os.path.join(rd, HOST_MARKER)
+        try:
+            with open(marker, encoding="utf-8") as fh:
+                host = fh.read().strip() or None
+        except OSError:
+            host = None
+        host_dead = bool(host) and not os.path.isdir(host)
+        rows = []
+        for rid in sorted(os.listdir(runs_d)):
+            ws = os.path.join(runs_d, rid)
+            if rid == "latest" or os.path.islink(ws) or not os.path.isdir(ws):
+                continue
+            state, mtime = _run_state(ws)
+            rows.append({"path": ws, "id": rid, "state": state, "mtime": mtime})
+        completed = sorted([r for r in rows if r["state"] == "complete"],
+                           key=lambda r: r["mtime"], reverse=True)
+        recent = set() if host_dead else {r["path"] for r in completed[:keep_recent]}
+        cands = []
+        for r in rows:
+            if r["state"] != "complete":
+                continue                       # kept: resumable or unknown
+            if r["path"] in recent:
+                continue                       # kept: among the N most recent
+            if r["mtime"] > cutoff:
+                continue                       # kept: younger than the age
+            cands.append(dict(r, why=(
+                ("completed, older than %d days, and its host path no longer "
+                 "exists (keep-recent does not apply to a dead host)"
+                 % min_age_days) if host_dead else
+                ("completed, not among the %d most recent, older than %d days"
+                 % (keep_recent, min_age_days)))))
+        out["runs"].extend(cands)
+        # The host-repo directory itself. DEADNESS IS THREE-VALUED: decidable
+        # only from the marker, because repo_key is lossy and reversing it
+        # would call a live repo dead whenever its path held an underscore or
+        # a dot. No marker => cannot-determine => NOT a candidate.
+        if host_dead and rows and len(cands) == len(rows):
+            out["repos"].append({"path": rd, "host": host,
+                                 "why": "host path %s no longer exists and "
+                                        "every run under it is a candidate"
+                                        % host})
+    return out
+
+
 def run_workspace(root, run_id):
     return os.path.join(runs_dir(root), run_id)
 
@@ -653,6 +823,50 @@ def run_workspace(root, run_id):
 # --------------------------------------------------------------------------
 # CLI
 # --------------------------------------------------------------------------
+def cmd_gc(args):
+    """Propose stale run workspaces for deletion; delete only on confirmation.
+
+    PROPOSE-THEN-DELETE, never a background purge (D2a). An automatic sweep
+    would be an undo privilege granted without the matching observation: the
+    state root is machine state, but deleting it is an owner act.
+    """
+    root_dir = state_root()
+    scan = _gc_scan(root_dir, keep_recent=args.keep, min_age_days=args.min_age)
+    items = ([dict(r, kind="run") for r in scan["runs"]]
+             + [dict(r, kind="repo") for r in scan["repos"]]
+             + [dict(r, kind="stray") for r in scan["stray"]])
+    for u in scan["unknown"]:
+        print("report-only   %s\n              %s" % (u["path"], u["why"]))
+    if not items:
+        print(json.dumps({"stage": "gc", "root": root_dir, "candidates": 0,
+                          "kept_rule": {"keep_recent": args.keep,
+                                        "min_age_days": args.min_age},
+                          "deleted": 0}, indent=2))
+        return 0
+    for it in items:
+        print("candidate  %-6s %s\n           reason: %s"
+              % (it["kind"], it["path"], it["why"]))
+    print("\n%d candidate(s). Kept: any run not `complete`, the %d most recent "
+          "completed per host repo, anything younger than %d days."
+          % (len(items), args.keep, args.min_age))
+    if args.dry_run:
+        print("--dry-run: nothing deleted.")
+        return 0
+    if not args.yes:
+        print("Nothing deleted. Re-run with --yes to delete the candidates "
+              "above, or --dry-run to keep listing them.")
+        return 0
+    deleted = []
+    for it in items:
+        try:
+            shutil.rmtree(it["path"])
+            deleted.append(it["path"])
+        except OSError as e:
+            sys.stderr.write("gc: could not remove %s: %s\n" % (it["path"], e))
+    print("deleted %d of %d candidate(s)." % (len(deleted), len(items)))
+    return 0
+
+
 def cmd_state_root(args):
     print(state_root())
     return 0
@@ -882,6 +1096,20 @@ def main(argv=None):
     )
     sub = p.add_subparsers(dest="cmd", required=True)
 
+    sp = sub.add_parser("gc", help="propose stale run workspaces for deletion "
+                                   "(never deletes without --yes)")
+    sp.add_argument("--dry-run", action="store_true",
+                    help="list candidates and stop; the default already "
+                         "deletes nothing without --yes")
+    sp.add_argument("--yes", action="store_true",
+                    help="delete the listed candidates")
+    sp.add_argument("--keep", type=int, default=GC_KEEP_RECENT,
+                    metavar="N", help="completed runs kept per host repo "
+                                      "(default %d)" % GC_KEEP_RECENT)
+    sp.add_argument("--min-age", type=int, default=GC_MIN_AGE_DAYS,
+                    metavar="DAYS", help="nothing younger is ever a candidate "
+                                         "(default %d)" % GC_MIN_AGE_DAYS)
+
     sub.add_parser("state-root", help="print the state root")
     sub.add_parser("config-home", help="print the machine-global config dir")
 
@@ -959,6 +1187,7 @@ def main(argv=None):
 
     args = p.parse_args(argv)
     return {
+        "gc": cmd_gc,
         "state-root": cmd_state_root,
         "config-home": cmd_config_home,
         "repo-key": cmd_repo_key,
