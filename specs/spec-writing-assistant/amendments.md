@@ -272,3 +272,38 @@ and no already-relocated text moves — the rule is prospective.
 > `INNER_TOTAL_MS` stays green — which would show the aggregate is not catching
 > it and the per-check ceiling has a job again. Delivery: stories 20.197, 20.198
 > (unchanged) and 20.199 (unchanged).
+
+> **Amended 2026-08-03 (implementation, #1356/#1363) — the retired-subject
+> orphan sweep RAN and returned EMPTY; what it leaves behind is the
+> DISCRIMINATOR, because the sweep's premise was true of its method and false of
+> its population.** #1356 act 2 asserted that "checkers guarding retired subjects
+> are pure waste detectable *without any runtime data*" and named the retired
+> mechanisms to sweep for. Executed 2026-08-03 over all 174 checks: **zero
+> orphans.** The three named subjects each failed for a different reason, and the
+> reasons are the finding. **`check-harvest.sh` is already absent** — it was
+> deleted with its subject, so the retirement had already discharged its own
+> checker. **The Framework family is live**: `skills/draft-article/frameworks/`
+> still holds F1 through F5, because what retired was the *vocabulary* — F1–F5
+> became intent labels and remain the internal alias — not the files. **The fact
+> sheet was renamed, not removed**: the 2026-08-02 amendment's "no fact sheet
+> exists anywhere in the pipeline" is true of the artifact and false of the
+> symbol, `--fact-sheet` survives as the flag name pointing at
+> `examination-pins.txt`, `examine.md` says so at the flag itself, and
+> `validate-fact-sheet.py` is reachable from `draft-pipeline.py`. **The
+> discriminator is the durable half and is recorded so the next sweep does not
+> re-derive it: a check's subject is what its `# covers:` globs resolve to, never
+> what its text mentions.** The mention-based reading the issue implies flags ~41
+> checks for "harvest" alone, and almost every one of them names harvest *while
+> asserting it is gone* — a live subject, and the most valuable kind. The
+> covers-glob discriminator is one loop, costs milliseconds, and returned a clean
+> answer; it is available to any future sweep. **Its stated limit, so a later
+> reader does not over-trust it:** it catches a check whose *file* subject
+> vanished, not one whose mechanism exists but is unreachable, which is exactly
+> the class the fact-sheet case nearly produced. That harder question is not left
+> unowned — it is #1355 rule 4's retention review, whose instrument is a check
+> that never fires across *exercised* runs, and which reads the ledger delivered
+> by story 20.199. **Consequence for delivery: story 20.198 produced its mapping
+> and no diff.** A story whose deliverable is a negative result cannot reach the
+> merged-PR definition of done that the story lane and cleanup both use, so it is
+> recorded here and closed rather than carried. Act 2 is discharged, not
+> deferred. Delivery: none; story 20.198 withdrawn, #1363 closed on this record.
