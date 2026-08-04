@@ -1,5 +1,12 @@
 # writing-assistant
 
+> **Archived 2026-08-04 — superseded by [Kogaki](https://github.com/tim-nish/kogaki) (小書).**
+> The successor inverts this repository's founding premise: repositories are
+> invisible to the article writer; material is quoted from a served policy
+> substrate at pins (Kogaki `specs/SPEC.md`). This repository stays read-only
+> as the record — its address is never recycled, and hub decision lines keep
+> resolving here.
+
 A Claude Code plugin that turns a repository's own specs, docs, and git history
 into publishable articles: a **probe** checks whether the repository can ground
 the brief at all, a **draft** pipeline fills a chosen framework and **examines**
